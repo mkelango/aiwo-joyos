@@ -1,0 +1,20 @@
+{
+  "name": "Joy OS · AIWO",
+  "short_name": "Joy OS",
+  "description": "The operating system for a joyful life. Joy, measured. Years worth living.",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FDFBF8",
+  "theme_color": "#FDFBF8",
+  "categories": ["health", "lifestyle"],
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Joy Ledger", "url": "/app/ledger" },
+    { "name": "Today", "url": "/app" }
+  ]
+}

@@ -1,0 +1,97 @@
+import type { Term, TermKey, SpaceSlug } from '@/domain/types'
+
+// The six terms of the Joyspan equation (Memo p.10, p.19).
+export const TERMS: Term[] = [
+  {
+    key: 'H',
+    name: 'Healthspan',
+    space: 'Body',
+    slug: 'body',
+    framework: 'WHO intrinsic capacity · AHA Life’s Essential 8 · LONGEVIS engine',
+    formula: 'H = 0.5·LE8 + 0.3·Capacity + 0.2·Self-rated',
+    instruments: ['LE8 self-report', 'Capacity battery', 'Self-rated health', 'AIWO panels (clinical)'],
+    leadCations: ['Healthcation', 'Slimcation', 'Fitcation'],
+    practiceWeek: '5 · Continuous Correction',
+    viva: ['explain_biomarker', 'le8_coach'],
+    whatMoves: 'LE8, capacity, signals trend, panel delta',
+  },
+  {
+    key: 'P',
+    name: 'Purpose',
+    space: 'Purpose',
+    slug: 'purpose',
+    framework: 'Ikigai in its original sense · Frankl · Seven Practices',
+    formula: 'P = 0.6·Ikigai-9 + 0.4·MLQ-P',
+    instruments: ['Ikigai-9', 'MLQ-Presence'],
+    leadCations: ['Mindcation'],
+    practiceWeek: '2 · The Tomorrow Question · 7 · Stay Curious',
+    viva: ['ikigai_coach', 'tomorrow_question'],
+    whatMoves: 'Ikigai-9, MLQ-Presence',
+  },
+  {
+    key: 'R',
+    name: 'Relationships',
+    space: 'People',
+    slug: 'people',
+    framework: 'Social Fitness (structure, function, quality) · Gottman for couples · Dunbar circles',
+    formula: 'R = 0.4·(100−UCLA-3) + 0.3·LSNS-6 + 0.3·Support',
+    instruments: ['UCLA-3', 'LSNS-6', 'Support items', 'CSI-4 (couples)'],
+    leadCations: ['Lovecation'],
+    practiceWeek: '3 · Release the Ledger',
+    viva: ['couples_prompt', 'repair_conversation'],
+    whatMoves: 'UCLA-3, LSNS-6, support, CSI-4 per partner',
+  },
+  {
+    key: 'F',
+    name: 'Freedom',
+    space: 'Freedom',
+    slug: 'freedom',
+    framework: 'Freedom Triad (Time, Money, Choice) on Self-Determination Theory and Sen',
+    formula: 'F = 0.4·Autonomy + 0.3·Time + 0.3·Financial WB',
+    instruments: ['BPNSFS autonomy', 'Time affluence', 'CFPB Financial Well-Being'],
+    leadCations: ['Wealthcation'],
+    practiceWeek: '7 · Own Your Emotional Life',
+    viva: ['time_audit_summary', 'no_list_coach'],
+    whatMoves: 'Autonomy, time affluence, CFPB financial wellbeing',
+  },
+  {
+    key: 'D',
+    name: 'Daily Pleasure',
+    space: 'Pleasure',
+    slug: 'pleasure',
+    framework: 'Experienced wellbeing (Kahneman) · savouring (Bryant) · SPANE',
+    formula: 'D = 0.5·SPANE-B + 0.3·Joy moments + 0.2·Savouring',
+    instruments: ['SPANE', 'Joy Ledger density', 'Savouring scale'],
+    leadCations: ['Beautycation', 'Savourcation'],
+    practiceWeek: '4 · Don’t Postpone Joy',
+    viva: ['savour_prompt', 'ledger_weekly_story'],
+    whatMoves: 'SPANE balance, joy moments per day, savouring',
+  },
+  {
+    key: 'B',
+    name: 'Preventable Suffering',
+    space: 'Ease',
+    slug: 'ease',
+    framework: 'The Second Arrow, via acceptance and commitment therapy · PHQ-4, ISI, PSS-4',
+    formula: 'B = 0.30·Mood + 0.25·Sleep + 0.20·Stress + 0.15·Pain + 0.10·Avoidance',
+    instruments: ['PHQ-4', 'ISI', 'PSS-4', 'Pain', 'Avoidance'],
+    leadCations: ['Sleepcation'],
+    practiceWeek: '6 · The Two Questions',
+    viva: ['second_arrow_reflection (journal text only)'],
+    whatMoves: 'Burden falling: mood, sleep, stress, pain, avoidance',
+    inverse: true,
+  },
+]
+
+export const termByKey = (k: TermKey) => TERMS.find((t) => t.key === k)!
+export const termBySlug = (s: SpaceSlug) => TERMS.find((t) => t.slug === s)!
+
+/** CSS variable for each term's Spectrum colour (defined in styles/tokens.css). */
+export const termColor: Record<TermKey, string> = {
+  H: 'var(--term-h)',
+  P: 'var(--term-p)',
+  R: 'var(--term-r)',
+  F: 'var(--term-f)',
+  D: 'var(--term-d)',
+  B: 'var(--term-b)',
+}

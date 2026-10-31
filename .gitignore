@@ -1,0 +1,16 @@
+# Source documents and research stay local (this repo is public).
+*.pdf
+research/
+deploy/
+.claude/
+joy-os-web/BUILD-BRIEF.md
+joy-os-mobile/MOBILE-BRIEF.md
+
+node_modules/
+dist/
+.expo/
+.vercel
+.DS_Store
+.vscode/
+*.log
+.env*

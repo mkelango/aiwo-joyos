@@ -1,0 +1,66 @@
+@import './styles/tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-paper font-sans text-ink;
+    font-size: 17px; /* Joy OS body minimum */
+    line-height: 1.53;
+    font-optical-sizing: auto;
+  }
+  :lang(hi) body, [lang='hi'] { font-family: 'Mukta', var(--font-sans); }
+  :lang(ta) body, [lang='ta'] { font-family: 'Mukta Malar', var(--font-sans); }
+  ::selection { background: var(--daybreak-soft); color: var(--ink); }
+  :focus-visible { outline: 2px solid var(--daybreak); outline-offset: 2px; border-radius: 6px; }
+  h1, h2, h3 { font-weight: 300; letter-spacing: -0.01em; }
+  em, .em { font-family: var(--font-serif); font-style: italic; font-weight: 300; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+}
+
+@layer components {
+  /* Mono caps label, +140 tracking (Playbook p41) */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    line-height: 1.5;
+  }
+  /* House names: caps, +240 */
+  .house {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+  }
+  /* Daybreak — one per screen. Label ≥18.66px bold for AA-large contrast on #E0482A. */
+  .btn-daybreak {
+    @apply inline-flex h-14 items-center justify-center gap-2 rounded-full px-7 transition-[transform,filter] duration-200;
+    background: var(--daybreak);
+    color: var(--daybreak-label);
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: 0.005em;
+  }
+  .btn-daybreak:hover { filter: brightness(0.96); }
+  .btn-daybreak:active { transform: scale(0.985); }
+  .btn-daybreak:disabled { opacity: 0.5; }
+  .focus-ring:focus-visible { outline: 2px solid var(--daybreak); outline-offset: 2px; }
+  .hatch-b {
+    background: repeating-linear-gradient(45deg, var(--term-b) 0 2px, var(--term-b-soft) 2px 4.5px);
+  }
+  .page { @apply mx-auto w-full max-w-page px-5 md:px-10 lg:px-16; }
+  .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .link { color: var(--daybreak-ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, var(--daybreak-ink) 35%, transparent); }
+  .link:hover { text-decoration-color: currentColor; }
+  .rule { border-top: 1px solid var(--line); }
+}

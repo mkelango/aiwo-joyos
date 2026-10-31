@@ -1,0 +1,1047 @@
+import clsx from 'clsx'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Bell, Check, Database, FileText, Globe2, KeyRound, Link2, Plus, Power, RefreshCw, ShieldCheck, Stethoscope, Timer, Undo2 } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Bar, BarChart, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { DaybreakButton, Eyebrow, SpecimenTag, TermChip } from '@/components/joy/primitives'
+import { Button, Card, PageHeader, Pill, Sheet, Tabs, Toggle } from '@/components/ui'
+import { AI_TOOLS, AUDIT, CELLS, COSTS, HUMAN_REVIEW, JIT_REQUESTS, RED_TEAM, RELEASE_FLAGS, RIGHTS_JOBS, RIGHTS_STORES, SIGNAL_SOURCES, SLOS, TENANTS } from './_data'
+import { AccessNote, CardHead, ChartLead, Field, Kpi, Legend, Meter, ScrollTabs, StatusTag, Swatch, areaCls, fieldCls, pct, tick, tipLabel, tipStyle, useTabParam } from './_parts'
+
+// CONTROL PLANE (Architecture p.20, p.24–27; Memo p.15): flags and kill switches on every AI tool,
+// the evaluation plane, SLOs and error budgets, cost per member per service, tenants and region cells,
+// audit with just-in-time access, signals ingest and rights-request jobs.
+
+const TABS = ['flags', 'evals', 'slos', 'cost', 'cells', 'audit', 'signals', 'rights'] as const
+type Tab = (typeof TABS)[number]
+const EVAL_BAR = 0.9
+const COST_TARGET = 60
+const ME = 'Neha Iyer · DPO'
+const ME_NAME = ME.split(' · ')[0]
+const TENANT_SCOPES = TENANTS.filter((t) => t.members > 0)
+const scopeLabel = (s: string) => (s === 'all' ? 'all tenants' : TENANTS.find((t) => t.id === s)?.name ?? s)
+const BASE_CALLS = AI_TOOLS.filter((t) => t.on).reduce((a, t) => a + t.calls, 0)
+const LANG_NAME: Record<string, string> = { EN: 'English', TA: 'Tamil', HI: 'Hindi' }
+const SIGNAL_FLAG: Record<string, string> = { healthkit: 'healthkit_background', health_connect: 'health_connect_v2', terra: 'oura_via_terra' }
+
+type JitStatus = 'pending' | 'active' | 'expired' | 'denied' | 'withdrawn'
+type Jit = { id: string; who: string; role: string; scope: string; duration: string; reason: string; status: JitStatus; approver: string; expires: string }
+type Change = { at: string; what: string; reason: string }
+type ToolState = { on: boolean; killedFor: string[]; signoff: 'none' | 'requested' | 'signed' }
+type Pending = { kind: 'tool' | 'flag' | 'signoff'; key: string; to: boolean; nonce: number }
+type Job = { id: string; kind: 'export' | 'erase' | 'withdraw'; opened: string; elapsedH: number; stores: number; done: number; status: 'running' | 'delivered'; note: string; escalated: boolean; retrying: boolean; notices: { at: string; text: string }[] }
+type RunState = 'idle' | 'running' | 'done'
+
+const SLA = { export: 72, erase: 24, withdraw: 24 } as const
+const KIND_LABEL = { export: 'Export', erase: 'Erase', withdraw: 'Withdraw consent' } as const
+
+function belowFloor(t: (typeof AI_TOOLS)[number]) {
+  return (Object.entries(t.langs) as [string, number][]).filter(([, v]) => v > 0 && v < EVAL_BAR).map(([l]) => l)
+}
+
+function initialNotices(r: (typeof RIGHTS_JOBS)[number]): Job['notices'] {
+  const base = [{ at: r.opened, text: `Request received. We will finish within ${SLA[r.kind]} hours and tell you when it is done.` }]
+  if (r.status === 'delivered') base.push({ at: r.kind === 'export' ? '28 Jan 21:05' : '27 Jan 13:24', text: r.kind === 'export' ? 'Your export is ready: a signed link, valid for 72 hours.' : r.kind === 'erase' ? 'Your data has been erased. Records the law requires us to keep are listed, with the reason.' : 'Your consent is withdrawn everywhere, including caches.' })
+  return base
+}
+
+export default function Ops() {
+  const [tab, setTab] = useTabParam(TABS, 'flags')
+  const [jit, setJit] = useState<Jit[]>(() => JIT_REQUESTS.map((j) => ({ ...j })))
+  const jitRef = useRef(jit)
+  jitRef.current = jit
+  const [jitOpen, setJitOpen] = useState(false)
+  const [changes, setChanges] = useState<Change[]>([])
+  const [tools, setTools] = useState<Record<string, ToolState>>(() => Object.fromEntries(AI_TOOLS.map((t) => [t.key, { on: t.on, killedFor: [], signoff: 'none' as const }])))
+  const [flags, setFlags] = useState<Record<string, boolean>>(() => Object.fromEntries(RELEASE_FLAGS.map((f) => [f.key, f.on])))
+  const [jobs, setJobs] = useState<Job[]>(() => RIGHTS_JOBS.map((r) => ({ ...r, escalated: false, retrying: false, notices: initialNotices(r) })))
+  const [evalRun, setEvalRun] = useState<{ state: RunState; at?: string }>({ state: 'idle' })
+  const [replay, setReplay] = useState<Record<string, RunState>>({})
+  const [pending, setPending] = useState<Pending | null>(null)
+  const nonce = useRef(0)
+  const clock = useRef(10)
+  const stamp = () => `21:${String(Math.min(59, clock.current++)).padStart(2, '0')}`
+  const log = (what: string, reason: string) => {
+    const at = stamp()
+    setChanges((c) => [{ at, what, reason }, ...c])
+    return at
+  }
+  const ask = (kind: Pending['kind'], key: string, to: boolean) => setPending({ kind, key, to, nonce: ++nonce.current })
+
+  // Derived from live state, so every tab and the header agree.
+  const liveTools = AI_TOOLS.filter((t) => tools[t.key].on)
+  const toolsOn = liveTools.length
+  const held = AI_TOOLS.filter((t) => t.hold && !tools[t.key].on && tools[t.key].signoff !== 'signed')
+  const killed = AI_TOOLS.filter((t) => !t.hold && !tools[t.key].on).length
+  const partial = AI_TOOLS.filter((t) => tools[t.key].on && tools[t.key].killedFor.length > 0).length
+  const liveCalls = liveTools.reduce((a, t) => a + t.calls, 0)
+  const costs = COSTS.map((c) => (c.service.startsWith('VIVA') ? { ...c, now: Math.round((c.now * liveCalls) / BASE_CALLS) } : c))
+  const totalCost = costs.reduce((a, c) => a + c.now, 0)
+  const sloOk = SLOS.filter((s) => s.budgetLeft > 0).length
+  const openRights = jobs.filter((r) => r.status === 'running').length
+
+  const applyChange = (p: Pending, scope: string, reason: string) => {
+    if (p.kind === 'flag') {
+      const f = RELEASE_FLAGS.find((x) => x.key === p.key)!
+      setFlags((fs) => ({ ...fs, [p.key]: p.to }))
+      log(`${p.key} ${p.to ? 'on' : 'off'} · ${f.scope}`, reason)
+    } else if (p.kind === 'signoff') {
+      setTools((ts) => ({ ...ts, [p.key]: { ...ts[p.key], signoff: 'requested' } }))
+      log(`${p.key} · physician sign-off requested`, reason)
+      // The physician reads the eval pack and signs it; the tool may then be switched on here.
+      const signer = AI_TOOLS.find((x) => x.key === p.key)?.hold ?? 'The physician'
+      window.setTimeout(() => {
+        setTools((ts) => (ts[p.key].signoff === 'requested' ? { ...ts, [p.key]: { ...ts[p.key], signoff: 'signed' } } : ts))
+        log(`${p.key} · eval pack signed by ${signer}`, 'English cleared; Tamil and Hindi answers stay with physician review until a re-run passes the floor')
+      }, 6000)
+    } else {
+      setTools((ts) => {
+        const cur = ts[p.key]
+        let next: ToolState
+        if (scope === 'all') next = { ...cur, on: p.to, killedFor: [] }
+        else next = p.to ? { ...cur, killedFor: cur.killedFor.filter((x) => x !== scope) } : { ...cur, killedFor: [...cur.killedFor, scope] }
+        return { ...ts, [p.key]: next }
+      })
+      log(`${p.key} ${p.to ? 'switched on' : 'killed'} · ${scopeLabel(scope)}`, reason)
+    }
+    setPending(null)
+  }
+
+  const submitJit = (r: Jit) => {
+    setJit((j) => [r, ...j])
+    log(`${r.id} requested · ${r.scope} · ${r.duration}`, r.reason)
+    // A second person on call picks it up; the requester can never approve their own.
+    window.setTimeout(() => {
+      if (jitRef.current.find((j) => j.id === r.id)?.status !== 'pending') return
+      setJit((js) => js.map((j) => (j.id === r.id ? { ...j, status: 'active', approver: 'Kiran Desai · SRE on call', expires: `in ${j.duration}` } : j)))
+      log(`${r.id} approved by Kiran Desai · SRE on call`, 'Second approver')
+    }, 6000)
+  }
+  const decide = (id: string, approve: boolean) => {
+    setJit((js) => js.map((j) => (j.id === id ? { ...j, status: approve ? 'active' : 'denied', approver: ME, expires: approve ? 'in ' + j.duration : '—' } : j)))
+    log(`${id} ${approve ? 'approved' : 'declined'}`, 'Just-in-time access decision')
+  }
+  const revoke = (id: string) => {
+    const at = log(`${id} revoked`, 'Access no longer needed; revoked before expiry')
+    setJit((js) => js.map((j) => (j.id === id ? { ...j, status: 'expired', approver: ME, expires: `revoked ${at}` } : j)))
+  }
+  const withdraw = (id: string) => {
+    setJit((js) => js.map((j) => (j.id === id ? { ...j, status: 'withdrawn', expires: '—' } : j)))
+    log(`${id} withdrawn by the requester`, 'Request no longer needed')
+  }
+
+  const runEvals = () => {
+    setEvalRun({ state: 'running' })
+    window.setTimeout(() => {
+      const at = log('Offline evals re-run · all live tools · EN, TA, HI', 'Manual re-run from the evaluation plane')
+      setEvalRun({ state: 'done', at })
+    }, 1400)
+  }
+  const runReplay = (key: string, name: string) => {
+    setReplay((r) => ({ ...r, [key]: 'running' }))
+    window.setTimeout(() => {
+      setReplay((r) => ({ ...r, [key]: 'done' }))
+      log(`${name} · replay of the last 12 h queued and drained`, 'Backfill deferred batches')
+    }, 1500)
+  }
+
+  return (
+    <div>
+      <PageHeader
+        eyebrow="Control plane · engineering, SRE and the DPO"
+        title={<>Know before the member <em>notices</em></>}
+        lead="Every AI tool can be switched off by tool and tenant. Every journey has an SLO and an error budget; a spent budget freezes that team’s releases. Production access is just-in-time, approved by a second person, and every action is written to a hash-chained audit trail."
+        actions={
+          <div className="flex flex-wrap items-center gap-3">
+            <SpecimenTag />
+            <DaybreakButton onClick={() => setJitOpen(true)}>Request JIT access</DaybreakButton>
+          </div>
+        }
+      />
+
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Kpi
+          label="AI tools live"
+          value={`${toolsOn}/${AI_TOOLS.length}`}
+          sub={[held.length ? `${held.length} held behind physician sign-off` : 'None held', killed ? `${killed} killed this session` : null, partial ? `${partial} off for some tenants` : null].filter(Boolean).join(' · ')}
+        />
+        <Kpi label="Journeys within budget" value={`${sloOk}/${SLOS.length}`} sub="Ledger budget spent · Ledger releases frozen" />
+        <Kpi label="Infra + AI per member-year" value={`₹${totalCost}`} sub={<>Mountain target ≤₹{COST_TARGET} · Milk ceiling ≤₹200 met</>} foot={<Meter value={totalCost} max={100} target={COST_TARGET} label={`₹${totalCost} against the ₹${COST_TARGET} target`} />} />
+        <Kpi label="Rights requests running" value={openRights} sub="All inside SLA · export ≤72 h · erase ≤24 h" />
+      </div>
+
+      <ScrollTabs<Tab>
+        label="Control plane sections"
+        value={tab}
+        onChange={setTab}
+        className="mb-6"
+        items={[
+          { value: 'flags', label: 'Flags & kill switches' },
+          { value: 'evals', label: 'Evaluation plane' },
+          { value: 'slos', label: 'SLOs & budgets' },
+          { value: 'cost', label: 'Cost' },
+          { value: 'cells', label: 'Tenants & cells' },
+          { value: 'audit', label: 'Audit & JIT', count: jit.filter((j) => j.status === 'pending').length },
+          { value: 'signals', label: 'Signals ingest' },
+          { value: 'rights', label: 'Rights requests', count: openRights },
+        ]}
+      />
+
+      <AnimatePresence mode="wait">
+        <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+          {tab === 'flags' && <Flags tools={tools} flags={flags} changes={changes} ask={ask} />}
+          {tab === 'evals' && <Evals tools={tools} run={evalRun} onRun={runEvals} />}
+          {tab === 'slos' && <Slos />}
+          {tab === 'cost' && <Cost total={totalCost} costs={costs} offTools={killed} />}
+          {tab === 'cells' && <Cells tools={tools} />}
+          {tab === 'audit' && <Audit jit={jit} changes={changes} onDecide={decide} onRevoke={revoke} onWithdraw={withdraw} />}
+          {tab === 'signals' && <Signals flags={flags} replay={replay} onReplay={runReplay} />}
+          {tab === 'rights' && <Rights jobs={jobs} setJobs={setJobs} log={log} stamp={stamp} />}
+        </motion.div>
+      </AnimatePresence>
+
+      <Sheet open={!!pending} onClose={() => setPending(null)} title={pending ? sheetTitle(pending) : ''} side="center">
+        {pending && <ChangeForm key={pending.nonce} p={pending} tool={tools[pending.key]} onApply={applyChange} onCancel={() => setPending(null)} />}
+      </Sheet>
+      <JitSheet open={jitOpen} onClose={() => setJitOpen(false)} onSubmit={submitJit} nextId={`JIT-0${391 + jit.length - JIT_REQUESTS.length}`} />
+    </div>
+  )
+}
+
+function sheetTitle(p: Pending) {
+  if (p.kind === 'signoff') return `Request physician sign-off · ${p.key}`
+  if (p.kind === 'flag') return `Turn ${RELEASE_FLAGS.find((f) => f.key === p.key)?.label ?? p.key} ${p.to ? 'on' : 'off'}`
+  return `${p.to ? 'Switch on' : 'Kill'} ${p.key}`
+}
+
+function ChangeForm({ p, tool, onApply, onCancel }: { p: Pending; tool?: ToolState; onApply: (p: Pending, scope: string, reason: string) => void; onCancel: () => void }) {
+  const [reason, setReason] = useState('')
+  const [scope, setScope] = useState('all')
+  const [err, setErr] = useState<string | null>(null)
+  const t = AI_TOOLS.find((x) => x.key === p.key)
+  const f = RELEASE_FLAGS.find((x) => x.key === p.key)
+
+  const scopes: string[] =
+    p.kind !== 'tool' || !tool ? [] : p.to ? (tool.on ? ['all', ...tool.killedFor] : ['all']) : ['all', ...TENANT_SCOPES.map((x) => x.id).filter((id) => !tool.killedFor.includes(id))]
+
+  const body =
+    p.kind === 'signoff' && t
+      ? <>This tool explains a lab value, so a physician signs its eval pack before it can go live: English <span className="num">{pct(t.langs.EN)}</span>, Tamil <span className="num">{pct(t.langs.TA)}</span>, Hindi <span className="num">{pct(t.langs.HI)}</span>. Tamil and Hindi sit below the <span className="num">{pct(EVAL_BAR)}</span> floor and would route to physician review. The request goes to {t.hold}.</>
+      : p.kind === 'flag' && f
+        ? <>{f.label} turns {p.to ? 'on' : 'off'} for {f.scope.toLowerCase()} in production. Members see the change on their next sync; nothing they wrote is lost.</>
+        : p.to
+          ? scope === 'all'
+            ? 'The tool returns for every tenant within a minute. It must hold its eval floor in every language it serves.'
+            : <>The tool returns for {scopeLabel(scope)} within a minute.</>
+          : scope === 'all'
+            ? 'The tool stops for every tenant within a minute. Members get the rules-based version and sealed copy; nothing they wrote is lost.'
+            : <>The tool stops for {scopeLabel(scope)} only, within a minute. Their members get the rules-based version and sealed copy; other tenants are untouched.</>
+
+  const confirm = () => {
+    if (reason.trim().length < 12) return setErr(p.kind === 'signoff' ? 'Say what changed since the last eval pack, in a sentence.' : 'Say why in a sentence. It is written to the audit trail.')
+    onApply(p, scope, reason.trim())
+  }
+  const cta = p.kind === 'signoff' ? 'Send for sign-off' : p.kind === 'flag' ? `Turn ${p.to ? 'on' : 'off'}` : p.to ? 'Switch on' : 'Kill now'
+
+  return (
+    <div>
+      <p className="text-[17px] leading-relaxed text-ink">{body}</p>
+      {scopes.length > 1 && (
+        <Field label="Scope" htmlFor="kill-scope" className="mt-5" hint="Per-tenant changes leave every other tenant as it is.">
+          <select id="kill-scope" className={fieldCls} value={scope} onChange={(e) => setScope(e.target.value)}>
+            {scopes.map((s) => <option key={s} value={s}>{s === 'all' ? (p.to ? 'All tenants · restore everywhere' : 'All tenants') : `${scopeLabel(s)} · ${s}`}</option>)}
+          </select>
+        </Field>
+      )}
+      <Field label={p.kind === 'signoff' ? 'Note to the physician' : 'Reason'} htmlFor="kill-reason" error={err} className="mt-5">
+        <textarea
+          id="kill-reason"
+          rows={3}
+          className={areaCls}
+          value={reason}
+          onChange={(e) => { setReason(e.target.value); setErr(null) }}
+          placeholder={p.kind === 'signoff' ? 'e.g. Hindi re-run after glossary fix; 40 new HbA1c cases written with Clinical' : p.kind === 'flag' ? 'e.g. OEM background-work fix verified on two devices; rolling forward' : 'e.g. Red-team found a couples-leakage path in Hindi; holding until re-run'}
+          aria-invalid={!!err}
+          aria-describedby={err ? 'kill-reason-err' : undefined}
+        />
+      </Field>
+      <div className="mt-5 flex flex-wrap gap-2">
+        <Button variant="ink" onClick={confirm}>{p.kind === 'signoff' ? <Stethoscope size={15} aria-hidden /> : <Power size={15} aria-hidden />} {cta}</Button>
+        <Button variant="ghost" onClick={onCancel}>Cancel</Button>
+      </div>
+      <p className="mt-4 text-[13px] text-ink-3">Signed in as {ME}. Written to the audit trail with your reason.</p>
+    </div>
+  )
+}
+
+// ─── Flags & kill switches ───────────────────────────────────────────────
+
+function Flags({ tools, flags, changes, ask }: { tools: Record<string, ToolState>; flags: Record<string, boolean>; changes: Change[]; ask: (kind: Pending['kind'], key: string, to: boolean) => void }) {
+  return (
+    <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
+      <Card className="lg:col-span-8">
+        <CardHead eyebrow="Per-AI-tool kill switches" title="Typed tools, each one switchable" lead="Switching a tool off falls back to rules-based next actions and sealed copy, for every tenant or just one. Members are never shown an error; they see the plain version." />
+        <ul className="divide-y divide-line">
+          {AI_TOOLS.map((t) => {
+            const st = tools[t.key]
+            const on = st.on
+            const offered = Object.entries(t.langs).filter(([, v]) => v > 0)
+            const min = Math.min(...offered.map(([, v]) => v))
+            const below = belowFloor(t)
+            const isHeld = !!t.hold && !on && st.signoff !== 'signed'
+            const signedOff = !!t.hold && !on && st.signoff === 'signed'
+            return (
+              <li key={t.key} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <code className="font-mono text-[14px] text-ink">{t.key}</code>
+                    {t.term === 'ALL' ? <Pill>All terms</Pill> : <TermChip term={t.term} />}
+                    {isHeld && <StatusTag tone={st.signoff === 'requested' ? 'info' : 'watch'}>{st.signoff === 'requested' ? 'Sign-off requested' : 'Held · physician sign-off required'}</StatusTag>}
+                    {signedOff && <StatusTag tone="ok">Eval pack signed · ready to switch on</StatusTag>}
+                    {!on && !isHeld && !signedOff && <StatusTag tone="off">Killed · all tenants</StatusTag>}
+                    {on && st.killedFor.length > 0 && <StatusTag tone="info">Killed for {st.killedFor.length} tenant{st.killedFor.length > 1 ? 's' : ''}</StatusTag>}
+                    {on && below.length > 0 && <StatusTag tone="watch">Below floor in {below.join(', ')}</StatusTag>}
+                  </div>
+                  <p className="mt-1 text-[14px] text-ink-2">{t.what}</p>
+                  <p className="mt-0.5 text-[13px] text-ink-3">{t.owner} · eval floor <span className="num">{pct(min)}</span> across {offered.map(([l]) => l).join(', ')} · <span className="num">{t.calls.toLocaleString('en-IN')}</span> calls in 7 days</p>
+                  {on && below.length > 0 && <p className="mt-1 text-[13px] text-ink-2">{below.map((l) => LANG_NAME[l]).join(' and ')} answers route to physician review until a re-run passes the <span className="num">{pct(EVAL_BAR)}</span> floor.</p>}
+                  {on && st.killedFor.length > 0 && <p className="mt-1 text-[13px] text-ink-2">Off for {st.killedFor.map(scopeLabel).join(', ')}. <button className="underline decoration-line-strong underline-offset-2 hover:text-ink focus-ring" onClick={() => ask('tool', t.key, true)}>Restore</button></p>}
+                  {signedOff && <p className="mt-1 text-[13px] text-ink-2">Signed by {t.hold}. English can answer once switched on; Tamil and Hindi route to physician review until a re-run passes the <span className="num">{pct(EVAL_BAR)}</span> floor.</p>}
+                  {isHeld && <p className="mt-1 text-[13px] text-ink-2">{st.signoff === 'requested' ? <>With {t.hold}. It can be switched on here once the eval pack is signed.</> : <>Cannot be switched on without a physician’s signature on its eval pack ({t.hold}).</>}</p>}
+                </div>
+                {isHeld ? (
+                  <Button variant="secondary" size="sm" className="shrink-0 self-start sm:self-center" disabled={st.signoff === 'requested'} onClick={() => ask('signoff', t.key, true)}>
+                    <Stethoscope size={14} aria-hidden /> {st.signoff === 'requested' ? 'Awaiting sign-off' : 'Request sign-off'}
+                  </Button>
+                ) : (
+                  <button
+                    role="switch"
+                    aria-checked={on}
+                    aria-label={`${t.key} ${on ? 'live' : signedOff ? 'off, signed' : 'killed'}; ${on ? 'kill' : 'switch on'}`}
+                    onClick={() => ask('tool', t.key, !on)}
+                    className={clsx('inline-flex h-9 shrink-0 items-center gap-2 self-start rounded-full border px-3 text-[13px] font-medium transition-colors focus-ring sm:self-center', on ? 'border-ink bg-ink text-paper' : 'border-line-strong text-ink-2 hover:text-ink')}
+                  >
+                    <Power size={14} aria-hidden /> {on ? 'Live' : signedOff ? 'Off' : 'Killed'}
+                  </button>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      </Card>
+
+      <div className="grid content-start gap-6 lg:col-span-4">
+        <Card>
+          <CardHead eyebrow="Release flags" title="By tenant, region, cohort, release" lead="Production flags ask for a reason, like a kill switch." />
+          <ul className="space-y-4">
+            {RELEASE_FLAGS.map((f) => {
+              const on = flags[f.key]
+              return (
+                <li key={f.key}>
+                  <Toggle
+                    checked={on}
+                    onChange={(v) => ask('flag', f.key, v)}
+                    label={f.label}
+                    description={<span><code className="font-mono text-[12px]">{f.key}</code> · {f.scope} · {on ? (f.state === 'Off' ? 'On' : f.state) : 'Off'}</span>}
+                  />
+                </li>
+              )
+            })}
+          </ul>
+        </Card>
+        <Card tone="sunk">
+          <Eyebrow>Changes this session</Eyebrow>
+          {changes.length === 0 ? (
+            <p className="mt-3 text-[15px] text-ink-2">No changes yet. Every switch you flip is written here and to the audit trail.</p>
+          ) : (
+            <ul className="mt-3 space-y-3">
+              {changes.map((c, i) => (
+                <li key={i} className="text-[14px]"><span className="num text-[12px] text-ink-3">{c.at}</span><p className="text-ink">{c.what}</p><p className="text-ink-3">{c.reason}</p></li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+// ─── Evaluation plane ────────────────────────────────────────────────────
+
+function Evals({ tools, run, onRun }: { tools: Record<string, ToolState>; run: { state: RunState; at?: string }; onRun: () => void }) {
+  const live = AI_TOOLS.filter((t) => tools[t.key].on)
+  const data = live.map((t) => ({ name: t.key, EN: t.langs.EN * 100, TA: t.langs.TA ? t.langs.TA * 100 : null, HI: t.langs.HI ? t.langs.HI * 100 : null }))
+  const below = live.flatMap((t) => (Object.entries(t.langs) as [string, number][]).filter(([, v]) => v > 0 && v < EVAL_BAR).map(([l, v]) => ({ tool: t.key, lang: l, v })))
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
+      <Card className="lg:col-span-12">
+        <CardHead
+          eyebrow="Offline evals · written with clinicians"
+          title="Pass rate by tool and language"
+          aside={
+            <>
+              <Pill>Floor {pct(EVAL_BAR)}</Pill>
+              <Button variant="secondary" size="sm" onClick={onRun} disabled={run.state === 'running'}><RefreshCw size={14} aria-hidden className={run.state === 'running' ? 'animate-spin motion-reduce:animate-none' : undefined} /> {run.state === 'running' ? 'Running evals…' : 'Re-run evals'}</Button>
+            </>
+          }
+        />
+        <ChartLead>Share of each live tool’s offline eval cases passed in English, Tamil and Hindi this week. The dashed line is the floor; below it, that language routes to physician review instead of answering. {live.length < AI_TOOLS.length && <>{AI_TOOLS.length - live.length} switched-off tool{AI_TOOLS.length - live.length > 1 ? 's are' : ' is'} not shown.</>}</ChartLead>
+        <p className="mb-4 text-[14px] text-ink-2" aria-live="polite">
+          {run.state === 'done' ? <><Check size={14} className="mr-1 inline" aria-hidden />Re-run finished at <span className="num">{run.at}</span>: {live.length} live tools, 3 languages, same results. Nothing crossed the floor in either direction.</> : run.state === 'running' ? 'Running every live tool’s eval set in English, Tamil and Hindi…' : <>Last full run <span className="num">27 Jan 02:00</span>, nightly.</>}
+        </p>
+        <div className="overflow-x-auto">
+          <div className="h-[280px] min-w-[720px]" aria-hidden>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -18 }} barGap={2}>
+                <XAxis dataKey="name" tickLine={false} axisLine={{ stroke: 'var(--line)' }} tick={{ ...tick, fontSize: 10 }} interval={0} tickFormatter={(v: string) => { const t = v.replace(/_/g, ' '); return t.length > 14 ? `${t.slice(0, 13)}…` : t }} />
+                <YAxis domain={[80, 100]} ticks={[80, 90, 100]} tickLine={false} axisLine={false} tick={tick} tickFormatter={(v) => `${v}%`} allowDataOverflow />
+                <Tooltip cursor={{ fill: 'var(--paper-sunk)' }} contentStyle={tipStyle} labelStyle={tipLabel} formatter={(v, n) => [v === null ? 'not offered' : `${Number(v).toFixed(0)}%`, String(n)]} />
+                <ReferenceLine y={EVAL_BAR * 100} stroke="var(--ink)" strokeDasharray="4 3" />
+                <Bar dataKey="EN" fill="var(--ink)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                <Bar dataKey="TA" fill="var(--ink-3)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                <Bar dataKey="HI" fill="var(--line-strong)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-col gap-3 border-t border-line pt-4 md:flex-row md:items-start md:justify-between">
+          <Legend items={[{ label: 'English', swatch: <Swatch color="var(--ink)" /> }, { label: 'Tamil', swatch: <Swatch color="var(--ink-3)" /> }, { label: 'Hindi', swatch: <Swatch color="var(--line-strong)" /> }]} />
+          <p className="max-w-xl text-[14px] text-ink-2">
+            {below.length ? <>Below the floor: {below.map((b) => <span key={b.tool + b.lang}><code className="font-mono text-ink">{b.tool}</code> {b.lang} <span className="num">{pct(b.v)}</span></span>).reduce<React.ReactNode[]>((a, n, i) => (i ? [...a, ', ', n] : [n]), [])}. Those answers go to a physician queue until a re-run passes.</> : 'Every live tool is above the floor in every language it serves.'}
+            {live.some((t) => t.key === 'coach_digest') && <>{' '}coach_digest is English-only; Tamil and Hindi are not offered.</>}
+          </p>
+        </div>
+      </Card>
+
+      <Card className="lg:col-span-7">
+        <CardHead eyebrow="Red team" title="Crisis, coercion, couples leakage, jailbreaks" />
+        <ul className="divide-y divide-line">
+          {RED_TEAM.map((r) => {
+            const rate = r.passed / r.cases
+            const ok = rate >= r.required
+            return (
+              <li key={r.suite} className="py-4">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="text-[15px] text-ink">{r.suite}</p>
+                  <span className="flex items-center gap-2"><span className="num text-[14px] text-ink">{r.passed}/{r.cases}</span><StatusTag tone={ok ? 'ok' : 'act'}>{r.required === 1 ? 'Must be 100%' : `Floor ${pct(r.required)}`}</StatusTag></span>
+                </div>
+                <Meter value={rate * 100} target={r.required * 100} label={`${r.suite} ${pct(rate, 1)}`} className="mt-2" />
+                <p className="mt-2 text-[13px] text-ink-2">{r.note} <span className="text-ink-3">· last run {r.last}</span></p>
+              </li>
+            )
+          })}
+        </ul>
+      </Card>
+
+      <Card tone="sunk" className="lg:col-span-5">
+        <Eyebrow>Live sampling · weekly human review</Eyebrow>
+        <p className="mt-3 text-[1.35rem] font-light leading-snug text-ink"><span className="num">{HUMAN_REVIEW.reviewed}</span> of <span className="num">{HUMAN_REVIEW.sampled}</span> sampled outputs read by a person this week.</p>
+        <p className="mt-2 text-[14px] text-ink-2">{HUMAN_REVIEW.reviewers}</p>
+        <ul className="mt-5 space-y-2.5 border-t border-line pt-4">
+          {HUMAN_REVIEW.findings.map((f) => (
+            <li key={f.kind} className="flex items-center justify-between text-[15px]"><span className="text-ink-2">{f.kind}</span><span className="num text-ink">{f.n}</span></li>
+          ))}
+        </ul>
+        <p className="mt-5 text-[14px] text-ink-2">Every output stores model, prompt version, tool, inputs hash and reviewer. No member data trains third-party models.</p>
+      </Card>
+    </div>
+  )
+}
+
+// ─── SLOs ────────────────────────────────────────────────────────────────
+
+function Slos() {
+  const [sel, setSel] = useState(SLOS[2].key)
+  const s = SLOS.find((x) => x.key === sel)!
+  const series = s.burn.map((v, i) => ({ day: `D-${13 - i}`, left: v }))
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
+      <Card className="lg:col-span-12">
+        <CardHead eyebrow="Service level objectives · 30 days" title="Per journey, not per server" />
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] border-collapse text-left text-[14px]">
+            <caption className="sr-only">SLOs and error budgets</caption>
+            <thead><tr className="border-b border-line">{['Journey', 'Objective', 'Actual', 'p95', 'Error budget left', ''].map((h, i) => <th key={h + i} scope="col" className={clsx('eyebrow whitespace-nowrap py-3 pr-4 font-normal text-ink-3', (i === 2 || i === 3) && 'text-right')}>{h}</th>)}</tr></thead>
+            <tbody>
+              {SLOS.map((x) => {
+                const spent = x.budgetLeft <= 0
+                return (
+                  <tr key={x.key} className={clsx('border-b border-line/70 last:border-0', sel === x.key && 'bg-paper-sunk/60')}>
+                    <th scope="row" className="py-3 pr-4 font-normal text-ink">{x.journey}</th>
+                    <td className="py-3 pr-4 text-ink-2">{x.target}</td>
+                    <td className="num py-3 pr-4 text-right text-ink">{(x.actual * 100).toFixed(x.objective === 1 ? 0 : 2)}%</td>
+                    <td className="num py-3 pr-4 text-right text-ink-2">{x.p95}</td>
+                    <td className="py-3 pr-4">
+                      <div className="flex items-center gap-3">
+                        <Meter value={x.budgetLeft * 100} label={`${x.journey} budget left ${pct(x.budgetLeft)}`} className="w-28" />
+                        {spent ? <StatusTag tone="act">Spent · releases frozen</StatusTag> : <span className="num text-[13px] text-ink-2">{x.objective === 1 ? 'held · no budget to spend' : pct(x.budgetLeft)}</span>}
+                      </div>
+                    </td>
+                    <td className="py-3 pr-4 text-right"><Button variant="link" className="text-[13px]" onClick={() => setSel(x.key)} aria-pressed={sel === x.key}>Burn</Button></td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <Card className="lg:col-span-8">
+        <CardHead eyebrow={`Error budget · ${s.journey}`} title={s.budgetLeft <= 0 ? 'Spent three days ago; the Ledger team ships fixes only' : s.objective === 1 ? 'Held at 100%; this journey has no budget to spend' : `${pct(s.budgetLeft)} of the budget left`} />
+        <ChartLead>Error budget remaining for {s.journey.toLowerCase()} over the last fourteen days, as a share of the month’s allowance.</ChartLead>
+        <div className="h-[220px]" aria-hidden>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={series} margin={{ top: 8, right: 12, bottom: 0, left: -18 }}>
+              <XAxis dataKey="day" tickLine={false} axisLine={{ stroke: 'var(--line)' }} tick={tick} interval={2} />
+              <YAxis domain={[0, 100]} ticks={[0, 50, 100]} tickLine={false} axisLine={false} tick={tick} tickFormatter={(v) => `${v}%`} />
+              <Tooltip contentStyle={tipStyle} labelStyle={tipLabel} formatter={(v) => [`${v}%`, 'Budget left']} />
+              <Line type="monotone" dataKey="left" stroke="var(--ink)" strokeWidth={2} dot={false} isAnimationActive={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        <p className="sr-only">Budget left fell from {s.burn[0]}% to {s.burn[s.burn.length - 1]}% over fourteen days.</p>
+      </Card>
+
+      <Card tone="sunk" className="lg:col-span-4">
+        <Eyebrow>Recovery · Milk</Eyebrow>
+        <dl className="mt-4 grid grid-cols-2 gap-4">
+          {[['RPO', '15 min'], ['RTO', '4 h'], ['Backups', 'PITR 35 d'], ['Restore test', '9 Jan']].map(([k, v]) => (
+            <div key={k}><dt className="eyebrow text-ink-3">{k}</dt><dd className="num mt-1 text-[1.3rem] font-light text-ink">{v}</dd></div>
+          ))}
+        </dl>
+        <p className="mt-5 border-t border-line pt-4 text-[14px] text-ink-2"><span className="text-ink">Graceful degradation.</span> AI down: rules-based actions and sealed copy. Signals down: survey-only Index, flagged. Payments down: grace access. Offline: Today, Ledger and the practice are cached.</p>
+      </Card>
+    </div>
+  )
+}
+
+// ─── Cost ────────────────────────────────────────────────────────────────
+
+function Cost({ total, costs, offTools }: { total: number; costs: typeof COSTS; offTools: number }) {
+  const data = [...costs].sort((a, b) => b.now - a.now)
+  const over = costs.filter((c) => c.now > c.budget)
+  const gateway = costs.find((c) => c.service.startsWith('VIVA'))!
+  return (
+    <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
+      <Card className="lg:col-span-8">
+        <CardHead eyebrow="Cost per active member-year · infra and AI" title={<>₹{total} today against a ₹{COST_TARGET} target</>} />
+        <ChartLead>Rupees per active member per year for each service, against that service’s own budget (the tick). Budgets add up to the ₹{COST_TARGET} Mountain target.</ChartLead>
+        <ul className="space-y-3.5">
+          {data.map((d) => {
+            const max = 20
+            const over = d.now > d.budget
+            return (
+              <li key={d.service} className="grid gap-1.5 sm:grid-cols-[14rem_1fr_6rem] sm:items-center sm:gap-4">
+                <span className="text-[14px] text-ink-2">{d.service}</span>
+                <div className="relative h-2.5 rounded-full bg-paper-sunk" role="img" aria-label={`${d.service}: ₹${d.now} against a ₹${d.budget} budget`}>
+                  <div className="h-full rounded-full" style={{ width: `${(d.now / max) * 100}%`, background: over ? 'var(--ink)' : 'var(--ink-3)' }} />
+                  <span aria-hidden className="absolute -top-1.5 w-0.5 rounded bg-ink" style={{ left: `${(d.budget / max) * 100}%`, height: 22 }} />
+                </div>
+                <span className="num text-[14px] text-ink sm:text-right">₹{d.now} <span className="text-ink-3">/ ₹{d.budget}</span></span>
+              </li>
+            )
+          })}
+        </ul>
+        <Legend className="mt-5" items={[{ label: 'Over its budget', swatch: <Swatch color="var(--ink)" /> }, { label: 'Within budget', swatch: <Swatch color="var(--ink-3)" /> }, { label: 'Budget', swatch: <span aria-hidden className="inline-block h-3.5 w-0.5 rounded bg-ink" /> }]} />
+      </Card>
+      <div className="grid content-start gap-6 lg:col-span-4">
+        <Card tone="sunk">
+          <Eyebrow>Over budget</Eyebrow>
+          <ul className="mt-3 space-y-3">
+            {over.map((o) => (
+              <li key={o.service}>
+                <div className="flex items-baseline justify-between gap-3"><span className="text-[15px] text-ink">{o.service}</span><span className="num text-[14px] text-ink">₹{o.now} / ₹{o.budget}</span></div>
+              </li>
+            ))}
+          </ul>
+          {over.length === 0 && <p className="mt-3 text-[15px] text-ink-2">Every service is within its budget.</p>}
+          <p className="mt-4 text-[14px] text-ink-2">The model gateway is the largest line: move Ledger tagging and offline prompts to on-device small models (J3), and cache index_explainer by band and lowest term.</p>
+          {offTools > 0 && <p className="mt-3 text-[14px] text-ink-2">With {offTools} tool{offTools > 1 ? 's' : ''} killed this session, the gateway runs at <span className="num text-ink">₹{gateway.now}</span> per member-year. Rules-based fallbacks cost almost nothing, but members get the plain version.</p>}
+        </Card>
+        <Card>
+          <Eyebrow>Per tenant</Eyebrow>
+          <ul className="mt-3 divide-y divide-line">
+            {TENANTS.filter((t) => t.budget > 0).map((t) => (
+              <li key={t.id} className="flex items-center justify-between gap-3 py-2.5 text-[14px]"><span className="text-ink-2">{t.name}</span><span className="num text-ink">₹{t.budget}</span></li>
+            ))}
+          </ul>
+          <p className="mt-3 text-[13px] text-ink-3">Kill line in the plan: total cost above ₹1,500 per active member-year at FY29 means stop scaling and redesign.</p>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+// ─── Tenants & cells ─────────────────────────────────────────────────────
+
+function Cells({ tools }: { tools: Record<string, ToolState> }) {
+  const offFor = (id: string) => AI_TOOLS.filter((t) => (tools[t.key].on ? tools[t.key].killedFor.includes(id) : !t.hold)).map((t) => t.key)
+  return (
+    <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
+      <AccessNote icon="shield" className="lg:col-span-12">
+        <span className="text-ink">The global control plane routes by AIWO ID to a home region and holds no health data.</span> Each cell runs the full stack with its own databases and keys; only de-identified aggregates cross between cells.
+      </AccessNote>
+      <ul className="grid gap-4 sm:grid-cols-2 lg:col-span-12 xl:grid-cols-5">
+        {CELLS.map((c) => (
+          <li key={c.name} className={clsx('rounded-card border p-5', c.status === 'Live' ? 'border-ink bg-paper-raised shadow-card' : 'border-dashed border-line-strong')}>
+            <div className="flex items-start justify-between gap-2"><Globe2 size={18} className="text-ink-3" aria-hidden /><StatusTag tone={c.status === 'Live' ? 'ok' : 'draft'}>{c.status}</StatusTag></div>
+            <p className="mt-3 text-[17px] text-ink">{c.name}</p>
+            <p className="num text-[12px] text-ink-3">{c.region} · {c.when}</p>
+            <p className="mt-3 text-[13px] text-ink-2">{c.law}</p>
+            <p className="mt-1 text-[13px] text-ink-3">Recovery: {c.recovery}</p>
+            {c.status === 'Live' && <p className="mt-3 border-t border-line pt-3 text-[13px] text-ink-2"><span className="num text-ink">{c.members}</span> members · <span className="num text-ink">{c.tenants}</span> tenants with data</p>}
+          </li>
+        ))}
+      </ul>
+      <Card className="lg:col-span-12">
+        <CardHead eyebrow="Tenants" title="Pooled now; a bridge for large tenants at J4" />
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] border-collapse text-left text-[14px]">
+            <caption className="sr-only">Tenants</caption>
+            <thead><tr className="border-b border-line">{['Tenant', 'Kind', 'Cell', 'Tenancy', 'Keys', 'AI tools off', 'Members'].map((h, i) => <th key={h} scope="col" className={clsx('eyebrow whitespace-nowrap py-3 pr-4 font-normal text-ink-3', i === 6 && 'text-right')}>{h}</th>)}</tr></thead>
+            <tbody>
+              {TENANTS.map((t) => (
+                <tr key={t.id} className="border-b border-line/70 last:border-0">
+                  <th scope="row" className="py-3 pr-4 font-normal"><span className="block text-ink">{t.name}</span><code className="font-mono text-[12px] text-ink-3">{t.id}</code></th>
+                  <td className="py-3 pr-4 text-ink-2">{t.kind}</td>
+                  <td className="py-3 pr-4 text-ink-2">{t.cell}</td>
+                  <td className="py-3 pr-4 text-ink-2">{t.tenancy}</td>
+                  <td className="py-3 pr-4 text-ink-2"><span className="inline-flex items-center gap-1.5"><KeyRound size={13} aria-hidden />{t.keys}</span></td>
+                  <td className="py-3 pr-4 text-[13px] text-ink-2">{t.members ? (offFor(t.id).length ? <span className="font-mono">{offFor(t.id).join(', ')}</span> : 'None') : '—'}</td>
+                  <td className="num py-3 pr-4 text-right text-ink">{t.members ? t.members.toLocaleString('en-IN') : t.kind === 'Venue partner' ? 'no PHI' : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-4 text-[14px] text-ink-2">Zero cross-tenant reads, tested on every release. A person belongs to AIWO, not to the tenant: changing employer or insurer keeps their record.</p>
+      </Card>
+    </div>
+  )
+}
+
+// ─── Audit & JIT ─────────────────────────────────────────────────────────
+
+function Audit({ jit, changes, onDecide, onRevoke, onWithdraw }: { jit: Jit[]; changes: Change[]; onDecide: (id: string, approve: boolean) => void; onRevoke: (id: string) => void; onWithdraw: (id: string) => void }) {
+  const [verify, setVerify] = useState<'idle' | 'running' | 'ok'>('idle')
+  const [role, setRole] = useState<'all' | 'system' | 'people'>('all')
+  const rows = AUDIT.filter((a) => role === 'all' || (role === 'system' ? a.role === 'system' : a.role !== 'system'))
+  const session = role === 'system' ? [] : changes
+  const tone = (st: JitStatus) => (st === 'active' ? 'ok' : st === 'pending' ? 'watch' : 'off') as 'ok' | 'watch' | 'off'
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
+      <Card className="lg:col-span-5">
+        <CardHead eyebrow="Just-in-time access" title="Production by approval only" lead={`You are signed in as ${ME}. You cannot approve your own request.`} />
+        <ul className="space-y-3">
+          {jit.map((j) => {
+            const mine = j.who === ME_NAME
+            return (
+              <li key={j.id} className={clsx('rounded-card border p-4', j.status === 'pending' ? 'border-ink' : 'border-line')}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="num text-[12px] text-ink-3">{j.id}</span>
+                  <StatusTag tone={tone(j.status)}>{j.status}{j.status === 'active' || (j.status === 'expired' && j.expires.startsWith('revoked')) ? ` · ${j.expires}` : ''}</StatusTag>
+                </div>
+                <p className="mt-2 text-[15px] text-ink">{j.who} <span className="text-ink-3">· {j.role}</span></p>
+                <p className="text-[14px] text-ink-2"><code className="font-mono text-[13px]">{j.scope}</code> · {j.duration}</p>
+                <p className="mt-1 text-[14px] text-ink-2">{j.reason}</p>
+                {j.status === 'pending' && !mine && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button variant="ink" size="sm" onClick={() => onDecide(j.id, true)}><Check size={14} aria-hidden /> Approve</Button>
+                    <Button variant="ghost" size="sm" onClick={() => onDecide(j.id, false)}>Decline</Button>
+                  </div>
+                )}
+                {j.status === 'pending' && mine && (
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[13px] text-ink-3">Waiting for a second approver.</p>
+                    <Button variant="ghost" size="sm" onClick={() => onWithdraw(j.id)}><Undo2 size={14} aria-hidden /> Withdraw</Button>
+                  </div>
+                )}
+                {j.status === 'active' && (
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[13px] text-ink-3">Approved by {j.approver}</p>
+                    <Button variant="ghost" size="sm" onClick={() => onRevoke(j.id)} aria-label={`Revoke ${j.id} now`}>Revoke now</Button>
+                  </div>
+                )}
+                {j.status === 'withdrawn' && <p className="mt-2 text-[13px] text-ink-3">Withdrawn by the requester.</p>}
+                {(j.status === 'expired' || j.status === 'denied') && j.approver !== '—' && <p className="mt-2 text-[13px] text-ink-3">{j.expires.startsWith('revoked') ? 'Revoked' : 'Decided'} by {j.approver}</p>}
+              </li>
+            )
+          })}
+        </ul>
+      </Card>
+
+      <Card className="lg:col-span-7">
+        <CardHead
+          eyebrow="Audit trail · hash-chained"
+          title="Who did what, and why"
+          aside={<Tabs value={role} onChange={setRole} items={[{ value: 'all', label: 'All' }, { value: 'people', label: 'People' }, { value: 'system', label: 'Services' }]} />}
+        />
+        <ol className="space-y-0">
+          {session.map((c, i) => (
+            <li key={'c' + i} className="grid gap-1 border-b border-line py-3 sm:grid-cols-[8.5rem_1fr]">
+              <span className="num text-[12px] text-ink-3">28 Jan {c.at}:00</span>
+              <div><p className="text-[14px] text-ink"><span className="font-medium">{ME_NAME}</span> <span className="text-ink-3">(dpo)</span> · <code className="font-mono text-[13px]">control.change</code> · {c.what}</p><p className="text-[13px] text-ink-3">Purpose: {c.reason}</p></div>
+            </li>
+          ))}
+          {rows.map((a) => (
+            <li key={a.hash} className="grid gap-1 border-b border-line py-3 last:border-0 sm:grid-cols-[8.5rem_1fr]">
+              <span className="num text-[12px] text-ink-3">{a.at}</span>
+              <div className="min-w-0">
+                <p className="text-[14px] text-ink"><span className="font-medium">{a.actor}</span> <span className="text-ink-3">({a.role})</span> · <code className="font-mono text-[13px]">{a.action}</code> · {a.resource}</p>
+                <p className="flex flex-wrap items-center gap-x-3 text-[13px] text-ink-3"><span>Purpose: {a.purpose}</span><span className="inline-flex items-center gap-1 font-mono"><Link2 size={11} aria-hidden />{a.hash}</span></p>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-line pt-4">
+          <Button variant="secondary" size="sm" onClick={() => { setVerify('running'); window.setTimeout(() => setVerify('ok'), 900) }} disabled={verify === 'running'}><ShieldCheck size={14} aria-hidden /> {verify === 'running' ? 'Verifying…' : verify === 'ok' ? 'Verify again' : 'Verify chain'}</Button>
+          <span className="text-[14px] text-ink-2" aria-live="polite">{verify === 'ok' && <>Chain intact: every link’s hash matches its predecessor, back to 22 Oct 2026{changes.length ? `, including ${changes.length} change${changes.length > 1 ? 's' : ''} this session` : ''}.</>}</span>
+        </div>
+        <p className="mt-3 text-[13px] text-ink-3">Members see their own slice of this trail in the Trust centre.</p>
+      </Card>
+    </div>
+  )
+}
+
+function JitSheet({ open, onClose, onSubmit, nextId }: { open: boolean; onClose: () => void; onSubmit: (r: Jit) => void; nextId: string }) {
+  const [scope, setScope] = useState('prod read · ledger write path traces')
+  const [duration, setDuration] = useState('1 h')
+  const [ticket, setTicket] = useState('')
+  const [reason, setReason] = useState('')
+  const [errs, setErrs] = useState<{ ticket?: string; reason?: string }>({})
+  const [done, setDone] = useState(false)
+
+  const submit = () => {
+    const e: typeof errs = {}
+    if (!/^INC-\d{4}$/i.test(ticket.trim())) e.ticket = 'Use an incident or change number, like INC-0412.'
+    if (reason.trim().length < 20) e.reason = 'Describe what you will look at and why, in at least 20 characters.'
+    setErrs(e)
+    if (Object.keys(e).length) return
+    onSubmit({ id: nextId, who: ME_NAME, role: 'DPO', scope, duration, reason: `${ticket.toUpperCase()} · ${reason.trim()}`, status: 'pending', approver: '—', expires: '—' })
+    setDone(true)
+  }
+  const close = () => { onClose(); window.setTimeout(() => { setDone(false); setTicket(''); setReason(''); setErrs({}) }, 250) }
+
+  return (
+    <Sheet open={open} onClose={close} title="Request just-in-time access">
+      {done ? (
+        <div role="status">
+          <Timer size={22} className="text-ink-3" aria-hidden />
+          <p className="mt-3 text-[1.35rem] font-light leading-snug text-ink">Requested. A second person must approve it.</p>
+          <p className="mt-2 text-[15px] text-ink-2">{nextId} · {scope} · {duration}. The SRE on call is paged to review it. Access expires on its own, and you can withdraw the request or revoke the grant early from Audit &amp; JIT.</p>
+          <Button variant="secondary" className="mt-6" onClick={close}>Close</Button>
+        </div>
+      ) : (
+        <div className="space-y-5">
+          <p className="text-[15px] text-ink-2">Least privilege, time-boxed and audited. Health data stays masked in logs whatever you request; raw clinical values are never in scope here.</p>
+          <Field label="Scope" htmlFor="jit-scope">
+            <select id="jit-scope" className={fieldCls} value={scope} onChange={(e) => setScope(e.target.value)}>
+              <option>prod read · ledger write path traces</option>
+              <option>prod read · signals-ingest logs</option>
+              <option>prod read · research registry schema</option>
+              <option>prod write · feature flags</option>
+            </select>
+          </Field>
+          <Field label="Duration" htmlFor="jit-dur">
+            <select id="jit-dur" className={fieldCls} value={duration} onChange={(e) => setDuration(e.target.value)}>
+              {['30 m', '1 h', '2 h', '4 h'].map((d) => <option key={d}>{d}</option>)}
+            </select>
+          </Field>
+          <Field label="Incident or change" htmlFor="jit-ticket" error={errs.ticket}>
+            <input id="jit-ticket" className={clsx(fieldCls, 'font-mono')} value={ticket} onChange={(e) => setTicket(e.target.value)} placeholder="INC-0415" aria-invalid={!!errs.ticket} />
+          </Field>
+          <Field label="Reason" htmlFor="jit-reason" error={errs.reason}>
+            <textarea id="jit-reason" rows={3} className={areaCls} value={reason} onChange={(e) => setReason(e.target.value)} aria-invalid={!!errs.reason} />
+          </Field>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="ink" onClick={submit}>Send for approval</Button>
+            <Button variant="ghost" onClick={close}>Cancel</Button>
+          </div>
+        </div>
+      )}
+    </Sheet>
+  )
+}
+
+// ─── Signals ingest ──────────────────────────────────────────────────────
+
+function Signals({ flags, replay, onReplay }: { flags: Record<string, boolean>; replay: Record<string, RunState>; onReplay: (key: string, name: string) => void }) {
+  return (
+    <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
+      <p className="text-[15px] text-ink-2 lg:col-span-12">Freshness is the time from a reading on the device to a feature in the record, p95 over the last twelve hours. The objective is 95% within fifteen minutes; vendor readiness or strain scores are kept as signals and never enter the Index.</p>
+      {SIGNAL_SOURCES.map((s) => {
+        const series = s.p95Series.map((v, i) => ({ h: `${i - 11}h`, v }))
+        const batch = s.key === 'labs'
+        const flag = SIGNAL_FLAG[s.key]
+        const paused = flag ? flags[flag] === false : false
+        const rp = replay[s.key] ?? 'idle'
+        return (
+          <Card key={s.key} className="lg:col-span-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="flex items-center gap-2 text-[17px] text-ink"><Database size={16} className="text-ink-3" aria-hidden /> {s.name}</p>
+                <p className="mt-1 text-[13px] text-ink-3">{s.path}</p>
+              </div>
+              {paused ? <StatusTag tone="off">Paused by flag</StatusTag> : <StatusTag tone={rp === 'done' ? 'ok' : s.status}>{s.status === 'ok' || rp === 'done' ? 'Healthy' : 'Watching'}</StatusTag>}
+            </div>
+            <dl className="mt-5 grid grid-cols-3 gap-4">
+              <div><dt className="eyebrow text-ink-3">p95 fresh</dt><dd className="num mt-1 text-[1.6rem] font-light text-ink">{s.p95}<span className="text-[14px] text-ink-3"> min</span></dd></div>
+              <div><dt className="eyebrow text-ink-3">Batches / h</dt><dd className="num mt-1 text-[1.6rem] font-light text-ink">{paused ? 0 : s.batchesHr.toLocaleString('en-IN')}</dd></div>
+              <div><dt className="eyebrow text-ink-3">Errors</dt><dd className="num mt-1 text-[1.6rem] font-light text-ink">{pct(s.errors, 1)}</dd></div>
+            </dl>
+            <div className="mt-4 h-[90px]" aria-hidden>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={series} margin={{ top: 6, right: 4, bottom: 0, left: -28 }}>
+                  <XAxis dataKey="h" hide />
+                  <YAxis domain={batch ? [0, 120] : [0, 25]} ticks={batch ? [0, 120] : [0, 15]} tickLine={false} axisLine={false} tick={tick} />
+                  {!batch && <ReferenceLine y={15} stroke="var(--ink-3)" strokeDasharray="3 3" />}
+                  <Tooltip contentStyle={tipStyle} labelStyle={tipLabel} formatter={(v) => [`${v} min`, 'p95']} />
+                  <Line type="monotone" dataKey="v" stroke="var(--ink)" strokeWidth={1.75} dot={false} isAnimationActive={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="sr-only">p95 freshness over twelve hours ranged from {Math.min(...s.p95Series)} to {Math.max(...s.p95Series)} minutes.</p>
+            <p className="mt-3 text-[14px] text-ink-2">
+              <span className="num text-ink">{s.members}</span> members connected.{' '}
+              {paused ? <>Paused by the <code className="font-mono text-[13px]">{flag}</code> flag. Readings queue on the device and backfill when it returns.</> : rp === 'done' ? 'Replay drained the deferred batches; the last twelve hours are complete.' : s.note}
+            </p>
+            {!batch && !paused && (
+              <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-line pt-4">
+                <Button variant="ghost" size="sm" onClick={() => onReplay(s.key, s.name)} disabled={rp === 'running'}>
+                  <RefreshCw size={14} aria-hidden className={rp === 'running' ? 'animate-spin motion-reduce:animate-none' : undefined} /> {rp === 'running' ? 'Replaying…' : rp === 'done' ? 'Replay again' : 'Replay last 12 h'}
+                </Button>
+                <span className="text-[13px] text-ink-3">Idempotent: a replayed batch is never counted twice.</span>
+              </div>
+            )}
+          </Card>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Rights requests ─────────────────────────────────────────────────────
+
+function Rights({ jobs, setJobs, log, stamp }: { jobs: Job[]; setJobs: React.Dispatch<React.SetStateAction<Job[]>>; log: (what: string, reason: string) => string; stamp: () => string }) {
+  const [filter, setFilter] = useState<'all' | 'running' | 'delivered'>('all')
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [newOpen, setNewOpen] = useState(false)
+  const rows = jobs.filter((r) => filter === 'all' || r.status === filter)
+  const job = jobs.find((j) => j.id === openId) ?? null
+
+  const patch = (id: string, f: (j: Job) => Job) => setJobs((js) => js.map((j) => (j.id === id ? f(j) : j)))
+  const retry = (j: Job) => {
+    patch(j.id, (x) => ({ ...x, retrying: true }))
+    log(`${j.id} · retry stalled store · ${RIGHTS_STORES[j.kind][j.done]}`, 'Worker re-queued from the control plane')
+    window.setTimeout(() => {
+      const at = `28 Jan ${stamp()}`
+      patch(j.id, (x) => ({ ...x, retrying: false, done: x.stores, status: 'delivered', note: `${x.note} Retried; every store done.`, notices: [...x.notices, { at, text: x.kind === 'export' ? 'Your export is ready: a signed link, valid for 72 hours.' : x.kind === 'erase' ? 'Your data has been erased. Records the law requires us to keep are listed, with the reason.' : 'Your consent is withdrawn everywhere, including caches.' }] }))
+    }, 1400)
+  }
+  const page = (j: Job) => {
+    patch(j.id, (x) => ({ ...x, escalated: true }))
+    log(`${j.id} · on-call engineer paged`, `Stalled at ${RIGHTS_STORES[j.kind][j.done]}`)
+  }
+  const notify = (j: Job) => {
+    const at = log(`${j.id} · member sent an update`, 'Delay notice inside SLA')
+    patch(j.id, (x) => ({ ...x, notices: [...x.notices, { at: `28 Jan ${at}`, text: `One part is taking longer than usual (${RIGHTS_STORES[x.kind][x.done]}). Everything else is ready, and we will still finish inside ${SLA[x.kind]} hours.` }] }))
+  }
+  const add = (kind: Job['kind'], member: string, channel: string) => {
+    const id = `RQ-${2292 + jobs.length - RIGHTS_JOBS.length}`
+    const at = `28 Jan ${stamp()}`
+    setJobs((js) => [{ id, kind, opened: at, elapsedH: 0, stores: RIGHTS_STORES[kind].length, done: 0, status: 'running', note: `Logged for ${member} · received by ${channel.toLowerCase()}.`, escalated: false, retrying: false, notices: [{ at, text: `Request received. We will finish within ${SLA[kind]} hours and tell you when it is done.` }] }, ...js])
+    log(`${id} opened · ${KIND_LABEL[kind]} · ${member}`, `Received by ${channel.toLowerCase()}`)
+    // Workers clear one store at a time; the member is told when every store is done.
+    const total = RIGHTS_STORES[kind].length
+    for (let n = 1; n <= total; n++) {
+      window.setTimeout(() => {
+        const last = n === total
+        const doneAt = last ? `28 Jan ${stamp()}` : ''
+        setJobs((js) => js.map((j) => (j.id !== id ? j : {
+          ...j,
+          done: n,
+          elapsedH: Math.round(n * 0.3 * 10) / 10,
+          ...(last ? { status: 'delivered' as const, note: `${j.note} Every store done and verified.`, notices: [...j.notices, { at: doneAt, text: kind === 'export' ? 'Your export is ready: a signed link, valid for 72 hours.' : kind === 'erase' ? 'Your data has been erased. Records the law requires us to keep are listed, with the reason.' : 'Your consent is withdrawn everywhere, including caches.' }] } : {}),
+        })))
+        if (last) log(`${id} delivered · ${KIND_LABEL[kind]} · ${total} stores verified`, 'Member told by email and in the Trust centre')
+      }, 1600 * n)
+    }
+    return id
+  }
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
+      <div className="grid gap-4 sm:grid-cols-3 lg:col-span-12">
+        <Kpi label="Export" value="≤72 h" sub="JSON + FHIR bundle + PDFs, signed link, short expiry" />
+        <Kpi label="Erase" value="≤24 h" sub="An erasure worker per store; clinical records only where law requires" />
+        <Kpi label="Withdraw consent" value="≤24 h" sub="consent.changed fans out; caches purged everywhere" />
+      </div>
+      <Card className="lg:col-span-12">
+        <CardHead
+          eyebrow="Jobs"
+          title="The member’s right, on a clock"
+          lead="Open a job to see each store, the SLA clock and what the member has been told."
+          aside={
+            <>
+              <Tabs value={filter} onChange={setFilter} items={[{ value: 'all', label: 'All' }, { value: 'running', label: 'Running' }, { value: 'delivered', label: 'Delivered' }]} />
+              <Button variant="secondary" size="sm" onClick={() => setNewOpen(true)}><Plus size={14} aria-hidden /> Log a request</Button>
+            </>
+          }
+        />
+        {rows.length === 0 ? (
+          <p className="py-6 text-[15px] text-ink-2">No {filter} requests.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[820px] border-collapse text-left text-[14px]">
+              <caption className="sr-only">Rights request jobs</caption>
+              <thead><tr className="border-b border-line">{['Request', 'Kind', 'Opened', 'Stores', 'Time against SLA', 'Status', ''].map((h, i) => <th key={h + i} scope="col" className="eyebrow whitespace-nowrap py-3 pr-4 font-normal text-ink-3">{h}</th>)}</tr></thead>
+              <tbody>
+                {rows.map((r) => {
+                  const limit = SLA[r.kind]
+                  const left = limit - r.elapsedH
+                  const tight = r.status === 'running' && left < limit * 0.25
+                  return (
+                    <tr key={r.id} className="border-b border-line/70 align-top last:border-0">
+                      <th scope="row" className="py-3 pr-4 font-normal"><span className="num text-ink">{r.id}</span><p className="mt-0.5 max-w-xs text-[13px] text-ink-3">{r.note}</p></th>
+                      <td className="py-3 pr-4 text-ink">{KIND_LABEL[r.kind]}</td>
+                      <td className="num whitespace-nowrap py-3 pr-4 text-ink-2">{r.opened}</td>
+                      <td className="py-3 pr-4"><span className="num text-ink">{r.done}/{r.stores}</span><Meter value={r.done} max={r.stores} label={`${r.done} of ${r.stores} stores`} className="mt-1.5 w-20" /></td>
+                      <td className="py-3 pr-4">
+                        <span className={clsx('num inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px]', r.status === 'delivered' ? 'border border-line text-ink-3' : tight ? 'bg-[color:var(--term-d-soft)] text-[color:var(--term-d-ink)]' : 'bg-paper-sunk text-ink-2')}>
+                          <Timer size={12} aria-hidden /> {r.status === 'delivered' ? `Done in ${r.elapsedH} h of ${limit}` : `${left.toFixed(1)} h left of ${limit}`}
+                        </span>
+                      </td>
+                      <td className="py-3 pr-4"><span className="flex flex-wrap gap-1.5"><StatusTag tone={r.status === 'delivered' ? 'ok' : 'info'}>{r.retrying ? 'retrying' : r.status}</StatusTag>{r.escalated && r.status === 'running' && <StatusTag tone="watch">On-call paged</StatusTag>}</span></td>
+                      <td className="py-3 pr-4 text-right"><Button variant="link" className="text-[13px]" onClick={() => setOpenId(r.id)} aria-label={`Open ${r.id}`}>Open</Button></td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      <Sheet open={!!job} onClose={() => setOpenId(null)} title={job ? `${job.id} · ${KIND_LABEL[job.kind]}` : ''}>
+        {job && <JobDetail job={job} onRetry={() => retry(job)} onPage={() => page(job)} onNotify={() => notify(job)} />}
+      </Sheet>
+      <Sheet open={newOpen} onClose={() => setNewOpen(false)} title="Log a rights request">
+        {newOpen && <NewRequest onAdd={add} onClose={() => setNewOpen(false)} onOpen={(id) => { setNewOpen(false); setOpenId(id) }} />}
+      </Sheet>
+    </div>
+  )
+}
+
+function JobDetail({ job, onRetry, onPage, onNotify }: { job: Job; onRetry: () => void; onPage: () => void; onNotify: () => void }) {
+  const limit = SLA[job.kind]
+  const stores = RIGHTS_STORES[job.kind]
+  const running = job.status === 'running'
+  const stalled = running && job.done < job.stores && job.elapsedH > limit * 0.5
+  return (
+    <div className="space-y-6">
+      <div>
+        <div className="flex items-baseline justify-between gap-3">
+          <Eyebrow>SLA clock</Eyebrow>
+          <span className="num text-[14px] text-ink">{job.status === 'delivered' ? `Done in ${job.elapsedH} h` : `${(limit - job.elapsedH).toFixed(1)} h left`} <span className="text-ink-3">of {limit} h</span></span>
+        </div>
+        <Meter value={job.elapsedH} max={limit} label={`${job.elapsedH} of ${limit} hours used`} className="mt-2" />
+        <p className="mt-2 text-[13px] text-ink-3">Opened {job.opened}. {job.note}</p>
+      </div>
+
+      <div>
+        <Eyebrow>Stores · {job.done} of {job.stores} done</Eyebrow>
+        <ol className="mt-3 divide-y divide-line rounded-card border border-line">
+          {stores.map((name, i) => {
+            const done = i < job.done
+            const current = running && i === job.done
+            return (
+              <li key={name} className="flex items-center justify-between gap-3 px-4 py-2.5 text-[14px]">
+                <span className={clsx('flex items-center gap-2', done ? 'text-ink' : 'text-ink-2')}>
+                  <span aria-hidden className={clsx('flex h-4 w-4 items-center justify-center rounded-full border', done ? 'border-ink bg-ink text-paper' : 'border-line-strong')}>{done && <Check size={10} strokeWidth={3} />}</span>
+                  {name}
+                </span>
+                <span className="text-[12px] text-ink-3">{done ? 'done' : current ? (job.retrying ? 'retrying…' : stalled ? 'stalled' : 'in progress') : 'queued'}</span>
+              </li>
+            )
+          })}
+        </ol>
+      </div>
+
+      {running && (
+        <div className="flex flex-wrap gap-2">
+          <Button variant="ink" size="sm" onClick={onRetry} disabled={job.retrying || !stalled}><RefreshCw size={14} aria-hidden className={job.retrying ? 'animate-spin motion-reduce:animate-none' : undefined} /> {job.retrying ? 'Retrying…' : 'Retry stalled store'}</Button>
+          <Button variant="ghost" size="sm" onClick={onPage} disabled={job.escalated}>{job.escalated ? 'On-call paged' : 'Page the on-call engineer'}</Button>
+          <Button variant="ghost" size="sm" onClick={onNotify}><Bell size={14} aria-hidden /> Send the member an update</Button>
+        </div>
+      )}
+      {!running && <p className="flex items-center gap-2 text-[15px] text-ink" role="status"><Check size={16} aria-hidden /> Delivered and verified per store. The member has been told.</p>}
+
+      <div>
+        <Eyebrow>What the member has been told</Eyebrow>
+        <ol className="mt-3 space-y-3">
+          {job.notices.map((n, i) => (
+            <li key={i} className="rounded-card bg-paper-sunk px-4 py-3">
+              <p className="num text-[12px] text-ink-3">{n.at}</p>
+              <p className="mt-1 text-[14px] text-ink">{n.text}</p>
+            </li>
+          ))}
+        </ol>
+        <p className="mt-3 text-[13px] text-ink-3">The member sees these in their Trust centre and by email. Health data never appears in a notice.</p>
+      </div>
+    </div>
+  )
+}
+
+function NewRequest({ onAdd, onClose, onOpen }: { onAdd: (kind: Job['kind'], member: string, channel: string) => string; onClose: () => void; onOpen: (id: string) => void }) {
+  const [kind, setKind] = useState<Job['kind']>('export')
+  const [member, setMember] = useState('')
+  const [channel, setChannel] = useState('Email to the DPO')
+  const [err, setErr] = useState<string | null>(null)
+  const [done, setDone] = useState<string | null>(null)
+
+  const submit = () => {
+    if (!/^m_\d{4}$/.test(member.trim())) return setErr('Use the member’s pseudonymous ID, like m_0142. Never a name.')
+    setDone(onAdd(kind, member.trim(), channel))
+  }
+
+  if (done)
+    return (
+      <div role="status">
+        <Check size={22} className="text-ink-3" aria-hidden />
+        <p className="mt-3 text-[1.35rem] font-light leading-snug text-ink">{done} is open and on the clock.</p>
+        <p className="mt-2 text-[15px] text-ink-2">{KIND_LABEL[kind]} for {member} · {SLA[kind]} h SLA · {RIGHTS_STORES[kind].length} stores. The member has been told it was received.</p>
+        <div className="mt-6 flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => onOpen(done)}>Open the job</Button>
+          <Button variant="ghost" onClick={onClose}>Close</Button>
+        </div>
+      </div>
+    )
+
+  return (
+    <div className="space-y-5">
+      <p className="text-[15px] text-ink-2">For requests that arrive outside the app: an email to the DPO or a letter. In-app requests open a job on their own.</p>
+      <Field label="Right" htmlFor="rq-kind">
+        <select id="rq-kind" className={fieldCls} value={kind} onChange={(e) => setKind(e.target.value as Job['kind'])}>
+          <option value="export">Export · ≤72 h</option>
+          <option value="erase">Erase · ≤24 h</option>
+          <option value="withdraw">Withdraw consent · ≤24 h</option>
+        </select>
+      </Field>
+      <Field label="Member ID" htmlFor="rq-member" error={err} hint="Pseudonymous ID from the identity check. Never a name.">
+        <input id="rq-member" className={clsx(fieldCls, 'font-mono')} value={member} onChange={(e) => { setMember(e.target.value); setErr(null) }} placeholder="m_0142" aria-invalid={!!err} aria-describedby={err ? 'rq-member-err' : undefined} />
+      </Field>
+      <Field label="Received by" htmlFor="rq-channel">
+        <select id="rq-channel" className={fieldCls} value={channel} onChange={(e) => setChannel(e.target.value)}>
+          {['Email to the DPO', 'Written letter', 'Call to member support'].map((c) => <option key={c}>{c}</option>)}
+        </select>
+      </Field>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="ink" onClick={submit}><FileText size={15} aria-hidden /> Open the job</Button>
+        <Button variant="ghost" onClick={onClose}>Cancel</Button>
+      </div>
+    </div>
+  )
+}

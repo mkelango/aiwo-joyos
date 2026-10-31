@@ -1,0 +1,154 @@
+import { router } from 'expo-router'
+import { useState } from 'react'
+import { Pressable, View } from 'react-native'
+import {
+  AppBar,
+  BandLabel,
+  Body,
+  Card,
+  DaybreakButton,
+  Delta,
+  Divider,
+  Eyebrow,
+  Icon,
+  JoyspanWheel,
+  Meta,
+  MethodLine,
+  Mono,
+  Screen,
+  ScreenHeader,
+  Serif,
+  SpecimenTag,
+  TermDot,
+} from '@/components'
+import { H2 } from '@/screens/a/local'
+import { ROOM_PLAIN, ROOM_VERDICT } from '@/screens/a/spacesData'
+import { INDEX_HISTORY } from '@/shared/member'
+import { termByKey } from '@/shared/terms'
+import type { TermKey } from '@/shared/types'
+import { useTheme } from '@/theme/ThemeProvider'
+
+// SPACES HUB (Memo p.19; Plan §4A): six rooms, one per term, in Wheel order.
+// The lowest term is marked "Start here"; tap a petal or a card to enter a room.
+
+const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
+
+export default function SpacesHome() {
+  const { c, space } = useTheme()
+  const latest = INDEX_HISTORY[0]
+  const [focus, setFocus] = useState<TermKey>(latest.lowestTerm)
+  const focusTerm = termByKey(focus)
+  const focusScore = latest.terms.find((s) => s.key === focus)!
+
+  return (
+    <Screen inTabs top={<AppBar />}>
+      <ScreenHeader
+        eyebrow="Six spaces · one per term"
+        title={
+          <>
+            Where your <Serif>Joyspan</Serif> lives.
+          </>
+        }
+        lead="Each space is a room for one part of the equation: what it measures, what moved, and three small things to try."
+      />
+
+      <Card tone="raised" style={{ gap: space.s2 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: space.s1 }}>
+          <Eyebrow>Tap a petal</Eyebrow>
+          <SpecimenTag />
+        </View>
+        <View style={{ alignItems: 'center' }}>
+          <JoyspanWheel terms={latest.terms} size={220} highlight={focus} onSelect={setFocus} />
+        </View>
+        <View style={{ gap: space.s1 }} accessibilityLiveRegion="polite">
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <TermDot term={focus} size={12} />
+            <Body weight="semibold">{focusTerm.space}</Body>
+            {focusTerm.name !== focusTerm.space ? <Meta>· {focusTerm.name}</Meta> : null}
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.s2 }}>
+            <Mono size={48} weight="light" tone="ink" accessibilityLabel={`${focusTerm.name} ${focus === 'B' ? 'minus ' : ''}${focusScore.value}`}>
+              {focus === 'B' ? `−${focusScore.value}` : String(focusScore.value)}
+            </Mono>
+            <View style={{ paddingBottom: 8, gap: 2 }}>
+              <Delta value={focusScore.delta} inverse={focus === 'B'} />
+              <BandLabel band={focusScore.band} />
+            </View>
+          </View>
+          <Body tone="ink2">{ROOM_VERDICT[focus]}</Body>
+        </View>
+        <DaybreakButton onPress={() => router.push(`/spaces/${focusTerm.slug}`)} accessibilityHint={`Opens the ${focusTerm.space} space`}>
+          {`Open ${focusTerm.space}`}
+        </DaybreakButton>
+        <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />
+      </Card>
+
+      <View style={{ gap: space.s2 }}>
+        <Eyebrow {...H2}>All six rooms</Eyebrow>
+        {ORDER.map((k) => {
+          const term = termByKey(k)
+          const s = latest.terms.find((x) => x.key === k)!
+          const lowest = k === latest.lowestTerm
+          const shown = k === 'B' ? `−${s.value}` : String(s.value)
+          return (
+            <Pressable
+              key={k}
+              onPress={() => router.push(`/spaces/${term.slug}`)}
+              accessibilityRole="link"
+              accessibilityLabel={`${term.space}, ${term.name} ${k === 'B' ? 'minus ' : ''}${s.value}, ${s.band}${lowest ? ', lowest term, start here' : ''}. ${ROOM_PLAIN[k]}.`}
+              style={({ pressed }) => ({
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: lowest ? c.lineStrong : c.line,
+                backgroundColor: pressed ? c.paperSunk : c.paperRaised,
+                padding: 20,
+                gap: 12,
+              })}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <TermDot term={k} size={12} />
+                    <Body size={19} weight="semibold">
+                      {term.space}
+                    </Body>
+                    {term.name !== term.space ? <Meta tone="ink3">{term.name}</Meta> : null}
+                  </View>
+                  <Meta>{ROOM_PLAIN[k]}</Meta>
+                </View>
+                <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                  <Mono size={28} weight="light" tone="ink">
+                    {shown}
+                  </Mono>
+                  <Delta value={s.delta} inverse={k === 'B'} size={14} />
+                </View>
+              </View>
+              <Divider />
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <BandLabel band={s.band} />
+                {lowest ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Eyebrow tone="daybreak">Start here</Eyebrow>
+                    <Icon name="arrow-right" size={14} color={c.daybreakInk} />
+                  </View>
+                ) : (
+                  <Icon name="chevron-right" size={18} color={c.ink3} />
+                )}
+              </View>
+            </Pressable>
+          )
+        })}
+      </View>
+
+      <Card tone="sunk" style={{ gap: space.s1 }}>
+        <Eyebrow>How the six add up</Eyebrow>
+        <Mono tone="ink" size={15}>
+          JI = GM(H, P, R, F, D) − 0.25·B
+        </Mono>
+        <Meta>
+          The geometric mean rewards balance, so the lowest room holds the Index back most. Ease is Burden: less is better, and it is shown with a minus.
+        </Meta>
+      </Card>
+    </Screen>
+  )
+}

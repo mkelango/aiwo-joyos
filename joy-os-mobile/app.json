@@ -1,0 +1,66 @@
+{
+  "expo": {
+    "name": "Joy OS",
+    "slug": "joy-os",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "joyos",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "ai.aiwo.joyos",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "Joy OS reads your sleep, heart rate, steps and workouts from Apple Health to keep your Body, Pleasure and Ease scores current. You choose what to share and can stop at any time.",
+        "NSHealthUpdateUsageDescription": "Joy OS writes the mindful minutes from your daily action back to Apple Health, only if you allow it."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FDFBF8",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "ai.aiwo.joyos"
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/images/favicon.png",
+      "bundler": "metro",
+      "backgroundColor": "#FDFBF8",
+      "name": "Joy OS",
+      "themeColor": "#FDFBF8"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "root": "./app"
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FDFBF8",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 76,
+          "dark": {
+            "backgroundColor": "#1C1314",
+            "image": "./assets/images/splash-icon.png"
+          }
+        }
+      ],
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": false,
+      "reactCompiler": true,
+      "tsconfigPaths": true
+    },
+    "backgroundColor": "#FDFBF8",
+    "description": "Joy OS by AIWO \u2014 the member app that measures and raises your Joyspan."
+  }
+}

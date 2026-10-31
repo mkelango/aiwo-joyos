@@ -1,0 +1,109 @@
+/* AIWO · Joy OS design tokens — Brand Identity Playbook Ed.1 (p32–41, p57, p62) and
+   Joy OS Technical Architecture p21. "The theme is a file, not a repaint."
+   Light (Paper-first) is the default; dark is warm Ink, never black-and-gold. */
+
+:root {
+  /* Primary */
+  --aiwo-ink: #1c1314;
+  --aiwo-paper: #ffffff;
+  --aiwo-stone: #f2eee8;
+  --aiwo-daybreak: #e0482a;
+  --aiwo-daybreak-deep: #b5341c;
+  --aiwo-daybreak-soft: #fbe3da;
+  --aiwo-umber: #442723;
+  --aiwo-slate: #5e6b73;
+  --aiwo-sage: #aaba9f;
+  --aiwo-mist: #c4d1d7;
+
+  /* Semantic — light */
+  --paper: #fdfbf8; /* page ground: Paper warmed one step toward Stone */
+  --paper-raised: #ffffff;
+  --paper-sunk: #f2eee8; /* Stone */
+  --ink: #1c1314;
+  --ink-ground: #1c1314;
+  --ink-2: #4f4547; /* secondary text, 9.4:1 on paper */
+  --ink-3: #6f6567; /* labels, 5.6:1 on paper */
+  --line: #e7e0d6;
+  --line-strong: #d3c9bc;
+  --daybreak: #e0482a;
+  --daybreak-ink: #b5341c; /* small Daybreak text and links */
+  --daybreak-soft: #fbe3da;
+  --daybreak-label: #ffffff;
+  --error: #9f1d1d;
+
+  /* Joyspan Spectrum — terms and data only, always with the term's name */
+  --term-h: #1f8a68; /* Jade · Healthspan · Body */
+  --term-p: #784d90; /* Iris · Purpose */
+  --term-r: #93355e; /* Bloom · Relationships · People */
+  --term-f: #2f79c2; /* Sky · Freedom */
+  --term-d: #e8b10f; /* Marigold · Daily Pleasure · Ink text only */
+  --term-b: #a8703f; /* Amber · Preventable Suffering · Ease · hatched */
+  --term-h-soft: #dcefe7;
+  --term-p-soft: #ece3f1;
+  --term-r-soft: #f3dfe7;
+  --term-f-soft: #dfeaf6;
+  --term-d-soft: #fbf0cc;
+  --term-b-soft: #f3e6da;
+  --term-h-ink: #17694f;
+  --term-p-ink: #5f3b73;
+  --term-r-ink: #7a2a4d;
+  --term-f-ink: #245f99;
+  --term-d-ink: #7a5a00;
+  --term-b-ink: #7d5230;
+
+  --wheel-guide: rgb(28 19 20 / 0.12);
+
+  /* Type */
+  --font-sans: 'Avenir Next', 'Nunito Sans', system-ui, sans-serif;
+  --font-serif: 'Newsreader', Georgia, serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Shape and motion */
+  --radius-card: 12px;
+  --ease-brand: cubic-bezier(0.2, 0, 0, 1);
+  --dur-1: 120ms;
+  --dur-2: 240ms;
+  --dur-3: 480ms;
+  --dur-bloom: 960ms;
+  --shadow-card: 0 1px 0 rgb(28 19 20 / 0.03), 0 1px 3px rgb(28 19 20 / 0.04);
+  --shadow-lift: 0 24px 60px -24px rgb(28 19 20 / 0.28), 0 2px 8px rgb(28 19 20 / 0.06);
+  color-scheme: light;
+}
+
+/* Warm Ink dark mode (Playbook p39) */
+:root[data-theme='dark'] {
+  --paper: #1c1314;
+  --paper-raised: #2a2021;
+  --paper-sunk: #241a1b;
+  --ink: #f2eee8;
+  --ink-ground: #120c0d;
+  --ink-2: #cfc6bd;
+  --ink-3: #a99f97;
+  --line: #3a2e2f;
+  --line-strong: #4d3f40;
+  --daybreak: #ec6a4e;
+  --daybreak-ink: #f08a72;
+  --daybreak-soft: #3a2420;
+  --daybreak-label: #1c1314;
+  --term-h-soft: #17352b;
+  --term-p-soft: #2c2234;
+  --term-r-soft: #34202a;
+  --term-f-soft: #1b2b3c;
+  --term-d-soft: #3a3016;
+  --term-b-soft: #3a2b1f;
+  --term-h-ink: #5fc6a0;
+  --term-p-ink: #bb9bd0;
+  --term-r-ink: #d77aa0;
+  --term-f-ink: #7fb4ea;
+  --term-d-ink: #f0c84a;
+  --term-b-ink: #e3a86e;
+  --term-b: #e3a86e; /* the minus on dark grounds */
+  --wheel-guide: rgb(242 238 232 / 0.14);
+  --shadow-card: 0 0 0 1px rgb(242 238 232 / 0.02);
+  --shadow-lift: 0 24px 60px -20px rgb(0 0 0 / 0.6);
+  color-scheme: dark;
+}
+
+/* Text size preference (Dynamic Type equivalent, up to 200%) */
+:root[data-text='large'] { font-size: 112.5%; }
+:root[data-text='xlarge'] { font-size: 125%; }
