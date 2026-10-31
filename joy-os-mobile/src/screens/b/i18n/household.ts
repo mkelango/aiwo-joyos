@@ -74,6 +74,8 @@ export const HOUSE = {
   c2: { en: 'Read aloud at an annual ’cation', ta: 'ஆண்டு ’கேஷனில் உரக்கப் படிக்கப்படும்', hi: 'सालाना ’केशन में पढ़कर सुनाया जाता है' },
   c3: { en: 'No one’s private answers are used', ta: 'யாருடைய தனிப்பட்ட பதில்களும் பயன்படுத்தப்படாது', hi: 'किसी के निजी जवाब इस्तेमाल नहीं होते' },
   seePatron: { en: 'See Patron', ta: 'Patron-ஐப் பாருங்கள்', hi: 'Patron देखें' },
+  patronIn: { en: 'In your Patron plan', ta: 'உங்கள் Patron திட்டத்தில்', hi: 'आपके Patron प्लान में' },
+  seeMembership: { en: 'See your membership', ta: 'உங்கள் உறுப்பினர் நிலையைப் பாருங்கள்', hi: 'अपनी सदस्यता देखें' },
   lakshmiSettings: { en: 'Lakshmi’s settings', ta: 'Lakshmi-யின் அமைப்புகள்', hi: 'Lakshmi की सेटिंग्स' },
   lakshmiBody: { en: 'These change how Joy OS looks on Lakshmi’s phone. She can change them too, and her choice wins.', ta: 'Lakshmi-யின் தொலைபேசியில் Joy OS எப்படித் தோன்றும் என்பதை இவை மாற்றும். அவரும் இவற்றை மாற்றலாம், அவருடைய தேர்வே இறுதியானது.', hi: 'इनसे Lakshmi के फ़ोन पर Joy OS का रूप बदलता है। वे भी इन्हें बदल सकती हैं, और उनकी पसंद ही मानी जाती है।' },
   larger: { en: 'Larger text', ta: 'பெரிய எழுத்து', hi: 'बड़े अक्षर' },

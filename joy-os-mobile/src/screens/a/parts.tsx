@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Pressable, ScrollView, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, TextInput, View, type StyleProp, type TextInputProps, type TextStyle, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, Defs, Line, Path, Rect } from 'react-native-svg'
 import { Body, Eyebrow, HatchPattern, Icon, InkSurface, Meta, Mono, TermDot, useSvgId, type IconName } from '@/components'
@@ -100,8 +100,11 @@ export function Chip({ label, selected, onPress, icon, accessibilityHint }: { la
   )
 }
 
-/** Labelled text field, 17pt. Free text must pass interceptsCrisis() before use. */
-export function TextField({ label, hideLabel, style, multiline, ...rest }: TextInputProps & { label: string; hideLabel?: boolean; style?: StyleProp<ViewStyle> }) {
+/**
+ * Labelled text field, 17pt. Free text must pass interceptsCrisis() before use.
+ * `style` sizes the wrapper (label + input); `inputStyle` goes to the input itself (e.g. a taller minHeight).
+ */
+export function TextField({ label, hideLabel, style, inputStyle, multiline, ...rest }: Omit<TextInputProps, 'style'> & { label: string; hideLabel?: boolean; style?: StyleProp<ViewStyle>; inputStyle?: StyleProp<TextStyle> }) {
   const { c, fonts, radius, textScale, type } = useTheme()
   const [focus, setFocus] = useState(false)
   return (
@@ -129,6 +132,7 @@ export function TextField({ label, hideLabel, style, multiline, ...rest }: TextI
           color: c.ink,
           textAlignVertical: multiline ? 'top' : 'center',
           outlineStyle: 'none',
+          ...StyleSheet.flatten(inputStyle),
         } as never}
       />
     </View>
@@ -300,7 +304,9 @@ export function InkScreen({ children, top }: { children: ReactNode; top?: ReactN
 function ScrollPad({ children, bottom }: { children: ReactNode; bottom: number }) {
   const { space } = useTheme()
   return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: space.gutter, paddingTop: space.s2, paddingBottom: bottom, gap: space.s3, width: '100%', maxWidth: 640, alignSelf: 'center' }}>
+    // As in Screen: a focused Field scrolls above the iOS keyboard, and a tap on a button while
+    // the keyboard is open acts on the first tap instead of only dismissing the keyboard.
+    <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets contentContainerStyle={{ paddingHorizontal: space.gutter, paddingTop: space.s2, paddingBottom: bottom, gap: space.s3, width: '100%', maxWidth: 640, alignSelf: 'center' }}>
       {children}
     </ScrollView>
   )

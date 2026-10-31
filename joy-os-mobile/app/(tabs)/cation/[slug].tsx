@@ -96,7 +96,7 @@ export default function CationDetail() {
     if (outcome.trim().length < 12) errs.outcome = t('In a sentence, what would you like to be different? It is how we measure the ’cation.')
     setErrors(errs)
     if (Object.keys(errs).length === 0)
-      setRequest(slug, { ref: `REQ-${slug.slice(0, 3).toUpperCase()}-${MEMBER.id.slice(-4)}-${String(Date.now()).slice(-4)}`, win, venue, guests, outcome: outcome.trim(), interestOnly })
+      setRequest(slug, { ref: `REQ-${slug.slice(0, 3).toUpperCase()}-${MEMBER.id.slice(-4)}-${String(Date.now()).slice(-4)}`, win, venue, guests, outcome: outcome.trim(), dietary: dietary.trim(), interestOnly })
   }
 
   return (
@@ -280,9 +280,14 @@ export default function CationDetail() {
             </KeyValue>
             {!interestOnly ? <KeyValue k={t('Dates')}>{localDate(request.win, lang)}</KeyValue> : null}
             <KeyValue k={t('Venue')}>{tx(request.venue)}</KeyValue>
-            <KeyValue k={t('Guests')} last>
+            <KeyValue k={t('Guests')} last={!request.dietary}>
               <Mono tone="ink">{String(request.guests)}</Mono>
             </KeyValue>
+            {request.dietary ? (
+              <KeyValue k={t('Dietary note')} last>
+                {request.dietary}
+              </KeyValue>
+            ) : null}
           </View>
           <Eyebrow>{t('What happens next')}</Eyebrow>
           {[t('Consents and your Index baseline'), t('Device posted and linked; home draw if needed'), t('{coach} reads your named outcome with you', { coach })].map((x, i) => (
@@ -309,6 +314,7 @@ export default function CationDetail() {
               setVenue(request.venue)
               setGuests(request.guests)
               setOutcome(request.outcome)
+              setDietary(request.dietary ?? '')
               setRequest(slug, null)
             }}
           >

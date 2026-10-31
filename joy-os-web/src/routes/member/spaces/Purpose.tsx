@@ -8,6 +8,7 @@ import { MEMBER } from '@/data/member'
 import { CONTRIBUTIONS, IKIGAI_START, SPACE_TODAY, STATEMENT_START, TOMORROW_ANSWERS } from './_data'
 import { SpaceShell, ToolCard, useCrisisGuard, Toggle } from './_SpaceShell'
 import { useSpaceText, type SpKey } from './_i18n'
+import { useSpaceState } from './_state'
 
 // PURPOSE (Memo p.19): the Ikigai map (direction for ten years, contribution,
 // daily anchors), the Tomorrow Question weekly, the 25-year statement from the
@@ -36,7 +37,7 @@ const inputCls = 'w-full rounded-xl border border-line-strong bg-paper px-4 py-3
 
 function IkigaiMap() {
   const guard = useCrisisGuard()
-  const [map, setMap] = useState(IKIGAI_START)
+  const [map, setMap] = useSpaceState<typeof IKIGAI_START & { changedOn?: string }>('purpose.ikigai.v1', IKIGAI_START)
   const [draft, setDraft] = useState(IKIGAI_START)
   const [editing, setEditing] = useState(false)
   const [newAnchor, setNewAnchor] = useState('')
@@ -50,8 +51,12 @@ function IkigaiMap() {
     if (!draft.contribution.trim()) e.contribution = 'pur.ik.errContribution'
     setErr(e)
     if (e.direction || e.contribution) return
-    if (guard(draft.direction, draft.contribution, ...draft.anchors)) return
-    setMap({ ...draft, direction: draft.direction.trim(), contribution: draft.contribution.trim(), anchors: draft.anchors.filter((a) => a.trim()) })
+    // An anchor typed but not yet added with + is kept, not thrown away.
+    const pending = newAnchor.trim()
+    const anchors = [...draft.anchors, ...(pending && draft.anchors.length < 5 ? [pending] : [])].map((a) => a.trim()).filter(Boolean)
+    if (guard(draft.direction, draft.contribution, ...anchors)) return
+    setMap({ direction: draft.direction.trim(), contribution: draft.contribution.trim(), anchors, changedOn: SPACE_TODAY })
+    setNewAnchor('')
     setEditing(false)
     setSaved(true)
   }
@@ -93,7 +98,8 @@ function IkigaiMap() {
         <li className="relative">
           <span aria-hidden className="absolute -left-[31px] top-1 h-3 w-3 rounded-full border-2 border-paper-raised bg-term-p" />
           <p className="eyebrow text-ink-3">{t('pur.ik.anchors')}</p>
-          <ul className="mt-2 flex flex-wrap gap-2">
+          {(editing ? draft.anchors : map.anchors).length === 0 && <p className="mt-2 text-[15px] text-ink-3">{t('c.nothingYet')}</p>}
+          <ul className="mt-2 flex flex-wrap gap-2 empty:hidden">
             {(editing ? draft.anchors : map.anchors).map((a, i) => (
               <li key={a + i} className="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--term-p-soft)] px-3.5 py-1.5 text-[15px] text-[color:var(--term-p-ink)]">
                 {a}
@@ -123,7 +129,7 @@ function IkigaiMap() {
             <Button variant="ghost" onClick={() => { setEditing(false); setErr({}); setNewAnchor('') }}>{t('c.cancel')}</Button>
           </>
         ) : (
-          <p className="text-[13px] text-ink-3" role="status">{saved ? t('pur.ik.saved') : t('pur.ik.lastChanged')}</p>
+          <p className="text-[13px] text-ink-3" role="status">{saved ? t('pur.ik.saved') : map.changedOn ? t('pur.ik.changedOn', { d: fmtDate(map.changedOn) }) : t('pur.ik.lastChanged')}</p>
         )}
       </div>
     </ToolCard>
@@ -134,21 +140,23 @@ function IkigaiMap() {
 
 function TomorrowQuestion() {
   const guard = useCrisisGuard()
-  const [answers, setAnswers] = useState(TOMORROW_ANSWERS)
+  const [answers, setAnswers] = useSpaceState('purpose.tomorrow.v1', TOMORROW_ANSWERS)
   const [text, setText] = useState('')
   const [err, setErr] = useState(false)
-  const { t, r, lang } = useSpaceText()
-  const [restore, setRestore] = useState<(typeof TOMORROW_ANSWERS)[number] | null>(null)
+  const { t, r, lang, dm } = useSpaceText()
+  // Changing this week's answer edits a draft; the saved answer stays in the record until the new one is saved.
+  const [changing, setChanging] = useState(false)
   const [justSaved, setJustSaved] = useState(false)
-  const answeredThisWeek = answers[0].week === 4
+  const thisWeek = answers.find((a) => a.week === 4)
+  const answeredThisWeek = !!thisWeek && !changing
   const save = () => {
     if (!text.trim()) return setErr(true)
     if (guard(text)) return
-    setAnswers((a) => [{ week: 4, date: SPACE_TODAY, text: text.trim() }, ...a])
-    setText(''); setErr(false); setRestore(null); setJustSaved(true)
+    setAnswers((a) => [{ week: 4, date: SPACE_TODAY, text: text.trim() }, ...a.filter((x) => x.week !== 4)])
+    setText(''); setErr(false); setChanging(false); setJustSaved(true)
   }
-  const change = () => { setRestore(answers[0]); setText(answers[0].text); setAnswers((a) => a.slice(1)); setJustSaved(false) }
-  const cancelChange = () => { if (restore) setAnswers((a) => [restore, ...a]); setRestore(null); setText(''); setErr(false) }
+  const change = () => { if (!thisWeek) return; setText(thisWeek.text); setChanging(true); setJustSaved(false) }
+  const cancelChange = () => { setChanging(false); setText(''); setErr(false) }
   return (
     <ToolCard className="w-full" tone="soft" eyebrow={<>{r('pur.tq.eyebrow', { n: <span className="num">4</span> })}</>} title={<>{r('pur.tq.title', { e: <em>{t('pur.tq.titleE')}</em> })}</>}>
       <AnimatePresence mode="wait" initial={false}>
@@ -163,12 +171,12 @@ function TomorrowQuestion() {
               <span className="num shrink-0 text-ink-3">{text.length}/200</span>
             </div>
             <DaybreakButton onClick={save} className="mt-4 w-full">{t('pur.tq.save')}</DaybreakButton>
-            {restore && <Button variant="ghost" onClick={cancelChange} className="mt-2 self-center !whitespace-normal text-center">{t('pur.tq.keepEarlier')}</Button>}
+            {changing && <Button variant="ghost" onClick={cancelChange} className="mt-2 self-center !whitespace-normal text-center">{t('pur.tq.keepEarlier')}</Button>}
           </motion.div>
         ) : (
           <motion.div key="done" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl bg-paper-raised p-4">
             <p className="eyebrow text-daybreak-ink">{t('c.thisWeek')}</p>
-            <p className="mt-1.5 text-[17px] text-ink">{answers[0].text}</p>
+            <p className="mt-1.5 text-[17px] text-ink">{thisWeek?.text}</p>
             {justSaved && <p role="status" className="mt-2 flex items-center gap-1.5 text-[14px] text-ink-2"><Check size={14} className="shrink-0" aria-hidden /> {t('pur.tq.saved')}</p>}
             <button onClick={change} className="mt-2 text-[14px] text-ink-2 underline underline-offset-4 focus-ring rounded">{t('pur.tq.changeIt')}</button>
           </motion.div>
@@ -179,7 +187,7 @@ function TomorrowQuestion() {
         <ol className="mt-3 space-y-3">
           {answers.filter((a) => a.week !== 4).map((a) => (
             <li key={a.week} className={clsx('grid gap-3 text-[15px]', lang === 'en' ? 'grid-cols-[3.5rem_1fr]' : 'grid-cols-[4.75rem_1fr]')}>
-              <span className="num text-[13px] text-ink-3">{t('pur.tq.wk', { n: a.week })}<span className="block">{fmtDate(a.date).slice(0, 6)}</span></span>
+              <span className="num text-[13px] text-ink-3">{t('pur.tq.wk', { n: a.week })}<span className="block">{dm(a.date)}</span></span>
               <span className="text-ink-2">{a.text}</span>
             </li>
           ))}
@@ -193,7 +201,7 @@ function TomorrowQuestion() {
 
 function Statement() {
   const guard = useCrisisGuard()
-  const [versions, setVersions] = useState([
+  const [versions, setVersions] = useSpaceState('purpose.statement.v1', [
     { v: 2, date: '2027-01-18', text: STATEMENT_START },
     { v: 1, date: '2027-01-04', text: STATEMENT_START.split('. ').slice(0, 3).join('. ') + '.' },
   ])
@@ -201,7 +209,7 @@ function Statement() {
   const [draft, setDraft] = useState(versions[0].text)
   const [showV, setShowV] = useState(false)
   const [justSaved, setJustSaved] = useState(false)
-  const [revisit, setRevisit] = useState<string[]>(['read'])
+  const [revisit, setRevisit] = useSpaceState<string[]>('purpose.statement.revisit.v1', ['read'])
   const { t, r } = useSpaceText()
   const words = draft.trim().split(/\s+/).filter(Boolean).length
   const daysToRevisit = MEMBER.loopLength - MEMBER.dayOfLoop
@@ -228,7 +236,7 @@ function Statement() {
         <div>
           <label>
             <span className="sr-only">{t('pur.st.label')}</span>
-            <textarea rows={8} value={draft} onChange={(e) => setDraft(e.target.value)} className={clsx(inputCls, 'font-serif text-[18px] leading-relaxed')} />
+            <textarea rows={8} value={draft} onChange={(e) => setDraft(e.target.value)} aria-invalid={words < 10} aria-describedby="stmt-help" className={clsx(inputCls, 'font-serif text-[18px] leading-relaxed')} />
           </label>
           <div className="mt-1.5 flex justify-between gap-3 text-[13px] text-ink-3">
             <span id="stmt-help" className={words < 10 ? 'text-error' : undefined} role={words < 10 ? 'alert' : undefined}>{words < 10 ? t('pur.st.tooShort') : t('pur.st.help')}</span>
@@ -291,11 +299,11 @@ function Statement() {
 
 function ContributionLog() {
   const guard = useCrisisGuard()
-  const [items, setItems] = useState(CONTRIBUTIONS)
+  const [items, setItems] = useSpaceState('purpose.contributions.v1', CONTRIBUTIONS)
   const [what, setWhat] = useState('')
   const [who, setWho] = useState('')
   const [err, setErr] = useState(false)
-  const { t, r } = useSpaceText()
+  const { t, r, dm } = useSpaceText()
   const add = () => {
     if (!what.trim()) return setErr(true)
     if (guard(what, who)) return
@@ -325,7 +333,7 @@ function ContributionLog() {
               <p className="text-[15px] text-ink">{c.what}</p>
               <p className="text-[13px] text-ink-3">{c.who || t('pur.cl.notNamed')}</p>
             </div>
-            <span className="num shrink-0 text-[12px] text-ink-3">{fmtDate(c.date).slice(0, 6)}</span>
+            <span className="num shrink-0 text-[12px] text-ink-3">{dm(c.date)}</span>
           </motion.li>
         ))}
       </ul>
@@ -353,12 +361,15 @@ function CareerVenn() {
   const guard = useCrisisGuard()
   const [on, setOn] = useState(false)
   const [sel, setSel] = useState<VennKey>('love')
-  const [items, setItems] = useState(VENN_START)
+  const [items, setItems] = useSpaceState('purpose.venn.v1', VENN_START)
   const [v, setV] = useState('')
   const [err, setErr] = useState<SpKey | ''>('')
   const { t } = useSpaceText()
-  const [overlap, setOverlap] = useState('Teaching plant turnarounds to young engineers')
+  const [overlap, setOverlap] = useSpaceState('purpose.venn.overlap.v1', 'Teaching plant turnarounds to young engineers')
+  // Focus is drawn by hand: :focus-visible on SVG shapes is unreliable across browsers.
+  const [focused, setFocused] = useState<VennKey | null>(null)
   const [editOverlap, setEditOverlap] = useState(false)
+  const [overlapDraft, setOverlapDraft] = useState('')
   const cur = VENN.find((x) => x.key === sel)!
   const curLabel = t(cur.label)
   const list = items[sel]
@@ -377,7 +388,7 @@ function CareerVenn() {
         {on && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.24 }} className="overflow-hidden">
             <div className="mt-6 grid items-start gap-6 md:grid-cols-[300px_1fr]">
-              <svg viewBox="0 0 300 330" className="mx-auto w-full max-w-[300px]" role="img" aria-label={t('pur.v.aria', { list: VENN.map((x) => `${t(x.label)}: ${items[x.key].join(', ') || t('pur.v.nothingYet')}`).join('. ') })}>
+              <svg viewBox="0 0 300 330" className="mx-auto w-full max-w-[300px]" role="group" aria-label={t('pur.v.aria', { list: VENN.map((x) => `${t(x.label)}: ${items[x.key].join(', ') || t('pur.v.nothingYet')}`).join('. ') })}>
                 {VENN.map((x) => (
                   <circle
                     key={x.key}
@@ -386,12 +397,16 @@ function CareerVenn() {
                     r={78}
                     fill="var(--term-p)"
                     fillOpacity={sel === x.key ? 0.28 : 0.08}
-                    stroke="var(--term-p)"
-                    strokeOpacity={sel === x.key ? 0.9 : 0.35}
-                    className="cursor-pointer transition-[fill-opacity] duration-200"
+                    stroke={focused === x.key ? 'var(--ink)' : 'var(--term-p)'}
+                    strokeOpacity={focused === x.key ? 1 : sel === x.key ? 0.9 : 0.35}
+                    strokeWidth={focused === x.key ? 2.5 : 1}
+                    className="cursor-pointer transition-[fill-opacity] duration-200 focus:outline-none"
                     tabIndex={0}
                     role="button"
                     aria-label={t('pur.v.items', { label: t(x.label), n: items[x.key].length })}
+                    aria-pressed={sel === x.key}
+                    onFocus={() => setFocused(x.key)}
+                    onBlur={() => setFocused((f) => (f === x.key ? null : f))}
                     onClick={() => { setSel(x.key); setErr('') }}
                     onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setSel(x.key))}
                   />
@@ -431,12 +446,12 @@ function CareerVenn() {
                 <div className="mt-5 rounded-xl bg-paper-sunk p-3.5">
                   <p className="text-[14px] text-ink-2">{t('pur.v.dot')}</p>
                   {editOverlap ? (
-                    <form onSubmit={(e) => { e.preventDefault(); if (overlap.trim() && !guard(overlap)) setEditOverlap(false) }} className="mt-2 flex gap-2">
-                      <label className="min-w-0 flex-1"><span className="sr-only">{t('pur.v.overlap')}</span><input value={overlap} onChange={(e) => setOverlap(e.target.value)} className={clsx(inputCls, 'h-11 bg-paper-raised py-0')} /></label>
-                      <Button type="submit" variant="ink" disabled={!overlap.trim()}><Check size={15} /> {t('pur.v.keep')}</Button>
+                    <form onSubmit={(e) => { e.preventDefault(); const o = overlapDraft.trim(); if (o && !guard(o)) { setOverlap(o); setEditOverlap(false) } }} className="mt-2 flex gap-2">
+                      <label className="min-w-0 flex-1"><span className="sr-only">{t('pur.v.overlap')}</span><input value={overlapDraft} onChange={(e) => setOverlapDraft(e.target.value)} className={clsx(inputCls, 'h-11 bg-paper-raised py-0')} /></label>
+                      <Button type="submit" variant="ink" disabled={!overlapDraft.trim()}><Check size={15} /> {t('pur.v.keep')}</Button>
                     </form>
                   ) : (
-                    <p className="mt-1 flex flex-wrap items-baseline gap-x-3 text-[17px] text-ink">{overlap}<button onClick={() => setEditOverlap(true)} className="rounded text-[14px] text-ink-2 underline underline-offset-4 focus-ring">{t('c.change')}</button></p>
+                    <p className="mt-1 flex flex-wrap items-baseline gap-x-3 text-[17px] text-ink">{overlap}<button onClick={() => { setOverlapDraft(overlap); setEditOverlap(true) }} className="rounded text-[14px] text-ink-2 underline underline-offset-4 focus-ring">{t('c.change')}</button></p>
                   )}
                 </div>
               </div>

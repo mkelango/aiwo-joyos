@@ -30,16 +30,33 @@ export const GATE: Record<string, Role[]> = {
 }
 
 /**
+ * The console role the visitor has chosen, if any. The stored role defaults to 'member',
+ * which is not a console role: that visitor has chosen nothing, and each console then
+ * opens as its own specimen person. Every console surface reads the role through here so
+ * none of them claims a role (say "coach") that was never picked.
+ */
+export function useConsoleRole() {
+  const { role, setRole } = useApp()
+  const chosen = ROLE_OPTIONS.find((r) => r.value === role) ?? null
+  return {
+    role,
+    setRole,
+    chosen,
+    roleLabel: chosen?.label ?? 'No console role',
+    person: chosen?.person ?? 'No console role chosen',
+  }
+}
+
+/**
  * Whether the signed-in demo role may act in a console. A visitor who has not chosen a
  * console role yet (the member default) signs in as that console's own specimen person.
  */
 export function useConsoleAccess(path: string) {
-  const { role, setRole } = useApp()
+  const { role, setRole, chosen, roleLabel } = useConsoleRole()
   const allowed = GATE[path] ?? []
-  const chosen = ROLE_OPTIONS.find((r) => r.value === role)
   const canAct = !chosen || allowed.includes(role)
   const native = ROLE_OPTIONS.find((r) => r.value === allowed[0])
-  return { canAct, roleLabel: chosen?.label ?? 'Member', switchTo: () => allowed[0] && setRole(allowed[0]), nativeLabel: native?.label ?? '' }
+  return { canAct, chosen: !!chosen, roleLabel, switchTo: () => allowed[0] && setRole(allowed[0]), nativeLabel: native?.label ?? '' }
 }
 
 export function PreviewBanner({ path }: { path: string }) {

@@ -1,12 +1,11 @@
 import { useState } from 'react'
 import { View } from 'react-native'
-import { Body, Button, Card, DaybreakButton, Eyebrow, Icon, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, TermChip, Title, Toggle, fmtDate } from '@/components'
+import { Avatar, Body, Button, Card, DaybreakButton, Eyebrow, Icon, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, TermChip, Title, Toggle, fmtDate } from '@/components'
 import { CIRCLE } from '@/shared/platform'
-import { brand, palettes } from '@/theme/tokens'
 import { useTheme } from '@/theme/ThemeProvider'
 import { CIRCLE_NEXT, CIRCLE_SESSIONS, OTHER_CIRCLES, PRACTICE_CONTENT, SALONS } from '@/screens/b/journeyData'
 import { accountStore, useStore } from '@/screens/b/bStore'
-import { CheckLine, Done, TimelineStep, memberOnly } from '@/screens/b/parts'
+import { CheckLine, Done, TimelineStep, fmtWhen, memberOnly } from '@/screens/b/parts'
 import { useDict } from '@/lib/i18n'
 import { CIRCLES, OTHER_CIRCLE_TEXT, CIRCLE_STATUS, SALON_TITLE, CIRCLE_PROMPT } from '@/screens/b/i18n/journey'
 import { PRACTICE_TITLE, useCommon, useTx } from '@/screens/b/i18n/common'
@@ -28,9 +27,7 @@ function Circles() {
   const tc = useCommon()
   const tx = useTx()
   const prompt = PRACTICE_CONTENT.find((p) => p.week === CIRCLE_NEXT.week)!
-  // Avatars sit on fixed Spectrum grounds with Paper initials in both schemes (as on Today).
-  const L = palettes.light
-  const tones = [L.termR, L.termP, L.termF, L.termH, L.termB, brand.slate, L.termR, L.termP]
+  // Avatars are neutral: the Spectrum is reserved for the six terms, never for people.
 
   return (
     <Screen>
@@ -58,13 +55,15 @@ function Circles() {
           </Meta>
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: space.s1 }} accessible accessibilityLabel={t('inCircle', { list: CIRCLE.members.join(', '), coach: CIRCLE.coach })}>
-          {CIRCLE.members.map((m, i) => (
+          {CIRCLE.members.map((m) => (
             <View key={m} style={{ width: '25%', alignItems: 'center', gap: 4 }}>
-              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: tones[i], alignItems: 'center', justifyContent: 'center', borderWidth: m === 'Arjun' ? 2 : 0, borderColor: c.ink }}>
-                <Mono size={15} color={L.onInk}>
-                  {m[0]}
-                </Mono>
-              </View>
+              {m === 'Arjun' ? (
+                <View style={{ borderRadius: 24, borderWidth: 2, borderColor: c.ink }}>
+                  <Avatar person={{ name: m, initials: m[0], tone: '' }} size={44} />
+                </View>
+              ) : (
+                <Avatar person={{ name: m, initials: m[0], tone: '' }} size={44} />
+              )}
               <Meta size={13} tone={m === 'Arjun' ? 'ink' : 'ink2'}>
                 {m === 'Arjun' ? tc('you') : m}
               </Meta>
@@ -160,7 +159,7 @@ function Circles() {
             <Title size={22}>{tx(SALON_TITLE[s.id], s.title)}</Title>
             <Meta tone="ink">{t('hosted', { host: s.host })}</Meta>
             <Meta size={14}>
-              <Mono size={14} tone="ink2">{s.when}</Mono> · {s.where}
+              <Mono size={14} tone="ink2">{fmtWhen(s)}</Mono> · {s.where}
             </Meta>
             <Meta size={14} tone="ink3">
               <Mono size={14} tone="ink3">{String(s.seats)}</Mono>{t('seats')}

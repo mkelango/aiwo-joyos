@@ -46,6 +46,7 @@ export const TRUST = {
   request: { en: 'Request export', ta: 'ஏற்றுமதியைக் கோரு', hi: 'निर्यात का अनुरोध करें' },
   savedDl: { en: 'Copy saved to your downloads. Keep it somewhere private.', ta: 'நகல் உங்கள் பதிவிறக்கங்களில் சேமிக்கப்பட்டது. அதைத் தனிப்பட்ட இடத்தில் வையுங்கள்.', hi: 'कॉपी आपके डाउनलोड में सेव हुई। इसे किसी निजी जगह रखें।' },
   handed: { en: 'Copy handed to your share sheet. Keep it somewhere private.', ta: 'நகல் உங்கள் பகிர்வுத் தாளுக்கு அனுப்பப்பட்டது. அதைத் தனிப்பட்ட இடத்தில் வையுங்கள்.', hi: 'कॉपी शेयर शीट को दी गई। इसे किसी निजी जगह रखें।' },
+  shareFailed: { en: 'Could not open the share sheet. Try again.', ta: 'பகிர்வுத் தாளைத் திறக்க முடியவில்லை. மீண்டும் முயலுங்கள்.', hi: 'शेयर शीट नहीं खुल सकी। फिर से कोशिश करें।' },
   readyLine: { en: 'Your {format} is ready · 2.6 MB · the link expires in 7 days.', ta: 'உங்கள் {format} தயார் · 2.6 MB · இணைப்பு 7 நாட்களில் காலாவதியாகும்.', hi: 'आपकी {format} तैयार है · 2.6 MB · लिंक 7 दिन में ख़त्म होगा।' },
   jsonFile: { en: 'JSON file', ta: 'JSON கோப்பு', hi: 'JSON फ़ाइल' },
   reqLine: { en: 'Requested {a} · ready by {b} at the latest. We will tell you by email and in the app.', ta: '{a} அன்று கோரப்பட்டது · அதிகபட்சம் {b}-க்குள் தயார். மின்னஞ்சலிலும் ஆப்பிலும் தெரிவிப்போம்.', hi: '{a} को अनुरोध · ज़्यादा से ज़्यादा {b} तक तैयार। हम ईमेल और ऐप में बताएँगे।' },

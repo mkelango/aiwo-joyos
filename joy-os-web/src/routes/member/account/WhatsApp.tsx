@@ -4,11 +4,11 @@ import { ArrowLeft, BadgeCheck, Ban, Check, CheckCheck, Clock, MessageCircle, Mo
 import { useEffect, useRef, useState } from 'react'
 import { DaybreakButton, useBandText } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill, Sheet, Tabs } from '@/components/ui'
-import { CONSENTS, INDEX_HISTORY, LEDGER_WEEK, MEMBER } from '@/data/member'
+import { CONSENTS, INDEX_HISTORY, LEDGER_WEEK } from '@/data/member'
 import { termByKey } from '@/data/terms'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { Checkbox, Section } from './_parts'
-import { readNotifPrefs, rich, syncWhatsAppChannel, usePersisted, useToast } from './_util'
+import { readNotifPrefs, rich, syncWhatsAppChannel, useMemberProfile, usePersisted, useToast } from './_util'
 import { INSTRUMENT_NOTE, fill, useDict, useLang, useTermText } from '@/lib/i18n'
 import { WA, useLookup } from './_i18n'
 
@@ -186,11 +186,12 @@ export default function WhatsApp() {
   }
 
   /** Chat lines are kept in English and read in the member's language; the Check statements stay English. */
+  const profile = useMemberProfile()
   const word = (w: string) => (lang === 'en' ? w.toLowerCase() : lk(w))
   const lineText = (m: ChatMsg) => {
     if (m.from === 'me') return m.vars?.reply ? lk(m.text) : m.text
     const bands = lang === 'en' ? bandsLine : latest.terms.map((x) => `${tt.space(x.key)} ${bandText(x.band)}`).join(' · ')
-    return fill(lk(m.text), { name: MEMBER.firstName, bands, w1: word(LEDGER_WEEK[0].tag), w2: word(LEDGER_WEEK[1].tag), ...m.vars, tag: word(m.vars?.tag ?? tag) })
+    return fill(lk(m.text), { name: profile.firstName, bands, w1: word(LEDGER_WEEK[0].tag), w2: word(LEDGER_WEEK[1].tag), ...m.vars, tag: word(m.vars?.tag ?? tag) })
   }
 
   return (
@@ -206,7 +207,7 @@ export default function WhatsApp() {
         <div className="flex flex-col items-center">
           <Tabs className="mb-5" value={scenario} onChange={setScenario} items={[{ value: 'ledger', label: tw('tabLedger') }, { value: 'check', label: tw('tabCheck') }, { value: 'reminders', label: tw('tabReminders') }]} />
           {scenario === 'check' && lang !== 'en' && <p className="mb-4 max-w-[360px] text-center text-[13px] leading-snug text-ink-3">{INSTRUMENT_NOTE[lang]}</p>}
-          <div className="relative w-full max-w-[360px] rounded-[2.6rem] border-[10px] border-ink-ground bg-ink-ground shadow-lift ring-1 ring-line-strong" aria-label={tw('simAria')}>
+          <div className="relative w-full max-w-[360px] rounded-[2.6rem] border-[10px] border-ink-ground bg-ink-ground shadow-lift ring-1 ring-line-strong" role="region" aria-label={tw('simAria')}>
             <div className="flex h-[640px] flex-col overflow-hidden rounded-[2rem] bg-paper-sunk">
               {/* Status + header */}
               <div className="bg-ink px-4 pb-3 pt-3 text-paper">
@@ -256,7 +257,7 @@ export default function WhatsApp() {
                   ))}
                 </AnimatePresence>
                 {typing && (
-                  <div className="flex w-fit gap-1 rounded-xl rounded-tl-sm bg-paper-raised px-3 py-3 shadow-card" aria-label={tw('typingAria')}>
+                  <div className="flex w-fit gap-1 rounded-xl rounded-tl-sm bg-paper-raised px-3 py-3 shadow-card" role="img" aria-label={tw('typingAria')}>
                     {[0, 1, 2].map((i) => <span key={i} className="h-1.5 w-1.5 animate-pulse rounded-full bg-ink-3 motion-reduce:animate-none" style={{ animationDelay: `${i * 150}ms` }} />)}
                   </div>
                 )}
@@ -274,7 +275,7 @@ export default function WhatsApp() {
             <Button size="sm" variant="ghost" onClick={() => start(scenario)}><RotateCcw size={14} /> {tw('restart')}</Button>
             <span className="eyebrow text-ink-3">{tw('simulation')}</span>
           </div>
-          <div className="mt-2 flex flex-wrap justify-center gap-1.5" aria-label={tw('tryTyping')}>
+          <div className="mt-2 flex flex-wrap justify-center gap-1.5" role="group" aria-label={tw('tryTyping')}>
             {['STOP', 'my blood results?', 'Lunch with Kavya'].map((x) => (
               <button key={x} type="button" onClick={() => setText(x)} className="rounded-full border border-line px-2.5 py-1 text-[12px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring">{tw('tryX', { x })}</button>
             ))}

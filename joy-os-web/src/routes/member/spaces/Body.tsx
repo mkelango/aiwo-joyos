@@ -9,6 +9,7 @@ import { Button, Pill, Sheet, Tabs } from '@/components/ui'
 import { BIOMARKERS, CAPACITY, DEVICES, LE8, PANEL_META, SIGNALS, SPACE_TODAY, type Marker, type MarkerStatus } from './_data'
 import { ChartTip, SpaceShell, ToolCard, axisTick, Toggle } from './_SpaceShell'
 import { useSpaceText, type SpKey } from './_i18n'
+import { useSpaceState } from './_state'
 
 // BODY · Healthspan (Memo p.19): device link, Life's Essential 8, biomarker vault
 // (from LifeOS, physician-signed), capacity battery at home, signal trends as
@@ -311,10 +312,12 @@ function CapacityBattery() {
   const [stsManual, setStsManual] = useState('')
   const [gaitTime, setGaitTime] = useState<number | null>(null)
   const [err, setErr] = useState<SpKey | ''>('')
-  const { t, d, r } = useSpaceText()
-  const [latest, setLatest] = useState<{ on: string; values: number[]; prev: number[]; prevLabel: string }>({
-    on: '2027-01-02', values: CAPACITY.map((c) => c.last), prev: CAPACITY.map((c) => c.prev), prevLabel: 'October',
+  const { t, d, r, dm } = useSpaceText()
+  // The committed readings persist; prevOn is the date of the readings compared against (null: the October baseline).
+  const [latest, setLatest] = useSpaceState<{ on: string; values: number[]; prev: number[]; prevOn: string | null }>('body.capacity.v1', {
+    on: '2027-01-02', values: CAPACITY.map((c) => c.last), prev: CAPACITY.map((c) => c.prev), prevOn: null,
   })
+  const prevLabel = latest.prevOn ? dm(latest.prevOn) : t('c.october')
   const [justSaved, setJustSaved] = useState(false)
   const steps: Step[] = ['grip', 'sts', 'gait']
   const idx = steps.indexOf(step)
@@ -336,7 +339,7 @@ function CapacityBattery() {
   const results = step === 'done' ? [Number(grip), sts!, Math.round((4 / gaitTime!) * 100) / 100] : null
   const back = () => { setErr(''); setStep(step === 'gait' ? 'sts' : 'grip') }
   const done = () => {
-    if (results) setLatest((l) => ({ on: SPACE_TODAY, values: results, prev: l.values, prevLabel: fmtDate(l.on).slice(0, 6) }))
+    if (results) setLatest((l) => ({ on: SPACE_TODAY, values: results, prev: l.values, prevOn: l.on }))
     setStep('intro'); setGrip(''); setSts(null); setStsManual(''); setGaitTime(null); setJustSaved(true)
   }
 
@@ -355,7 +358,7 @@ function CapacityBattery() {
                 <li key={c.key} className="rounded-2xl border border-line p-4">
                   <span className="eyebrow block text-ink-3">{d(c.name)}</span>
                   <span className="num mt-2 block text-[2rem] font-light leading-none text-ink">{last}<span className="ml-1 text-[14px] text-ink-3">{c.unit}</span></span>
-                  <span className="mt-2 block text-[13px] text-ink-2">{t(same ? 'body.cap.sameAs' : better ? 'body.cap.better' : 'body.cap.notQuite', { label: latest.prevLabel === 'October' ? t('c.october') : latest.prevLabel })} (<span className="num">{prev}</span> {c.unit})</span>
+                  <span className="mt-2 block text-[13px] text-ink-2">{t(same ? 'body.cap.sameAs' : better ? 'body.cap.better' : 'body.cap.notQuite', { label: prevLabel })} (<span className="num">{prev}</span> {c.unit})</span>
                   <span className="mt-1 block text-[12px] text-ink-3">{d(c.norm)}</span>
                 </li>
               )
@@ -395,7 +398,7 @@ function CapacityBattery() {
                   <div className="mt-4"><Stopwatch label={t('body.cap.swSts')} onUse={(v) => { setSts(v); setStsManual(String(v)) }} /></div>
                   <label className="mt-3 block max-w-xs">
                     <span className="text-[14px] text-ink-2">{t('body.cap.orType')}</span>
-                    <input inputMode="decimal" value={stsManual} onChange={(e) => { setStsManual(e.target.value); setSts(null) }} aria-invalid={!!err} className="num mt-1.5 h-11 w-full rounded-xl border border-line-strong bg-paper px-4 text-[17px] text-ink focus-ring" placeholder="10.8" />
+                    <input inputMode="decimal" value={stsManual} onChange={(e) => { setStsManual(e.target.value); setSts(null) }} aria-invalid={!!err} aria-describedby={err ? 'cap-err' : undefined} className="num mt-1.5 h-11 w-full rounded-xl border border-line-strong bg-paper px-4 text-[17px] text-ink focus-ring" placeholder="10.8" />
                   </label>
                 </>
               )}
@@ -443,7 +446,7 @@ function CapacityBattery() {
 // ─── Biological age ───────────────────────────────────────────────────────
 
 function BiologicalAge() {
-  const [asked, setAsked] = useState(false)
+  const [asked, setAsked] = useSpaceState('body.bioAge.asked.v1', false)
   const { t } = useSpaceText()
   return (
     <ToolCard className="w-full" tone="sunk" eyebrow={t('body.ba.eyebrow')} aside={<Lock size={16} className="text-ink-3" aria-hidden />}>
@@ -471,7 +474,7 @@ function BiologicalAge() {
 function SignalTrends() {
   type K = 'regularity' | 'hrv' | 'rhr'
   const [k, setK] = useState<K>('hrv')
-  const { t } = useSpaceText()
+  const { t, dm } = useSpaceText()
   const meta: Record<K, { name: string; unit: string; sentence: string; better: string; domain: [number, number] }> = {
     regularity: { name: t('body.sig.regularity'), unit: '', sentence: t('body.sig.regS'), better: t('body.sig.regB'), domain: [55, 95] },
     hrv: { name: t('body.sig.hrvName'), unit: ' ms', sentence: t('body.sig.hrvS'), better: t('body.sig.hrvB'), domain: [25, 55] },
@@ -494,15 +497,15 @@ function SignalTrends() {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={SIGNALS} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
                 <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="2 4" />
-                <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={{ stroke: 'var(--line)' }} interval={6} />
+                <XAxis dataKey="on" tick={axisTick} tickLine={false} axisLine={{ stroke: 'var(--line)' }} interval={6} tickFormatter={dm} />
                 <YAxis tick={axisTick} tickLine={false} axisLine={false} domain={m.domain} />
-                <Tooltip content={<ChartTip unit={m.unit} />} cursor={{ stroke: 'var(--line-strong)' }} />
+                <Tooltip content={<ChartTip unit={m.unit} fmt={dm} />} cursor={{ stroke: 'var(--line-strong)' }} />
                 <ReferenceLine y={mean} stroke="var(--ink-3)" strokeDasharray="4 4" />
                 <Line isAnimationActive={false} type="monotone" dataKey={k} stroke="var(--term-h)" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: 'var(--term-h)' }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
-          <p className="sr-only">{t('body.sig.sr', { name: m.name, list: SIGNALS.map((s) => `${s.label} ${s[k]}`).join(', ') })}</p>
+          <p className="sr-only">{t('body.sig.sr', { name: m.name, list: SIGNALS.map((s) => `${dm(s.on)} ${s[k]}`).join(', ') })}</p>
         </div>
         <dl className="grid grid-cols-3 gap-3 md:grid-cols-1">
           <div className="rounded-xl bg-paper-sunk p-3"><dt className="eyebrow text-ink-3">{t('body.sig.mean')}</dt><dd className="num mt-1 text-[1.6rem] font-light text-ink">{mean}<span className="text-[13px] text-ink-3">{m.unit}</span></dd></div>

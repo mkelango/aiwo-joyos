@@ -9,7 +9,7 @@ import { MEMBER } from '@/data/member'
 import { MEMBERSHIPS } from '@/data/platform'
 import { ENTITLEMENTS, GSTIN_AIWO, GST_RATE, INVOICES } from './_data'
 import { Section, Segmented, Toggle } from './_parts'
-import { inr, rich, usePersisted, useToast } from './_util'
+import { inr, rich, useMemberProfile, usePersisted, useToast } from './_util'
 import { useDict, useLang } from '@/lib/i18n'
 import { MEM, useData } from './_i18n'
 
@@ -22,7 +22,6 @@ type Invoice = (typeof INVOICES)[number]
 
 /** Annual rupee price of the paid tiers, for the pro-rata line. */
 const ANNUAL_INR: Record<string, number> = { 'Joy OS Plus': 499 * 12, Circle: 150000, Clinical: 450000, Patron: 1200000 }
-const TODAY = '2027-01-28'
 const CIRCLE_RENEWS = '2027-12-15'
 const PLUS_NEXT = '2027-02-01'
 const FREE = ['Joyspan Check', 'Joy OS']
@@ -30,10 +29,12 @@ function daysBetween(a: string, b: string) {
   return Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000)
 }
 function addMonths(iso: string, n: number) {
-  const d = new Date(iso)
-  d.setMonth(d.getMonth() + n)
+  // UTC throughout, so a date west of UTC never slips back a day and rolls a month over.
+  const d = new Date(iso + 'T00:00:00Z')
+  d.setUTCMonth(d.getUTCMonth() + n)
   return d.toISOString().slice(0, 10)
 }
+const FEB_INVOICE = 'INV-2027-000531'
 interface Pending { plan: string; kind: 'up' | 'down'; from: string; today?: number }
 
 export default function Membership() {
@@ -59,12 +60,19 @@ export default function Membership() {
   const rank = (name: string) => MEMBERSHIPS.findIndex((x) => x.name === name)
   const quote = (name: string): Pending => {
     if (rank(name) > rank(MEMBER.membership)) {
-      const days = daysBetween(TODAY, CIRCLE_RENEWS)
+      // Charged on the day the upgrade starts, pro-rated from then to the Circle renewal.
+      const days = daysBetween(PLUS_NEXT, CIRCLE_RENEWS)
       const diff = Math.round(((ANNUAL_INR[name] - ANNUAL_INR[MEMBER.membership]) * days) / 365)
       return { plan: name, kind: 'up', from: PLUS_NEXT, today: diff }
     }
     return { plan: name, kind: 'down', from: name === 'Joy OS' ? PLUS_NEXT : CIRCLE_RENEWS }
   }
+  // Once February is paid the grace state is over; the demo switch can no longer bring it back.
+  const febPaid = extraInvoices.some((i) => i.id === FEB_INVOICE)
+  const inGrace = grace && !febPaid
+  const invoiceRows: Invoice[] = inGrace
+    ? [{ id: FEB_INVOICE, date: '2027-02-01', item: 'Joy OS Plus · February', total: 499, method: 'UPI', status: 'Retrying' }, ...extraInvoices, ...INVOICES]
+    : [...extraInvoices, ...INVOICES]
   const toLadder = () => document.getElementById('ladder')?.scrollIntoView({ behavior: 'smooth' })
 
   return (
@@ -78,23 +86,23 @@ export default function Membership() {
       <div className="mb-8 flex items-center justify-end">
         <div className="flex items-center gap-3 rounded-full border border-dashed border-line px-4 py-2 text-[13px] text-ink-3">
           <span className="eyebrow">{t('demoGrace')}</span>
-          <button role="switch" aria-checked={grace} aria-label={t('showGrace')} onClick={() => setGrace(!grace)} className={clsx('relative h-6 w-10 rounded-full transition-colors focus-ring', grace ? 'bg-ink' : 'bg-line-strong')}>
-            <span className={clsx('absolute left-0 top-1 h-4 w-4 rounded-full bg-paper transition-transform', grace ? 'translate-x-5' : 'translate-x-1')} />
+          <button type="button" role="switch" aria-checked={inGrace} aria-label={t('showGrace')} disabled={febPaid} onClick={() => setGrace(!grace)} className={clsx('relative h-6 w-10 rounded-full transition-colors focus-ring disabled:cursor-not-allowed disabled:opacity-50', inGrace ? 'bg-ink' : 'bg-line-strong')}>
+            <span className={clsx('absolute left-0 top-1 h-4 w-4 rounded-full bg-paper transition-transform', inGrace ? 'translate-x-5' : 'translate-x-1')} />
           </button>
         </div>
       </div>
 
       <AnimatePresence>
-        {grace && (
+        {inGrace && (
           <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }} className="mb-8">
             <Card tone="soft" role="status">
               <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
                 <div className="max-w-2xl">
                   <p className="eyebrow text-daybreak-ink">{t('graceEyebrow')}</p>
-                  <p className="mt-2 text-[1.3rem] font-light leading-snug text-ink">{rich(t('graceTitle'), { date: <span className="num">15 Feb 2027</span> })}</p>
+                  <p className="mt-2 text-[1.3rem] font-light leading-snug text-ink">{rich(t('graceTitle'), { date: <span className="num">{fmtDate('2027-02-15')}</span> })}</p>
                   <p className="mt-2 text-[15px] text-ink-2">{t('graceBody')}</p>
                 </div>
-                <DaybreakButton onClick={() => { setGrace(false); setExtraInvoices((x) => (x.some((i) => i.id === 'INV-2027-000531') ? x : [{ id: 'INV-2027-000531', date: '2027-02-01', item: 'Joy OS Plus · February', total: 499, method: 'UPI', status: 'Paid' }, ...x])); showToast(t('paidToast')) }} className="shrink-0">{t('payUpi')}</DaybreakButton>
+                <DaybreakButton onClick={() => { setGrace(false); setExtraInvoices((x) => (x.some((i) => i.id === FEB_INVOICE) ? x : [{ id: FEB_INVOICE, date: '2027-02-01', item: 'Joy OS Plus · February', total: 499, method: 'UPI', status: 'Paid' }, ...x])); showToast(t('paidToast')) }} className="shrink-0">{t('payUpi')}</DaybreakButton>
               </div>
             </Card>
           </motion.div>
@@ -156,7 +164,7 @@ export default function Membership() {
             )}
           </AnimatePresence>
           <div className="mt-auto flex flex-wrap gap-2 pt-6">
-            {grace ? (
+            {inGrace ? (
               <Button variant="ink" onClick={toLadder}>{t('changePlan')}</Button>
             ) : (
               <DaybreakButton onClick={toLadder}>{t('changePlan')}</DaybreakButton>
@@ -230,7 +238,7 @@ export default function Membership() {
           <Card>
             {/* Phones: one row per invoice, so View is never scrolled out of sight */}
             <ul className="divide-y divide-line sm:hidden" aria-label={t('invoices')}>
-              {(grace ? [{ id: 'INV-2027-000531', date: '2027-02-01', item: 'Joy OS Plus · February', total: 499, method: 'UPI', status: 'Retrying' }, ...INVOICES] : [...extraInvoices, ...INVOICES]).map((r) => (
+              {invoiceRows.map((r) => (
                 <li key={r.id} className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
                   <span className="min-w-0">
                     <span className="block text-[15px] text-ink">{dx(r.item)}</span>
@@ -244,7 +252,7 @@ export default function Membership() {
             <div className="hidden sm:block">
             <DataTable
               caption={t('invoices')}
-              rows={grace ? [{ id: 'INV-2027-000531', date: '2027-02-01', item: 'Joy OS Plus · February', total: 499, method: 'UPI', status: 'Retrying' }, ...INVOICES] : [...extraInvoices, ...INVOICES]}
+              rows={invoiceRows}
               rowKey={(r) => r.id}
               columns={[
                 { key: 'date', header: t('date'), render: (r) => <span className="num whitespace-nowrap text-ink-2">{fmtDate(r.date)}</span> },
@@ -269,7 +277,7 @@ export default function Membership() {
                 </li>
                 <li className="flex items-center gap-3 p-5">
                   <span className="flex h-10 w-10 items-center justify-center rounded-full bg-paper-sunk"><CreditCard size={18} className="text-ink-2" /></span>
-                  <span className="min-w-0 flex-1"><span className="block text-[15px] text-ink">Visa</span><span className="num text-[13px] text-ink-2">•••• 4417 · exp 09/29</span></span>
+                  <span className="min-w-0 flex-1"><span className="block text-[15px] text-ink">Visa</span><span className="text-[13px] text-ink-2"><span className="num">•••• 4417</span> · {rich(t('cardExp'), { d: <span className="num">09/29</span> })}</span></span>
                   <span className="text-[13px] text-ink-3">Circle</span>
                 </li>
               </ul>
@@ -316,7 +324,7 @@ export default function Membership() {
               </ul>
               {q.kind === 'up' ? (
                 <dl className="mt-5 space-y-2 rounded-card bg-paper-sunk p-4 text-[15px]">
-                  <div className="flex justify-between gap-4"><dt className="text-ink-2">{rich(t('onProrated'), { date: <span className="num">{fmtDate(q.from)}</span>, n: <span className="num">{daysBetween(TODAY, CIRCLE_RENEWS)}</span> })}</dt><dd className="num text-ink">{inr(q.today ?? 0)}</dd></div>
+                  <div className="flex justify-between gap-4"><dt className="text-ink-2">{rich(t('onProrated'), { date: <span className="num">{fmtDate(q.from)}</span>, n: <span className="num">{daysBetween(q.from, CIRCLE_RENEWS)}</span> })}</dt><dd className="num text-ink">{inr(q.today ?? 0)}</dd></div>
                   <div className="flex justify-between gap-4"><dt className="text-ink-2">{rich(t('thenFrom'), { date: <span className="num">{fmtDate(CIRCLE_RENEWS)}</span> })}</dt><dd className="num text-ink">{m.price} {dx(m.cadence)}</dd></div>
                   <p className="border-t border-line pt-2 text-[13px] text-ink-3">{rich(t('gstIncluded'), { r: <span className="num">{GST_RATE * 100}%</span> })}</p>
                 </dl>
@@ -382,6 +390,7 @@ function gstOf(total: number) {
 function InvoiceView({ inv, onSaved }: { inv: Invoice; onSaved: (m: string) => void }) {
   const t = useDict(MEM)
   const dx = useData()
+  const profile = useMemberProfile()
   const gst = gstOf(inv.total)
   const taxable = Math.round((inv.total - gst) * 100) / 100
   const half = Math.round((gst / 2) * 100) / 100
@@ -391,7 +400,7 @@ function InvoiceView({ inv, onSaved }: { inv: Invoice; onSaved: (m: string) => v
     const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${inv.id}</title></head><body style="font-family:system-ui,sans-serif;max-width:640px;margin:40px auto;padding:0 16px">`
       + `<p style="font-size:12px;letter-spacing:.1em;text-transform:uppercase">Tax invoice · Specimen, not a real member</p>`
       + `<h1 style="font-weight:300">${inv.id}</h1><p>AIWO Joyspan Pvt Ltd · Chennai, Tamil Nadu · GSTIN ${GSTIN_AIWO}</p>`
-      + `<p>Billed to ${esc(`${MEMBER.firstName} ${MEMBER.lastName}`)}, ${MEMBER.city}, Tamil Nadu · ${MEMBER.aiwoId}</p>`
+      + `<p>Billed to ${esc(`${profile.firstName} ${profile.lastName}`)}, ${esc(profile.city)}, Tamil Nadu · ${MEMBER.aiwoId}</p>`
       + `<p>Date ${fmtDate(inv.date)} · SAC 999723 · Paid by ${inv.method} via Razorpay · ${inv.status}</p>`
       + `<table style="width:100%;border-collapse:collapse;margin-top:24px">${row(inv.item, inr(taxable, 2))}${row('CGST 9%', inr(half, 2))}${row('SGST 9%', inr(gst - half, 2))}${row('Total', inr(inv.total, 2), true)}</table>`
       + `</body></html>`
@@ -432,7 +441,7 @@ function InvoiceView({ inv, onSaved }: { inv: Invoice; onSaved: (m: string) => v
         <Pill tone={inv.status === 'Paid' ? 'positive' : 'caution'}>{dx(inv.status)}</Pill>
       </div>
       <dl className="mt-5 grid grid-cols-2 gap-3 text-[14px]">
-        <div><dt className="eyebrow text-ink-3">{t('billedTo')}</dt><dd className="mt-1 text-ink">{MEMBER.firstName} {MEMBER.lastName}<span className="block text-ink-2">{MEMBER.city}, Tamil Nadu</span></dd></div>
+        <div><dt className="eyebrow text-ink-3">{t('billedTo')}</dt><dd className="mt-1 text-ink">{profile.firstName} {profile.lastName}<span className="block text-ink-2">{profile.city}, Tamil Nadu</span></dd></div>
         <div><dt className="eyebrow text-ink-3">{t('date')}</dt><dd className="num mt-1 text-ink">{fmtDate(inv.date)}</dd></div>
         <div><dt className="eyebrow text-ink-3">SAC</dt><dd className="num mt-1 text-ink">999723</dd></div>
         <div><dt className="eyebrow text-ink-3">{inv.status === 'Paid' ? t('paidBy') : t('charging')}</dt><dd className="mt-1 text-ink">{dx(inv.method)} · Razorpay</dd></div>

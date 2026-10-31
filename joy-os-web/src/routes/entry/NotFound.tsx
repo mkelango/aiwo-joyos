@@ -70,25 +70,32 @@ export default function NotFound() {
     )
   }
 
+  // ConsoleLayout already supplies the header, the console nav and <main>: page content only.
+  if (inConsole) {
+    return (
+      <div className="pb-8">
+        <Body
+          path={pathname}
+          lead={t('leadConsole')}
+          primary={<DaybreakButton onClick={() => nav('/console')}>{te('allConsoles')} <ArrowRight size={20} aria-hidden /></DaybreakButton>}
+          secondary={<Link to="/" className="link text-[15px]">{t('signInAnother')}</Link>}
+          links={L.consoles}
+          linksTitle={t('consoles')}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-paper">
       <FlowTopBar exitTo="/" exitLabel={te('signIn')} />
       <main id="main" className="page flex-1 pb-32 pt-12 md:pb-20 md:pt-16">
         <Body
           path={pathname}
-          lead={
-            inConsole ? t('leadConsole') : t('leadPublic')
-          }
-          primary={
-            inConsole ? (
-              <DaybreakButton onClick={() => nav('/console')}>{te('allConsoles')} <ArrowRight size={20} aria-hidden /></DaybreakButton>
-            ) : (
-              <DaybreakButton onClick={() => nav('/')}>{te('signIn')} <ArrowRight size={20} aria-hidden /></DaybreakButton>
-            )
-          }
-          secondary={inConsole ? <Link to="/" className="link text-[15px]">{t('signInAnother')}</Link> : undefined}
-          links={inConsole ? L.consoles : L.pub}
-          linksTitle={inConsole ? t('consoles') : t('withoutSignIn')}
+          lead={t('leadPublic')}
+          primary={<DaybreakButton onClick={() => nav('/')}>{te('signIn')} <ArrowRight size={20} aria-hidden /></DaybreakButton>}
+          links={L.pub}
+          linksTitle={t('withoutSignIn')}
         />
       </main>
     </div>

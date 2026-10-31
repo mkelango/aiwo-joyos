@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Layers, X } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { Role } from '@/domain/types'
 import { useApp } from '@/lib/store'
@@ -24,13 +24,41 @@ export function DemoBar() {
   const { role, setRole } = useApp()
   const nav = useNavigate()
   const { pathname } = useLocation()
+  const rootRef = useRef<HTMLDivElement>(null)
+  const toggleRef = useRef<HTMLButtonElement>(null)
+  const panelId = useId()
+
+  // Any navigation closes the menu.
+  useEffect(() => { setOpen(false) }, [pathname])
+
+  // Escape or a press outside the bar closes it too.
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      setOpen(false)
+      toggleRef.current?.focus()
+    }
+    const onDown = (e: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('pointerdown', onDown)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('pointerdown', onDown)
+    }
+  }, [open])
+
   if (pathname.startsWith('/creds') || pathname.startsWith('/app/index/take')) return null
   return (
     // Above the member tab bar inside /app; near the corner everywhere else.
-    <div className={clsx('fixed right-3 z-40 lg:bottom-5 lg:right-4', pathname === '/app' || pathname.startsWith('/app/') ? 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))]' : 'bottom-[calc(1.25rem+env(safe-area-inset-bottom))]')}>
+    // A reviewer's tool, not member copy: English on purpose, marked so screen readers say it in English.
+    <div ref={rootRef} lang="en" className={clsx('fixed right-3 z-40 lg:bottom-5 lg:right-4', pathname === '/app' || pathname.startsWith('/app/') ? 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))]' : 'bottom-[calc(1.25rem+env(safe-area-inset-bottom))]')}>
       <AnimatePresence>
         {open && (
           <motion.div
+            id={panelId}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
@@ -48,7 +76,7 @@ export function DemoBar() {
                       <span className="block text-[14px] text-ink">{r.label}</span>
                       <span className="block text-[12px] text-ink-3">{r.who}</span>
                     </span>
-                    {role === r.role && <span className="h-1.5 w-1.5 rounded-full bg-daybreak" />}
+                    {role === r.role && <span className="h-1.5 w-1.5 rounded-full bg-daybreak" aria-hidden />}
                   </button>
                 </li>
               ))}
@@ -62,11 +90,13 @@ export function DemoBar() {
         )}
       </AnimatePresence>
       <button
+        ref={toggleRef}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
         className="ml-auto flex h-11 items-center gap-2 rounded-full border border-line bg-paper-raised px-3 text-[13px] text-ink shadow-lift focus-ring lg:px-4"
       >
-        {open ? <X size={16} /> : <Layers size={16} />} Demo
+        {open ? <X size={16} aria-hidden /> : <Layers size={16} aria-hidden />} Demo
       </button>
     </div>
   )

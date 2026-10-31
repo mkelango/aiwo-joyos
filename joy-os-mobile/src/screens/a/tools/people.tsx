@@ -53,8 +53,9 @@ function Orbit() {
         <Svg width={size} height={size}>
           <Circle cx={h} cy={h} r={52} fill="none" stroke={c.line} strokeWidth={1} />
           <Circle cx={h} cy={h} r={112} fill="none" stroke={c.line} strokeWidth={1} strokeDasharray="3 4" />
-          <Circle cx={h} cy={h} r={18} fill={c.ink} />
-          <SvgText x={h} y={h + (lang === 'en' ? 4 : 3)} fontSize={lang === 'ta' ? 7 : lang === 'hi' ? 10 : 11} fontFamily={lang === 'en' ? fonts.monoMedium : undefined} fill={c.paper} textAnchor="middle">
+          {/* The centre grows for Tamil and Hindi so “You” stays readable (never below 10pt); the inner five sit from r 43 out. */}
+          <Circle cx={h} cy={h} r={lang === 'en' ? 18 : 26} fill={c.ink} />
+          <SvgText x={h} y={h + 4} fontSize={lang === 'en' ? 11 : lang === 'hi' ? 12 : 10} fontFamily={lang === 'en' ? fonts.monoMedium : undefined} fill={c.paper} textAnchor="middle">
             {t('You')}
           </SvgText>
           {[...five.map((p, i) => ({ p, pt: place(i, five.length, 56), r: 13 })), ...fifteen.map((p, i) => ({ p, pt: place(i, fifteen.length, 112, 0.2), r: 11 }))].map(({ p, pt, r }) => (
@@ -155,7 +156,11 @@ function StateOfUs() {
   const { c, space } = useTheme()
   const { t, tx } = useA()
   const [step, setStep] = useState(-1)
-  const [done, setDone] = useState(false)
+  // Kept on the phone for the week it was done in, so "Done for this week" survives leaving the space.
+  const thisWeek = `practice-week-${CIRCLE.week}`
+  const [doneWeek, setDoneWeek] = useLocal<string | null>('stateOfUsDone', null)
+  const done = doneWeek === thisWeek
+  const setDone = (v: boolean) => setDoneWeek(v ? thisWeek : null)
   const [checkOpen, setCheckOpen] = useState(false)
   // Arjun's own answers (private to him). Kavya's are held separately and never shown.
   const [mine, setMine, , ] = useLocal<boolean[] | null>('couplesCheck', null)

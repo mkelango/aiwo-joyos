@@ -162,7 +162,7 @@ function Trend() {
   return (
     <Card className="lg:col-span-12">
       <CardHead eyebrow="Last four quarters" title="The north star and the Day-90 rate, together" />
-      <ChartLead>Records re-measured per ₹1 lakh of Joy OS spend (left) and the share of each cohort re-measured at Day 90 (right), for the last four quarters. The dashed line is the 70% Milk gate. Both have risen every quarter.</ChartLead>
+      <ChartLead>Records re-measured per ₹1 lakh of Joy OS spend (left) and the share of each cohort re-measured at Day 90 (right), for the last four quarters. The dashed line is the 70% Milk gate. Method v1.0 was published on 22 Oct 2026, so only {last.q} is measured on it (filled point); the three earlier quarters (hollow points) are ’Cation suite-cohort pilots on the pre-v1.0 pilot instrument and are not like for like.</ChartLead>
       <div className="grid gap-8 md:grid-cols-2">
         {[
           { key: 'perLakh', label: 'Records per ₹1 lakh', domain: [0, 4] as [number, number], ticks: [0, 2, 4], fmt: (v: number) => v.toFixed(1), unit: '' },
@@ -177,7 +177,15 @@ function Trend() {
                   <YAxis domain={c.domain} ticks={c.ticks} tickLine={false} axisLine={false} tick={tick} tickFormatter={c.fmt} />
                   {c.key === 'rate' && <ReferenceLine y={70} stroke="var(--ink-3)" strokeDasharray="3 3" />}
                   <Tooltip contentStyle={tipStyle} labelStyle={tipLabel} formatter={(v) => [c.fmt(Number(v)), c.label]} />
-                  <Line type="monotone" dataKey={c.key} stroke="var(--ink)" strokeWidth={2} dot={{ r: 3.5, fill: 'var(--paper-raised)', stroke: 'var(--ink)', strokeWidth: 2 }} isAnimationActive={false}>
+                  <Line
+                    type="monotone"
+                    dataKey={c.key}
+                    stroke="var(--ink)"
+                    strokeWidth={2}
+                    // Hollow for the pre-v1.0 pilot quarters, filled for the first quarter on method v1.0.
+                    dot={(p: { cx?: number; cy?: number; index?: number }) => <circle key={p.index} cx={p.cx} cy={p.cy} r={3.5} fill={data[p.index ?? 0]?.pilot ? 'var(--paper-raised)' : 'var(--ink)'} stroke="var(--ink)" strokeWidth={2} />}
+                    isAnimationActive={false}
+                  >
                     <LabelList dataKey={c.key} position="top" offset={8} formatter={(v: unknown) => c.fmt(Number(v))} style={{ fill: 'var(--ink-2)', fontFamily: 'var(--font-mono)', fontSize: 11 }} />
                   </Line>
                 </LineChart>
@@ -186,7 +194,8 @@ function Trend() {
           </div>
         ))}
       </div>
-      <p className="sr-only">Records per ₹1 lakh rose from {first.perLakh} in {first.q} to {last.perLakh} in {last.q}. The Day-90 re-measure rate rose from {Math.round(first.remeasure * 100)}% to {Math.round(last.remeasure * 100)}%.</p>
+      <Legend className="mt-4" items={[{ label: 'Pilot quarter · pre-v1.0 instrument', swatch: <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full border-2 border-ink bg-paper-raised" /> }, { label: 'Method v1.0', swatch: <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full bg-ink" /> }]} />
+      <p className="sr-only">Records per ₹1 lakh went from {first.perLakh} in {first.q} to {last.perLakh} in {last.q}, and the Day-90 re-measure rate from {Math.round(first.remeasure * 100)}% to {Math.round(last.remeasure * 100)}%. Only {last.q} is on method v1.0; the earlier quarters are suite-cohort pilots on the pre-v1.0 instrument.</p>
     </Card>
   )
 }
@@ -326,7 +335,7 @@ function Revenue() {
       <div className="mt-5 overflow-x-auto border-t border-line pt-4">
         <table className="w-full min-w-[420px] text-left text-[14px]">
           <caption className="sr-only">Revenue build</caption>
-          <thead><tr>{['', 'Plus', 'Licensed', 'Total', 'Of AIWO'].map((h) => <th key={h} scope="col" className="eyebrow pb-2 pr-3 text-right font-normal text-ink-3 first:text-left">{h}</th>)}</tr></thead>
+          <thead><tr>{['', 'Plus subscribers', 'Licensed members', 'Total', 'Of AIWO'].map((h) => <th key={h} scope="col" className="eyebrow pb-2 pr-3 text-right font-normal text-ink-3 first:text-left">{h}</th>)}</tr></thead>
           <tbody>
             {REVENUE.map((r) => (
               <tr key={r.fy}>
@@ -514,7 +523,7 @@ function Decisions() {
   const tag = { signed: { tone: 'ok' as const, l: 'Signed' }, partial: { tone: 'watch' as const, l: 'Partly' }, open: { tone: 'info' as const, l: 'Open · on plan' }, principle: { tone: 'info' as const, l: 'In principle' } }
   return (
     <Card className="lg:col-span-12">
-      <CardHead eyebrow="Decisions requested · by 15 November 2026" title="Eight decisions that let the build begin" aside={<Pill tone="positive">{signed} of 8 signed</Pill>} />
+      <CardHead eyebrow="Decisions requested · by 15 November 2026" title="Eight decisions that let the build begin" aside={<Pill tone="neutral">{signed} of 8 signed</Pill>} />
       <ol className="divide-y divide-line">
         {DECISIONS.map((d) => (
           <li key={d.n} className="grid gap-2 py-4 md:grid-cols-[2.5rem_1fr_14rem_10rem] md:items-start md:gap-6">

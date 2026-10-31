@@ -52,12 +52,16 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
   }
 
   const full = petalPath(inner, outer)
-  const describe = terms
-    .map((t) => `${tt.name(t.key)} ${t.key === 'B' ? tx('minus') : ''}${t.value ?? tx('bandNone')}${t.value !== null ? ', ' + bandText(t.band) : ''}`)
-    .join('; ')
+  // "Ease minus 24, steady" — the minus only belongs to a Burden that has a value.
+  const readTerm = (k: TermKey, v: number | null, band?: TermScore['band']) =>
+    v === null ? `${tt.name(k)} ${tx('bandNone')}` : `${tt.name(k)} ${k === 'B' ? tx('minus') : ''}${v}${band ? ', ' + bandText(band) : ''}`
+  const describe = terms.map((t) => readTerm(t.key, t.value, t.band)).join('; ')
+  const interactive = !!onSelect
 
   return (
-    <svg width={box} height={box} viewBox={`0 0 ${box} ${box}`} role="img" aria-label={`${tx('wheel')}${value != null ? tx('wheelIndex', { v: value }) : ''}. ${describe}`} className="max-w-full shrink-0">
+    // A role=img makes its children presentational, so an interactive Wheel is a group:
+    // the six petals are then exposed as toggle buttons.
+    <svg width={box} height={box} viewBox={`0 0 ${box} ${box}`} role={interactive ? 'group' : 'img'} aria-label={`${tx('wheel')}${value != null ? tx('wheelIndex', { v: value }) : ''}. ${describe}`} className="h-auto max-w-full shrink-0">
       <defs>
         <pattern id={`hatch-${uid}`} width="4.5" height="4.5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
           <rect width="4.5" height="4.5" fill="var(--term-b-soft)" />
@@ -74,7 +78,6 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
         const fillTo = v === null ? 0 : inner + len * Math.max(0.06, v / 100)
         const dim = highlight !== null && highlight !== k
         const clipId = `clip-${uid}-${k}`
-        const interactive = !!onSelect
         return (
           <g
             key={k}
@@ -85,7 +88,9 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
             onKeyDown={interactive ? (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onSelect!(k)) : undefined}
             tabIndex={interactive ? 0 : undefined}
             role={interactive ? 'button' : undefined}
-            aria-label={interactive ? `${tt.space(k)}: ${tt.name(k)} ${v ?? tx('bandNone')}` : undefined}
+            aria-pressed={interactive ? highlight === k : undefined}
+            aria-label={interactive ? `${tt.space(k)}: ${readTerm(k, v, t?.band)}` : undefined}
+            className={interactive ? 'wheel-petal' : undefined}
           >
             <clipPath id={clipId}>
               <motion.circle
@@ -98,11 +103,13 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
             </clipPath>
             <path d={full} fill={v === null ? 'none' : SOFT[k]} stroke={v === null ? 'var(--ink-3)' : termColor[k]} strokeOpacity={v === null ? 0.6 : 0.35} strokeDasharray={v === null ? '3 3' : undefined} strokeWidth={0.8} />
             {v !== null && <path d={full} fill={isB ? `url(#hatch-${uid})` : termColor[k]} clipPath={`url(#${clipId})`} />}
+            {/* Focus ring: outline on an SVG <g> is unreliable in Safari and Firefox, so the petal itself is stroked (index.css .wheel-petal). */}
+            {interactive && <path d={full} fill="none" className="wheel-petal-ring" aria-hidden />}
           </g>
         )
       })}
       {value !== undefined && (
-        <text x={c} y={c} textAnchor="middle" dominantBaseline="central" fontFamily="var(--font-mono)" fontWeight={300} fontSize={size * 0.13} fill="var(--ink)">
+        <text aria-hidden x={c} y={c} textAnchor="middle" dominantBaseline="central" fontFamily="var(--font-mono)" fontWeight={300} fontSize={size * 0.13} fill="var(--ink)">
           {value ?? '—'}
         </text>
       )}
@@ -113,7 +120,7 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
           const x = c + Math.cos(a) * (outer + 30)
           const y = c + Math.sin(a) * (outer + 30)
           return (
-            <g key={`l-${k}`}>
+            <g key={`l-${k}`} aria-hidden>
               <text x={x} y={y - 7} textAnchor="middle" fontFamily="var(--font-sans)" fontSize={13} fill="var(--ink)">
                 {tt.space(k)}
               </text>

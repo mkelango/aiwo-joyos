@@ -9,6 +9,7 @@ import { PRACTICE_CONTENT } from '@/screens/b/journeyData'
 import { practiceStore, useStore } from '@/screens/b/bStore'
 import { AudioPlayer, Field, PrimaryChip, useCrisisGuard } from '@/screens/b/parts'
 import { localDate, Rich, useA } from '@/screens/a/i18n'
+import { SPACE_TODAY, SPACE_TODAY_INDEX, localDay } from '@/screens/a/spacesData'
 
 // PRACTICE WEEK (Memo p.21): one week in full — audio, the practice, the science note,
 // a private reflection (crisis-intercepted) and "Mark practised", the one Daybreak.
@@ -65,7 +66,10 @@ function WeekView({ n }: { n: string }) {
   const prev = PRACTICE_WEEKS.find((w) => w.week === num - 1)
   const next = PRACTICE_WEEKS.find((w) => w.week === num + 1)
   const termName = week.term === 'ALL' ? null : name(week.term)
-  const opens = new Date(2027, 0, 11 + (num - 1) * 7).toISOString()
+  // Each week opens on the circle's Monday. Counted from the specimen today's Monday (25 Jan, the
+  // start of CIRCLE.week), so Week 1 opens Mon 4 Jan and Week 5 opens Mon 1 Feb.
+  const today = localDay(SPACE_TODAY)
+  const opens = new Date(today.getFullYear(), today.getMonth(), today.getDate() - SPACE_TODAY_INDEX + (num - CIRCLE.week) * 7).toISOString()
 
   const save = () => {
     if (!guard(reflection)) return

@@ -8,9 +8,19 @@ import { KIT } from './_i18n'
 
 const DATE_LOCALE: Record<Lang, string> = { en: 'en-GB', ta: 'ta-IN', hi: 'hi-IN' }
 
+/** A date-only ISO string ('2027-01-02') is a calendar day, not UTC midnight: `new Date()` would
+ *  parse it as UTC and show the day before anywhere west of Greenwich. Parse it as a local date. */
+export function parseIsoDate(iso: string) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+    const [y, m, d] = iso.split('-').map(Number)
+    return new Date(y, m - 1, d)
+  }
+  return new Date(iso)
+}
+
 /** "31 Oct 2026". Pass the member's language for Tamil or Hindi month names; digits stay Latin. */
 export function fmtDate(iso: string, lang: Lang = activeLang()) {
-  const d = new Date(iso)
+  const d = parseIsoDate(iso)
   if (Number.isNaN(d.getTime())) return iso
   try {
     return d.toLocaleDateString(DATE_LOCALE[lang], { day: '2-digit', month: 'short', year: 'numeric', numberingSystem: 'latn' } as Intl.DateTimeFormatOptions)
@@ -27,7 +37,7 @@ export function useFmtDate() {
 
 /** dd.mm.yyyy — the Index-card / p62 date form. */
 export function fmtDateDots(iso: string) {
-  const d = new Date(iso)
+  const d = parseIsoDate(iso)
   if (Number.isNaN(d.getTime())) return iso
   const p = (n: number) => String(n).padStart(2, '0')
   return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()}`

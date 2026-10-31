@@ -5,9 +5,9 @@ import { ArrowLink, Body, Button, Card, DaybreakButton, Eyebrow, Icon, Meta, Mon
 import { INDEX_HISTORY, MEMBER } from '@/shared/member'
 import { EVENTS } from '@/shared/platform'
 import { useTheme } from '@/theme/ThemeProvider'
-import { PASSES, SESSIONS_OPEN, SESSION_SCHEDULE, ZONES } from '@/screens/b/journeyData'
+import { EVENT_DATES, PASSES, SESSIONS_OPEN, SESSION_SCHEDULE, ZONES } from '@/screens/b/journeyData'
 import { accountStore, refCode, useStore } from '@/screens/b/bStore'
-import { Done, KeyValue, SpecimenQR, TimelineStep, memberOnly } from '@/screens/b/parts'
+import { Done, KeyValue, SpecimenQR, TimelineStep, fmtWhen, memberOnly } from '@/screens/b/parts'
 import { useDict, useTermText } from '@/lib/i18n'
 import { EVENTS_T, PASS_STATUS, EVENT_KIND, PASS_TEXT, SCHEDULE_TEXT, ZONE_TEXT, SESSION_OPEN_TEXT } from '@/screens/b/i18n/journey'
 import { useCommon, useTx } from '@/screens/b/i18n/common'
@@ -34,7 +34,6 @@ function Events() {
   const tt = useTermText()
   const openWhere = (s: Open) => tx(SESSION_OPEN_TEXT[s.id]?.where, s.where)
   const openPrice = (s: Open) => tx(SESSION_OPEN_TEXT[s.id]?.price, s.price)
-  const day90 = new Date(new Date(MEMBER.loopStarted).getTime() + 89 * 86400000).toISOString().slice(0, 10)
   const firstOpen = SESSIONS_OPEN.find((s) => !acct.bookings.some((b) => b.id === s.id))
   const toggleCal = (key: string, on: boolean) => setAcct((a) => ({ ...a, calendar: on ? [...a.calendar, key] : a.calendar.filter((k) => k !== key) }))
 
@@ -70,7 +69,7 @@ function Events() {
                 <View style={{ flex: 1, gap: 4 }}>
                   <Eyebrow>{tx(EVENT_KIND[ev.kind], ev.kind)}</Eyebrow>
                   <Title size={22}>{ev.name}</Title>
-                  <Mono tone="ink2">{ev.when}</Mono>
+                  <Mono tone="ink2">{EVENT_DATES[ev.id] ? fmtWhen(EVENT_DATES[ev.id]) : ev.when}</Mono>
                   <Meta>{ev.where}</Meta>
                 </View>
                 <Pill tone={valid ? 'ink' : 'neutral'}>{tx(PASS_STATUS[p.status], p.status)}</Pill>
@@ -122,6 +121,7 @@ function Events() {
         <Card tone="raised">
           {SESSION_SCHEDULE.map((s, i) => {
             const key = `ev2-${i}`
+            const where = tx(SCHEDULE_TEXT[i]?.where, s.where)
             return (
               <TimelineStep key={key} index={i} state={s.mine ? 'now' : 'next'} last={i === SESSION_SCHEDULE.length - 1}>
                 <View style={{ gap: 4 }}>
@@ -131,8 +131,8 @@ function Events() {
                     {s.mine ? <Pill tone="daybreak">{t('yours')}</Pill> : null}
                   </View>
                   <Body>{tx(SCHEDULE_TEXT[i]?.title, s.title)}</Body>
-                  <Meta size={14}>{tx(SCHEDULE_TEXT[i]?.where, s.where)}</Meta>
-                  <Toggle checked={acct.calendar.includes(key)} onChange={(v) => toggleCal(key, v)} label={t('addCal')} />
+                  <Meta size={14}>{where}</Meta>
+                  <Toggle checked={acct.calendar.includes(key)} onChange={(v) => toggleCal(key, v)} label={t('addCalFor', { time: s.time, where })} />
                 </View>
               </TimelineStep>
             )
@@ -166,7 +166,7 @@ function Events() {
         <Body>{t('onSiteBody', { date: fmtDate(latest.takenOn) })}</Body>
         <Meta>
           {t('day90A')}
-          <Mono tone="ink">{fmtDate(day90)}</Mono>
+          <Mono tone="ink">{fmtDate(latest.nextMeasure)}</Mono>
           {t('day90B', { n: MEMBER.dayOfLoop })}
         </Meta>
         <ArrowLink onPress={() => router.push('/passport')}>{t('passport')}</ArrowLink>
@@ -183,12 +183,12 @@ function Events() {
                 <Title size={20} style={{ flexShrink: 1 }}>{t('sessionCity', { city: s.city })}</Title>
                 {b ? <Pill tone="ink">{t('booked')}</Pill> : null}
               </View>
-              <Mono tone="ink2">{s.when}</Mono>
+              <Mono tone="ink2">{fmtWhen(s)}</Mono>
               <Meta>{`${openWhere(s)} · ${openPrice(s)}`}</Meta>
               {b ? (
                 <Done>{t('passAppears', { ref: b.ref })}</Done>
               ) : (
-                <Button variant="secondary" size="sm" onPress={() => { setBookedRef(null); setBook(s) }}>
+                <Button variant="secondary" size="sm" accessibilityLabel={`${t('sessionCity', { city: s.city })}, ${t('book')}`} onPress={() => { setBookedRef(null); setBook(s) }}>
                   {t('book')}
                 </Button>
               )}
@@ -197,7 +197,7 @@ function Events() {
         })}
         {firstOpen ? (
           <DaybreakButton icon="calendar" onPress={() => { setBookedRef(null); setBook(firstOpen) }}>
-            {t('book')}
+            {t('bookCity', { city: firstOpen.city })}
           </DaybreakButton>
         ) : (
           <Done>{t('allBooked')}</Done>
@@ -250,7 +250,7 @@ function Events() {
               </Title>
               <KeyValue k={t('kSession')}>{t('sessionCity', { city: book.city })}</KeyValue>
               <KeyValue k={t('kWhen')}>
-                <Mono tone="ink">{book.when}</Mono>
+                <Mono tone="ink">{fmtWhen(book)}</Mono>
               </KeyValue>
               <KeyValue k={t('kPass')} last>
                 <Mono tone="ink">{bookedRef}</Mono>
@@ -261,7 +261,7 @@ function Events() {
             <>
               <KeyValue k={t('kSession')}>{t('sessionCity', { city: book.city })}</KeyValue>
               <KeyValue k={t('kWhen')}>
-                <Mono tone="ink">{book.when}</Mono>
+                <Mono tone="ink">{fmtWhen(book)}</Mono>
               </KeyValue>
               <KeyValue k={t('kWhere')}>{openWhere(book)}</KeyValue>
               <KeyValue k={t('kPrice')} last>{openPrice(book)}</KeyValue>

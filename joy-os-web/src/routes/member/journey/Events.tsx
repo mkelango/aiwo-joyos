@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, CalendarHeart, Check, Clock, MapPin, Plus, QrCode, Star, Ticket } from 'lucide-react'
-import { useEffect, useId, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
 import { BandLabel, DaybreakButton, Eyebrow, MethodLine, SpecimenTag, TermChip, TermDot, useFmtDate } from '@/components/joy/primitives'
@@ -57,9 +57,26 @@ export default function Events() {
   const active = allPasses.find((p) => p.id === openPass)
   const schedule = SESSION_SCHEDULE.map((s, i) => ({ ...s, i })).filter((s) => view === 'all' || mine[s.i])
 
+  const schedRef = useRef<HTMLOListElement>(null)
+  const swapRef = useRef<HTMLParagraphElement>(null)
+
   const toggleSession = (i: number) => {
     const s = SESSION_SCHEDULE[i]
-    if (mine[i]) { setSchedule({ ...mine, [i]: false }); setSwapNote({ k: 'swapOff', i }); return }
+    if (mine[i]) {
+      // In “Mine” the row (and the button just pressed) goes away: keep focus on
+      // the next row's toggle, or the previous one, or the status note if none is left.
+      const at = schedule.findIndex((x) => x.i === i)
+      const nextRow = view === 'mine' ? (schedule[at + 1] ?? schedule[at - 1]) : undefined
+      setSchedule({ ...mine, [i]: false })
+      setSwapNote({ k: 'swapOff', i })
+      if (view === 'mine') {
+        window.setTimeout(() => {
+          const btn = nextRow ? schedRef.current?.querySelector<HTMLButtonElement>(`button[data-sched="${nextRow.i}"]`) : null
+          ;(btn ?? swapRef.current)?.focus()
+        }, 0)
+      }
+      return
+    }
     const clash = SESSION_SCHEDULE.findIndex((o, j) => j !== i && o.time === s.time && mine[j])
     setSchedule({ ...mine, [i]: true, ...(clash >= 0 ? { [clash]: false } : {}) })
     setSwapNote(clash >= 0 ? { k: 'swapClash', i, o: clash } : { k: 'swapOn', i })
@@ -145,7 +162,7 @@ export default function Events() {
           <EmptyState title={t('emptySchedTitle')} body={t('emptySchedBody')} action={<Button variant="secondary" onClick={() => setView('all')}>{t('seeFull')}</Button>} />
         ) : (
           <Card tone="outline" className="p-0 md:p-0">
-            <ol className="divide-y divide-line">
+            <ol ref={schedRef} className="divide-y divide-line">
               {schedule.map((s) => (
                 <li key={s.i} className="grid grid-cols-[3.75rem_1fr_auto] items-center gap-3 px-4 py-3.5 md:grid-cols-[4.5rem_1fr_12rem_auto] md:px-6">
                   <span className="num text-[15px] text-ink-2">{s.time}</span>
@@ -157,6 +174,7 @@ export default function Events() {
                   <button
                     type="button"
                     onClick={() => toggleSession(s.i)}
+                    data-sched={s.i}
                     aria-pressed={!!mine[s.i]}
                     aria-label={t(mine[s.i] ? 'removeFromSched' : 'addToSched', { t: tx(s.title) })}
                     className={clsx('flex h-9 w-9 items-center justify-center rounded-full border transition-colors focus-ring', mine[s.i] ? 'border-ink bg-ink text-paper' : 'border-line text-ink-2 hover:border-line-strong')}
@@ -168,7 +186,7 @@ export default function Events() {
             </ol>
           </Card>
         )}
-        <p className="mt-3 min-h-[1.25rem] text-[14px] text-ink" role="status">{swapNote && t(swapNote.k, { t: tx(SESSION_SCHEDULE[swapNote.i].title), o: swapNote.o !== undefined ? tx(SESSION_SCHEDULE[swapNote.o].title) : '', time: SESSION_SCHEDULE[swapNote.i].time })}</p>
+        <p ref={swapRef} tabIndex={-1} className="mt-3 min-h-[1.25rem] text-[14px] text-ink outline-none" role="status">{swapNote && t(swapNote.k, { t: tx(SESSION_SCHEDULE[swapNote.i].title), o: swapNote.o !== undefined ? tx(SESSION_SCHEDULE[swapNote.o].title) : '', time: SESSION_SCHEDULE[swapNote.i].time })}</p>
         <p className="text-[13px] text-ink-3">{r('schedFoot', { t: { n: '14:00' } })}</p>
       </section>
 

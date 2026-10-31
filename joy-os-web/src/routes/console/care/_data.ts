@@ -20,8 +20,8 @@ export interface CaseRow { id: string; name: string; day: number; index: number;
 /** Rest of Priya's caseload beyond the platform specimen (same shape as CASELOAD). */
 export const EXTRA_CASELOAD: CaseRow[] = [
   { id: 'm_0221', name: 'Ananya Krishnan', day: 14, index: 63, lowest: 'P', trend: 2, cation: 'Mindcation', nextCall: 'Day 15 review · Fri', risk: 'low' },
-  { id: 'm_0234', name: 'Rahul Menon', day: 44, index: 57, lowest: 'F', trend: -1, cation: 'Wealthcation', nextCall: 'Day 45 review · Sat', risk: 'medium' },
-  { id: 'm_0256', name: 'Meenakshi Sundaram', day: 59, index: 69, lowest: 'D', trend: 3, cation: 'Beautycation', nextCall: 'Day 60 talk · Sun', risk: 'low' },
+  { id: 'm_0234', name: 'Rahul Menon', day: 44, index: 57, lowest: 'F', trend: -1, cation: 'Wealthcation', nextCall: 'Day 45 review · Fri', risk: 'medium' },
+  { id: 'm_0256', name: 'Meenakshi Sundaram', day: 59, index: 69, lowest: 'D', trend: 3, cation: 'Beautycation', nextCall: 'Day 60 talk · Fri', risk: 'low' },
   { id: 'm_0262', name: 'Sameer Joshi', day: 6, index: 52, lowest: 'R', trend: 0, cation: 'Lovecation', nextCall: 'Thu 18:30', risk: 'low' },
   { id: 'm_0287', name: 'Leela Thomas', day: 79, index: 66, lowest: 'B', trend: 2, cation: 'Sleepcation', nextCall: 'Re-measure due', risk: 'low' },
   { id: 'm_0291', name: 'Karthik Raman', day: 27, index: 60, lowest: 'H', trend: 1, cation: 'Healthcation', nextCall: 'Tue 08:00', risk: 'low' },
@@ -32,7 +32,7 @@ export const COACH_CASELOAD: CaseRow[] = [...CASELOAD, ...EXTRA_CASELOAD]
 export const CIRCLES_LED = [
   { id: 'c1', name: 'Circle of eight · Fairmont January', when: 'Mon 1 Feb · 19:00', week: 4, of: 8, members: 8, theme: 'Week 4 · Don’t Postpone Joy', term: 'D' as TermKey, room: 'In-app video · recordings off' },
   { id: 'c2', name: 'Founders after exit', when: 'Thu 28 Jan · 21:30', week: 6, of: 8, members: 7, theme: 'Week 6 · The Two Questions', term: 'B' as TermKey, room: 'In-app video · recordings off' },
-  { id: 'c3', name: 'Sleepcation · Coorg alumni', when: 'Wed 3 Feb · 07:00', week: 2, of: 8, members: 8, theme: 'Week 2 · The Tomorrow Question', term: 'P' as TermKey, room: 'In-app video · recordings off' },
+  { id: 'c3', name: 'Circle of eight · January starters', when: 'Wed 3 Feb · 07:00', week: 2, of: 8, members: 8, theme: 'Week 2 · The Tomorrow Question', term: 'P' as TermKey, room: 'In-app video · recordings off' },
 ]
 
 /** Day-N milestones (Memo p.13): reviews at 15 and 45, the talk at 60, re-measure opens at 76. */
@@ -56,6 +56,8 @@ export interface CoachDigest {
   method: MethodVersion
   takenOn: string
   nextMeasure: string
+  /** When Care consent v3 was granted: the checkout or Day 0 of this member's loop. */
+  consentGranted: string
   terms: TermScore[]
   index: number
   band: Band
@@ -77,7 +79,7 @@ const arjunIx = INDEX_HISTORY[0]
 export const COACH_DIGESTS: Record<string, CoachDigest> = {
   m_0001: {
     id: 'm_0001', name: 'Arjun Rao', firstName: 'Arjun', age: 52, city: 'Chennai', circle: 'Circle of eight · Fairmont January', cation: 'Joycation',
-    day: 23, method: arjunIx.method, takenOn: arjunIx.takenOn, nextMeasure: arjunIx.nextMeasure, terms: arjunIx.terms, index: arjunIx.value, band: arjunIx.band,
+    day: 23, method: arjunIx.method, takenOn: arjunIx.takenOn, nextMeasure: arjunIx.nextMeasure, consentGranted: '05 Jan 2027', terms: arjunIx.terms, index: arjunIx.value, band: arjunIx.band,
     summary: [
       'Arjun’s Index rose from 61 to 64 at the January measure. Daily Pleasure is still his lowest term, though it moved most this quarter (53 → 58).',
       'He has done the evening verandah action on 6 of the last 9 days, usually with Kavya. Both “Not today” days were Thursdays, when he travels for work.',
@@ -105,7 +107,7 @@ export const COACH_DIGESTS: Record<string, CoachDigest> = {
   },
   m_0002: {
     id: 'm_0002', name: 'Kavya Rao', firstName: 'Kavya', age: 55, city: 'Chennai', circle: 'Circle of eight · Fairmont January', cation: 'Joycation',
-    day: 23, method: 'v1.0', takenOn: '2027-01-02', nextMeasure: '2027-04-02', terms: t([69, 78, 81, 58, 72, 14], [1, 2, 0, 1, 3, -2]), index: 68, band: 'uneven',
+    day: 23, method: 'v1.0', takenOn: '2027-01-02', nextMeasure: '2027-04-05', consentGranted: '05 Jan 2027', terms: t([69, 78, 81, 58, 72, 14], [1, 2, 0, 1, 3, -2]), index: 68, band: 'uneven',
     summary: [
       'Kavya’s Index is 68, up 2. Freedom is her lowest term at 58; the time-audit summary shows most evenings given to her mother’s care.',
       'She has done her action on 7 of the last 9 days. She asked on the Day 15 call for an action she can do before 8 am.',
@@ -124,7 +126,7 @@ export const COACH_DIGESTS: Record<string, CoachDigest> = {
   },
   m_0142: {
     id: 'm_0142', name: 'Nikhil Sharma', firstName: 'Nikhil', age: 47, city: 'Pune', circle: 'Founders after exit', cation: 'Mindcation',
-    day: 41, method: 'v1.0', takenOn: '2026-12-18', nextMeasure: '2027-03-18', terms: t([64, 58, 62, 66, 63, 54], [-2, -5, -3, 0, -4, 6]), index: 49, band: 'thin',
+    day: 41, method: 'v1.0', takenOn: '2026-12-18', nextMeasure: '2027-03-18', consentGranted: '18 Dec 2026', terms: t([64, 58, 62, 66, 63, 54], [-2, -5, -3, 0, -4, 6]), index: 49, band: 'thin',
     summary: [],
     summaryPaused: 'A safety task is open and held by the clinical team. VIVA does not draft a digest while a P0 is open, and Ease results are never summarised by AI. Dr Sanjay Menon leads; your role is to stay in touch as his coach once the clinician says so.',
     safetyHold: 'Held by Dr Sanjay Menon · P0 opened 21:04',
@@ -136,12 +138,12 @@ export const COACH_DIGESTS: Record<string, CoachDigest> = {
     ],
     ledgerWeeks: [{ week: 'W3', moments: 9 }, { week: 'W4', moments: 6 }, { week: 'W5', moments: 4 }, { week: 'W6', moments: 2 }],
     ledgerByPrompt: [{ prompt: 'Midday', count: 8 }, { prompt: 'Afternoon', count: 6 }, { prompt: 'Evening', count: 7 }],
-    calls: [{ at: '08 Jan · Day 30 check-in', outcome: 'Reached', note: 'Quieter than usual. Agreed to keep the circle on Thursdays.' }],
+    calls: [{ at: '08 Jan · Day 21 check-in', outcome: 'Reached', note: 'Quieter than usual. Agreed to keep the circle on Thursdays.' }],
     currentAction: { id: 'a_b_004', title: 'Begin the wind-down at 22:00.', term: 'B' },
   },
   m_0088: {
-    id: 'm_0088', name: 'Farah Khan', firstName: 'Farah', age: 39, city: 'Mumbai', circle: 'Sleepcation · Coorg alumni', cation: 'Sleepcation',
-    day: 12, method: 'v1.0', takenOn: '2027-01-16', nextMeasure: '2027-04-16', terms: t([68, 73, 70, 58, 61, 44], [0, 1, -1, -2, -1, 3]), index: 55, band: 'uneven',
+    id: 'm_0088', name: 'Farah Khan', firstName: 'Farah', age: 39, city: 'Mumbai', circle: 'Circle of eight · January starters', cation: 'Sleepcation',
+    day: 12, method: 'v1.0', takenOn: '2027-01-16', nextMeasure: '2027-04-16', consentGranted: '16 Jan 2027', terms: t([68, 73, 70, 58, 61, 44], [0, 1, -1, -2, -1, 3]), index: 55, band: 'uneven',
     summary: [
       'Farah’s Index is 55. A screen result has been routed to the clinical team; you see that a review is open, never the answers.',
       'Her wind-down action is done on 5 of 8 nights. She prefers voice notes to calls.',
@@ -158,7 +160,7 @@ export const COACH_DIGESTS: Record<string, CoachDigest> = {
   },
   m_0203: {
     id: 'm_0203', name: 'Deepa Venkat', firstName: 'Deepa', age: 49, city: 'Bengaluru', circle: 'Completed eight weeks · Healthcation December', cation: 'Healthcation',
-    day: 58, method: 'v1.0', takenOn: '2026-12-01', nextMeasure: '2027-03-01', terms: t([72, 80, 78, 74, 79, 42], [2, 1, 0, 1, 2, 1]), index: 66, band: 'uneven',
+    day: 58, method: 'v1.0', takenOn: '2026-12-01', nextMeasure: '2027-03-01', consentGranted: '01 Dec 2026', terms: t([72, 80, 78, 74, 79, 42], [2, 1, 0, 1, 2, 1]), index: 66, band: 'uneven',
     summary: [],
     summaryPaused: 'A lab result is held by the clinical team tonight. VIVA does not draft a digest while a P0 is open on the member. Dr Meera Iyer leads; your Day 60 talk on Friday goes ahead unless she says otherwise.',
     safetyHold: 'Held by Dr Meera Iyer · P0 opened 20:55 · reached 21:01',
@@ -180,7 +182,7 @@ export const COACH_DIGESTS: Record<string, CoachDigest> = {
   },
   m_0175: {
     id: 'm_0175', name: 'Thomas Mathew', firstName: 'Thomas', age: 58, city: 'Kochi', circle: 'Founders after exit', cation: 'Savourcation',
-    day: 34, method: 'v1.0', takenOn: '2026-12-25', nextMeasure: '2027-03-25', terms: t([78, 82, 80, 76, 66, 22], [1, 0, -1, 1, -1, 0]), index: 71, band: 'steady',
+    day: 34, method: 'v1.0', takenOn: '2026-12-25', nextMeasure: '2027-03-25', consentGranted: '25 Dec 2026', terms: t([78, 82, 80, 76, 66, 22], [1, 0, -1, 1, -1, 0]), index: 71, band: 'steady',
     summary: [
       'Thomas’s Index is 71, unchanged. Daily Pleasure is his lowest term at 66; the savouring dinners at the stay were the moments he named most.',
       'His Joy Ledger has been quiet for ten days, after four steady weeks. He has kept doing his action on most days, so the quiet looks like the logging, not the living.',
@@ -200,11 +202,11 @@ export const COACH_DIGESTS: Record<string, CoachDigest> = {
   },
   m_0119: {
     id: 'm_0119', name: 'Vikram Patel', firstName: 'Vikram', age: 44, city: 'Ahmedabad', circle: 'Completed eight weeks · Lovecation November', cation: 'Lovecation',
-    day: 77, method: 'v1.0', takenOn: '2026-11-12', nextMeasure: '2027-02-10', terms: t([70, 76, 61, 70, 72, 30], [1, 2, 4, 0, 2, -2]), index: 62, band: 'uneven',
+    day: 77, method: 'v1.0', takenOn: '2026-11-12', nextMeasure: '2027-02-10', consentGranted: '12 Nov 2026', terms: t([70, 76, 61, 70, 72, 30], [2, 3, 6, 1, 3, -2]), index: 62, band: 'uneven',
     summary: [
       'Vikram’s Index rose 4 to 62. Relationships is still his lowest term at 61, though it moved most, after the weekly walk with Priti that came out of the stay.',
-      'His re-measure window opened yesterday and closes on Day 90. A sleep review was routed to the clinical team last week and has since been closed by the clinician.',
-      'He books calls in the early morning. Worth offering the re-measure slot on Saturday at 07:30, like for like with his first panel.',
+      'His re-measure window opened yesterday and closes on Day 90. The panel was drawn at home that morning, like for like with his first, and is awaiting Dr Meera’s Clinical-grade signature. Nothing is shown to him until it is signed.',
+      'A sleep review was routed to the clinical team last week and has since been closed by the clinician. He books calls in the early morning; offer an early slot for the Day 90 talk once the score is signed.',
     ],
     actions: [
       { date: 'Thu 28 Jan', title: 'Call one person you have not spoken to this month.', term: 'R', outcome: 'open' },
@@ -223,7 +225,7 @@ export const COACH_DIGESTS: Record<string, CoachDigest> = {
   },
   m_0310: {
     id: 'm_0310', name: 'Shalini Iyer', firstName: 'Shalini', age: 51, city: 'Chennai', circle: 'Completed eight weeks · Wealthcation November', cation: 'Wealthcation',
-    day: 88, method: 'v1.0', takenOn: '2026-11-01', nextMeasure: '2027-01-30', terms: t([79, 84, 83, 69, 78, 17], [2, 1, 1, 5, 2, -4]), index: 74, band: 'steady',
+    day: 88, method: 'v1.0', takenOn: '2026-11-01', nextMeasure: '2027-01-30', consentGranted: '01 Nov 2026', terms: t([79, 84, 83, 69, 78, 17], [4, 3, 3, 5, 3, -4]), index: 74, band: 'steady',
     summary: [
       'Shalini’s Index rose 5 to 74 at her Index-grade check. Freedom remains her lowest term at 69, and it moved most this quarter (64 → 69).',
       'Her Day 90 re-measure is drafted and waiting for Dr Meera’s Clinical-grade signature. Nothing is shown to her until it is signed.',
@@ -245,8 +247,8 @@ export const COACH_DIGESTS: Record<string, CoachDigest> = {
     currentAction: { id: 'a_f_003', title: 'Write the No list.', term: 'F' },
   },
   m_0221: {
-    id: 'm_0221', name: 'Ananya Krishnan', firstName: 'Ananya', age: 34, city: 'Hyderabad', circle: 'Sleepcation · Coorg alumni', cation: 'Mindcation',
-    day: 14, method: 'v1.0', takenOn: '2027-01-14', nextMeasure: '2027-04-14', terms: t([72, 59, 71, 69, 72, 22], [1, 3, 0, 1, 2, -1]), index: 63, band: 'uneven',
+    id: 'm_0221', name: 'Ananya Krishnan', firstName: 'Ananya', age: 34, city: 'Hyderabad', circle: 'Circle of eight · January starters', cation: 'Mindcation',
+    day: 14, method: 'v1.0', takenOn: '2027-01-14', nextMeasure: '2027-04-14', consentGranted: '14 Jan 2027', terms: t([72, 59, 71, 69, 72, 22], [1, 3, 0, 1, 2, -1]), index: 63, band: 'uneven',
     summary: [
       'Ananya’s Index is 63. Purpose is her lowest term at 59; at checkout she said she wants to know “what the work is for”.',
       'She has answered the Tomorrow Question on 5 of the last 7 evenings. The two misses were both late office nights.',
@@ -266,9 +268,9 @@ export const COACH_DIGESTS: Record<string, CoachDigest> = {
   },
   m_0234: {
     id: 'm_0234', name: 'Rahul Menon', firstName: 'Rahul', age: 46, city: 'Kochi', circle: 'Founders after exit', cation: 'Wealthcation',
-    day: 44, method: 'v1.0', takenOn: '2026-12-15', nextMeasure: '2027-03-15', terms: t([68, 66, 70, 54, 64, 28], [0, -1, -2, -2, 0, 1]), index: 57, band: 'uneven',
+    day: 44, method: 'v1.0', takenOn: '2026-12-15', nextMeasure: '2027-03-15', consentGranted: '15 Dec 2026', terms: t([68, 66, 70, 54, 64, 28], [0, -1, -2, -2, 0, 1]), index: 57, band: 'uneven',
     summary: [],
-    summaryPaused: 'You raised a concern after today’s call, and it is with Dr Sanjay Menon for review within 48 hours. VIVA pauses the digest while a clinical review is open. Stay in touch as usual; the Day 45 review on Saturday goes ahead.',
+    summaryPaused: 'You raised a concern after today’s call, and it is with Dr Sanjay Menon for review within 48 hours. VIVA pauses the digest while a clinical review is open. Stay in touch as usual; the Day 45 review on Friday goes ahead.',
     actions: [
       { date: 'Thu 28 Jan', title: 'Write the No list.', term: 'F', outcome: 'open' },
       { date: 'Wed 27 Jan', title: 'Write the No list.', term: 'F', outcome: 'not-today' },
@@ -286,11 +288,11 @@ export const COACH_DIGESTS: Record<string, CoachDigest> = {
   },
   m_0256: {
     id: 'm_0256', name: 'Meenakshi Sundaram', firstName: 'Meenakshi', age: 61, city: 'Madurai', circle: 'Completed eight weeks · Beautycation December', cation: 'Beautycation',
-    day: 59, method: 'v1.0', takenOn: '2026-11-30', nextMeasure: '2027-02-28', terms: t([78, 80, 81, 74, 67, 29], [2, 1, 1, 0, 4, -2]), index: 69, band: 'uneven',
+    day: 59, method: 'v1.0', takenOn: '2026-11-30', nextMeasure: '2027-02-28', consentGranted: '30 Nov 2026', terms: t([78, 80, 81, 74, 67, 29], [2, 1, 1, 0, 4, -2]), index: 69, band: 'uneven',
     summary: [
       'Meenakshi’s Index rose 3 to 69. Daily Pleasure is her lowest term at 67, and it moved most, up 4 since the stay.',
       'She has kept “three good things” on most evenings and often logs music and the temple garden in her Ledger.',
-      'The Day 60 talk is on Sunday. The next step, by lowest term, is still Daily Pleasure; she has asked about a short Savourcation with her sister.',
+      'The Day 60 talk is on Friday. The next step, by lowest term, is still Daily Pleasure; she has asked about a short Savourcation with her sister.',
     ],
     actions: [
       { date: 'Thu 28 Jan', title: 'Three good things before sleep.', term: 'D', outcome: 'open' },
@@ -305,8 +307,8 @@ export const COACH_DIGESTS: Record<string, CoachDigest> = {
     currentAction: { id: 'c_d_three', title: 'Three good things before sleep.', term: 'D' },
   },
   m_0262: {
-    id: 'm_0262', name: 'Sameer Joshi', firstName: 'Sameer', age: 38, city: 'Pune', circle: 'Sleepcation · Coorg alumni', cation: 'Lovecation',
-    day: 6, method: 'v1.0', takenOn: '2027-01-22', nextMeasure: '2027-04-22', terms: t([64, 62, 50, 60, 63, 32]), index: 52, band: 'uneven',
+    id: 'm_0262', name: 'Sameer Joshi', firstName: 'Sameer', age: 38, city: 'Pune', circle: 'Circle of eight · January starters', cation: 'Lovecation',
+    day: 6, method: 'v1.0', takenOn: '2027-01-22', nextMeasure: '2027-04-22', consentGranted: '22 Jan 2027', terms: t([64, 62, 50, 60, 63, 32]), index: 52, band: 'uneven',
     summary: [
       'Sameer’s Day 0 Index is 52. Relationships is his lowest term at 50; at checkout he and Neha named “an evening that is ours” as the outcome.',
       'Six days in, he has done his action on 4 of 5 days. What Neha answered as his partner stays private to her and is not part of this digest.',
@@ -325,7 +327,7 @@ export const COACH_DIGESTS: Record<string, CoachDigest> = {
   },
   m_0287: {
     id: 'm_0287', name: 'Leela Thomas', firstName: 'Leela', age: 56, city: 'Thiruvananthapuram', circle: 'Completed eight weeks · Sleepcation November', cation: 'Sleepcation',
-    day: 79, method: 'v1.0', takenOn: '2026-11-10', nextMeasure: '2027-02-08', terms: t([74, 79, 76, 72, 75, 38], [1, 0, 1, 2, 1, -3]), index: 66, band: 'uneven',
+    day: 79, method: 'v1.0', takenOn: '2026-11-10', nextMeasure: '2027-02-08', consentGranted: '10 Nov 2026', terms: t([74, 79, 76, 72, 75, 38], [1, 0, 1, 2, 1, -3]), index: 66, band: 'uneven',
     summary: [],
     summaryPaused: 'A sleep screen result is with the clinical team for routing. You see that a review is open, never the answers, and VIVA does not summarise an Ease result. Her re-measure window is open; book it as usual.',
     actions: [
@@ -342,7 +344,7 @@ export const COACH_DIGESTS: Record<string, CoachDigest> = {
   },
   m_0291: {
     id: 'm_0291', name: 'Karthik Raman', firstName: 'Karthik', age: 42, city: 'Coimbatore', circle: 'Circle of eight · Fairmont January', cation: 'Healthcation',
-    day: 27, method: 'v1.0', takenOn: '2027-01-01', nextMeasure: '2027-04-01', terms: t([58, 72, 74, 68, 70, 34], [2, 0, 1, 0, 1, -1]), index: 60, band: 'uneven',
+    day: 27, method: 'v1.0', takenOn: '2027-01-01', nextMeasure: '2027-04-01', consentGranted: '01 Jan 2027', terms: t([58, 72, 74, 68, 70, 34], [2, 0, 1, 0, 1, -1]), index: 60, band: 'uneven',
     summary: [
       'Karthik’s Index is 60. Healthspan is his lowest term at 58; his capacity battery at the stay put grip and sit-to-stand below his age norm.',
       'He has done the morning sit-to-stands on 6 of the last 7 days, before his 08:00 call. His Ledger moments are mostly about his daughter’s cricket.',
@@ -388,7 +390,7 @@ export const SAFETY_ALERTS: SafetyAlert[] = [
   { id: 's1', member: 'Nikhil Sharma', memberId: 'm_0142', priority: 'P0', kind: 'Self-harm language · intercept', detail: 'Second Arrow journal matched the crisis intercept before any model ran. Tele-MANAS 14416 shown to the member; on-call paged.', openedAt: '2027-01-28T21:04:00+05:30', slaMinutes: 15, owner: 'Dr Sanjay Menon', status: 'open' },
   { id: 's2', member: 'Deepa Venkat', memberId: 'm_0203', priority: 'P0', kind: 'Critical lab value', detail: 'Serum potassium 6.2 mmol/L (critical ≥ 6.0). Result final from the lab partner 20:52; repeat sample advised.', openedAt: '2027-01-28T20:55:00+05:30', slaMinutes: 60, owner: 'Dr Meera Iyer', status: 'acknowledged', ackAt: '2027-01-28T21:01:00+05:30' },
   { id: 's3', member: 'Farah Khan', memberId: 'm_0088', priority: 'P1', kind: 'Screen threshold · PHQ-4', detail: 'PHQ-4 = 7 (threshold ≥ 6). Clinician review required within 48 h.', openedAt: '2027-01-28T09:12:00+05:30', slaMinutes: 48 * 60, owner: 'Dr Sanjay Menon', status: 'open' },
-  { id: 's4', member: 'Rahul Menon', memberId: 'm_0234', priority: 'P1', kind: 'Coach concern', detail: 'Raised by Priya Natarajan after a call: “sounded more withdrawn than at Day 15.” No screen result attached.', openedAt: '2027-01-28T13:40:00+05:30', slaMinutes: 48 * 60, owner: 'Dr Sanjay Menon', status: 'open' },
+  { id: 's4', member: 'Rahul Menon', memberId: 'm_0234', priority: 'P1', kind: 'Coach concern', detail: 'Raised by Priya Natarajan after a call: “sounded more withdrawn than at Day 15.” Attached: PHQ-4 = 6 (threshold ≥ 6), taken 27 Jan.', openedAt: '2027-01-28T13:40:00+05:30', slaMinutes: 48 * 60, owner: 'Dr Sanjay Menon', status: 'open' },
   { id: 's5', member: 'Vikram Patel', memberId: 'm_0119', priority: 'P1', kind: 'Screen threshold · ISI', detail: 'ISI = 16 (threshold ≥ 15). Sleep study suggested.', openedAt: '2027-01-24T15:20:00+05:30', slaMinutes: 48 * 60, owner: 'Dr Meera Iyer', status: 'closed', outcome: 'Tele-consult held; home sleep study ordered.' },
 ]
 
@@ -396,9 +398,9 @@ export const CLOSE_OUTCOMES = ['Reached the member; safe; plan agreed', 'Reached
 
 export const SCREEN_QUEUE = [
   { id: 'q1', member: 'Nikhil Sharma', instrument: 'PHQ-4', score: 10, threshold: 6, max: 12, taken: '28 Jan · 20:58', lang: 'EN', route: 'P0 open · Dr Sanjay Menon' },
-  { id: 'q2', member: 'Farah Khan', instrument: 'PHQ-4', score: 7, threshold: 6, max: 12, taken: '28 Jan · 09:05', lang: 'EN', route: 'Unassigned' },
+  { id: 'q2', member: 'Farah Khan', instrument: 'PHQ-4', score: 7, threshold: 6, max: 12, taken: '28 Jan · 09:05', lang: 'EN', route: 'P1 open · Dr Sanjay Menon' },
   { id: 'q3', member: 'Leela Thomas', instrument: 'ISI', score: 18, threshold: 15, max: 28, taken: '27 Jan · 22:40', lang: 'TA', route: 'Unassigned' },
-  { id: 'q4', member: 'Rahul Menon', instrument: 'PHQ-4', score: 6, threshold: 6, max: 12, taken: '27 Jan · 18:10', lang: 'HI', route: 'Unassigned' },
+  { id: 'q4', member: 'Rahul Menon', instrument: 'PHQ-4', score: 6, threshold: 6, max: 12, taken: '27 Jan · 18:10', lang: 'HI', route: 'P1 open · Dr Sanjay Menon' },
   { id: 'q5', member: 'Vikram Patel', instrument: 'ISI', score: 16, threshold: 15, max: 28, taken: '24 Jan · 15:02', lang: 'EN', route: 'Closed · sleep study' },
 ]
 
@@ -421,7 +423,8 @@ export interface SignoffItem {
 export const SIGNOFF_QUEUE: SignoffItem[] = [
   {
     id: 'so1', member: 'Shalini Iyer', memberId: 'm_0310', occasion: 'Day 90 · Wealthcation', method: 'v1.0', engine: 'engine 1.0.4', drafted: '28 Jan · 18:20',
-    prev: t([70, 79, 80, 61, 72, 26]), now: t([72, 80, 82, 69, 74, 21]),
+    // prev is the Day 0 measure the coach digest compares against (digest term − delta).
+    prev: t([75, 81, 80, 64, 75, 21]), now: t([78, 84, 83, 70, 78, 17]),
     labs: [
       { name: 'HbA1c', value: '5.6', unit: '%', ref: '< 5.7' },
       { name: 'LDL-C', value: '118', unit: 'mg/dL', ref: '< 100', flag: 'H' },
@@ -433,8 +436,8 @@ export const SIGNOFF_QUEUE: SignoffItem[] = [
     notes: [],
   },
   {
-    id: 'so2', member: 'Kavya Rao', memberId: 'm_0002', occasion: 'Day 0 · Joycation baseline', method: 'v1.0', engine: 'engine 1.0.4', drafted: '28 Jan · 16:05',
-    prev: t([68, 76, 81, 57, 69, 24]), now: t([69, 78, 81, 58, 72, 22]),
+    id: 'so2', member: 'Kavya Rao', memberId: 'm_0002', occasion: 'Day 23 · Joycation interim panel', method: 'v1.0', engine: 'engine 1.0.4', drafted: '28 Jan · 16:05',
+    prev: t([68, 76, 81, 57, 69, 16]), now: t([69, 78, 81, 58, 72, 15]),
     labs: [
       { name: 'HbA1c', value: '6.1', unit: '%', ref: '< 5.7', flag: 'H' },
       { name: 'TSH', value: '2.4', unit: 'mIU/L', ref: '0.4–4.0' },
@@ -445,8 +448,8 @@ export const SIGNOFF_QUEUE: SignoffItem[] = [
     notes: ['Ravi (concierge): home draw done 06:40, fasting confirmed.'],
   },
   {
-    id: 'so3', member: 'Vikram Patel', memberId: 'm_0119', occasion: 'Day 90 · Lovecation', method: 'v1.0', engine: 'engine 1.0.4', drafted: '27 Jan · 11:30',
-    prev: t([64, 70, 58, 66, 63, 34]), now: t([65, 71, 66, 64, 66, 33]),
+    id: 'so3', member: 'Vikram Patel', memberId: 'm_0119', occasion: 'Re-measure · Lovecation (window Day 76–90)', method: 'v1.0', engine: 'engine 1.0.4', drafted: '27 Jan · 11:30',
+    prev: t([68, 73, 55, 69, 69, 32]), now: t([70, 76, 62, 70, 72, 30]),
     labs: [
       { name: 'HbA1c', value: '5.4', unit: '%', ref: '< 5.7' },
       { name: 'LDL-C', value: '96', unit: 'mg/dL', ref: '< 100' },
@@ -570,7 +573,7 @@ export const ZONES = [
 export const PASSES = [
   { code: 'JX-2401', name: 'Ms Sunita Rao', pass: 'Healthcation guest', zones: ['z2', 'z3', 'z4', 'z5'], checkedIn: true },
   { code: 'JX-2402', name: 'Mr Anand Pillai', pass: 'Healthcation guest', zones: ['z2', 'z3', 'z4', 'z5'], checkedIn: true },
-  { code: 'JX-2403', name: 'Mrs Lalitha Pillai', pass: 'Healthcation guest', zones: ['z2', 'z3', 'z4', 'z5'], checkedIn: false },
+  { code: 'JX-2403', name: 'Mrs Lalitha Pillai', pass: 'Healthcation guest', zones: ['z2', 'z3', 'z4', 'z5'], checkedIn: true },
   { code: 'JX-2404', name: 'Dr Neha Bhatia', pass: 'Joycation guest', zones: ['z1', 'z2', 'z3', 'z4', 'z5'], checkedIn: false },
   { code: 'EV-7710', name: 'Mr Rohan Kapoor', pass: 'AIWO Joyspan 2027 · Summit day pass', zones: ['z1'], checkedIn: false },
   { code: 'EV-7711', name: 'Ms Aisha Merchant', pass: 'AIWO Joyspan 2027 · Summit day pass', zones: ['z1'], checkedIn: false },
@@ -679,14 +682,14 @@ export const CLINICAL_RECORDS: Record<string, ClinicalRecord> = {
   m_0001: {
     id: 'm_0001', name: 'Arjun Rao', age: 52, care: 'Joycation · Day 23 · Dr Meera Iyer', labDates: LAB_DATES, labs: MEMBER_LABS, meds: CURRENT_MEDS,
     chart: { lab: 'LDL-C', target: 100, targetLabel: 'target 100', domain: [80, 160], sentence: 'LDL-C over three panels, with the target line at 100 mg/dL.' },
-    orders: [{ test: 'Lipid panel + ApoB', when: 'Due 02 Apr 2027', status: 'Scheduled with the re-measure' }],
+    orders: [{ test: 'Lipid panel + ApoB', when: 'Due 05 Apr 2027', status: 'Scheduled with the re-measure' }],
   },
   m_0203: {
     id: 'm_0203', name: 'Deepa Venkat', age: 49, care: 'Healthcation · Day 58 · Dr Meera Iyer', labDates: ['01 Dec 2026', '12 Jan 2027', '28 Jan 2027'],
     labs: [
       { name: 'Serum potassium', unit: 'mmol/L', ref: '3.5–5.0', series: [4.6, 4.9, 6.2], flag: 'H' },
       { name: 'Creatinine', unit: 'mg/dL', ref: '0.5–1.1', series: [0.9, 1.0, 1.2], flag: 'H' },
-      { name: 'eGFR', unit: 'mL/min/1.73m²', ref: '≥ 90', series: [84, 76, 61] },
+      { name: 'eGFR', unit: 'mL/min/1.73m²', ref: '≥ 90', series: [84, 76, 61], flag: 'L' },
       { name: 'Sodium', unit: 'mmol/L', ref: '135–145', series: [139, 138, 137] },
       { name: 'HbA1c', unit: '%', ref: '< 5.7', series: [6.4, 6.2, 6.1], flag: 'H' },
       { name: 'Blood pressure', unit: 'mmHg', ref: '< 130/80', series: ['146/92', '134/84', '128/80'] },
@@ -711,7 +714,7 @@ export const CLINICAL_RECORDS: Record<string, ClinicalRecord> = {
     ],
     meds: [{ drug: 'Amlodipine', dose: '5 mg', freq: 'Once daily', since: 'Feb 2025', by: 'Outside physician' }],
     chart: { lab: 'Vitamin D (25-OH)', target: 30, targetLabel: 'lower limit 30', domain: [0, 60], sentence: 'Vitamin D over three panels, with the lower limit of the range at 30 ng/mL.' },
-    orders: [{ test: 'Day 0 panel · home draw', when: '28 Jan 2027 · 06:40', status: 'Final · awaiting your sign-off' }],
+    orders: [{ test: 'Day 23 interim panel · home draw', when: '28 Jan 2027 · 06:40', status: 'Final · awaiting your sign-off' }],
     suggestedOrder: { test: 'Vitamin D (25-OH) after loading', urgency: 'Routine · in 8 weeks', why: 'Low at 18 ng/mL on three panels. Recheck after a loading course.' },
   },
   m_0310: {
@@ -728,7 +731,7 @@ export const CLINICAL_RECORDS: Record<string, ClinicalRecord> = {
     orders: [{ test: 'Day 90 panel · home draw', when: '26 Jan 2027', status: 'Final · score drafted for sign-off' }],
   },
   m_0119: {
-    id: 'm_0119', name: 'Vikram Patel', age: 44, care: 'Lovecation · Day 77 · Dr Meera Iyer', labDates: ['12 Nov 2026', '25 Jan 2027'],
+    id: 'm_0119', name: 'Vikram Patel', age: 44, care: 'Lovecation · Day 77 · Dr Meera Iyer', labDates: ['12 Nov 2026', '27 Jan 2027'],
     labs: [
       { name: 'HbA1c', unit: '%', ref: '< 5.7', series: [5.5, 5.4] },
       { name: 'LDL-C', unit: 'mg/dL', ref: '< 100', series: [104, 96] },
@@ -736,8 +739,11 @@ export const CLINICAL_RECORDS: Record<string, ClinicalRecord> = {
       { name: 'Ferritin', unit: 'ng/mL', ref: '30–400', series: [88, 92] },
     ],
     meds: [{ drug: 'Melatonin', dose: '2 mg PR', freq: 'At night × 4 weeks', since: 'Jan 2027', by: 'Dr Meera Iyer' }],
-    chart: { lab: 'LDL-C', target: 100, targetLabel: 'target 100', domain: [80, 140], sentence: 'LDL-C at Day 0 and at the Day 90 re-measure, with the target line at 100 mg/dL.' },
-    orders: [{ test: 'Home sleep study (level 3)', when: 'Booked 02 Feb 2027', status: 'Ordered after ISI review' }],
+    chart: { lab: 'LDL-C', target: 100, targetLabel: 'target 100', domain: [80, 140], sentence: 'LDL-C at Day 0 and at the Day 76 re-measure, with the target line at 100 mg/dL.' },
+    orders: [
+      { test: 'Re-measure panel · home draw', when: '27 Jan 2027 · 06:30', status: 'Final · score drafted for sign-off' },
+      { test: 'Home sleep study (level 3)', when: 'Booked 02 Feb 2027', status: 'Ordered after ISI review' },
+    ],
   },
   m_0088: {
     id: 'm_0088', name: 'Farah Khan', age: 39, care: 'Sleepcation · Day 12 · Dr Sanjay Menon', labDates: ['16 Jan 2027'],
@@ -749,7 +755,7 @@ export const CLINICAL_RECORDS: Record<string, ClinicalRecord> = {
     ],
     meds: [],
     chart: { lab: 'Haemoglobin', target: 12, targetLabel: 'lower limit 12', domain: [10, 14], sentence: 'Haemoglobin at the Day 0 panel, with the lower limit at 12 g/dL.' },
-    orders: [{ test: 'Psychologist tele-consult', when: 'Within 48 h', status: 'Awaiting routing · PHQ-4 review' }],
+    orders: [{ test: 'Psychologist tele-consult', when: 'Within 48 h', status: 'P1 open · Dr Sanjay Menon · PHQ-4 review' }],
   },
   m_0142: {
     id: 'm_0142', name: 'Nikhil Sharma', age: 47, care: 'Mindcation · Day 41 · Dr Sanjay Menon', labDates: ['18 Dec 2026'],

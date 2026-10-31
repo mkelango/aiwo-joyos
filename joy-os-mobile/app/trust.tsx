@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, Share, View } from 'react-native'
 import {
   Body,
@@ -29,6 +29,7 @@ import { TENANT } from '@/shared/platform'
 import type { AccessEvent, Consent } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { CLAIMS_LOG, EXPORTS_PAST, EXTRA_ACCESS } from '@/screens/b/accountData'
+import { trustStore, useStore } from '@/screens/b/bStore'
 import { ChoiceCard, Done, Field, FilterChips, TimelineStep, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
 import { useDict } from '@/lib/i18n'
 import { TRUST, SCOPE_TEXT, CONSENT_T, ACCESS_T, EXPORT_T, CLAIM_STATE, CLAIM_BY, CLAIM_T } from '@/screens/b/i18n/trust'
@@ -67,12 +68,21 @@ function Trust() {
   const people = new Set(all.filter((e) => e.role !== 'System').map((e) => e.who)).size
 
   // Consents
-  const [consent, setConsent] = useState<Record<string, { on: boolean; changed?: boolean }>>(() => Object.fromEntries(CONSENTS.map((x) => [x.id, { on: x.granted }])))
+  // Consents, research use and a scheduled erasure are kept on the phone (they hold on return).
+  const [trust, setTrust] = useStore(trustStore)
+  const consent: Record<string, { on: boolean; changed?: boolean }> = Object.fromEntries(
+    CONSENTS.map((x) => [x.id, x.id in trust.consents ? { on: trust.consents[x.id], changed: true } : { on: x.granted }]),
+  )
   const [confirm, setConfirm] = useState<Consent | null>(null)
+  const setConsentOn = (x: Consent, v: boolean) => setTrust((s) => ({ ...s, consents: { ...s.consents, [x.id]: v } }))
+  const consentToast = (x: Consent, v: boolean) => t(v ? 'turnedOn' : 'withdrawnT', { name: cName(x) })
   const applyConsent = (x: Consent, v: boolean) => {
-    setConsent((s) => ({ ...s, [x.id]: { on: v, changed: true } }))
-    setToast(t(v ? 'turnedOn' : 'withdrawnT', { name: cName(x) }))
+    setConsentOn(x, v)
+    setToast(consentToast(x, v))
   }
+  // iOS cannot present the toast Modal while the confirm Sheet is still dismissing.
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current) }, [])
   const granted = Object.values(consent).filter((x) => x.on).length
   const groups = (['core', 'cohort', 'device', 'calendar', 'whatsapp', 'partner'] as const).map((g) => ({ g, items: CONSENTS.filter((x) => x.scope === g) })).filter((x) => x.items.length)
 
@@ -86,6 +96,7 @@ function Trust() {
   ]
   const expIdx = steps.findIndex((s) => s.key === exp)
   const [shared, setShared] = useState(false)
+  const [shareFailed, setShareFailed] = useState(false)
   // The copy is prepared in stages; each advances on its own (specimen timing).
   useEffect(() => {
     if (exp !== 'requested' && exp !== 'preparing') return
@@ -102,6 +113,7 @@ function Trust() {
       exportedAt: new Date().toISOString(),
     }
     const text = JSON.stringify(bundle, null, 2)
+    setShareFailed(false)
     // On the web build there is no share sheet to rely on, so the copy downloads as a file.
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       const url = URL.createObjectURL(new Blob([text], { type: format === 'fhir' ? 'application/fhir+json' : 'application/json' }))
@@ -117,7 +129,10 @@ function Trust() {
     }
     Share.share({ title: 'Joy OS export (specimen)', message: text })
       .then(() => setShared(true))
-      .catch(() => setShared(true))
+      .catch(() => {
+        setShared(false)
+        setShareFailed(true)
+      })
   }
 
   // Ask about an entry
@@ -149,7 +164,8 @@ function Trust() {
   const [understood, setUnderstood] = useState(false)
   const [typed, setTyped] = useState('')
   const [tried, setTried] = useState(false)
-  const [scheduled, setScheduled] = useState(false)
+  const scheduled = trust.eraseScheduled
+  const setScheduled = (v: boolean) => setTrust((s) => ({ ...s, eraseScheduled: v }))
   const closeDel = () => {
     setDel('closed')
     setTyped('')
@@ -158,7 +174,8 @@ function Trust() {
   }
 
   // Research
-  const [research, setResearch] = useState(true)
+  const research = trust.research
+  const setResearch = (v: boolean) => setTrust((s) => ({ ...s, research: v }))
 
   return (
     <Screen>
@@ -287,6 +304,12 @@ function Trust() {
               ))}
             </View>
             {shared ? <Done>{Platform.OS === 'web' ? t('savedDl') : t('handed')}</Done> : null}
+            {shareFailed ? (
+              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }} accessibilityLiveRegion="polite">
+                <Icon name="alert-circle" size={15} color={c.ink2} />
+                <Meta tone="ink" style={{ flex: 1 }}>{t('shareFailed')}</Meta>
+              </View>
+            ) : null}
             <Meta>
               {exp === 'ready'
                 ? t('readyLine', { format: format === 'fhir' ? 'FHIR R4 bundle' : t('jsonFile') })
@@ -298,7 +321,7 @@ function Trust() {
                   {Platform.OS === 'web' ? t('dlCopy') : t('shareCopy')}
                 </Button>
               ) : null}
-              <Button variant="ghost" size="sm" onPress={() => { setExp('idle'); setShared(false) }}>
+              <Button variant="ghost" size="sm" onPress={() => { setExp('idle'); setShared(false); setShareFailed(false) }}>
                 {exp === 'ready' ? tc('done') : t('cancelReq')}
               </Button>
             </View>
@@ -421,8 +444,13 @@ function Trust() {
             <Button
               variant="ink"
               onPress={() => {
-                if (confirm) applyConsent(confirm, false)
-                setConfirm(null)
+                if (confirm) {
+                  const x = confirm
+                  setConsentOn(x, false)
+                  setConfirm(null)
+                  if (toastTimer.current) clearTimeout(toastTimer.current)
+                  toastTimer.current = setTimeout(() => setToast(consentToast(x, false)), 350)
+                } else setConfirm(null)
               }}
             >
               {t('withdraw')}

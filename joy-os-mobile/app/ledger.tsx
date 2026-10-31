@@ -27,7 +27,7 @@ import { interceptsCrisis, useApp } from '@/lib/store'
 import { LEDGER_CALENDAR, LEDGER_SCHEDULE, LEDGER_STORY } from '@/screens/a/coreData'
 import { H2, isSpecimenToday, ledgerStamp, madeHere, ledgerWhen, shiftTime, useLocal } from '@/screens/a/local'
 import { BarRow, Chip, IconButton, Provenance, TextField } from '@/screens/a/parts'
-import { LEDGER_TAGS, LEDGER_WEEK } from '@/shared/member'
+import { LEDGER as SEED_LEDGER, LEDGER_TAGS, LEDGER_WEEK } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
 import { notifPrefsStore, useStore } from '@/screens/b/bStore'
 import { memberOnly } from '@/screens/b/parts'
@@ -82,7 +82,8 @@ function Ledger() {
     ledger.filter((e) => madeHere(e) && isSpecimenToday(e)).forEach((e) => e.tags.forEach((tg) => m.set(tg, (m.get(tg) ?? 0) + 1)))
     return [...m.entries()].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count)
   }, [ledger])
-  const total = week.reduce((a, b) => a + b.count, 0)
+  // Moments are entries, not tags (one entry can carry several): the seed week plus today's on this phone.
+  const total = SEED_LEDGER.length + ledger.filter((e) => madeHere(e) && isSpecimenToday(e)).length
 
   const toggle = (tg: string) => {
     setError('')
@@ -181,7 +182,7 @@ function Ledger() {
               {state === 'saved' ? tl('addAnother') : tl('actually')}
             </Button>
             {state === 'saved' ? (
-              <ArrowLink icon="sun" onPress={() => router.push('/')}>
+              <ArrowLink icon="sun" onPress={() => router.dismissTo('/')}>
                 {tc('backToday')}
               </ArrowLink>
             ) : null}

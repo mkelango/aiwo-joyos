@@ -1,13 +1,13 @@
 import clsx from 'clsx'
 import { motion } from 'framer-motion'
 import { AlertCircle, Apple, Check, CircleDot, Clock, Link2, RefreshCw, ShieldOff, Smartphone, Watch } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bar, BarChart, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { DaybreakButton, SpecimenTag, TermChip } from '@/components/joy/primitives'
 import { Button, Card, EmptyState, PageHeader, Pill, Sheet } from '@/components/ui'
 import { DEVICES, HEALTHKIT_TYPES, WEAR_NIGHTS, type DeviceState } from './_data'
 import { Checkbox, Section, Toggle } from './_parts'
-import { rich, usePersisted, useToast } from './_util'
+import { fmtShortDate, rich, usePersisted, useToast } from './_util'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
 import { DEV, useData } from './_i18n'
 
@@ -22,6 +22,9 @@ function applyDeviceStates(states: Record<string, DeviceOverride>): Device[] {
   // Android-only sources keep their own state; a disconnected default ring becomes "available" again.
   return DEVICES.map((d) => (states[d.id] ? { ...d, ...states[d.id], state: states[d.id].state === 'available' && d.state === 'android' ? 'android' : states[d.id].state } : d))
 }
+/** A wear-chart night (day of January 2027) as a localised day and month. */
+const wearDay = (d: string) => fmtShortDate(`2027-01-${d.padStart(2, '0')}`)
+
 /** Specimen samples per sync, per source. */
 const SAMPLES: Record<string, number> = { oura: 288, apple: 124 }
 
@@ -39,6 +42,8 @@ export default function Devices() {
     return { states: Object.fromEntries(next.map((d) => [d.id, { state: d.state, lastSync: d.lastSync, freshness: d.freshness }])) }
   })
   const [syncing, setSyncing] = useState(false)
+  const syncTimer = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(syncTimer.current), [])
   const [connect, setConnect] = useState<Device | null>(null)
   const [disconnect, setDisconnect] = useState<Device | null>(null)
   const [hkSaved, setHkSaved] = usePersisted<{ on: Record<string, boolean>; writeBack: boolean }>('healthkit', { on: Object.fromEntries(HEALTHKIT_TYPES.map((x) => [x.id, x.on])), writeBack: true })
@@ -57,7 +62,8 @@ export default function Devices() {
   const sync = () => {
     if (connected.length === 0) return
     setSyncing(true)
-    window.setTimeout(() => {
+    window.clearTimeout(syncTimer.current)
+    syncTimer.current = window.setTimeout(() => {
       setSyncing(false)
       setDevices((ds) => ds.map((d) => (d.state === 'connected' ? { ...d, lastSync: 'Just now', freshness: 'fresh' } : d)))
       const samples = connected.reduce((a, d) => a + (SAMPLES[d.id] ?? 150), 0)
@@ -171,13 +177,13 @@ export default function Devices() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
           <Card>
             <p className="text-[15px] text-ink-2">{t('chartIntro')}</p>
-            <div className="mt-4 h-56" role="img" aria-label={t('chartAria', { worn: wornNights, gaps: gaps.map((g) => `${g.d} Jan`).join(lang === 'en' ? ' and ' : ', '), short: short.map((s) => `${s.d} Jan`).join(', ') })}>
+            <div className="mt-4 h-56" role="img" aria-label={t('chartAria', { worn: wornNights, gaps: gaps.map((g) => wearDay(g.d)).join(lang === 'en' ? ' and ' : ', '), short: short.map((s) => wearDay(s.d)).join(', ') })}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={WEAR_NIGHTS} margin={{ top: 8, right: 4, left: -24, bottom: 0 }}>
                   <XAxis dataKey="d" tickLine={false} axisLine={{ stroke: 'var(--line)' }} tick={{ fill: 'var(--ink-3)', fontSize: 11, fontFamily: 'var(--font-mono)' }} />
                   <YAxis domain={[0, 10]} ticks={[0, 4, 8]} tickLine={false} axisLine={false} tick={{ fill: 'var(--ink-3)', fontSize: 11, fontFamily: 'var(--font-mono)' }} />
                   <ReferenceLine y={4} stroke="var(--ink-3)" strokeDasharray="3 3" />
-                  <Tooltip cursor={{ fill: 'var(--paper-sunk)' }} contentStyle={{ background: 'var(--paper-raised)', border: '1px solid var(--line)', borderRadius: 8, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)' }} formatter={(v) => [`${v} h`, t('worn')]} labelFormatter={(l) => `${l} Jan`} />
+                  <Tooltip cursor={{ fill: 'var(--paper-sunk)' }} contentStyle={{ background: 'var(--paper-raised)', border: '1px solid var(--line)', borderRadius: 8, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink)' }} formatter={(v) => [`${v} h`, t('worn')]} labelFormatter={(l) => wearDay(String(l))} />
                   <Bar dataKey="h" radius={[3, 3, 0, 0]} isAnimationActive={false}>
                     {WEAR_NIGHTS.map((n) => <Cell key={n.d} fill={n.h >= 4 ? 'var(--term-h)' : 'var(--line-strong)'} />)}
                   </Bar>
@@ -211,7 +217,7 @@ export default function Devices() {
                 <DeviceIcon id={d.id} />
                 <div className="min-w-0">
                   <p className="text-[16px] text-ink">{d.name}</p>
-                  <p className="text-[13px] text-ink-2">{d.via}</p>
+                  <p className="text-[13px] text-ink-2">{dx(d.via)}</p>
                 </div>
               </div>
               <p className="mt-3 text-[14px] text-ink-2">{dx(d.note)}</p>

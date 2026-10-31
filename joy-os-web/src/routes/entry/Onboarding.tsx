@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, BellOff, Check, Fingerprint, KeyRound, Link2, Loader2, Lock, Mail, MessageCircle, Plus, RotateCcw, Smartphone, Trash2, UserPlus, Users, Watch } from 'lucide-react'
-import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
 import { DaybreakButton, Eyebrow, TermDot } from '@/components/joy/primitives'
@@ -11,7 +11,7 @@ import { LANGS, useDict, useLang, useTermText } from '@/lib/i18n'
 import { useApp, type Lang } from '@/lib/store'
 import { COUNTRIES, DEVICES, EMAIL_RE, INTENTS, ONBOARDING_COPY, ONBOARDING_STEPS as STEPS, countryName, phoneError, type CountryCode, type DeviceId, type OnboardingStep } from './_data'
 import { E, OB, dateLocale } from './_i18n'
-import { FlowTopBar, rich, useBand } from './_parts'
+import { FlowTopBar, enterCodeDigits, rich, useBand } from './_parts'
 import { CHECK_KEY, ONBOARDING_KEY, readJSON, removeKey, writeJSON, type SavedCheck, type SavedOnboarding } from './_store'
 
 // ONBOARDING (Plan §4B; competitive pattern 5, intent-first, device last):
@@ -75,13 +75,31 @@ export default function Onboarding() {
   const [quiet, setQuiet] = useState(saved?.quiet ?? { from: '21:45', to: '07:30' })
   const [perDay, setPerDay] = useState(saved?.perDay ?? 2)
   const [channels, setChannels] = useState<Channels>(saved?.channels ?? { app: true, whatsapp: false, email: true })
-  const headingRef = useRef<HTMLHeadingElement>(null)
+  // Each step's heading takes focus as it mounts after a step change. AnimatePresence
+  // calls onExitComplete (below) once the old step has left and before the new one
+  // mounts, so focus never lands on the exiting heading and drops to <body>.
+  const focusOnMount = useRef(false)
+  const headingRef = useCallback((el: HTMLHeadingElement | null) => {
+    if (el && focusOnMount.current) {
+      focusOnMount.current = false
+      el.focus({ preventScroll: true })
+    }
+  }, [])
   const highWater = useRef(resumeStep)
 
   useEffect(() => {
-    headingRef.current?.focus({ preventScroll: true })
     window.scrollTo({ top: 0 })
   }, [step])
+
+  // Linking a device lives here, not in the Device step, so leaving the step
+  // ("Link it later") mid-link still finishes it instead of leaving it stuck.
+  const linkTimers = useRef<number[]>([])
+  const clearLinkTimers = () => { linkTimers.current.forEach((id) => window.clearTimeout(id)); linkTimers.current = [] }
+  useEffect(() => clearLinkTimers, [])
+  const linkDevice = (id: DeviceId) => {
+    setLinked((l) => ({ ...l, [id]: 'linking' }))
+    linkTimers.current.push(window.setTimeout(() => setLinked((l) => (l[id] === 'linking' ? { ...l, [id]: 'linked' } : l)), 1200))
+  }
 
   // Save as you go. The furthest step reached is kept, so returning resumes there.
   const snapshot = (extra?: Partial<SavedOnboarding>): SavedOnboarding => ({
@@ -125,6 +143,7 @@ export default function Onboarding() {
       case 'Household':
         return draftStarted ? t('vHousehold') : null
       case 'Quiet hours':
+        if (!quiet.from || !quiet.to) return t('vQuietEmpty')
         if (quiet.from === quiet.to) return t('vQuietSame')
         if (!channels.app && !channels.whatsapp && !channels.email && perDay > 0) return t('vChannel')
         return null
@@ -132,6 +151,11 @@ export default function Onboarding() {
         return null
     }
   }
+
+  // Where "Continue" on Welcome really lands: the furthest step, unless an earlier
+  // answer has since become incomplete (say, the contact changed after verifying).
+  const resumeGap = STEPS.slice(1, resumeStep).findIndex((s) => validate(s) !== null)
+  const resumeTarget = resumeGap === -1 ? resumeStep : resumeGap + 1
 
   const go = (to: number, d: 1 | -1) => {
     setError(null)
@@ -142,10 +166,7 @@ export default function Onboarding() {
   const next = () => {
     if (STEPS[step] === 'Welcome' && resumable) {
       setResumable(false)
-      // Resume at the furthest step, unless an earlier answer has since become
-      // incomplete (say, the contact changed after verifying): then stop there.
-      const gap = STEPS.slice(1, resumeStep).findIndex((s) => validate(s) !== null)
-      return go(gap === -1 ? resumeStep : gap + 1, 1)
+      return go(resumeTarget, 1)
     }
     const err = validate()
     if (err) {
@@ -163,6 +184,7 @@ export default function Onboarding() {
     setIntents(check ? [check.lowest] : [])
     setConsents({ care: false, data: false, publishing: false })
     setDevice('oura')
+    clearLinkTimers()
     setLinked({})
     setInvites([])
     setDraft({ name: '', relation: 'Partner', contact: '' })
@@ -181,7 +203,7 @@ export default function Onboarding() {
   const name = STEPS[step]
   const eyebrow = (extra = '') => `${L.step} ${step + 1} · ${L.names[name]}${extra}`
   const nextLabel =
-    name === 'Welcome' ? (resumable ? `${L.cont} · ${L.step} ${resumeStep + 1}` : L.begin) :
+    name === 'Welcome' ? (resumable ? `${L.cont} · ${L.step} ${resumeTarget + 1}` : L.begin) :
     name === 'Household' && invites.length === 0 ? L.skip :
     name === 'Device' && device !== 'none' && linked[device] !== 'linked' ? L.later :
     L.cont
@@ -201,7 +223,7 @@ export default function Onboarding() {
       </div>
 
       <main id="main" className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pb-36 pt-8 md:px-6 md:pb-16 md:pt-14">
-        <AnimatePresence mode="wait" initial={false}>
+        <AnimatePresence mode="wait" initial={false} onExitComplete={() => { focusOnMount.current = true }}>
           <motion.div
             key={step}
             initial={{ opacity: 0, x: offset }}
@@ -210,12 +232,12 @@ export default function Onboarding() {
             transition={{ duration: 0.22, ease: [0.2, 0, 0, 1] }}
             className="flex-1"
           >
-            {name === 'Welcome' && <Welcome headingRef={headingRef} lang={lang} onLang={setLang} resumable={resumable} resumeStep={resumeStep} resumeName={STEPS[resumeStep]} savedAt={saved?.savedAt} completedAt={saved?.completedAt} firstName={account.name} onStartAgain={startAgain} />}
+            {name === 'Welcome' && <Welcome headingRef={headingRef} lang={lang} onLang={setLang} resumable={resumable} resumeStep={resumeTarget} resumeName={STEPS[resumeTarget]} savedAt={saved?.savedAt} completedAt={saved?.completedAt} firstName={account.name} onStartAgain={startAgain} />}
             {name === 'Account' && <AccountStep headingRef={headingRef} eyebrow={eyebrow()} value={account} onChange={(a) => { setAccount(a); setError(null) }} attempted={attempted} />}
             {name === 'Intent' && <IntentStep headingRef={headingRef} eyebrow={eyebrow()} check={check} value={intents} onChange={(v) => { setIntents(v); setError(null) }} />}
             {name === 'Language' && <LanguageStep headingRef={headingRef} eyebrow={eyebrow()} value={lang} onChange={setLang} />}
             {name === 'Consents' && <ConsentStep headingRef={headingRef} eyebrow={eyebrow()} value={consents} onChange={(v) => { setConsents(v); setError(null) }} />}
-            {name === 'Device' && <DeviceStep headingRef={headingRef} eyebrow={eyebrow()} device={device} setDevice={setDevice} linked={linked} setLinked={setLinked} />}
+            {name === 'Device' && <DeviceStep headingRef={headingRef} eyebrow={eyebrow()} device={device} setDevice={setDevice} linked={linked} onLink={linkDevice} setLinked={setLinked} />}
             {name === 'Household' && <HouseholdStep headingRef={headingRef} eyebrow={eyebrow(t('optionalSuffix'))} invites={invites} setInvites={setInvites} draft={draft} setDraft={(d) => { setDraft(d); setError(null) }} />}
             {name === 'Quiet hours' && <QuietStep headingRef={headingRef} eyebrow={eyebrow()} quiet={quiet} setQuiet={(q) => { setQuiet(q); setError(null) }} perDay={perDay} setPerDay={(n) => { setPerDay(n); setError(null) }} channels={channels} setChannels={(c) => { setChannels(c); setError(null) }} />}
             {name === 'Begin' && <BeginStep headingRef={headingRef} eyebrow={eyebrow()} account={account} check={check} intents={intents} lang={lang} consents={consents} device={device} linked={linked[device] === 'linked'} invites={invites} quiet={quiet} perDay={perDay} channels={channels} onFinish={finish} />}
@@ -260,7 +282,7 @@ function StepDots({ step, names }: { step: number; names: Record<OnboardingStep,
   )
 }
 
-function StepHead({ headingRef, eyebrow, title, lead }: { headingRef: React.RefObject<HTMLHeadingElement | null>; eyebrow: string; title: ReactNode; lead?: ReactNode }) {
+function StepHead({ headingRef, eyebrow, title, lead }: { headingRef: React.Ref<HTMLHeadingElement>; eyebrow: string; title: ReactNode; lead?: ReactNode }) {
   return (
     <header className="mb-8">
       <p className="eyebrow mb-3 text-daybreak-ink">{eyebrow}</p>
@@ -270,7 +292,7 @@ function StepHead({ headingRef, eyebrow, title, lead }: { headingRef: React.RefO
   )
 }
 
-type HeadRef = { headingRef: React.RefObject<HTMLHeadingElement | null>; eyebrow: string }
+type HeadRef = { headingRef: React.Ref<HTMLHeadingElement>; eyebrow: string }
 
 // ─── Steps ─────────────────────────────────────────────────────────────────
 
@@ -288,7 +310,7 @@ function Welcome({ headingRef, lang, onLang, resumable, resumeStep, resumeName, 
           title={resumable ? <>{rich(t('wTitleBack'), { who, em: <em>{t('wTitleBackEm')}</em> })}</> : <>{rich(t('wTitle'), { em: <em>{t('wTitleEm')}</em> })}</>}
           lead={
             resumable
-              ? t('wLeadBack', { n: resumeStep + 1, name: lang === 'en' ? resumeName.toLowerCase() : L.names[resumeName] })
+              ? t('wLeadBack', { n: resumeStep + 1, name: lang === 'en' ? lowerFirst(L.names[resumeName]) : L.names[resumeName] })
               : t('wLead')
           }
         />
@@ -341,6 +363,10 @@ function AccountStep({ headingRef, eyebrow, value, onChange, attempted }: HeadRe
   const boxes = useRef<(HTMLInputElement | null)[]>([])
   const timer = useRef<number | null>(null)
   useEffect(() => () => { if (timer.current !== null) window.clearTimeout(timer.current) }, [])
+  // The passkey timer reads the account as it is when the device answers, never the
+  // copy captured at click time (the fields are also locked while it waits).
+  const latest = useRef(value)
+  latest.current = value
 
   const lang = useLang()
   const t = useDict(OB)
@@ -355,7 +381,7 @@ function AccountStep({ headingRef, eyebrow, value, onChange, attempted }: HeadRe
   const createPasskey = () => {
     if (!fieldsOk) return setFieldsNote(true)
     setSecure('passkey-waiting')
-    timer.current = window.setTimeout(() => { onChange({ ...value, verified: 'passkey' }); setSecure('choose') }, 1400)
+    timer.current = window.setTimeout(() => { onChange({ ...latest.current, verified: 'passkey' }); setSecure('choose') }, 1400)
   }
   const sendCode = () => {
     if (!fieldsOk) return setFieldsNote(true)
@@ -370,10 +396,10 @@ function AccountStep({ headingRef, eyebrow, value, onChange, attempted }: HeadRe
     setSecure('choose')
   }
   const setDigit = (i: number, v: string) => {
-    const d = v.replace(/\D/g, '').slice(-1)
-    setCode((cur) => cur.map((x, n) => (n === i ? d : x)))
+    const next = enterCodeDigits(code, i, v)
+    setCode(next.code)
     setCodeErr(null)
-    if (d && i < 5) boxes.current[i + 1]?.focus()
+    if (next.focus !== null) boxes.current[next.focus]?.focus()
   }
   const onKey = (i: number, e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Backspace' && !code[i] && i > 0) boxes.current[i - 1]?.focus()
@@ -391,6 +417,7 @@ function AccountStep({ headingRef, eyebrow, value, onChange, attempted }: HeadRe
     <div>
       <StepHead headingRef={headingRef} eyebrow={eyebrow} title={<>{rich(t('aTitle'), { em: <em>AIWO ID</em> })}</>} lead={t('aLead')} />
       <Card>
+        <fieldset disabled={secure === 'passkey-waiting'} className="min-w-0">
         <div>
           <label htmlFor="acc-name" className="block text-[14px] text-ink-2">{t('firstName')}</label>
           <input
@@ -461,6 +488,7 @@ function AccountStep({ headingRef, eyebrow, value, onChange, attempted }: HeadRe
           )}
           {show('contact') ? <p id="acc-contact-err" className="mt-1.5 text-[14px] text-error">{errs.contact}</p> : <p id="acc-contact-help" className="mt-1.5 text-[13px] text-ink-3">{t('contactHelp')}</p>}
         </div>
+        </fieldset>
       </Card>
 
       <Card tone="sunk" className="mt-5" aria-live="polite">
@@ -488,9 +516,9 @@ function AccountStep({ headingRef, eyebrow, value, onChange, attempted }: HeadRe
                     onChange={(e) => setDigit(i, e.target.value)}
                     onKeyDown={(e) => onKey(i, e)}
                     onPaste={onPaste}
+                    onFocus={(e) => e.currentTarget.select()}
                     inputMode="numeric"
                     autoComplete={i === 0 ? 'one-time-code' : 'off'}
-                    maxLength={1}
                     aria-label={te('digit', { n: i + 1 })}
                     aria-invalid={!!codeErr}
                     className={clsx('num h-12 w-full min-w-0 rounded-xl border bg-paper text-center text-[20px] text-ink focus-ring', codeErr && !d ? 'border-error' : 'border-line-strong')}
@@ -655,16 +683,10 @@ function ConsentStep({ headingRef, eyebrow, value, onChange }: HeadRef & { value
   )
 }
 
-function DeviceStep({ headingRef, eyebrow, device, setDevice, linked, setLinked }: HeadRef & { device: DeviceId; setDevice: (d: DeviceId) => void; linked: Partial<Record<DeviceId, 'linking' | 'linked'>>; setLinked: React.Dispatch<React.SetStateAction<Partial<Record<DeviceId, 'linking' | 'linked'>>>> }) {
+function DeviceStep({ headingRef, eyebrow, device, setDevice, linked, onLink, setLinked }: HeadRef & { device: DeviceId; setDevice: (d: DeviceId) => void; linked: Partial<Record<DeviceId, 'linking' | 'linked'>>; onLink: (d: DeviceId) => void; setLinked: React.Dispatch<React.SetStateAction<Partial<Record<DeviceId, 'linking' | 'linked'>>>> }) {
   const d = DEVICES.find((x) => x.id === device)!
   const state = linked[device]
-  const timers = useRef<number[]>([])
-  useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), [])
-  const link = () => {
-    const id = device
-    setLinked((l) => ({ ...l, [id]: 'linking' }))
-    timers.current.push(window.setTimeout(() => setLinked((l) => ({ ...l, [id]: 'linked' })), 1200))
-  }
+  const link = () => onLink(device)
   const unlink = () => setLinked((l) => { const n = { ...l }; delete n[device]; return n })
   const t = useDict(OB)
   const lang = useLang()
@@ -884,6 +906,11 @@ function BeginStep({ headingRef, eyebrow, account, check, intents, lang, consent
       </p>
     </div>
   )
+}
+
+/** "Your AIWO ID" → "your AIWO ID": only the first letter, so names like AIWO keep their capitals. */
+function lowerFirst(s: string) {
+  return s.charAt(0).toLowerCase() + s.slice(1)
 }
 
 function fmtWhen(iso: string, lang: Lang = 'en') {

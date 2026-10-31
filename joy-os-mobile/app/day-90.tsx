@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Pressable, View } from 'react-native'
 import { ArrowLink, Avatar, Body, Button, DaybreakButton, Eyebrow, Icon, InkSurface, Meta, MethodLine, Mono, Numeral, Segmented, Serif, Sheet, TermDot, Title } from '@/components'
 import { interceptsCrisis, useApp } from '@/lib/store'
-import { H2 } from '@/screens/a/local'
+import { H2, useLocal } from '@/screens/a/local'
 import { DAY90_DATES, DAY90_TERMS, DAY90_WHY, NEXT_90 } from '@/screens/a/coreData'
 import { INK, InkScreen, TextField } from '@/screens/a/parts'
 import { DAY90_SPECIMEN, INDEX_HISTORY, TEAM } from '@/shared/member'
@@ -27,6 +27,11 @@ const SLOTS = [
   { value: 'sat', label: 'Sat 10:30', long: 'Saturday 10 April · 10:30' },
 ] as const
 type Slot = (typeof SLOTS)[number]['value']
+type PlanState = 'open' | 'agreed' | 'note' | 'noted'
+// The booked call and the member's answer to the plan, kept on the phone so they hold when
+// the member leaves Day 90 and comes back.
+type Day90Saved = { confirmed: boolean; slot: Slot; planState: PlanState; note: string }
+const DAY90_INITIAL: Day90Saved = { confirmed: false, slot: 'thu', planState: 'open', note: '' }
 
 export default memberOnly(Day90)
 
@@ -34,12 +39,17 @@ function Day90() {
   const { space, radius } = useTheme()
   const meera = TEAM.find((p) => p.id === 'p_meera')!
   const { setCrisisOpen } = useApp()
-  const [confirmed, setConfirmed] = useState(false)
-  const [slot, setSlot] = useState<Slot>('thu')
-  const [pick, setPick] = useState<Slot>('thu')
+  const [savedRaw, setSaved] = useLocal<Day90Saved>('day90', DAY90_INITIAL)
+  const saved: Day90Saved = { ...DAY90_INITIAL, ...savedRaw }
+  const { confirmed, planState, note } = saved
+  const slot: Slot = SLOTS.some((x) => x.value === saved.slot) ? saved.slot : 'thu'
+  const save = (patch: Partial<Day90Saved>) => setSaved((p) => ({ ...DAY90_INITIAL, ...p, ...patch }))
+  const setConfirmed = (v: boolean) => save({ confirmed: v })
+  const setSlot = (v: Slot) => save({ slot: v })
+  const setPlanState = (v: PlanState) => save({ planState: v })
+  const setNote = (v: string) => save({ note: v })
+  const [pick, setPick] = useState<Slot>(slot)
   const [slotOpen, setSlotOpen] = useState(false)
-  const [planState, setPlanState] = useState<'open' | 'agreed' | 'note' | 'noted'>('open')
-  const [note, setNote] = useState('')
   const when = SLOTS.find((x) => x.value === slot)!
   const t = useDict(DAY90)
   const tc = useCommon()
@@ -284,8 +294,7 @@ function Day90() {
               variant="ink"
               block
               onPress={() => {
-                setSlot(pick)
-                setConfirmed(true)
+                save({ slot: pick, confirmed: true })
                 setSlotOpen(false)
               }}
             >

@@ -1,6 +1,6 @@
 // Ported from joy-os-web/src/routes/member/spaces/_data.ts (Lane A). SPECIMEN — not a real member.
 import type { Action, TermKey } from '@/shared/types'
-import { ACTION_LIBRARY, INDEX_HISTORY } from '@/shared/member'
+import { ACTION_LIBRARY, INDEX_HISTORY, TODAY_ACTION } from '@/shared/member'
 
 // SPECIMEN DATA for the six spaces — not a real member (Memo p.19).
 // Everything a space needs beyond the shared specimens lives here so the
@@ -8,6 +8,15 @@ import { ACTION_LIBRARY, INDEX_HISTORY } from '@/shared/member'
 
 /** "Today" for the specimen member: Day 23 of the loop that started 5 Jan 2027. */
 export const SPACE_TODAY = '2027-01-28'
+
+/** SPACE_TODAY's weekday, Monday = 0 (28 Jan 2027 is a Thursday). Matches Today's TODAY_INDEX. */
+export const SPACE_TODAY_INDEX = 3
+
+/** A date-only ISO string ('YYYY-MM-DD') as a local Date, so no timezone shifts the day. */
+export function localDay(iso: string) {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
 
 /** Plain-word names for the six rooms (the hub speaks in these, not in jargon). */
 export const ROOM_PLAIN: Record<TermKey, string> = {
@@ -30,17 +39,18 @@ export const ROOM_VERDICT: Record<TermKey, string> = {
 
 // ─── 90-day history ────────────────────────────────────────────────────────
 
-/** Weekly short-form pulse across the last ninety days, ending at the latest full measure. */
+/** Weekly short-form pulse across the last ninety days, ending on the specimen today (SPACE_TODAY). */
 export function termHistory(key: TermKey) {
   const cur = INDEX_HISTORY[0].terms.find((t) => t.key === key)!.value ?? 0
   const prev = INDEX_HISTORY[1].terms.find((t) => t.key === key)!.value ?? cur
   const seed = key.charCodeAt(0)
-  const start = new Date('2026-10-30')
+  const end = localDay(SPACE_TODAY)
   return Array.from({ length: 14 }, (_, i) => {
     const p = i / 13
     // The ends are the two measured scores (so the line agrees with the delta); weeks between wobble.
     const wobble = i === 0 || i === 13 ? 0 : Math.round(Math.sin(seed * 1.7 + i * 1.3) * 1.6)
-    const d = new Date(start.getTime() + i * 7 * 86400000)
+    // Local constructor (not ms arithmetic) so the last point is today in every timezone.
+    const d = new Date(end.getFullYear(), end.getMonth(), end.getDate() - (13 - i) * 7)
     return {
       label: d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
       value: Math.round(prev + (cur - prev) * p + wobble),
@@ -49,10 +59,12 @@ export function termHistory(key: TermKey) {
 }
 
 // ─── Three actions per term (ACTION_LIBRARY first, then our own) ───────────
+// Today's one action is never offered again here: planning it would only repeat it on Today.
+// Action sizes are 2, 10 or 30 minutes (shared Action type), so each title names its own size.
 
 const OWN_ACTIONS: Action[] = [
-  { id: 'a_h_021', term: 'H', title: 'Walk after dinner for twenty minutes.', detail: 'With Kavya if she is free.', minutes: 30, timeOfDay: 'evening', shared: true, evidence: 'Post-meal walking lowers glucose excursions (LE8 · blood glucose).', why: 'HbA1c is at the edge of its range.' },
-  { id: 'a_h_027', term: 'H', title: 'Fifteen minutes of morning sun.', detail: 'Arms and face, before 10 am.', minutes: 10, timeOfDay: 'morning', shared: false, evidence: 'Sun exposure supports vitamin D status; your physician advises on supplements.', why: 'Vitamin D was below range in January.' },
+  { id: 'a_h_021', term: 'H', title: 'Walk after dinner for thirty minutes.', detail: 'With Kavya if she is free.', minutes: 30, timeOfDay: 'evening', shared: true, evidence: 'Post-meal walking lowers glucose excursions (LE8 · blood glucose).', why: 'HbA1c is at the edge of its range.' },
+  { id: 'a_h_027', term: 'H', title: 'Ten minutes of morning sun.', detail: 'Arms and face, before 10 am.', minutes: 10, timeOfDay: 'morning', shared: false, evidence: 'Sun exposure supports vitamin D status; your physician advises on supplements.', why: 'Vitamin D was below range in January.' },
   { id: 'a_p_009', term: 'P', title: 'Write one line in the contribution log.', detail: 'Who did your work help today?', minutes: 2, timeOfDay: 'evening', shared: false, evidence: 'Prosocial contribution and meaning in life (MLQ-P).', why: 'Contribution is the quietest part of your Ikigai map.' },
   { id: 'a_p_012', term: 'P', title: 'Spend ten minutes learning something new.', detail: 'Stay Curious, Practice week 7.', minutes: 10, timeOfDay: 'any', shared: false, evidence: 'Curiosity predicts meaning presence (Kashdan & Steger).', why: 'Keeps the daily anchors alive.' },
   { id: 'a_r_011', term: 'R', title: 'Plan State of Us for Sunday.', detail: 'Twenty minutes, phones away.', minutes: 2, timeOfDay: 'any', shared: true, evidence: 'Weekly couple rituals (Gottman, “State of the Union”).', why: 'Your last State of Us was eleven days ago.' },
@@ -60,18 +72,19 @@ const OWN_ACTIONS: Action[] = [
   { id: 'a_f_007', term: 'F', title: 'Block one hour on Thursday that is yours.', detail: 'Name it. Defend it like a board meeting.', minutes: 2, timeOfDay: 'morning', shared: false, evidence: 'Time affluence and autonomy (Whillans; BPNSFS).', why: 'Nearly half of last fortnight was asked of you.' },
   { id: 'a_f_010', term: 'F', title: 'Schedule the succession conversation.', detail: 'Thirty minutes, with Kavya and your adviser.', minutes: 10, timeOfDay: 'any', shared: true, evidence: 'Choice and peace of mind (Freedom Triad · Choice).', why: 'It is the open item on your peace-of-mind list.' },
   { id: 'a_d_019', term: 'D', title: 'Savour one meal without a screen.', detail: 'Name the three best flavours.', minutes: 30, timeOfDay: 'any', shared: true, evidence: 'Sensory sharpening raises savouring (Bryant).', why: 'Food is your second-largest source of joy this week.' },
+  { id: 'a_d_023', term: 'D', title: 'Listen to one raga all the way through.', detail: 'Headphones on, nothing else open.', minutes: 10, timeOfDay: 'evening', shared: false, evidence: 'Absorption deepens savouring (Bryant & Veroff).', why: 'Music is a quiet, steady joy in your Ledger.' },
   { id: 'a_b_009', term: 'B', title: 'Write the second arrow down.', detail: 'The problem, and the extra you are adding.', minutes: 10, timeOfDay: 'evening', shared: false, evidence: 'Cognitive defusion (ACT; Hayes).', why: 'Stress is your second-largest Burden part.' },
   { id: 'a_b_012', term: 'B', title: 'Move one “keep meaning to” item to done.', detail: 'The smallest one.', minutes: 10, timeOfDay: 'any', shared: false, evidence: 'Behavioural activation reduces avoidance.', why: 'Avoidance is small, but it is there.' },
 ]
 
 export function actionsFor(key: TermKey): Action[] {
-  const lib = ACTION_LIBRARY.filter((a) => a.term === key)
+  const lib = ACTION_LIBRARY.filter((a) => a.term === key && a.id !== TODAY_ACTION.id)
   return [...lib, ...OWN_ACTIONS.filter((a) => a.term === key)].slice(0, 3)
 }
 
 /** A specimen VIVA draft per space — drafted by VIVA, a person signs. */
 export const VIVA_DRAFT: Record<TermKey, { tool: string; ask: string; draft: string; reviewer: string } | null> = {
-  H: { tool: 'explain_biomarker', ask: 'What is ApoB, in plain words?', draft: 'ApoB counts the particles that carry cholesterol in your blood. Yours is 92 mg/dL; the lab range is under 90. It is one number among several, and Dr Meera will talk it through with you at your Day 45 review. VIVA does not diagnose.', reviewer: 'Reviewed by Dr Meera Iyer' },
+  H: { tool: 'explain_biomarker', ask: 'What is ApoB, in plain words?', draft: 'ApoB counts the particles that carry cholesterol in your blood. Yours is 92 mg/dL; the lab range is under 90. It is one number among several, and Dr Meera will talk it through with you at your panel review on 4 Feb. VIVA does not diagnose.', reviewer: 'Reviewed by Dr Meera Iyer' },
   P: { tool: 'ikigai_coach', ask: 'Help me make my daily anchors smaller.', draft: 'Your three anchors are good ones. “Teach the interns every Friday” could become “answer one intern question a day”. Small enough that a busy day cannot take it away.', reviewer: 'Coach Priya sees this in your digest' },
   R: { tool: 'couples_prompt', ask: 'Give us a State of Us prompt for this week.', draft: 'Each of you, separately: name one moment this week when you felt your partner was on your side. Then say it out loud to them, without explaining it.', reviewer: 'Never reveals one partner to the other' },
   F: { tool: 'time_audit_summary', ask: 'Summarise my time audit.', draft: 'Over two weeks, a little over a quarter of your planned hours were yours. Nearly half were asked of you by others, mostly in Tuesday and Wednesday meetings. Weekends were largely your own.', reviewer: 'Calendar entries discarded · totals only · never financial advice' },
@@ -134,7 +147,7 @@ export const BIOMARKERS: Marker[] = [
   { name: 'TSH', panel: 'Blood & thyroid', value: 2.1, unit: 'mIU/L', range: '0.4 – 4.0', prev: 2.4, status: 'in range', plain: 'The signal that runs the thyroid.' },
 ]
 
-export const PANEL_META = { drawn: '2027-01-22', signed: '2027-01-24', signedBy: 'Dr Meera Iyer', lab: 'AIWO panel · NABL-accredited partner lab', previous: '2026-10-03' }
+export const PANEL_META = { drawn: '2027-01-21', signed: '2027-01-24', signedBy: 'Dr Meera Iyer', lab: 'AIWO panel · NABL-accredited partner lab', previous: '2026-10-03' }
 
 export const CAPACITY = [
   { key: 'grip', name: 'Grip strength', unit: 'kg', last: 38, prev: 36, better: 'higher', how: 'Dominant hand, best of three squeezes, elbow at 90°.', norm: 'Typical for men in their fifties: 36 – 44 kg' },
@@ -142,14 +155,17 @@ export const CAPACITY = [
   { key: 'gait', name: 'Gait speed', unit: 'm/s', last: 1.12, prev: 1.08, better: 'higher', how: 'Walk 4 metres at your usual pace. We divide 4 by your time.', norm: 'Above 1.0 m/s is the usual line' },
 ] as const
 
-/** 28 days of signal features (not vendor scores). */
+/**
+ * 28 days of signal features (not vendor scores), from Fri 1 Jan 2027. i % 7 === 1 is a Saturday
+ * (HRV dips and resting HR bumps after late dinners); i % 7 === 2 is a Sunday (late nights cut regularity).
+ */
 export const SIGNALS = Array.from({ length: 28 }, (_, i) => {
-  const d = new Date(new Date('2027-01-01').getTime() + i * 86400000)
+  const d = new Date(2027, 0, 1 + i)
   return {
     label: d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
-    hrv: Math.round(38 + i * 0.18 + Math.sin(i * 0.9) * 4 + (i % 7 === 5 ? -6 : 0)),
-    rhr: Math.round((60 - i * 0.06 + Math.cos(i * 0.8) * 1.6 + (i % 7 === 5 ? 3 : 0)) * 10) / 10,
-    regularity: Math.round(78 + Math.sin(i * 0.6) * 6 - (i > 20 ? 7 : 0) + (i % 7 === 6 ? -5 : 0)),
+    hrv: Math.round(38 + i * 0.18 + Math.sin(i * 0.9) * 4 + (i % 7 === 1 ? -6 : 0)),
+    rhr: Math.round((60 - i * 0.06 + Math.cos(i * 0.8) * 1.6 + (i % 7 === 1 ? 3 : 0)) * 10) / 10,
+    regularity: Math.round(78 + Math.sin(i * 0.6) * 6 - (i > 20 ? 7 : 0) + (i % 7 === 2 ? -5 : 0)),
   }
 })
 
@@ -158,13 +174,16 @@ export const SIGNALS = Array.from({ length: 28 }, (_, i) => {
 export const IKIGAI_START = {
   direction: 'Build a teaching practice that outlives the firm: forty young engineers who can run a plant better than I did.',
   contribution: 'Make it easier for the next generation in Chennai to start something honest.',
-  anchors: ['Morning walk on Besant Nagar beach', 'Answer one intern question a day', 'Carnatic music with Amma on Sundays'],
+  anchors: ['Morning walk on Besant Nagar beach', 'Teach the interns every Friday', 'Carnatic music with Amma on Sundays'],
 }
 
-export const TOMORROW_ANSWERS = [
-  { week: 3, date: '2027-01-24', text: 'Sitting with Ishaan to review his plant layout before he presents it.' },
-  { week: 2, date: '2027-01-17', text: 'Taking Amma to the Music Academy for the morning concert.' },
-  { week: 1, date: '2027-01-10', text: 'The first walk after the Summit, with nothing to prove.' },
+/** One kept Tomorrow Question answer. `id` keys the row (answers kept before ids existed have none). */
+export interface TomorrowAnswer { id?: string; week: number; date: string; text: string }
+
+export const TOMORROW_ANSWERS: TomorrowAnswer[] = [
+  { id: 't3', week: 3, date: '2027-01-24', text: 'Sitting with Ishaan to review his plant layout before he presents it.' },
+  { id: 't2', week: 2, date: '2027-01-17', text: 'Taking Amma to the Music Academy for the morning concert.' },
+  { id: 't1', week: 1, date: '2027-01-10', text: 'The first walk after the Summit, with nothing to prove.' },
 ]
 
 export const STATEMENT_START = 'In twenty-five years I will be seventy-seven. I want to be the person younger engineers in this city call before a hard decision. I want Kavya and I to still be walking the beach in the mornings, slower, still arguing about music. I want the plant to run without me, and the people I trained to be training others. I want to have said the things I meant to say to my mother while she could hear them.'
@@ -255,7 +274,7 @@ export const PEACE_OF_MIND = [
 export const PLANNED_START = [
   { id: 'pp1', day: 'Mon', time: '19:30', what: 'Tea on the verandah with Kavya', minutes: 10, with: 'Kavya' },
   { id: 'pp2', day: 'Tue', time: '13:00', what: 'Lunch at Murugan Idli, alone with a book', minutes: 30, with: '' },
-  { id: 'pp3', day: 'Wed', time: '18:30', what: 'Play the veena for fifteen minutes', minutes: 10, with: '' },
+  { id: 'pp3', day: 'Wed', time: '18:30', what: 'Play the veena for fifteen minutes', minutes: 15, with: '' },
 ]
 
 export const SAVOURING_PROMPTS = [
@@ -332,7 +351,7 @@ export const PHQ4_OPTIONS = ['Not at all', 'Several days', 'More than half the d
 
 export const BURDEN_PARTS = [
   { key: 'Mood', weight: 0.3, value: 22 },
-  { key: 'Sleep', weight: 0.25, value: 38 },
+  { key: 'Sleep', weight: 0.25, value: 34 },
   { key: 'Stress', weight: 0.2, value: 29 },
   { key: 'Pain', weight: 0.15, value: 14 },
   { key: 'Avoidance', weight: 0.1, value: 12 },

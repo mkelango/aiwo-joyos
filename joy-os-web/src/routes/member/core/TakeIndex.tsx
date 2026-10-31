@@ -14,7 +14,7 @@ import type { TermKey } from '@/domain/types'
 import { SIGNAL_READINGS, SITTINGS, TERM_DETAIL, type InstrumentBlock, type SampleItem } from './_data'
 import { HumanWritten, Switch } from './_parts'
 import { ORDER, scaleOf, scoreAnswers, signalId, signalSources } from './_scoring'
-import { IN_REMEASURE_WINDOW, SPECIMEN_TODAY, addDays, useMeasured } from './_store'
+import { IN_REMEASURE_WINDOW, REMEASURE_OPENS, SPECIMEN_TODAY, addDays, useMeasured } from './_store'
 import { BLOCK_TEXT, SIGNAL_READING_TEXT, SIGNAL_SOURCE_TEXT, SITTING_TITLE, fmtLocal, rich, useCore } from './_i18n'
 import { INSTRUMENT_NOTE, useT } from '@/lib/i18n'
 
@@ -89,6 +89,18 @@ export default function TakeIndex() {
   const [fromReview, setFromReview] = useState(false)
   const [savedStage, setSavedStage] = useState<'step' | 'review'>('step')
   const topRef = useRef<HTMLDivElement>(null)
+  // The pending auto-advance after an answer. Any other navigation cancels it, and it
+  // only fires if the member is still on the step that scheduled it.
+  const autoTimer = useRef<number | undefined>(undefined)
+  const stageRef = useRef(stage)
+  const cursorRef = useRef(cursor)
+  stageRef.current = stage
+  cursorRef.current = cursor
+  const cancelAuto = () => {
+    window.clearTimeout(autoTimer.current)
+    autoTimer.current = undefined
+  }
+  useEffect(() => () => window.clearTimeout(autoTimer.current), [])
 
   const { t: c, pick } = useCore()
   const answeredCount = Object.keys(answers).filter((id) => answers[id] !== undefined).length
@@ -105,6 +117,7 @@ export default function TakeIndex() {
   }, [cursor, stage])
 
   const go = (n: number) => {
+    cancelAuto()
     if (n >= steps.length) return setStage('review')
     setCursor(Math.max(0, n))
     setStage('step')
@@ -116,8 +129,23 @@ export default function TakeIndex() {
     }
     go(cursor + 1)
   }
-  const back = () => (cursor === 0 ? setStage('overview') : go(cursor - 1))
+  const back = () => {
+    cancelAuto()
+    if (cursor !== 0) return go(cursor - 1)
+    // Refresh what the Overview says is kept from live state, not the draft read at mount.
+    setDraftSnapshot({ cursor, answers, stage: fromReview ? 'review' : 'step', signalsOff, confirmed, savedAt: new Date().toISOString() })
+    setStage('overview')
+  }
+  const autoAdvance = (delay: number) => {
+    cancelAuto()
+    const at = cursor
+    autoTimer.current = window.setTimeout(() => {
+      autoTimer.current = undefined
+      if (stageRef.current === 'step' && cursorRef.current === at) go(at + 1)
+    }, delay)
+  }
   const saveLater = () => {
+    cancelAuto()
     const at: 'step' | 'review' = stage === 'review' || fromReview ? 'review' : 'step'
     writeDraft({ cursor, answers, stage: at, signalsOff, confirmed, savedAt: new Date().toISOString() })
     setFromReview(false)
@@ -125,6 +153,7 @@ export default function TakeIndex() {
     setStage('saved')
   }
   const resume = (at: 'step' | 'review') => {
+    cancelAuto()
     setFromReview(false)
     if (at === 'review' || cursor >= steps.length) setStage('review')
     else setStage('step')
@@ -204,6 +233,7 @@ export default function TakeIndex() {
                 fromReview={fromReview}
                 onAnswer={(v) => setAnswers((a) => ({ ...a, [step.item.id]: v }))}
                 onNext={next}
+                onAutoAdvance={autoAdvance}
                 onBack={back}
               />
             )}
@@ -299,7 +329,7 @@ function Overview({ resumable, resumeLabel, answered, onStart, onRestart }: { re
       </p>
       {!IN_REMEASURE_WINDOW && (
         <p className="mt-3 text-[15px] text-ink-2">
-          {rich(c('ovOpens'), { n: <span className="num">76</span>, date: fmtLocal(new Date(`${addDays(MEMBER.loopStarted, 76)}T12:00`), lang, { day: 'numeric', month: 'short' }) })}
+          {rich(c('ovOpens'), { n: <span className="num">76</span>, date: fmtLocal(new Date(`${REMEASURE_OPENS}T12:00`), lang, { day: 'numeric', month: 'short' }) })}
         </p>
       )}
 
@@ -354,7 +384,7 @@ function InstrumentIntro({ block, index, of, onBegin, onBack }: { block: Instrum
   return (
     <div className="flex flex-1 flex-col">
       <p className="eyebrow text-ink-3">{rich(c('inOf'), { i: <span className="num">{index + 1}</span>, n: <span className="num">{of}</span> })}</p>
-      <h1 className="mt-3 text-[2rem] font-light leading-tight text-ink md:text-[2.5rem]">{block.name}</h1>
+      <h1 lang="en" className="mt-3 text-[2rem] font-light leading-tight text-ink md:text-[2.5rem]">{block.name}</h1>
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <TermChip term={block.term} withSpace={term.space !== term.name} />
         <span className="flex items-center gap-1.5 text-[14px] text-ink-2"><Clock size={14} /> {rich(c('inAbout'), { m: <span className="num">{block.minutes}</span>, n: <span className="num">{block.items}</span> })}</span>
@@ -373,7 +403,7 @@ function InstrumentIntro({ block, index, of, onBegin, onBack }: { block: Instrum
         </div>
         <div>
           <dt className="eyebrow text-ink-3">{c('inLicence')}</dt>
-          <dd className="mt-1 text-ink">{block.attribution}</dd>
+          <dd lang="en" className="mt-1 text-ink">{block.attribution}</dd>
         </div>
       </dl>
       <div className="mt-auto flex flex-col gap-2 pt-10">
@@ -385,17 +415,15 @@ function InstrumentIntro({ block, index, of, onBegin, onBack }: { block: Instrum
 }
 
 // ─── One item per screen ────────────────────────────────────────────────────
-function ItemScreen({ block, item, value, fromReview, onAnswer, onNext, onBack }: { block: InstrumentBlock; item: SampleItem; value: number | undefined; fromReview: boolean; onAnswer: (v: number) => void; onNext: () => void; onBack: () => void }) {
+function ItemScreen({ block, item, value, fromReview, onAnswer, onNext, onAutoAdvance, onBack }: { block: InstrumentBlock; item: SampleItem; value: number | undefined; fromReview: boolean; onAnswer: (v: number) => void; onNext: () => void; onAutoAdvance: (delay: number) => void; onBack: () => void }) {
   const reduce = useReducedMotion()
-  const timer = useRef<number | undefined>(undefined)
   const scale = scaleOf(block, item)
   const { t: c, lang } = useCore()
-  useEffect(() => () => window.clearTimeout(timer.current), [])
 
+  // The parent owns the auto-advance timer, so Back or "Save for later" can cancel it.
   const choose = (v: number) => {
     onAnswer(v)
-    window.clearTimeout(timer.current)
-    if (!fromReview) timer.current = window.setTimeout(onNext, reduce ? 60 : 320)
+    if (!fromReview) onAutoAdvance(reduce ? 60 : 320)
   }
 
   useEffect(() => {
@@ -415,10 +443,10 @@ function ItemScreen({ block, item, value, fromReview, onAnswer, onNext, onBack }
     <div className="flex flex-1 flex-col">
       <div className="flex items-center gap-2">
         <TermDot term={block.term} />
-        <span className="eyebrow text-ink-3">{block.code} · {block.timeframe}</span>
+        <span lang="en" className="eyebrow text-ink-3">{block.code} · {block.timeframe}</span>
       </div>
       {lang !== 'en' && <p lang={lang} className="mt-3 rounded-card bg-paper-sunk px-3 py-2 text-[13px] text-ink-2">{INSTRUMENT_NOTE[lang]}</p>}
-      {item.stem && <p className="mt-4 text-[17px] text-ink-2">{item.stem}</p>}
+      {item.stem && <p lang="en" className="mt-4 text-[17px] text-ink-2">{item.stem}</p>}
       <h1 id={headingId} lang="en" className={clsx('text-[1.8rem] font-light leading-snug text-ink md:text-[2.2rem]', item.stem ? 'mt-1' : 'mt-4')}>
         {item.text}
       </h1>
@@ -440,7 +468,7 @@ function ItemScreen({ block, item, value, fromReview, onAnswer, onNext, onBack }
               <span className={clsx('num flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-[13px]', on ? 'border-paper/40' : 'border-line-strong text-ink-3')}>
                 {on ? <Check size={14} /> : i + 1}
               </span>
-              {opt.label}
+              <span lang="en">{opt.label}</span>
             </button>
           )
         })}

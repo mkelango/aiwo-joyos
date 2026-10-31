@@ -54,22 +54,28 @@ export interface JourneyState {
   reflections: Record<number, { text: string; savedAt: string }>
   /** Earlier Practice weeks the member has un-marked (all earlier weeks start as practised). */
   weeksUnmarked: number[]
+  /** Practice weeks whose Mentor audio is kept on this device for offline play. */
+  offlineWeeks: number[]
 }
 
 const KEY = 'joyos:journey'
 
-/** The specimen “today”: Day 23 of the loop that started at checkout. */
-export const TODAY = (() => {
-  const d = new Date(`${MEMBER.loopStarted}T12:00:00`)
-  d.setDate(d.getDate() + MEMBER.dayOfLoop)
-  return d.toISOString().slice(0, 10)
-})()
+const pad = (n: number) => String(n).padStart(2, '0')
+
+/**
+ * A local Date as YYYY-MM-DD from its local parts. Not toISOString(), which
+ * gives the UTC date: at UTC+12 or more, local noon is the previous UTC day.
+ */
+export const isoDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 
 export const addDays = (iso: string, n: number) => {
   const d = new Date(`${iso.slice(0, 10)}T12:00:00`)
   d.setDate(d.getDate() + n)
-  return d.toISOString().slice(0, 10)
+  return isoDate(d)
 }
+
+/** The specimen “today”: Day 23 of the loop that started at checkout. */
+export const TODAY = addDays(MEMBER.loopStarted, MEMBER.dayOfLoop)
 
 /** Days already practised this week before today (specimen). */
 const SEED_DAYS = [addDays(TODAY, -3), addDays(TODAY, -2)]
@@ -86,6 +92,7 @@ const initial: JourneyState = {
   schedule: null,
   reflections: {},
   weeksUnmarked: [],
+  offlineWeeks: [],
 }
 
 function load(): JourneyState {
@@ -186,6 +193,10 @@ export const weekPractised = (s: JourneyState, week: number) => !s.weeksUnmarked
 
 export function setWeekPractised(week: number, on: boolean) {
   setJourney((s) => ({ ...s, weeksUnmarked: on ? s.weeksUnmarked.filter((w) => w !== week) : Array.from(new Set([...s.weeksUnmarked, week])) }))
+}
+
+export function setOffline(week: number, on: boolean) {
+  setJourney((s) => ({ ...s, offlineWeeks: on ? Array.from(new Set([...s.offlineWeeks, week])) : s.offlineWeeks.filter((w) => w !== week) }))
 }
 
 export const holderName = `${MEMBER.firstName} ${MEMBER.lastName}`

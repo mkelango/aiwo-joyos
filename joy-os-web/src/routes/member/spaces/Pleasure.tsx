@@ -3,13 +3,14 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, CalendarClock, Check, Pause, Play, RefreshCw, Share2, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { DaybreakButton, Eyebrow, SpecimenTag, fmtDate } from '@/components/joy/primitives'
+import { DaybreakButton, Eyebrow, SpecimenTag } from '@/components/joy/primitives'
 import { Button, Sheet } from '@/components/ui'
-import { LEDGER_WEEK } from '@/data/member'
+import { useLedgerRemoved, weekCounts, weekEntryCount } from '@/routes/member/core/_store'
 import { useApp } from '@/lib/store'
 import { FILMS, PLANNED_START, SAVOURING_PROMPTS } from './_data'
-import { SpaceShell, ToolCard, useCrisisGuard, Toggle } from './_SpaceShell'
+import { SpaceShell, ToolCard, rovingRadio, useCrisisGuard, Toggle } from './_SpaceShell'
 import { useSpaceText, type SpKey } from './_i18n'
+import { useSpaceState } from './_state'
 
 // PLEASURE · Daily Pleasure (Memo p.19): the Joy Ledger's weekly view of where joy
 // came from; one planned pleasure a day, scheduled like a meeting; savouring
@@ -35,9 +36,12 @@ export default function Pleasure() {
 
 function LedgerInsights() {
   const { ledger } = useApp()
-  const { t, d, r, lang } = useSpaceText()
-  const max = Math.max(...LEDGER_WEEK.map((l) => l.count))
-  const total = LEDGER_WEEK.reduce((a, b) => a + b.count, 0)
+  const { t, d, r, lang, dm, clock } = useSpaceText()
+  const [removed] = useLedgerRemoved()
+  // The same week the Ledger shows: the seed entries plus moments kept here, minus any removed.
+  const week = useMemo(() => weekCounts(ledger, removed), [ledger, removed])
+  const max = Math.max(1, ...week.map((l) => l.count))
+  const total = useMemo(() => weekEntryCount(ledger, removed), [ledger, removed])
   const byPrompt = useMemo(() => {
     const c = { 1: 0, 2: 0, 3: 0 } as Record<1 | 2 | 3, number>
     ledger.forEach((e) => { c[e.prompt] += 1 })
@@ -45,7 +49,9 @@ function LedgerInsights() {
   }, [ledger])
   const slots = [{ k: 1 as const, label: t('pl.slot.Midday'), time: '12:40' }, { k: 2 as const, label: t('pl.slot.Afternoon'), time: '16:15' }, { k: 3 as const, label: t('pl.slot.Evening'), time: '21:30' }]
   const pct = useMemo(() => largestRemainder([byPrompt[1], byPrompt[2], byPrompt[3]]), [byPrompt])
-  const best = useMemo(() => [...ledger].filter((e) => e.word).sort((a, b) => b.at.localeCompare(a.at))[0], [ledger])
+  // The ledger is newest first (addLedger prepends). Do not sort by `at`: specimen entries are dated
+  // 2027, ahead of the real clock that stamps a new moment, so a string sort would bury it.
+  const best = useMemo(() => ledger.find((e) => e.word), [ledger])
   return (
     <ToolCard
       className="w-full"
@@ -56,7 +62,7 @@ function LedgerInsights() {
     >
       <p className="text-[15px] text-ink-2">{t('pl.lg.perTag')}</p>
       <ul className="mt-3 space-y-2.5" aria-label={t('pl.lg.perTagAria')}>
-        {LEDGER_WEEK.map((l) => (
+        {week.map((l) => (
           <li key={l.tag} className={clsx('grid items-center gap-3', lang === 'en' ? 'grid-cols-[5.5rem_1fr_2rem]' : 'grid-cols-[6.5rem_1fr_2rem]')}>
             <span className="min-w-0 break-words text-[14px] text-ink">{d(l.tag)}</span>
             <span className="h-3 overflow-hidden rounded-full bg-paper-sunk" aria-hidden>
@@ -80,9 +86,9 @@ function LedgerInsights() {
       </div>
       {best && (
         <figure className="mt-6 rounded-2xl border border-line p-4">
-          <Eyebrow>{r('pl.lg.keep', { d: <span className="num">{fmtDate(best.at.slice(0, 10)).slice(0, 6)}</span> })}</Eyebrow>
+          <Eyebrow>{r('pl.lg.keep', { d: <span className="num">{dm(best.at)}</span> })}</Eyebrow>
           <blockquote className="mt-2 text-[1.25rem] font-light leading-snug text-ink">“{best.word}”</blockquote>
-          <figcaption className="mt-1 text-[13px] text-ink-3">{best.tags.map(d).join(' · ')} · <span className="num">{best.at.slice(11)}</span></figcaption>
+          <figcaption className="mt-1 text-[13px] text-ink-3">{best.tags.map(d).join(' · ')} · <span className="num">{clock(best.at)}</span></figcaption>
         </figure>
       )}
       <Link to="/app/ledger" className="mt-auto inline-flex items-center gap-1.5 pt-5 text-[15px] text-ink underline-offset-4 hover:underline focus-ring rounded">{t('pl.lg.add')} <ArrowRight size={15} /></Link>
@@ -93,10 +99,11 @@ function LedgerInsights() {
 // ─── One planned pleasure ─────────────────────────────────────────────────
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const LENGTHS = [10, 30] as const
 
 function PlannedPleasure() {
   const guard = useCrisisGuard()
-  const [items, setItems] = useState(PLANNED_START)
+  const [items, setItems] = useSpaceState('pleasure.planned.v1', PLANNED_START)
   const [what, setWhat] = useState('')
   const [day, setDay] = useState('Thu')
   const [time, setTime] = useState('19:00')
@@ -110,6 +117,7 @@ function PlannedPleasure() {
   const taken = items.some((i) => i.day === day)
   const schedule = () => {
     if (!what.trim()) return setErr('pl.pp.errName')
+    if (!/^\d{2}:\d{2}$/.test(time)) return setErr('pl.pp.errTime')
     if (taken) return setErr('pl.pp.errTaken')
     if (guard(what, withWho)) return
     const id = `pp${Date.now()}`
@@ -118,24 +126,25 @@ function PlannedPleasure() {
     const next = DAYS.find((d) => !items.some((i) => i.day === d) && d !== day)
     if (next) setDay(next)
   }
+  const lengthRadio = rovingRadio(LENGTHS, mins, setMins)
   const inputCls = 'h-11 w-full rounded-xl border border-line-strong bg-paper px-3.5 text-[16px] text-ink placeholder:text-ink-3 focus-ring'
   return (
     <ToolCard className="w-full" tone="soft" eyebrow={t('pl.pp.eyebrow')} title={t('pl.pp.title')} sub={t('pl.pp.sub')}>
       <form onSubmit={(e) => { e.preventDefault(); schedule() }} className="space-y-3">
         <label className="block">
           <span className="text-[13px] text-ink-2">{t('pl.pp.pleasure')}</span>
-          <input value={what} onChange={(e) => { setWhat(e.target.value); setErr('') }} placeholder={t('pl.pp.placeholder')} aria-invalid={!!err} className={clsx(inputCls, 'bg-paper-raised')} />
+          <input value={what} onChange={(e) => { setWhat(e.target.value); setErr('') }} placeholder={t('pl.pp.placeholder')} aria-invalid={err === 'pl.pp.errName'} aria-describedby={err === 'pl.pp.errName' ? 'pp-err' : undefined} className={clsx(inputCls, 'bg-paper-raised')} />
         </label>
         <div className="grid grid-cols-[1fr_1fr] gap-3">
           <label className="block">
             <span className="text-[13px] text-ink-2">{t('pl.pp.day')}</span>
-            <select value={day} onChange={(e) => { setDay(e.target.value); setErr('') }} className={clsx(inputCls, 'bg-paper-raised')}>
+            <select value={day} onChange={(e) => { setDay(e.target.value); setErr('') }} aria-invalid={err === 'pl.pp.errTaken'} aria-describedby={err === 'pl.pp.errTaken' ? 'pp-err' : undefined} className={clsx(inputCls, 'bg-paper-raised')}>
               {DAYS.map((d) => <option key={d} value={d}>{dayT(d)}{items.some((i) => i.day === d) ? t('pl.pp.planned') : ''}</option>)}
             </select>
           </label>
           <label className="block">
             <span className="text-[13px] text-ink-2">{t('pl.pp.time')}</span>
-            <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={clsx(inputCls, 'num bg-paper-raised')} />
+            <input type="time" value={time} onChange={(e) => { setTime(e.target.value); if (err === 'pl.pp.errTime') setErr('') }} aria-invalid={err === 'pl.pp.errTime'} aria-describedby={err === 'pl.pp.errTime' ? 'pp-err' : undefined} className={clsx(inputCls, 'num bg-paper-raised')} />
           </label>
         </div>
         <div className="grid grid-cols-[1fr_auto] items-end gap-3">
@@ -144,12 +153,12 @@ function PlannedPleasure() {
             <input value={withWho} onChange={(e) => setWithWho(e.target.value)} placeholder="Kavya" className={clsx(inputCls, 'bg-paper-raised')} />
           </label>
           <div role="radiogroup" aria-label={t('pl.pp.length')} className="inline-flex h-11 rounded-full bg-paper-raised p-1">
-            {([10, 30] as const).map((m) => (
-              <button key={m} type="button" role="radio" aria-checked={mins === m} onClick={() => setMins(m)} className={clsx('rounded-full px-3 text-[13px] focus-ring', mins === m ? 'bg-ink text-paper' : 'text-ink-2')}><span className="num">{m}</span> {t('c.min')}</button>
+            {LENGTHS.map((m) => (
+              <button key={m} type="button" {...lengthRadio(m)} className={clsx('rounded-full px-3 text-[13px] focus-ring', mins === m ? 'bg-ink text-paper' : 'text-ink-2')}><span className="num">{m}</span> {t('c.min')}</button>
             ))}
           </div>
         </div>
-        {err && <p role="alert" className="text-[13px] text-error">{t(err, { day: dayT(day) })}</p>}
+        {err && <p id="pp-err" role="alert" className="text-[13px] text-error">{t(err, { day: dayT(day) })}</p>}
         <DaybreakButton type="submit" className="w-full"><CalendarClock size={18} /> {t('pl.pp.schedule')}</DaybreakButton>
         {added && (
           <p role="status" className="flex items-start gap-2 text-[14px] text-ink"><Check size={15} className="mt-0.5 shrink-0" aria-hidden /><span>{r('pl.pp.added', { dt: <span className="num">{dayT(added.day)} {added.time}</span>, m: <span className="num">{added.minutes}</span>, with: added.with ? t('pl.pp.withX', { who: added.with }) : '', slot: t(Number(added.time.slice(0, 2)) < 14 ? 'pl.slot.midday' : Number(added.time.slice(0, 2)) < 18 ? 'pl.slot.afternoon' : 'pl.slot.evening') })}</span></p>
@@ -232,11 +241,12 @@ function Films() {
   const [open, setOpen] = useState<(typeof FILMS)[number] | null>(null)
   const [playing, setPlaying] = useState(false)
   const [pos, setPos] = useState(0)
-  const [optIn, setOptIn] = useState(false)
-  const [shared, setShared] = useState<string[]>([])
+  const [optIn, setOptIn] = useSpaceState('pleasure.share.optIn.v1', false)
+  const [shared, setShared] = useSpaceState<string[]>('pleasure.share.v1', [])
   const { ledger } = useApp()
-  const { t, d } = useSpaceText()
-  const recent = useMemo(() => [...ledger].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 3), [ledger])
+  const { t, d, dm, clock } = useSpaceText()
+  // Newest first, as the ledger stores them (see LedgerInsights).
+  const recent = useMemo(() => ledger.slice(0, 3), [ledger])
   // pos is elapsed seconds; the film's length comes from its m:ss label.
   const length = open ? toSecs(open.minutes) : 0
   useEffect(() => {
@@ -280,7 +290,7 @@ function Films() {
                     <li key={e.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-paper-sunk px-3 py-2.5">
                       <span className="min-w-0 text-[14px] text-ink">
                         {e.word ?? e.tags.map(d).join(' & ')}
-                        <span className="block text-[12px] text-ink-3"><span className="num">{fmtDate(e.at.slice(0, 10)).slice(0, 6)} · {e.at.slice(11)}</span> · {e.tags.map(d).join(', ')}{e.photo ? t('pl.fm.photo') : ''}</span>
+                        <span className="block text-[12px] text-ink-3"><span className="num">{dm(e.at)} · {clock(e.at)}</span> · {e.tags.map(d).join(', ')}{e.photo ? t('pl.fm.photo') : ''}</span>
                       </span>
                       {on ? (
                         <span role="status" className="flex items-center gap-2 text-[13px] text-ink-2">

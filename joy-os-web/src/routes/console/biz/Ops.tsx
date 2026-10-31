@@ -6,7 +6,7 @@ import { Bar, BarChart, Line, LineChart, ReferenceLine, ResponsiveContainer, Too
 import { DaybreakButton, Eyebrow, SpecimenTag, TermChip } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill, Sheet, Tabs, Toggle } from '@/components/ui'
 import { AI_TOOLS, AUDIT, CELLS, COSTS, HUMAN_REVIEW, JIT_REQUESTS, RED_TEAM, RELEASE_FLAGS, RIGHTS_JOBS, RIGHTS_STORES, SIGNAL_SOURCES, SLOS, TENANTS } from './_data'
-import { AccessNote, CardHead, ChartLead, Field, Kpi, Legend, Meter, ScrollTabs, StatusTag, Swatch, areaCls, fieldCls, pct, tick, tipLabel, tipStyle, useTabParam } from './_parts'
+import { AccessNote, CardHead, ChartLead, Field, Kpi, Legend, Meter, ScrollTabs, StatusTag, Swatch, areaCls, fieldCls, pct, tabPanelProps, tick, tipLabel, tipStyle, useTabParam } from './_parts'
 
 // CONTROL PLANE (Architecture p.20, p.24–27; Memo p.15): flags and kill switches on every AI tool,
 // the evaluation plane, SLOs and error budgets, cost per member per service, tenants and region cells,
@@ -19,6 +19,7 @@ const COST_TARGET = 60
 const ME = 'Neha Iyer · DPO'
 const ME_NAME = ME.split(' · ')[0]
 const TENANT_SCOPES = TENANTS.filter((t) => t.members > 0)
+const TENANT_WEIGHTED_COST = Math.round(TENANT_SCOPES.reduce((a, t) => a + t.budget * t.members, 0) / TENANT_SCOPES.reduce((a, t) => a + t.members, 0))
 const scopeLabel = (s: string) => (s === 'all' ? 'all tenants' : TENANTS.find((t) => t.id === s)?.name ?? s)
 const BASE_CALLS = AI_TOOLS.filter((t) => t.on).reduce((a, t) => a + t.calls, 0)
 const LANG_NAME: Record<string, string> = { EN: 'English', TA: 'Tamil', HI: 'Hindi' }
@@ -26,7 +27,8 @@ const SIGNAL_FLAG: Record<string, string> = { healthkit: 'healthkit_background',
 
 type JitStatus = 'pending' | 'active' | 'expired' | 'denied' | 'withdrawn'
 type Jit = { id: string; who: string; role: string; scope: string; duration: string; reason: string; status: JitStatus; approver: string; expires: string }
-type Change = { at: string; what: string; reason: string }
+type Change = { day: string; at: string; what: string; reason: string }
+type Stamp = { day: string; at: string }
 type ToolState = { on: boolean; killedFor: string[]; signoff: 'none' | 'requested' | 'signed' }
 type Pending = { kind: 'tool' | 'flag' | 'signoff'; key: string; to: boolean; nonce: number }
 type Job = { id: string; kind: 'export' | 'erase' | 'withdraw'; opened: string; elapsedH: number; stores: number; done: number; status: 'running' | 'delivered'; note: string; escalated: boolean; retrying: boolean; notices: { at: string; text: string }[] }
@@ -43,7 +45,7 @@ function belowFloor(t: (typeof AI_TOOLS)[number]) {
 
 function initialNotices(r: (typeof RIGHTS_JOBS)[number]): Job['notices'] {
   const base = [{ at: r.opened, text: `Request received. We will finish within ${SLA[r.kind]} hours and tell you when it is done.` }]
-  if (r.status === 'delivered') base.push({ at: r.kind === 'export' ? '28 Jan 21:05' : '27 Jan 13:24', text: r.kind === 'export' ? 'Your export is ready: a signed link, valid for 72 hours.' : r.kind === 'erase' ? 'Your data has been erased. Records the law requires us to keep are listed, with the reason.' : 'Your consent is withdrawn everywhere, including caches.' })
+  if (r.status === 'delivered') base.push({ at: r.deliveredAt ?? r.opened, text: r.kind === 'export' ? 'Your export is ready: a signed link, valid for 72 hours.' : r.kind === 'erase' ? 'Your data has been erased. Records the law requires us to keep are listed, with the reason.' : 'Your consent is withdrawn everywhere, including caches.' })
   return base
 }
 
@@ -61,12 +63,24 @@ export default function Ops() {
   const [replay, setReplay] = useState<Record<string, RunState>>({})
   const [pending, setPending] = useState<Pending | null>(null)
   const nonce = useRef(0)
+  // Session clock: minutes after 21:00 on 28 Jan, one per logged action. Hours (and the day) roll over rather than
+  // clamp, so the hash-chained trail keeps its order however long the session runs.
   const clock = useRef(10)
-  const stamp = () => `21:${String(Math.min(59, clock.current++)).padStart(2, '0')}`
-  const log = (what: string, reason: string) => {
-    const at = stamp()
-    setChanges((c) => [{ at, what, reason }, ...c])
-    return at
+  const next = (): Stamp => {
+    const t = 21 * 60 + clock.current++
+    const m = t % 1440
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return { day: `${28 + Math.floor(t / 1440)} Jan`, at: `${pad(Math.floor(m / 60))}:${pad(m % 60)}` }
+  }
+  /** "28 Jan 21:14": a dated stamp for member notices. */
+  const stamp = () => {
+    const s = next()
+    return `${s.day} ${s.at}`
+  }
+  const log = (what: string, reason: string): Stamp => {
+    const s = next()
+    setChanges((c) => [{ ...s, what, reason }, ...c])
+    return s
   }
   const ask = (kind: Pending['kind'], key: string, to: boolean) => setPending({ kind, key, to, nonce: ++nonce.current })
 
@@ -124,7 +138,7 @@ export default function Ops() {
     log(`${id} ${approve ? 'approved' : 'declined'}`, 'Just-in-time access decision')
   }
   const revoke = (id: string) => {
-    const at = log(`${id} revoked`, 'Access no longer needed; revoked before expiry')
+    const { at } = log(`${id} revoked`, 'Access no longer needed; revoked before expiry')
     setJit((js) => js.map((j) => (j.id === id ? { ...j, status: 'expired', approver: ME, expires: `revoked ${at}` } : j)))
   }
   const withdraw = (id: string) => {
@@ -135,7 +149,7 @@ export default function Ops() {
   const runEvals = () => {
     setEvalRun({ state: 'running' })
     window.setTimeout(() => {
-      const at = log('Offline evals re-run · all live tools · EN, TA, HI', 'Manual re-run from the evaluation plane')
+      const { at } = log('Offline evals re-run · all live tools · EN, TA, HI', 'Manual re-run from the evaluation plane')
       setEvalRun({ state: 'done', at })
     }, 1400)
   }
@@ -173,6 +187,7 @@ export default function Ops() {
       </div>
 
       <ScrollTabs<Tab>
+        idBase="ops"
         label="Control plane sections"
         value={tab}
         onChange={setTab}
@@ -190,7 +205,7 @@ export default function Ops() {
       />
 
       <AnimatePresence mode="wait">
-        <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+        <motion.div key={tab} {...tabPanelProps('ops', tab)} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
           {tab === 'flags' && <Flags tools={tools} flags={flags} changes={changes} ask={ask} />}
           {tab === 'evals' && <Evals tools={tools} run={evalRun} onRun={runEvals} />}
           {tab === 'slos' && <Slos />}
@@ -563,12 +578,13 @@ function Cost({ total, costs, offTools }: { total: number; costs: typeof COSTS; 
           {offTools > 0 && <p className="mt-3 text-[14px] text-ink-2">With {offTools} tool{offTools > 1 ? 's' : ''} killed this session, the gateway runs at <span className="num text-ink">₹{gateway.now}</span> per member-year. Rules-based fallbacks cost almost nothing, but members get the plain version.</p>}
         </Card>
         <Card>
-          <Eyebrow>Per tenant</Eyebrow>
+          <Eyebrow>Per tenant · infra + AI per member-year</Eyebrow>
           <ul className="mt-3 divide-y divide-line">
-            {TENANTS.filter((t) => t.budget > 0).map((t) => (
-              <li key={t.id} className="flex items-center justify-between gap-3 py-2.5 text-[14px]"><span className="text-ink-2">{t.name}</span><span className="num text-ink">₹{t.budget}</span></li>
+            {TENANT_SCOPES.filter((t) => t.budget > 0).map((t) => (
+              <li key={t.id} className="flex items-center justify-between gap-3 py-2.5 text-[14px]"><span className="text-ink-2">{t.name} <span className="num text-[12px] text-ink-3">· {t.members.toLocaleString('en-IN')} members</span></span><span className="num text-ink">₹{t.budget}</span></li>
             ))}
           </ul>
+          <p className="mt-3 text-[13px] text-ink-2">Weighted by members, these average <span className="num text-ink">₹{TENANT_WEIGHTED_COST}</span>, the service total at the start of this session.</p>
           <p className="mt-3 text-[13px] text-ink-3">Kill line in the plan: total cost above ₹1,500 per active member-year at FY29 means stop scaling and redesign.</p>
         </Card>
       </div>
@@ -593,7 +609,12 @@ function Cells({ tools }: { tools: Record<string, ToolState> }) {
             <p className="num text-[12px] text-ink-3">{c.region} · {c.when}</p>
             <p className="mt-3 text-[13px] text-ink-2">{c.law}</p>
             <p className="mt-1 text-[13px] text-ink-3">Recovery: {c.recovery}</p>
-            {c.status === 'Live' && <p className="mt-3 border-t border-line pt-3 text-[13px] text-ink-2"><span className="num text-ink">{c.members}</span> members · <span className="num text-ink">{c.tenants}</span> tenants with data</p>}
+            {c.status === 'Live' && (() => {
+              // Derived from the tenants table below, so the card and the table always agree.
+              const withData = TENANTS.filter((t) => t.cell === c.name && t.members > 0)
+              const members = withData.reduce((a, t) => a + t.members, 0)
+              return <p className="mt-3 border-t border-line pt-3 text-[13px] text-ink-2"><span className="num text-ink">{members.toLocaleString('en-IN')}</span> members · <span className="num text-ink">{withData.length}</span> tenant{withData.length === 1 ? '' : 's'} with data</p>
+            })()}
           </li>
         ))}
       </ul>
@@ -684,7 +705,7 @@ function Audit({ jit, changes, onDecide, onRevoke, onWithdraw }: { jit: Jit[]; c
         <ol className="space-y-0">
           {session.map((c, i) => (
             <li key={'c' + i} className="grid gap-1 border-b border-line py-3 sm:grid-cols-[8.5rem_1fr]">
-              <span className="num text-[12px] text-ink-3">28 Jan {c.at}:00</span>
+              <span className="num text-[12px] text-ink-3">{c.day} {c.at}:00</span>
               <div><p className="text-[14px] text-ink"><span className="font-medium">{ME_NAME}</span> <span className="text-ink-3">(dpo)</span> · <code className="font-mono text-[13px]">control.change</code> · {c.what}</p><p className="text-[13px] text-ink-3">Purpose: {c.reason}</p></div>
             </li>
           ))}
@@ -719,7 +740,7 @@ function JitSheet({ open, onClose, onSubmit, nextId }: { open: boolean; onClose:
 
   const submit = () => {
     const e: typeof errs = {}
-    if (!/^INC-\d{4}$/i.test(ticket.trim())) e.ticket = 'Use an incident or change number, like INC-0412.'
+    if (!/^(INC|CHG)-\d{4}$/i.test(ticket.trim())) e.ticket = 'Use an incident or change number, like INC-0412 or CHG-0123.'
     if (reason.trim().length < 20) e.reason = 'Describe what you will look at and why, in at least 20 characters.'
     setErrs(e)
     if (Object.keys(e).length) return
@@ -828,7 +849,7 @@ function Signals({ flags, replay, onReplay }: { flags: Record<string, boolean>; 
 
 // ─── Rights requests ─────────────────────────────────────────────────────
 
-function Rights({ jobs, setJobs, log, stamp }: { jobs: Job[]; setJobs: React.Dispatch<React.SetStateAction<Job[]>>; log: (what: string, reason: string) => string; stamp: () => string }) {
+function Rights({ jobs, setJobs, log, stamp }: { jobs: Job[]; setJobs: React.Dispatch<React.SetStateAction<Job[]>>; log: (what: string, reason: string) => Stamp; stamp: () => string }) {
   const [filter, setFilter] = useState<'all' | 'running' | 'delivered'>('all')
   const [openId, setOpenId] = useState<string | null>(null)
   const [newOpen, setNewOpen] = useState(false)
@@ -840,7 +861,7 @@ function Rights({ jobs, setJobs, log, stamp }: { jobs: Job[]; setJobs: React.Dis
     patch(j.id, (x) => ({ ...x, retrying: true }))
     log(`${j.id} · retry stalled store · ${RIGHTS_STORES[j.kind][j.done]}`, 'Worker re-queued from the control plane')
     window.setTimeout(() => {
-      const at = `28 Jan ${stamp()}`
+      const at = stamp()
       patch(j.id, (x) => ({ ...x, retrying: false, done: x.stores, status: 'delivered', note: `${x.note} Retried; every store done.`, notices: [...x.notices, { at, text: x.kind === 'export' ? 'Your export is ready: a signed link, valid for 72 hours.' : x.kind === 'erase' ? 'Your data has been erased. Records the law requires us to keep are listed, with the reason.' : 'Your consent is withdrawn everywhere, including caches.' }] }))
     }, 1400)
   }
@@ -849,12 +870,12 @@ function Rights({ jobs, setJobs, log, stamp }: { jobs: Job[]; setJobs: React.Dis
     log(`${j.id} · on-call engineer paged`, `Stalled at ${RIGHTS_STORES[j.kind][j.done]}`)
   }
   const notify = (j: Job) => {
-    const at = log(`${j.id} · member sent an update`, 'Delay notice inside SLA')
-    patch(j.id, (x) => ({ ...x, notices: [...x.notices, { at: `28 Jan ${at}`, text: `One part is taking longer than usual (${RIGHTS_STORES[x.kind][x.done]}). Everything else is ready, and we will still finish inside ${SLA[x.kind]} hours.` }] }))
+    const s = log(`${j.id} · member sent an update`, 'Delay notice inside SLA')
+    patch(j.id, (x) => ({ ...x, notices: [...x.notices, { at: `${s.day} ${s.at}`, text: `One part is taking longer than usual (${RIGHTS_STORES[x.kind][x.done]}). Everything else is ready, and we will still finish inside ${SLA[x.kind]} hours.` }] }))
   }
   const add = (kind: Job['kind'], member: string, channel: string) => {
     const id = `RQ-${2292 + jobs.length - RIGHTS_JOBS.length}`
-    const at = `28 Jan ${stamp()}`
+    const at = stamp()
     setJobs((js) => [{ id, kind, opened: at, elapsedH: 0, stores: RIGHTS_STORES[kind].length, done: 0, status: 'running', note: `Logged for ${member} · received by ${lcFirst(channel)}.`, escalated: false, retrying: false, notices: [{ at, text: `Request received. We will finish within ${SLA[kind]} hours and tell you when it is done.` }] }, ...js])
     log(`${id} opened · ${KIND_LABEL[kind]} · ${member}`, `Received by ${lcFirst(channel)}`)
     // Workers clear one store at a time; the member is told when every store is done.
@@ -862,7 +883,7 @@ function Rights({ jobs, setJobs, log, stamp }: { jobs: Job[]; setJobs: React.Dis
     for (let n = 1; n <= total; n++) {
       window.setTimeout(() => {
         const last = n === total
-        const doneAt = last ? `28 Jan ${stamp()}` : ''
+        const doneAt = last ? stamp() : ''
         setJobs((js) => js.map((j) => (j.id !== id ? j : {
           ...j,
           done: n,
@@ -913,7 +934,7 @@ function Rights({ jobs, setJobs, log, stamp }: { jobs: Job[]; setJobs: React.Dis
                       <td className="num whitespace-nowrap py-3 pr-4 text-ink-2">{r.opened}</td>
                       <td className="py-3 pr-4"><span className="num text-ink">{r.done}/{r.stores}</span><Meter value={r.done} max={r.stores} label={`${r.done} of ${r.stores} stores`} className="mt-1.5 w-20" /></td>
                       <td className="py-3 pr-4">
-                        <span className={clsx('num inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px]', r.status === 'delivered' ? 'border border-line text-ink-3' : tight ? 'bg-[color:var(--term-d-soft)] text-[color:var(--term-d-ink)]' : 'bg-paper-sunk text-ink-2')}>
+                        <span className={clsx('num inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px]', r.status === 'delivered' ? 'border border-line text-ink-3' : tight ? 'border border-ink bg-paper-sunk text-ink' : 'bg-paper-sunk text-ink-2')}>
                           <Timer size={12} aria-hidden /> {r.status === 'delivered' ? `Done in ${r.elapsedH} h of ${limit}` : `${left.toFixed(1)} h left of ${limit}`}
                         </span>
                       </td>

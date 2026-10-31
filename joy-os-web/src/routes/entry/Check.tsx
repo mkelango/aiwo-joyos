@@ -21,6 +21,11 @@ import { FlowTopBar, LMethodLine, LTermChip, rich, useBand, useFmtDate } from '.
 type Phase = 'intro' | 'q' | 'result'
 const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 const TOTAL = CHECK_STATEMENTS.length
+/** Where to pick up: the first statement not yet answered (the last one when all are). */
+const firstUnanswered = (a: Record<string, number>) => {
+  const n = CHECK_STATEMENTS.findIndex((s) => typeof a[s.id] !== 'number')
+  return n === -1 ? TOTAL - 1 : n
+}
 
 export default function Check() {
   const [phase, setPhase] = useState<Phase>('intro')
@@ -37,6 +42,14 @@ export default function Check() {
   // When re-opening a saved result, keep its original date rather than stamping today.
   const [resultAt, setResultAt] = useState<string | null>(null)
   const t = useDict(CK)
+
+  // Coming back to the intro mid-Check: the resume card shows these answers, not the
+  // snapshot read when the screen first opened (which would overwrite newer answers).
+  useEffect(() => {
+    if (phase !== 'intro' || Object.keys(answers).length === 0) return
+    setProgress({ answers, i: firstUnanswered(answers), at: new Date().toISOString() })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase])
 
   // Save as you go, so a reload picks up where you left off.
   useEffect(() => {
@@ -139,7 +152,7 @@ export default function Check() {
               // Coming back from statement 1 keeps the answers given so far.
               setResultAt(null); setPhase('q'); setI(0); setDir(1)
             }}
-            onResume={(p) => { setResultAt(null); setAnswers(p.answers); setI(Math.min(TOTAL - 1, Math.max(0, p.i))); setDir(1); setPhase('q') }}
+            onResume={(p) => { setResultAt(null); setAnswers((a) => ({ ...p.answers, ...a })); setI(Math.min(TOTAL - 1, Math.max(0, p.i))); setDir(1); setPhase('q') }}
             onStartOver={() => { setResultAt(null); removeKey(CHECK_PROGRESS_KEY); setProgress(null); setAnswers({}); setI(0); setDir(1); setPhase('q') }}
             onSeeLast={(l) => { setAnswers(l.answers); setResultAt(l.at); setPhase('result'); window.scrollTo({ top: 0 }) }}
           />
@@ -268,6 +281,18 @@ function Question({ i, dir, answers, onAnswer, onBack, onNext }: { i: number; di
   const answered = Object.keys(answers).length
   const minutesLeft = Math.max(1, Math.ceil(((TOTAL - i) * 16) / 60))
   const offset = reduce ? 0 : 24 * dir
+  // The answered option unmounts with its statement: move focus to the next statement
+  // so keyboard and screen-reader users hear it first and keep their place. The flag is
+  // set when the old statement has left (AnimatePresence calls onExitComplete before the
+  // new one mounts), and the new heading takes focus as it mounts. The first statement
+  // takes it too, since Begin/Resume unmounts with the intro.
+  const focusOnMount = useRef(true)
+  const headingRef = useCallback((el: HTMLHeadingElement | null) => {
+    if (el && focusOnMount.current) {
+      focusOnMount.current = false
+      el.focus({ preventScroll: true })
+    }
+  }, [])
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col px-4 pb-28 pt-8 md:px-6 md:pb-16 md:pt-14">
@@ -286,7 +311,7 @@ function Question({ i, dir, answers, onAnswer, onBack, onNext }: { i: number; di
         ))}
       </ol>
 
-      <AnimatePresence mode="wait" initial={false}>
+      <AnimatePresence mode="wait" initial={false} onExitComplete={() => { focusOnMount.current = true }}>
         <motion.div
           key={s.id}
           initial={{ opacity: 0, x: offset }}
@@ -300,7 +325,7 @@ function Question({ i, dir, answers, onAnswer, onBack, onNext }: { i: number; di
             <span className="eyebrow text-ink-3">{t('qWindow')}</span>
           </div>
           {lang !== 'en' && <p className="mt-4 rounded-card bg-paper-sunk px-3 py-2 text-[14px] leading-relaxed text-ink-2">{INSTRUMENT_NOTE[lang]}</p>}
-          <h1 id={`q-${s.id}`} className="mt-6 text-[1.75rem] font-light leading-snug text-ink md:text-[2.4rem]">
+          <h1 ref={headingRef} id={`q-${s.id}`} tabIndex={-1} lang="en" className="mt-6 text-[1.75rem] font-light leading-snug text-ink outline-none md:text-[2.4rem]">
             {s.text}
           </h1>
           {s.burden && <p className="mt-3 text-[15px] text-ink-2">{t('qBurden')}</p>}
@@ -405,7 +430,8 @@ function Result({ answers, savedAt, onRestart, onSaved }: { answers: Record<stri
         : t('reasonLowest', { n: result.sharing.length + 1 })
   const easeThin = result.rows.find((r) => r.key === 'B')?.band === 'thin'
   const count = (b: Band) => result.rows.filter((r) => r.band === b).length
-  const today = (savedAt ?? new Date().toISOString()).slice(0, 10)
+  // The full timestamp, so the method line shows the member's local date (not the UTC one).
+  const takenOn = savedAt ?? new Date().toISOString()
   const description = result.rows.map((r) => { const x = termByKey(r.key); return `${x.name === x.space ? tt.space(r.key) : `${tt.space(r.key)}, ${tt.name(r.key)}`}: ${band.label(r.band)}` }).join('. ')
   const bandWord = (b: 'steady' | 'thin') => <span className="eyebrow text-ink">{band.label(b)}</span>
 
@@ -465,7 +491,7 @@ function Result({ answers, savedAt, onRestart, onSaved }: { answers: Record<stri
             </ul>
           </div>
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
-            <LMethodLine method="v1.0" grade="check" takenOn={today} />
+            <LMethodLine method="v1.0" grade="check" takenOn={takenOn} />
             <span className="text-[13px] text-ink-3">{t('easeKind')}</span>
           </div>
         </Card>

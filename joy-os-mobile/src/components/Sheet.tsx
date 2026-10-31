@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Modal, Pressable, ScrollView, View } from 'react-native'
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDict } from '../lib/i18n'
 import { useTheme } from '../theme/ThemeProvider'
@@ -17,7 +17,9 @@ export function Sheet({ open, onClose, title, children, footer }: { open: boolea
   const t = useDict(KIT)
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+      {/* The keyboard must not cover a Field in the sheet or its footer button. iOS needs the padding;
+          on Android the Modal window already resizes for the keyboard. */}
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
         <Pressable style={{ position: 'absolute', inset: 0, backgroundColor: c.scrim }} onPress={onClose} accessibilityRole="button" accessibilityLabel={t('close')} />
         <View
           accessibilityViewIsModal
@@ -43,10 +45,10 @@ export function Sheet({ open, onClose, title, children, footer }: { open: boolea
               <Icon name="x" size={20} color={c.ink2} />
             </Pressable>
           </View>
-          <ScrollView contentContainerStyle={{ paddingHorizontal: space.gutter, paddingTop: space.s3, paddingBottom: space.s2, gap: space.s2 }}>{children}</ScrollView>
+          <ScrollView automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: space.gutter, paddingTop: space.s3, paddingBottom: space.s2, gap: space.s2 }}>{children}</ScrollView>
           {footer ? <View style={{ paddingHorizontal: space.gutter, paddingTop: space.s1, gap: space.s1 }}>{footer}</View> : null}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   )
 }

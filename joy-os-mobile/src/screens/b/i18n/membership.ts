@@ -83,7 +83,7 @@ export const ENTITLEMENT_USE: Record<string, L3> = {
   'Oura · Apple Health linked': { en: 'Oura · Apple Health linked', ta: 'Oura · Apple Health இணைக்கப்பட்டுள்ளன', hi: 'Oura · Apple Health जुड़े हैं' },
   'Week 4 of 8': { en: 'Week 4 of 8', ta: '8 இல் வாரம் 4', hi: '8 में से हफ़्ता 4' },
   'Mondays 19:00 with Priya': { en: 'Mondays 19:00 with Priya', ta: 'திங்கள்தோறும் 19:00, Priya உடன்', hi: 'हर सोमवार 19:00, Priya के साथ' },
-  'Next: 2 Apr 2027': { en: 'Next: 2 Apr 2027', ta: 'அடுத்து: 2 ஏப்ரல் 2027', hi: 'अगला: 2 अप्रैल 2027' },
+  'Next: 5 Apr 2027': { en: 'Next: 5 Apr 2027', ta: 'அடுத்து: 5 ஏப்ரல் 2027', hi: 'अगला: 5 अप्रैल 2027' },
   'Two seats held · 20 Feb, Chennai': { en: 'Two seats held · 20 Feb, Chennai', ta: 'இரண்டு இருக்கைகள் ஒதுக்கப்பட்டுள்ளன · 20 பிப், சென்னை', hi: 'दो सीटें रखी गईं · 20 फ़र, चेन्नई' },
   'Day 23 of 90': { en: 'Day 23 of 90', ta: '90 இல் நாள் 23', hi: '90 में से दिन 23' },
 }

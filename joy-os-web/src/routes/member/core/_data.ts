@@ -444,6 +444,8 @@ export const SITTINGS: Sitting[] = [
  */
 export const HISTORY_METHOD: Record<string, { method: string; note?: string }> = {
   ix_001: { method: 'v0.9 pilot', note: 'Pilot weights, same six terms · shown as recorded, never recomputed' },
+  // Sat 4 Oct 2026, before v1.0 was published (22 Oct 2026): still pilot method.
+  ix_002: { method: 'v0.9 pilot', note: 'Pilot weights, same six terms · shown as recorded, never recomputed' },
 }
 export const METHOD_V10_PUBLISHED = '2026-10-22'
 
@@ -455,10 +457,10 @@ export const DAY90_TERMS: TermScore[] = [
   { key: 'R', value: 77, band: 'steady', delta: 0 },
   { key: 'F', value: 51, band: 'uneven', delta: -11 },
   { key: 'D', value: 60, band: 'uneven', delta: 2 },
-  { key: 'B', value: 27, band: 'uneven', delta: 3 },
+  { key: 'B', value: 27, band: 'steady', delta: 3 },
 ]
 
-export const DAY90_DATES = { day0: '2027-01-02', day90: '2027-04-02', call: 'Thursday 8 April · 18:30' }
+export const DAY90_DATES = { day0: '2027-01-05', day90: '2027-04-05', call: 'Thursday 8 April · 18:30' }
 
 export const DAY90_WHY: Record<TermKey, string> = {
   H: 'Capacity battery and sleep efficiency both a touch better.',
@@ -484,6 +486,13 @@ export const LEDGER_SCHEDULE = [
   { prompt: 2 as const, time: '16:15', label: 'Late afternoon' },
   { prompt: 3 as const, time: '21:30', label: 'Before the wind-down' },
 ]
+
+/**
+ * Moments (entries) kept in the specimen week, Monday to today. It matches the seed
+ * Ledger (seven entries, 25 to 28 Jan) that the calendar, Today and the entries list
+ * show; LEDGER_WEEK holds the per-tag counts, where one entry can carry several tags.
+ */
+export const LEDGER_WEEK_ENTRIES = 7
 
 /** Entries per day for the four weeks ending yesterday (oldest first). Specimen. */
 export const LEDGER_CALENDAR = [

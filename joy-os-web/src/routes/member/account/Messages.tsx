@@ -9,7 +9,7 @@ import { TEAM } from '@/data/member'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { AUTO_REPLY, PEOPLE_DETAIL, THREADS, type Msg, type Thread } from './_data'
 import { TeleManasStrip } from './_parts'
-import { fmtDay, fmtTime, rich } from './_util'
+import { fmtDay, fmtShortDate, fmtTime, rich, usePersisted } from './_util'
 import { useDict } from '@/lib/i18n'
 import { MSG, useData } from './_i18n'
 
@@ -29,13 +29,20 @@ export default function Messages() {
   const dx = useData()
   const { setCrisisOpen } = useApp()
   const [params, setParams] = useSearchParams()
-  const [threads, setThreads] = useState<Thread[]>(() => {
+  // Threads persist per viewer (read state, sent messages, replies). A thread opened from
+  // ?p= or "New message" stays a draft until it holds a message, so an empty one is never kept.
+  const [store, setStore] = usePersisted<{ list: Thread[] }>('threads', { list: THREADS })
+  const [draftThread, setDraftThread] = useState<Thread | null>(() => {
     const p = params.get('p')
-    if (p && !THREADS.some((t) => t.personId === p) && TEAM.some((m) => m.id === p)) {
-      return [newThread(p), ...THREADS]
-    }
-    return THREADS
+    return p && TEAM.some((m) => m.id === p) ? newThread(p) : null
   })
+  const withDraft = (list: Thread[]) => (draftThread && !list.some((t) => t.personId === draftThread.personId) ? [draftThread, ...list] : list)
+  const threads = withDraft(store.list)
+  const setThreads = (fn: (ts: Thread[]) => Thread[]) =>
+    setStore((s) => {
+      const next = fn(withDraft(s.list))
+      return { list: next.filter((t) => t.messages.length > 0 || s.list.some((x) => x.id === t.id)) }
+    })
   const initial = threads.find((t) => t.personId === params.get('p'))?.id ?? null
   const [activeId, setActiveId] = useState<string | null>(initial)
   const activeIdRef = useRef<string | null>(initial)
@@ -107,7 +114,7 @@ export default function Messages() {
     const existing = threads.find((t) => t.personId === pid)
     if (existing) { open(existing.id); return }
     const t = newThread(pid)
-    setThreads((ts) => [t, ...ts])
+    setDraftThread(t)
     setFilter('all'); setKeepId(null)
     setActiveId(t.id)
     setError(null); setHeld(false)
@@ -148,14 +155,14 @@ export default function Messages() {
                     <span className="min-w-0 flex-1">
                       <span className="flex items-baseline justify-between gap-2">
                         <span className={clsx('truncate text-[15px]', t.unread ? 'font-medium text-ink' : 'text-ink')}>{tp.name}</span>
-                        {last && <span className="num shrink-0 text-[12px] text-ink-3">{fmtDay(last.at).split(',')[0]}</span>}
+                        {last && <span className="num shrink-0 text-[12px] text-ink-3">{fmtShortDate(last.at)}</span>}
                       </span>
                       <span className="mt-0.5 flex items-center gap-1.5 text-[13px] text-ink-2">
                         {dx(tp.role)}{t.clinical && <><span aria-hidden>·</span><Stethoscope size={12} /> {tr('clinical')}</>}
                       </span>
                       <span className="mt-1 line-clamp-2 block text-[14px] text-ink-2">{last ? last.body : tr('startConv')}</span>
                     </span>
-                    {t.unread > 0 && <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-daybreak" aria-label={tr('nUnread', { n: t.unread })} />}
+                    {t.unread > 0 && <><span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-daybreak" aria-hidden /><span className="sr-only">{tr('nUnread', { n: t.unread })}</span></>}
                   </button>
                 </li>
               )

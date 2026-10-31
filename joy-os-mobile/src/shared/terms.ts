@@ -22,7 +22,7 @@ export const TERMS: Term[] = [
     slug: 'purpose',
     framework: 'Ikigai in its original sense · Frankl · Seven Practices',
     formula: 'P = 0.6·Ikigai-9 + 0.4·MLQ-P',
-    instruments: ['Ikigai-9', 'MLQ-Presence'],
+    instruments: ['Ikigai-9', 'MLQ-P'],
     leadCations: ['Mindcation'],
     practiceWeek: '2 · The Tomorrow Question · 7 · Stay Curious',
     viva: ['ikigai_coach', 'tomorrow_question'],

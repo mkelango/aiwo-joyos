@@ -2,6 +2,9 @@ import clsx from 'clsx'
 import { Clock, Lock, ShieldCheck } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { TermDot } from '@/components/joy/primitives'
+import { termByKey } from '@/data/terms'
+import type { TermKey } from '@/domain/types'
 import { CONSOLE_NOW } from './_data'
 
 // Shared parts for the care consoles. Local to this lane by design.
@@ -35,6 +38,15 @@ export function fmtDuration(ms: number) {
   if (d > 0) return `${d}d ${h}h`
   if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`
   return `${m}m ${String(sec).padStart(2, '0')}s`
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** The specimen "YYYY-MM-DD HH:mm" (IST) as the consoles write dates: "28 Jan 21:04". */
+export function fmtOpened(s: string) {
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}:\d{2})/)
+  if (!m) return s
+  return `${m[3]} ${MONTHS[Number(m[2]) - 1] ?? m[2]} ${m[4]}`
 }
 
 export function fmtClock(ms: number) {
@@ -138,16 +150,19 @@ export function useTabParam<T extends string>(values: readonly T[], fallback: T)
   return [value, set]
 }
 
-/** Scrollable pill tabs that never cause horizontal page scroll. */
+/**
+ * Scrollable pill tabs that never cause horizontal page scroll. Plain toggle buttons
+ * (aria-pressed) rather than an ARIA tablist, so no arrow-key behaviour is promised.
+ */
 export function ScrollTabs<T extends string>({ value, onChange, items, label }: { value: T; onChange: (v: T) => void; items: { value: T; label: ReactNode; count?: number }[]; label: string }) {
   return (
     <div className="relative -mx-1 overflow-x-auto px-1 pb-1">
-      <div role="tablist" aria-label={label} className="inline-flex min-w-max gap-1 rounded-full bg-paper-sunk p-1">
+      <div role="group" aria-label={label} className="inline-flex min-w-max gap-1 rounded-full bg-paper-sunk p-1">
         {items.map((it) => (
           <button
             key={it.value}
-            role="tab"
-            aria-selected={value === it.value}
+            type="button"
+            aria-pressed={value === it.value}
             onClick={() => onChange(it.value)}
             className={clsx('flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-[14px] transition-colors focus-ring', value === it.value ? 'bg-paper-raised text-ink shadow-card' : 'text-ink-2 hover:text-ink')}
           >
@@ -160,8 +175,22 @@ export function ScrollTabs<T extends string>({ value, onChange, items, label }: 
   )
 }
 
+/**
+ * Term chip for the staff consoles. Consoles stay English on purpose, so the term name
+ * comes from the canonical English term list, never from the member's app language.
+ */
+export function ConsoleTermChip({ term, className }: { term: TermKey; className?: string }) {
+  return (
+    <span className={clsx('inline-flex max-w-full items-center gap-2 rounded-full border border-line bg-paper-raised px-2.5 py-1 text-[13px]', className)}>
+      <TermDot term={term} />
+      <span className="min-w-0 break-words text-ink">{termByKey(term).name}</span>
+    </span>
+  )
+}
+
 export function inr(n: number) {
-  if (n >= 100000) return `₹${(n / 100000).toFixed(n % 100000 === 0 ? 0 : 2).replace(/\.?0+$/, '')} L`
+  // Number(...).toString() keeps whole lakhs intact (₹10 L) and drops trailing decimal zeros.
+  if (n >= 100000) return `₹${Number((n / 100000).toFixed(2)).toString()} L`
   return `₹${n.toLocaleString('en-IN')}`
 }
 

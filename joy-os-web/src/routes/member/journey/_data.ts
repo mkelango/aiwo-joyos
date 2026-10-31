@@ -13,7 +13,7 @@ export const MY_CATION = {
   room: 'Ocean Suite 1412',
   arrived: '2026-12-31',
   checkedOut: '2027-01-05',
-  bookingRef: 'JC-FMB-2701-0142',
+  bookingRef: 'JC-FMB-2701-0001',
   /** The named outcome on the booking, in the guest’s own words (non-negotiable 1). */
   namedOutcome: 'I want to come home from work and actually be there. Evenings with Kavya, not with my inbox.',
   outcomeWritten: '2026-12-17',
@@ -55,7 +55,7 @@ export interface CationDetailData {
 export const CATION_DETAIL: Record<string, CationDetailData> = {
   joycation: {
     secondary: [],
-    clinician: { name: 'Dr Meera Iyer', role: 'Physician · AIWO Clinical', note: 'On the floor every day of the edition, not on call. Signs your Clinical-grade Index before checkout.' },
+    clinician: { name: 'Dr Meera Iyer', role: 'Physician · AIWO Clinical', note: 'On the floor every day of the edition, not on call. Before checkout, reads your on-site Index with you against your Clinical-grade baseline.' },
     signature: [
       { title: 'AIWO panel draw and Clinical intake', where: 'Clinic suite', kind: 'Measure', term: 'H' },
       { title: 'The Ikigai map, with the faculty', where: 'Harbour room', kind: 'Talk', term: 'P' },
@@ -264,7 +264,7 @@ export function buildItinerary(slug: string): ItinDay[] {
 // ─── Joy Passport ─────────────────────────────────────────────────────────
 
 export const PASSPORT = {
-  number: 'JP-2027-0142',
+  number: 'JP-2027-0001',
   issued: '2026-12-31',
   issuedAt: 'Fairmont Mumbai',
   stamps: [
@@ -504,8 +504,8 @@ export const SALONS = [
 // ─── Events ───────────────────────────────────────────────────────────────
 
 export const PASSES = [
-  { id: 'ev2', code: 'JS-CHN-0220-0142', gate: 'Gate B · East lawn', seat: 'Open seating', holder: 'Arjun Rao', status: 'Valid' as const },
-  { id: 'ev1', code: 'AJ27-FMB-0142', gate: 'Grand ballroom', seat: 'Table 14', holder: 'Arjun Rao', status: 'Used' as const },
+  { id: 'ev2', code: 'JS-CHN-0220-0001', gate: 'Gate B · East lawn', seat: 'Open seating', holder: 'Arjun Rao', status: 'Valid' as const },
+  { id: 'ev1', code: 'AJ27-FMB-0001', gate: 'Grand ballroom', seat: 'Table 14', holder: 'Arjun Rao', status: 'Used' as const },
 ]
 
 export const SESSION_SCHEDULE = [
@@ -561,7 +561,7 @@ export const FLAGSHIP_NEXT = {
   when: '31 Dec 2027 – 5 Jan 2028',
   where: 'Fairmont Mumbai',
   kind: 'Flagship' as const,
-  what: 'Five nights at New Year: the Summit, the Experience Zones, a Clinical-grade Index on site, and a new circle formed before checkout.',
+  what: 'Five nights at New Year: the Summit, the Experience Zones, your Index taken on site, and a new circle formed before checkout.',
   guests: 600,
   requestsOpen: 'Requests open now · places confirmed from 1 Jun 2027',
 }

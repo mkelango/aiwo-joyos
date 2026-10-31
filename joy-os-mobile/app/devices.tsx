@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Platform, View } from 'react-native'
 import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg'
-import { Body, Button, Card, DaybreakButton, Divider, Eyebrow, Icon, type IconName, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Serif, Sheet, SpecimenTag, TermChip, TermDot, Toggle } from '@/components'
+import { Body, Button, Card, DaybreakButton, Divider, Eyebrow, Icon, type IconName, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Serif, Sheet, SpecimenTag, TermChip, Toggle } from '@/components'
 import { useTheme } from '@/theme/ThemeProvider'
-import { DEVICES, HEALTHKIT_TYPES, WEAR_NIGHTS } from '@/screens/b/accountData'
+import { DEVICES, HEALTHKIT_TYPES, WEAR_NIGHTS, type DeviceState } from '@/screens/b/accountData'
+import { devicesStore, useStore } from '@/screens/b/bStore'
 import { CheckLine, memberOnly } from '@/screens/b/parts'
 import { useDict } from '@/lib/i18n'
 import { DEV, DEVICE_NOTE, SIGNAL_TEXT, HK_TEXT } from '@/screens/b/i18n/devices'
@@ -22,14 +23,34 @@ export default memberOnly(Devices)
 
 function Devices() {
   const { c, space, fonts } = useTheme()
-  const [devices, setDevices] = useState<Device[]>(DEVICES)
+  // Connections, HealthKit reads and the write-back are kept on the phone, over the specimen.
+  const [stored, setStored] = useStore(devicesStore)
+  const devices: Device[] = DEVICES.map((d) => (stored.states[d.id] ? { ...d, ...stored.states[d.id] } : d))
+  const hk = HEALTHKIT_TYPES.map((x) => (x.id in stored.hk ? { ...x, on: stored.hk[x.id] } : x))
+  const writeBack = stored.writeBack
+  const setDevice = (id: string, next: { state: DeviceState; lastSync?: string; freshness?: 'fresh' | 'stale' }) => setStored((st) => ({ ...st, states: { ...st.states, [id]: next } }))
+  const setHk = (id: string, on: boolean) => setStored((st) => ({ ...st, hk: { ...st.hk, [id]: on } }))
+  const setWriteBack = (v: boolean) => setStored((st) => ({ ...st, writeBack: v }))
   const [syncing, setSyncing] = useState(false)
   const [connect, setConnect] = useState<Device | null>(null)
   const [linking, setLinking] = useState(false)
   const [disconnect, setDisconnect] = useState<Device | null>(null)
-  const [hk, setHk] = useState(HEALTHKIT_TYPES)
-  const [writeBack, setWriteBack] = useState(true)
   const [toast, setToast] = useState<string | null>(null)
+
+  // Every pending timer is tracked so it can be cancelled (closing the Connect sheet, leaving the screen).
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([])
+  const connectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const later = (fn: () => void, ms: number) => {
+    const id = setTimeout(() => {
+      timers.current = timers.current.filter((x) => x !== id)
+      fn()
+    }, ms)
+    timers.current.push(id)
+    return id
+  }
+  useEffect(() => () => timers.current.forEach(clearTimeout), [])
+  // iOS cannot present a Modal while another is dismissing: the toast waits for the sheet to close.
+  const toastAfterSheet = (msg: string) => later(() => setToast(msg), 350)
 
   const connected = devices.filter((d) => d.state === 'connected')
   const others = devices.filter((d) => d.state !== 'connected')
@@ -47,9 +68,13 @@ function Devices() {
 
   const sync = () => {
     setSyncing(true)
-    setTimeout(() => {
+    later(() => {
       setSyncing(false)
-      setDevices((ds) => ds.map((d) => (d.state === 'connected' ? { ...d, lastSync: 'Just now', freshness: 'fresh' as const } : d)))
+      setStored((st) => {
+        const states = { ...st.states }
+        DEVICES.filter((d) => (st.states[d.id]?.state ?? d.state) === 'connected').forEach((d) => (states[d.id] = { state: 'connected', lastSync: 'Just now', freshness: 'fresh' }))
+        return { ...st, states }
+      })
       setToast(t('synced'))
     }, 1200)
   }
@@ -132,7 +157,7 @@ function Devices() {
                 <Divider />
                 <Eyebrow>{t('hkRead')}</Eyebrow>
                 {hk.map((x) => (
-                  <Toggle key={x.id} checked={x.on} onChange={(v) => setHk((h) => h.map((z) => (z.id === x.id ? { ...z, on: v } : z)))} label={tx(HK_TEXT[x.id], x.label)} />
+                  <Toggle key={x.id} checked={x.on} onChange={(v) => setHk(x.id, v)} label={tx(HK_TEXT[x.id], x.label)} />
                 ))}
                 <Divider />
                 <Eyebrow>{t('writeBack')}</Eyebrow>
@@ -170,7 +195,7 @@ function Devices() {
                 const x = padL + i * bw + bw * 0.18
                 const usable = n.h >= 4
                 return (
-                  <Rect key={n.d} x={x} y={n.h ? y(n.h) : H - padB - 2} width={bw * 0.64} height={n.h ? H - padB - y(n.h) : 2} rx={3} fill={usable ? c.termH : c.lineStrong} />
+                  <Rect key={n.d} x={x} y={n.h ? y(n.h) : H - padB - 2} width={bw * 0.64} height={n.h ? H - padB - y(n.h) : 2} rx={3} fill={usable ? c.ink2 : c.lineStrong} />
                 )
               })}
               {WEAR_NIGHTS.map((n, i) =>
@@ -184,7 +209,7 @@ function Devices() {
           </View>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s2, rowGap: 4 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <TermDot term="H" />
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: c.ink2 }} />
               <Meta size={14}>{t('usable')}</Meta>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -251,6 +276,12 @@ function Devices() {
       <Sheet
         open={!!connect}
         onClose={() => {
+          // Dismissing the sheet cancels the connection that was under way.
+          if (connectTimer.current) {
+            clearTimeout(connectTimer.current)
+            timers.current = timers.current.filter((x) => x !== connectTimer.current)
+            connectTimer.current = null
+          }
           setConnect(null)
           setLinking(false)
         }}
@@ -265,11 +296,12 @@ function Devices() {
               if (!connect) return
               const d = connect
               setLinking(true)
-              setTimeout(() => {
-                setDevices((ds) => ds.map((x) => (x.id === d.id ? { ...x, state: 'connected' as const, lastSync: 'Just now', freshness: 'fresh' as const } : x)))
+              connectTimer.current = later(() => {
+                connectTimer.current = null
+                setDevice(d.id, { state: 'connected', lastSync: 'Just now', freshness: 'fresh' })
                 setLinking(false)
                 setConnect(null)
-                setToast(t('connectedToast', { name: d.name, via: d.via.startsWith('via') ? ` ${via(d)}` : '' }))
+                toastAfterSheet(t('connectedToast', { name: d.name, via: d.via.startsWith('via') ? ` ${via(d)}` : '' }))
               }, 1000)
             }}
           >
@@ -309,10 +341,11 @@ function Devices() {
               onPress={() => {
                 if (disconnect) {
                   const d = disconnect
-                  setDevices((ds) => ds.map((x) => (x.id === d.id ? { ...x, state: 'available' as const } : x)))
-                  setToast(t('disconnected', { name: d.name }))
-                }
-                setDisconnect(null)
+                  // Health Connect goes back to "Android only"; the rest can be connected again.
+                  setDevice(d.id, { state: DEVICES.find((x) => x.id === d.id)?.state === 'android' ? 'android' : 'available' })
+                  setDisconnect(null)
+                  toastAfterSheet(t('disconnected', { name: d.name }))
+                } else setDisconnect(null)
               }}
             >
               {t('disconnect')}

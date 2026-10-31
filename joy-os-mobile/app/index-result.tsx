@@ -315,7 +315,7 @@ function IndexResult() {
           cardSaved ? (
             <View accessibilityLiveRegion="polite" style={{ gap: 4, alignItems: 'center' }}>
               <Body weight="medium" align="center">
-                {cardSaved === 'photos' ? t('savedPhotos') : Platform.OS === 'web' ? t('printOpened') : t('sentPrinter')}
+                {cardSaved === 'photos' ? t('savedPhotos') : t('printOpened')}
               </Body>
               <Meta align="center">{t('cardCarries')}</Meta>
               <Button variant="link" onPress={() => setCardSaved(null)}>
@@ -327,13 +327,16 @@ function IndexResult() {
               <Button variant="ink" icon="download" onPress={() => setCardSaved('photos')} style={{ flexGrow: 1 }}>
                 {t('savePhotos')}
               </Button>
-              <Button variant="secondary" icon="printer" onPress={() => {
-                  setCardSaved('print')
-                  // The web build opens the browser's print dialog; a phone hands it to the system print sheet.
-                  if (Platform.OS === 'web' && typeof window !== 'undefined') setTimeout(() => window.print(), 50)
-                }} style={{ flexGrow: 1 }}>
-                {t('print')}
-              </Button>
+              {/* Print is offered only where it really happens: the web build opens the browser's
+                  print dialog. The phone build has no print sheet, so it does not claim one. */}
+              {Platform.OS === 'web' ? (
+                <Button variant="secondary" icon="printer" onPress={() => {
+                    setCardSaved('print')
+                    if (typeof window !== 'undefined') setTimeout(() => window.print(), 50)
+                  }} style={{ flexGrow: 1 }}>
+                  {t('print')}
+                </Button>
+              ) : null}
             </View>
           )
         }

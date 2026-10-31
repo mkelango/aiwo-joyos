@@ -1,5 +1,5 @@
 import { router } from 'expo-router'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { View } from 'react-native'
 import {
   ArrowLink,
@@ -34,7 +34,8 @@ import { CASELOAD } from '@/shared/platform'
 import { TERMS } from '@/shared/terms'
 import type { Band, TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
-import { COUPLES_CHECK, GRANTS, HOUSEHOLD_MINOR, KAVYA_SHARED, type Grant, type GrantScope } from '@/screens/b/accountData'
+import { COUPLES_CHECK, HOUSEHOLD_MINOR, KAVYA_SHARED, SPECIMEN_NOW, type Grant, type GrantScope } from '@/screens/b/accountData'
+import { PLANS } from '@/screens/b/_data'
 import { accountStore, refCode, useStore } from '@/screens/b/bStore'
 import { ChoiceCard, Done, Field, KeyValue, shareOrCopy, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
@@ -68,13 +69,23 @@ export default memberOnly(Household)
 
 function Household() {
   const { c, space } = useTheme()
-  const [grants, setGrants] = useState<Grant[]>(GRANTS)
   const [shareOpen, setShareOpen] = useState(false)
   const [revoke, setRevoke] = useState<Grant | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [helperOpen, setHelperOpen] = useState(false)
   const [acct, setAcct] = useStore(accountStore)
+  // Share grants are kept with the account, so a proposal or revoke holds on return.
+  const grants = acct.grants
+  const setGrants = (fn: (gs: Grant[]) => Grant[]) => setAcct((a) => ({ ...a, grants: fn(a.grants) }))
+  // iOS cannot present the toast Modal while another Sheet is still dismissing.
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current) }, [])
+  const toastAfterSheet = (msg: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(msg), 350)
+  }
+  const isPatron = acct.plan === 'Patron'
   const me = INDEX_HISTORY[0]
   const kavyaIndex = CASELOAD.find((x) => x.name === 'Kavya Rao')!.index
   const [arjun, kavya, lakshmi] = HOUSEHOLD
@@ -88,11 +99,12 @@ function Household() {
   const mutual = (s: GrantScope) =>
     grants.some((g) => g.from === 'Arjun' && g.state === 'active' && g.scope.includes(s)) && grants.some((g) => g.from === 'Kavya' && g.state === 'active' && g.scope.includes(s))
   const sharedTerms = TERMS.filter((t) => mutual(t.key))
+  const unshared = TERMS.filter((term) => !sharedTerms.includes(term))
   const indexShared = mutual('index')
   const live = grants.filter((g) => g.state !== 'revoked')
 
   const members = [
-    { person: arjun, role: t('roleYou'), detail: t('detailYou'), tags: [t('indexTag', { v: me.value }), t('plus')] },
+    { person: arjun, role: t('roleYou'), detail: t('detailYou'), tags: [t('indexTag', { v: me.value }), PLANS.find((p) => p.key === acct.plan)?.name ?? t('plus')] },
     { person: kavya, role: t('rolePartner'), detail: t('detailPartner'), tags: [t('ownIndex'), t('ownConsents')] },
     { person: lakshmi, role: t('roleMother'), detail: t('detailMother'), tags: [t('elderMode'), t('helperArjun')] },
     { person: HOUSEHOLD_MINOR, role: t('roleDaughter'), detail: t('detailDaughter'), tags: [t('notScored'), t('parentalConsent')] },
@@ -196,14 +208,14 @@ function Household() {
             </View>
           ))}
           <MethodLine method={me.method} grade={me.grade} takenOn={me.takenOn} next={me.nextMeasure} />
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Icon name="lock" size={13} color={c.ink3} />
-            <Meta size={14} tone="ink3" style={{ flex: 1 }}>
-              {t('notShown', { list: TERMS.filter((term) => !sharedTerms.includes(term))
-                .map((term) => tt.space(term.key))
-                .join(', ') })}
-            </Meta>
-          </View>
+          {unshared.length > 0 ? (
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Icon name="lock" size={13} color={c.ink3} />
+              <Meta size={14} tone="ink3" style={{ flex: 1 }}>
+                {t('notShown', { list: unshared.map((term) => tt.space(term.key)).join(', ') })}
+              </Meta>
+            </View>
+          ) : null}
         </Card>
       </View>
 
@@ -234,7 +246,7 @@ function Household() {
                       size="sm"
                       variant="link"
                       onPress={() => {
-                        setGrants((gs) => [...gs.map((x) => (x.id === g.id ? { ...x, state: 'active' as const } : x)), { id: `g${Date.now()}`, scope: g.scope, from: 'Kavya', to: 'Arjun', state: 'active', since: '2027-01-28' }])
+                        setGrants((gs) => [...gs.map((x) => (x.id === g.id ? { ...x, state: 'active' as const } : x)), { id: `g${Date.now()}`, scope: g.scope, from: 'Kavya', to: 'Arjun', state: 'active', since: SPECIMEN_NOW }])
                         setToast(t('kavyaAgreed', { scope: scopeLabel(g.scope) }))
                       }}
                     >
@@ -280,7 +292,7 @@ function Household() {
 
       {/* Charter */}
       <Card tone="sunk" style={{ gap: space.s1 + 4 }}>
-        <Eyebrow>{t('patronSoon')}</Eyebrow>
+        <Eyebrow>{isPatron ? t('patronIn') : t('patronSoon')}</Eyebrow>
         <Title size={22}>{t('charter')}</Title>
         <Body tone="ink2">{t('charterBody')}</Body>
         {[t('c1'), t('c2'), t('c3')].map((x) => (
@@ -289,7 +301,7 @@ function Household() {
             <Meta style={{ flex: 1 }}>{x}</Meta>
           </View>
         ))}
-        <ArrowLink onPress={() => router.push('/membership')}>{t('seePatron')}</ArrowLink>
+        <ArrowLink onPress={() => router.push('/membership')}>{isPatron ? t('seeMembership') : t('seePatron')}</ArrowLink>
       </Card>
 
       <InviteSheet
@@ -325,9 +337,9 @@ function Household() {
         open={shareOpen}
         onClose={() => setShareOpen(false)}
         onPropose={(scope) => {
-          setGrants((gs) => [...gs, { id: `g${Date.now()}`, scope, from: 'Arjun', to: 'Kavya', state: 'waiting', since: '2027-01-28' }])
+          setGrants((gs) => [...gs, { id: `g${Date.now()}`, scope, from: 'Arjun', to: 'Kavya', state: 'waiting', since: SPECIMEN_NOW }])
           setShareOpen(false)
-          setToast(t('proposed', { scope: scopeLabel(scope) }))
+          toastAfterSheet(t('proposed', { scope: scopeLabel(scope) }))
         }}
       />
 
@@ -344,9 +356,11 @@ function Household() {
               variant="ink"
               icon="rotate-ccw"
               onPress={() => {
-                if (revoke) setGrants((gs) => gs.map((x) => (x.id === revoke.id ? { ...x, state: 'revoked' as const } : x)))
-                setRevoke(null)
-                setToast(t('doneUpdated'))
+                if (revoke) {
+                  setGrants((gs) => gs.map((x) => (x.id === revoke.id ? { ...x, state: 'revoked' as const } : x)))
+                  setRevoke(null)
+                  toastAfterSheet(t('doneUpdated'))
+                } else setRevoke(null)
               }}
             >
               {revoke?.state === 'waiting' ? t('withdraw') : t('revoke')}
@@ -502,7 +516,7 @@ function InviteSheet({ open, onClose, onInvite }: { open: boolean; onClose: () =
     if (age === 'minor' && !consent) e.consent = t('errConsent')
     setErrors(e)
     if (Object.keys(e).length) return
-    const expires = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
+    const expires = new Date(Date.parse(SPECIMEN_NOW) + 7 * 86400000).toISOString().slice(0, 10)
     const iv: Invite = { id: refCode('INV'), name: name.trim(), relation, age: AGES.find((a) => a.value === age)!.label, expires }
     onInvite(iv)
     setDone(iv)

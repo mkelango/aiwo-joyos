@@ -9,9 +9,10 @@ import { Avatar, Button, Card, PageHeader, Pill, Sheet } from '@/components/ui'
 import { termByKey } from '@/data/terms'
 import { joyspanIndex } from '@/domain/indexEngine'
 import {
-  CLINICAL_RECORDS, CLOSE_OUTCOMES, EXTRA_FORMULARY, EXTRA_INTERACTIONS, FORMULARY, HITL_QUEUE, MD_CONFIG, MEERA, MEMBER_IDS, RETURN_REASONS, SAFETY_ALERTS, SCREEN_QUEUE, SCREEN_ROUTES, SCREEN_ROUTE_OWNER, SIGNOFF_QUEUE,
+  CLINICAL_RECORDS, CLOSE_OUTCOMES, EXTRA_FORMULARY, EXTRA_INTERACTIONS, FORMULARY, MD_CONFIG, MEERA, MEMBER_IDS, RETURN_REASONS, SCREEN_ROUTES, SCREEN_ROUTE_OWNER,
   type SafetyAlert,
 } from './_data'
+import { clinical, recordOf, useClinicalState, type Draft, type MdActive, type MdHistory, type Order, type Screen, type Sent, type SignItem } from './_clinicalStore'
 import { PreviewBanner, useConsoleAccess } from './_gate'
 import { AccessNote, CardHead, Kpi, PriorityTag, ScrollTabs, SlaChip, areaCls, fieldCls, fmtClock, fmtDuration, labelCls, useConsoleNow, useTabParam } from './_parts'
 
@@ -23,9 +24,6 @@ const TABS = ['safety', 'screens', 'signoff', 'member', 'ai', 'config'] as const
 const PRIORITY_RANK = { P0: 0, P1: 1 } as const
 const STATUS_RANK = { open: 0, acknowledged: 1, closed: 2 } as const
 
-/** The Medical Director's active, signed threshold set. Lifted so every tab reads the same version. */
-type MdActive = { version: string; signedOn: string; signers: string[]; hash: string; values: Record<string, number> }
-const MD_INITIAL = (): MdActive => ({ version: MD_CONFIG.active.version, signedOn: MD_CONFIG.active.signedOn, signers: MD_CONFIG.active.signers, hash: MD_CONFIG.active.hash, values: Object.fromEntries(MD_CONFIG.thresholds.map((t) => [t.key, t.value])) as Record<string, number> })
 
 /** Reached-in time and whether it was inside the SLA, from the alert's own clock. */
 function reachOf(a: SafetyAlert) {
@@ -63,11 +61,12 @@ export default function Clinical() {
     next.set('member', id)
     setParams(next, { replace: true })
   }
-  const [alerts, setAlerts] = useState<SafetyAlert[]>(SAFETY_ALERTS)
-  const [signoffs, setSignoffs] = useState<SignItem[]>(SIGNOFF_QUEUE.map((s) => ({ ...s, signed: null, returned: null })))
-  const [drafts, setDrafts] = useState(HITL_QUEUE.map((h) => ({ ...h, state: 'pending' as 'pending' | 'approved' | 'rejected', edited: false })))
-  const [screens, setScreens] = useState<Screen[]>(SCREEN_QUEUE.map((q) => ({ ...q })))
-  const [md, setMd] = useState<MdActive>(MD_INITIAL)
+  // Persisted for the browser session (_clinicalStore), like the coach console's work.
+  const { alerts, signoffs, drafts, screens, md, mdHistory } = useClinicalState()
+  const setAlerts = clinical.setAlerts
+  const setSignoffs = clinical.setSignoffs
+  const setDrafts = clinical.setDrafts
+  const setScreens = clinical.setScreens
 
   const openP0 = alerts.filter((a) => a.priority === 'P0' && a.status === 'open').sort((a, b) => +new Date(a.openedAt) - +new Date(b.openedAt))[0]
   const activeP0 = alerts.filter((a) => a.priority === 'P0' && a.status !== 'closed').length
@@ -137,7 +136,7 @@ export default function Clinical() {
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Kpi label="P0 active" value={activeP0} sub={p0Unreached ? <><span className="num">{p0Unreached}</span> awaiting first contact</> : p0Late ? <><span className="num">{p0Late}</span> reached after SLA · escalated</> : 'All reached within SLA'} />
-        <Kpi label="P1 within SLA" value={<>{p1InSla}<span className="text-ink-3">/{p1Open.length}</span></>} sub="Clinician review in 48 h" />
+        <Kpi label="P1 within SLA" value={<>{p1InSla}<span className="text-ink-3">/{p1Open.length}</span></>} sub={<>Clinician review in <span className="num">{md.values.p1}</span> h · config <span className="num">{md.version}</span></>} />
         <Kpi label="Awaiting sign-off" value={pendingSign} sub={signoffs.some((s) => s.returned) ? <><span className="num">{signoffs.filter((s) => s.returned).length}</span> returned to the lab</> : 'Clinical grade · method pinned'} />
         <Kpi label="AI drafts to review" value={pendingAi} sub="HITL gate · nothing released unread" />
       </div>
@@ -165,8 +164,13 @@ export default function Clinical() {
         {tab === 'member' && <MemberRecord key={memberId} memberId={memberId} setMember={setMember} now={now} canAct={canAct} alerts={alerts} />}
         {tab === 'ai' && <AiReview drafts={drafts} setDrafts={setDrafts} onOpen={openMember} canAct={canAct} />}
         {/* Kept mounted so a pending proposal or a new version survives a tab switch. */}
-        <div hidden={tab !== 'config'}><MedicalDirector canAct={canAct} active={md} setActive={setMd} /></div>
+        <div hidden={tab !== 'config'}><MedicalDirector canAct={canAct} active={md} history={mdHistory} /></div>
       </div>
+
+      <p className="mt-10 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-3">
+        Your work in this portal is kept for this browser session, as specimen data.
+        <button type="button" disabled={!canAct} onClick={() => { if (window.confirm('Reset the clinical portal to the specimen start? Alerts, sign-offs, AI reviews, routing, orders and the Medical Director config all go back.')) clinical.reset() }} className="text-ink-2 underline underline-offset-4 hover:text-ink focus-ring disabled:opacity-50">Reset the clinical specimen</button>
+      </p>
     </div>
   )
 }
@@ -288,8 +292,6 @@ function SafetyBoard({ alerts, setAlerts, now, onAck, onOpen, canAct, p0Minutes 
 
 // ─── Screen queue ──────────────────────────────────────────────────────────
 
-type Screen = (typeof SCREEN_QUEUE)[number] & { routedAt?: string; alertId?: string }
-
 function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canAct, md }: {
   screens: Screen[]
   setScreens: (f: (s: Screen[]) => Screen[]) => void
@@ -315,11 +317,11 @@ function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canA
       setAlerts((xs) => [...xs, {
         id: alertId!, member: q.member, memberId, priority: 'P1', kind: `Screen threshold · ${q.instrument}`,
         detail: `${q.instrument} = ${q.score} (threshold ≥ ${q.threshold}). Routed: ${r.toLowerCase()}.`,
-        openedAt: new Date(now).toISOString(), slaMinutes: 48 * 60, owner, status: 'open',
+        openedAt: new Date(now).toISOString(), slaMinutes: md.values.p1 * 60, owner, status: 'open',
       }])
     }
     setScreens((s) => s.map((x) => (x.id === q.id ? { ...x, route: `${r} · ${owner}`, routedAt: fmtClock(now), alertId: existing ? undefined : alertId } : x)))
-    setNotice(`${q.member} routed to ${owner} · ${r}. ${existing ? 'An alert is already open on the safety board.' : 'A P1 is now on the safety board with a 48 h clock.'}`)
+    setNotice(`${q.member} routed to ${owner} · ${r}. ${existing ? 'An alert is already open on the safety board.' : `A P1 is now on the safety board with a ${md.values.p1} h clock (config ${md.version}).`}`)
   }
   const undo = (q: Screen) => {
     setScreens((s) => s.map((x) => (x.id === q.id ? { ...x, route: 'Unassigned', routedAt: undefined, alertId: undefined } : x)))
@@ -395,8 +397,6 @@ function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canA
 
 // ─── Sign-off ──────────────────────────────────────────────────────────────
 
-type SignItem = (typeof SIGNOFF_QUEUE)[number] & { signed: string | null; returned: { reason: string; note: string; at: string } | null }
-
 function SignOff({ items, setItems, now, onOpen, canAct }: { items: SignItem[]; setItems: (f: (s: SignItem[]) => SignItem[]) => void; now: number; onOpen: (id: string) => void; canAct: boolean }) {
   const [sel, setSel] = useState(items[0]?.id)
   const [note, setNote] = useState('')
@@ -433,10 +433,10 @@ function SignOff({ items, setItems, now, onOpen, canAct }: { items: SignItem[]; 
     <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
       <Card tone="sunk" className="h-fit">
         <Eyebrow>Clinical-grade drafts</Eyebrow>
-        <ul className="mt-3 space-y-2" role="listbox" aria-label="Drafts awaiting sign-off">
+        <ul className="mt-3 space-y-2" aria-label="Drafts awaiting sign-off">
           {items.map((i) => (
             <li key={i.id}>
-              <button role="option" aria-selected={i.id === item.id} onClick={() => select(i.id)} className={clsx('w-full rounded-lg px-3 py-2.5 text-left focus-ring', i.id === item.id ? 'bg-paper-raised shadow-card' : 'hover:bg-paper-raised')}>
+              <button type="button" aria-pressed={i.id === item.id} onClick={() => select(i.id)} className={clsx('w-full rounded-lg px-3 py-2.5 text-left focus-ring', i.id === item.id ? 'bg-paper-raised shadow-card' : 'hover:bg-paper-raised')}>
                 <span className="flex items-center justify-between gap-2">
                   <span className="text-[15px] text-ink">{i.member}</span>
                   {i.signed ? <Check size={15} aria-label="Signed" className="text-ink" /> : i.returned ? <span className="rounded-full border border-line-strong px-2 py-0.5 text-[11px] text-ink-2">Returned</span> : <span className="num text-[12px] text-ink-3">{i.drafted}</span>}
@@ -591,12 +591,8 @@ const interactionsFor = (drug: string) => [
 const ORDERABLE = ['Repeat serum potassium', 'Basic metabolic panel', 'Lipid panel + ApoB', 'HbA1c', 'Vitamin D (25-OH)', 'Thyroid panel (TSH, fT4)', 'Complete blood count']
 const URGENCY = ['STAT · home draw tonight', 'Within 48 h', 'Routine · next visit', 'Routine · in 8 weeks']
 
-type Sent = { rx: string; drug: string; dose: string; freq: string; sentAt: number; reason?: string }
-type Order = { test: string; when: string; status: string }
-
-// Orders and prescriptions survive switching member or tab for the browser session.
-const RECORD_WORK: Record<string, { sent: Sent[]; adjusted: Record<string, string>; orders: Order[] }> = {}
-let rxSeq = 41
+/** An e-Rx can be withdrawn for ten minutes after it is signed. */
+const CANCEL_WINDOW_MS = 10 * 60000
 
 function MemberRecord({ memberId, setMember, now, canAct, alerts }: { memberId: string; setMember: (id: string) => void; now: number; canAct: boolean; alerts: SafetyAlert[] }) {
   const rec = CLINICAL_RECORDS[memberId]
@@ -606,15 +602,16 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts }: { memberId: 
   const [days, setDays] = useState('30')
   const [checked, setChecked] = useState(false)
   const [override, setOverride] = useState('')
-  const [sent, setSent] = useState<Sent[]>(() => RECORD_WORK[memberId]?.sent ?? [])
-  const [lastSent, setLastSent] = useState<Sent | null>(null)
+  // Orders and prescriptions survive switching member, tab or console (_clinicalStore).
+  const work = recordOf(useClinicalState(), memberId)
+  const { sent, adjusted, orders } = work
+  const setSent = (f: (s: Sent[]) => Sent[]) => clinical.updateRecord(memberId, (w) => ({ ...w, sent: f(w.sent) }))
+  const setAdjusted = (f: (a: Record<string, string>) => Record<string, string>) => clinical.updateRecord(memberId, (w) => ({ ...w, adjusted: f(w.adjusted) }))
+  const setOrders = (f: (o: Order[]) => Order[]) => clinical.updateRecord(memberId, (w) => ({ ...w, orders: f(w.orders) }))
   const [cancelled, setCancelled] = useState<string | null>(null)
   const [errs, setErrs] = useState('')
-  const [adjusted, setAdjusted] = useState<Record<string, string>>(() => RECORD_WORK[memberId]?.adjusted ?? {})
   const [adjustTo, setAdjustTo] = useState('')
   const [adjustDone, setAdjustDone] = useState<string | null>(null)
-  const [orders, setOrders] = useState<Order[]>(() => RECORD_WORK[memberId]?.orders ?? [])
-  useEffect(() => { RECORD_WORK[memberId] = { sent, adjusted, orders } }, [memberId, sent, adjusted, orders])
   const [orderTest, setOrderTest] = useState('')
   const [orderUrg, setOrderUrg] = useState(URGENCY[1])
   const [orderDone, setOrderDone] = useState<string | null>(null)
@@ -655,6 +652,7 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts }: { memberId: 
   const f = ALL_FORMULARY.find((x) => x.drug === drug)
   const hits = drug ? interactionsFor(drug).filter((i) => meds.some((m) => m.drug === i.with)) : []
   const duplicate = drug ? meds.find((m) => m.drug === drug) : undefined
+  const otherStrengths = duplicate && f ? f.strengths.filter((x) => x !== duplicate.dose) : []
   const major = hits.some((h) => h.severity === 'major')
   const memberAlerts = alerts.filter((a) => a.memberId === rec.id && a.status !== 'closed')
   const first = rec.name.split(' ')[0]
@@ -667,16 +665,17 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts }: { memberId: 
     if (!checked) return setErrs('Run the interaction check first.')
     if (duplicate) return setErrs(`Duplicate therapy: ${first} already takes ${duplicate.drug} ${duplicate.dose}. Adjust the existing order instead.`)
     if (major && override.trim().length < 10) return setErrs('A major interaction needs a written clinical reason to proceed.')
-    const rx: Sent = { rx: `RX-2027-0128-0${String(rxSeq++).padStart(2, '0')}`, drug, dose: strength, freq: `${freq} × ${days} days`, sentAt: now, reason: major ? override.trim() : undefined }
+    const rx: Sent = { rx: clinical.nextRx(), drug, dose: strength, freq: `${freq} × ${days} days`, sentAt: now, reason: major ? override.trim() : undefined }
     setSent((s) => [...s, rx])
-    setLastSent(rx)
     setCancelled(null)
     reset()
   }
-  const cancelRx = (rx: string) => { setSent((s) => s.filter((x) => x.rx !== rx)); setCancelled(rx); setLastSent(null) }
+  const cancelRx = (rx: string) => { setSent((s) => s.filter((x) => x.rx !== rx)); setCancelled(rx) }
   const applyAdjust = () => {
-    if (!duplicate || !adjustTo) return
-    setAdjusted((a) => ({ ...a, [duplicate.drug]: adjustTo }))
+    if (!duplicate || !adjustTo || !canAct) return
+    // A prescription sent this session is amended in place; a standing medicine gets a new dose.
+    if (duplicate.isNew) setSent((s) => s.map((x) => (x.rx === duplicate.rx ? { ...x, dose: adjustTo } : x)))
+    else setAdjusted((a) => ({ ...a, [duplicate.drug]: adjustTo }))
     setAdjustDone(`${duplicate.drug} changed from ${duplicate.dose} to ${adjustTo}. Signed by ${MEERA.name} · amended e-Rx sent to ABDM · ${first} notified.`)
     reset()
   }
@@ -686,7 +685,11 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts }: { memberId: 
     setOrderDone(`${test} ordered · ${urgency.toLowerCase()}. ${first} gets a plain-language note from you, not from AI.`)
     setOrderTest('')
   }
-  const windowLeft = lastSent ? 10 * 60000 - (now - lastSent.sentAt) : 0
+  // Derived from what was sent, so the cancel window survives leaving and coming back.
+  // Clamped: after a reload the console clock restarts, but the window is never longer than ten minutes.
+  const cancelLeft = (x: Sent) => Math.min(CANCEL_WINDOW_MS, CANCEL_WINDOW_MS - (now - x.sentAt))
+  const lastSent = [...sent].sort((a, b) => b.sentAt - a.sentAt).find((x) => cancelLeft(x) > 0) ?? null
+  const windowLeft = lastSent ? cancelLeft(lastSent) : 0
   const suggested = rec.suggestedOrder && !orders.some((o) => o.test === rec.suggestedOrder!.test) ? rec.suggestedOrder : null
 
   return (
@@ -755,7 +758,14 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts }: { memberId: 
                 {meds.map((m, i) => (
                   <li key={i} className="flex flex-wrap items-baseline justify-between gap-2 py-2.5">
                     <span><span className="text-[15px] text-ink">{m.drug} <span className="num">{m.dose}</span></span> <span className="text-[13px] text-ink-2">· {m.freq}</span></span>
-                    <span className="text-[12px] text-ink-3">{m.isNew ? <>e-Rx <span className="num">{m.rx}</span> · ABDM</> : m.adjustedNow ? 'Dose amended today' : `since ${m.since} · ${m.by}`}</span>
+                    <span className="flex flex-wrap items-baseline gap-x-2 text-[12px] text-ink-3">
+                      {m.isNew ? <>e-Rx <span className="num">{m.rx}</span> · ABDM</> : m.adjustedNow ? 'Dose amended today' : `since ${m.since} · ${m.by}`}
+                      {m.isNew && (() => {
+                        const s = sent.find((x) => x.rx === m.rx)
+                        const left = s ? cancelLeft(s) : 0
+                        return left > 0 && canAct ? <button type="button" onClick={() => cancelRx(m.rx!)} className="text-ink underline underline-offset-4 focus-ring">Cancel within <span className="num">{Math.ceil(left / 60000)}</span> min</button> : null
+                      })()}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -845,16 +855,20 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts }: { memberId: 
                 {duplicate ? (
                   <div className="mt-2">
                     <p className="text-[14px] text-ink-2"><span className="mr-2 rounded-full bg-ink px-2 py-0.5 text-[11px] uppercase tracking-wide text-paper">major</span><span className="text-ink">Duplicate therapy.</span> {first} already takes {duplicate.drug} <span className="num">{duplicate.dose}</span>. A second order is blocked.</p>
-                    <div className="mt-3 flex flex-wrap items-end gap-2">
-                      <div>
-                        <label htmlFor="rx-adjust" className={labelCls}>Adjust the existing order to</label>
-                        <select id="rx-adjust" className={clsx(fieldCls, 'w-44')} value={adjustTo} onChange={(e) => setAdjustTo(e.target.value)}>
-                          <option value="">Choose…</option>
-                          {f.strengths.filter((x) => x !== duplicate.dose).map((x) => <option key={x}>{x}</option>)}
-                        </select>
+                    {otherStrengths.length === 0 ? (
+                      <p className="mt-3 rounded-lg bg-paper-sunk px-3 py-2 text-[14px] text-ink">No other strength in the formulary; stop or change the existing order.</p>
+                    ) : (
+                      <div className="mt-3 flex flex-wrap items-end gap-2">
+                        <div>
+                          <label htmlFor="rx-adjust" className={labelCls}>Adjust the existing order to</label>
+                          <select id="rx-adjust" className={clsx(fieldCls, 'w-44')} value={adjustTo} onChange={(e) => setAdjustTo(e.target.value)}>
+                            <option value="">Choose…</option>
+                            {otherStrengths.map((x) => <option key={x}>{x}</option>)}
+                          </select>
+                        </div>
+                        <Button variant="ink" size="sm" disabled={!adjustTo || !canAct} onClick={applyAdjust}>Adjust the existing order</Button>
                       </div>
-                      <Button variant="ink" size="sm" disabled={!adjustTo || !canAct} onClick={applyAdjust}>Adjust the existing order</Button>
-                    </div>
+                    )}
                   </div>
                 ) : hits.length === 0 ? (
                   <p className="mt-2 flex items-center gap-2 text-[15px] text-ink"><Check size={15} aria-hidden /> No interactions found.</p>
@@ -886,8 +900,6 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts }: { memberId: 
 }
 
 // ─── AI review (HITL) ──────────────────────────────────────────────────────
-
-type Draft = (typeof HITL_QUEUE)[number] & { state: 'pending' | 'approved' | 'rejected'; edited: boolean; flagged?: string }
 
 function AiReview({ drafts, setDrafts, onOpen, canAct }: { drafts: Draft[]; setDrafts: (f: (d: Draft[]) => Draft[]) => void; onOpen: (id: string) => void; canAct: boolean }) {
   const [editing, setEditing] = useState<string | null>(null)
@@ -964,13 +976,18 @@ function AiReview({ drafts, setDrafts, onOpen, canAct }: { drafts: Draft[]; setD
 
 // ─── Medical Director config ───────────────────────────────────────────────
 
-function MedicalDirector({ canAct, active, setActive }: { canAct: boolean; active: MdActive; setActive: (a: MdActive) => void }) {
+function MedicalDirector({ canAct, active, history }: { canAct: boolean; active: MdActive; history: MdHistory[] }) {
   const base = MD_CONFIG.thresholds
   const [vals, setVals] = useState<Record<string, number>>(active.values)
+  // Follow the active version when it changes from outside (a reset, or another tab of this session).
+  const [seenVersion, setSeenVersion] = useState(active.version)
+  if (seenVersion !== active.version) {
+    setSeenVersion(active.version)
+    setVals(active.values)
+  }
   const [why, setWhy] = useState('')
   const [proposal, setProposal] = useState<null | { version: string; changes: string[]; why: string }>(null)
   const [justActivated, setJustActivated] = useState<string | null>(null)
-  const [history, setHistory] = useState(MD_CONFIG.history)
   const [err, setErr] = useState('')
   const nextVersion = `v${Number(active.version.slice(1)) + 1}`
   const fmt = (k: string, v: number) => (k === 'k' ? v.toFixed(1) : String(v))
@@ -990,8 +1007,10 @@ function MedicalDirector({ canAct, active, setActive }: { canAct: boolean; activ
     if (!proposal) return
     const hash = `cfg:${Math.random().toString(16).slice(2, 6)}…${Math.random().toString(16).slice(2, 6)}`
     const signers = ['Dr Meera Iyer · Medical Director', 'Dr Sanjay Menon · Lead Psychologist']
-    setActive({ version: proposal.version, signedOn: '28 Jan 2027', signers, hash, values: { ...vals } })
-    setHistory((h) => [{ version: proposal.version, date: '28 Jan 2027', change: proposal.changes.join('; '), signers: 'Dr Meera Iyer, Dr Sanjay Menon', hash }, ...h])
+    clinical.activateMd(
+      { version: proposal.version, signedOn: '28 Jan 2027', signers, hash, values: { ...vals } },
+      { version: proposal.version, date: '28 Jan 2027', change: proposal.changes.join('; '), signers: 'Dr Meera Iyer, Dr Sanjay Menon', hash },
+    )
     setJustActivated(proposal.version)
     setProposal(null)
     setWhy('')
@@ -1035,6 +1054,9 @@ function MedicalDirector({ canAct, active, setActive }: { canAct: boolean; activ
             </tbody>
           </table>
         </div>
+        <p className="mt-3 text-[13px] text-ink-3">
+          Every threshold applies to new results only. The PHQ-4 and ISI values set the screen queue; P0 and P1 set the clock on each new alert. The PSS-4 value routes new stress screens to the coach, and the potassium value raises a P0 on new lab results; neither re-scores a result already on the safety board.
+        </p>
 
         {justActivated && (
           <p role="status" className="mt-5 flex items-start gap-2 rounded-lg bg-paper-sunk px-4 py-3 text-[14px] text-ink"><Check size={15} className="mt-0.5 shrink-0" aria-hidden /> {justActivated} is active. Both signatures recorded. Queues re-evaluate from the next result; past screens are never re-scored.</p>

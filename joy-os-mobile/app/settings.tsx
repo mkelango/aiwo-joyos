@@ -90,7 +90,7 @@ function Settings() {
       <View style={{ gap: space.s1 }}>
         <SectionTitle>{ts('account')}</SectionTitle>
         <Card tone="raised" padding={8} style={{ paddingHorizontal: 16 }}>
-          <ListRow icon="user" title={ts('profile')} sub={ts('profileSub', { name: `${MEMBER.firstName} ${MEMBER.lastName}` })} onPress={() => router.push('/profile')} />
+          <ListRow icon="user" title={ts('profile')} sub={ts('profileSub', { name: acct.profile.name || `${MEMBER.firstName} ${MEMBER.lastName}` })} onPress={() => router.push('/profile')} />
           <Divider />
           <ListRow icon="star" title={ts('membership')} sub={ts('invoices', { plan: `${PLANS.find((p) => p.key === acct.plan)?.name ?? MEMBER.plan} + ${MEMBER.membership}` })} onPress={() => router.push('/membership')} />
           <Divider />

@@ -3,10 +3,10 @@ import { useEffect, useState } from 'react'
 import { Pressable, View } from 'react-native'
 import { ArrowLink, Body, Button, Divider, Eyebrow, Icon, Meta, Mono, Progress, Segmented, Sheet } from '@/components'
 import { interceptsCrisis, useApp } from '@/lib/store'
-import { useLocal } from '@/screens/a/local'
+import { madeHere, useLocal } from '@/screens/a/local'
 import { BarRow, IconButton, TextField } from '@/screens/a/parts'
 import { FILMS, PLANNED_START, SAVOURING_PROMPTS } from '@/screens/a/spacesData'
-import { LEDGER_WEEK } from '@/shared/member'
+import { LEDGER, LEDGER_WEEK } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
 import { dayShort, useA } from '../i18n'
 import { ToolCard, ToolsHeading } from './common'
@@ -31,8 +31,19 @@ function LedgerInsight() {
   const { term } = useTheme()
   const { t, tx, lang } = useA()
   const col = term('D')
-  const top = LEDGER_WEEK.slice(0, 5)
-  const total = LEDGER_WEEK.reduce((a, b) => a + b.count, 0)
+  const { ledger } = useApp()
+  // The specimen week, plus every moment saved on this phone (a savoured prompt included), by tag.
+  const week = LEDGER_WEEK.map((x) => ({ ...x }))
+  for (const e of ledger.filter(madeHere))
+    for (const tag of e.tags) {
+      const row = week.find((x) => x.tag === tag)
+      if (row) row.count += 1
+      else week.push({ tag, count: 1 })
+    }
+  week.sort((a, b) => b.count - a.count)
+  const top = week.slice(0, 5)
+  // Moments are entries, not tags (one entry can carry several): the seed week plus this phone's.
+  const total = LEDGER.length + ledger.filter(madeHere).length
   return (
     <ToolCard
       title={t('Joy Ledger · this week')}
@@ -157,7 +168,7 @@ function Savour() {
             variant="ink"
             icon="check"
             onPress={() => {
-              addLedger({ prompt: 3, tags: ['Rest'], word: `Savoured · ${p.kind}` })
+              addLedger({ prompt: 3, tags: ['Rest'], word: t('Savoured · {kind}', { kind: tx(p.kind) }) })
               setDid(true)
             }}
           >

@@ -111,6 +111,9 @@ function TakeIndex() {
   }
   const pause = () => setStep({ kind: 'paused' })
   const leave = () => (router.canGoBack() ? router.back() : router.replace('/'))
+  // Every step renders its own <Screen>; keying it per step gives each item, block intro, break
+  // and review a fresh scroll view that opens at the top, not wherever the last one was left.
+  const stepKey = 'i' in step ? `${step.kind}-${step.i}` : step.kind
 
   const careCard = (
     <Card tone="sunk" style={{ gap: space.s1 }}>
@@ -134,7 +137,7 @@ function TakeIndex() {
   if (step.kind === 'intro') {
     const resuming = ready && answered > 0
     return (
-      <Screen>
+      <Screen key={stepKey}>
         <ScreenHeader
           back
           eyebrow={t('introEyebrow')}
@@ -211,7 +214,7 @@ function TakeIndex() {
     const tm = termByKey(b.term)
     const here = items.filter((x) => x.block.code === b.code).length
     return (
-      <Screen>
+      <Screen key={stepKey}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <Pressable
             onPress={() => (i === 0 ? setStep({ kind: 'intro' }) : i === firstOf2 ? setStep({ kind: 'break' }) : setStep({ kind: 'item', i: i - 1 }))}
@@ -288,7 +291,7 @@ function TakeIndex() {
       setStep({ kind: 'item', i: i - 1 })
     }
     return (
-      <Screen>
+      <Screen key={stepKey}>
         <View style={{ gap: space.s1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
             <Pressable onPress={back} accessibilityRole="button" accessibilityLabel={t('previous')} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44 }}>
@@ -348,7 +351,7 @@ function TakeIndex() {
   // ── Between sittings ─────────────────────────────────────────────────────
   if (step.kind === 'break') {
     return (
-      <Screen>
+      <Screen key={stepKey}>
         <ScreenHeader
           eyebrow={t('breakEyebrow')}
           title={
@@ -377,7 +380,7 @@ function TakeIndex() {
   // ── Paused ───────────────────────────────────────────────────────────────
   if (step.kind === 'paused') {
     return (
-      <Screen>
+      <Screen key={stepKey}>
         <ScreenHeader
           eyebrow={t('paused')}
           title={
@@ -397,7 +400,7 @@ function TakeIndex() {
         {offline ? <Meta tone="ink3">{t('offline')}</Meta> : null}
         <View style={{ gap: space.s1 }}>
           <DaybreakButton onPress={() => goTo(resumeAt())}>{t('carryOn')}</DaybreakButton>
-          <Button variant="ghost" onPress={leave} style={{ alignSelf: 'center' }}>
+          <Button variant="ghost" onPress={() => router.replace('/')} style={{ alignSelf: 'center' }}>
             {tc('backToday')}
           </Button>
         </View>
@@ -408,7 +411,7 @@ function TakeIndex() {
   // ── Review ───────────────────────────────────────────────────────────────
   if (step.kind === 'review') {
     return (
-      <Screen>
+      <Screen key={stepKey}>
         <ScreenHeader
           eyebrow={t('review')}
           title={
@@ -484,7 +487,7 @@ function TakeIndex() {
 
   // ── Done ─────────────────────────────────────────────────────────────────
   return (
-    <Screen>
+    <Screen key={stepKey}>
       <ScreenHeader
         eyebrow={t('sentEyebrow')}
         title={

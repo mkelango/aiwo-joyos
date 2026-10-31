@@ -151,7 +151,8 @@ export function useApp() {
 
 /** Emergency intercept — runs before anything else touches free text (Memo p.24).
  *  Every free-text input calls this on submit; a match opens the CrisisSheet first. */
-const CRISIS = /\b(kill myself|suicide|end my life|self[- ]?harm|want to die|hurt myself|khudkushi|aatmahatya|atmahatya|marna chah(ta|ti)|jaan de d(u|oo)n|tharkolai|thatkolai|saaganum|saaga venum)\b/i
+// English: \b only on the outer edges, so 'suicidal', 'killing myself', "don't want to live" all match.
+const CRISIS = /\b(suicid(e|al|ally)|kill(ing)? my ?self|(end|ending|take|taking) (my (own )?life|it all)|self[- ]?harm(ing)?|(want(ing)?|wanna) (to )?die|hurt(ing)? my ?self|(do ?n[o'’]?t|dont) want to (live|be alive|be here)|better off dead|no reason to (live|go on)|khudkushi|aatmahatya|atmahatya|marna chah(ta|ti)|jaan de d(u|oo)n|tharkolai|thatkolai|saaganum|saaga venum)\b/i
 // Tamil and Hindi phrases. \b does not work for Indic scripts, so these match as plain
 // substrings after normalising (NFD, nukta dropped so ख़/ख and नुक़सान/नुकसान both match).
 // Starter list pending clinical review of the translated intercept.

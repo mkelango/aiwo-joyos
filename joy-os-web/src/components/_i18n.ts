@@ -73,6 +73,7 @@ export const SHARED = {
     hi: 'आपका लेजर और जवाब इसी डिवाइस पर सुरक्षित हैं, और स्क्रीन वापस आने पर सिंक हो जाएँगे।',
   },
   backToToday: { en: 'Back to Today', ta: 'இன்றைய பக்கத்துக்குத் திரும்பு', hi: 'आज पर वापस जाएँ' },
+  backToStart: { en: 'Back to the start', ta: 'தொடக்கத்துக்குத் திரும்பு', hi: 'शुरुआत पर वापस जाएँ' },
   tryAgain: { en: 'Try again', ta: 'மீண்டும் முயலவும்', hi: 'फिर से कोशिश करें' },
 
   // ui primitives

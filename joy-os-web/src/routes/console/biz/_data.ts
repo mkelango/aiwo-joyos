@@ -16,7 +16,7 @@ export const TENANT_PROFILE = {
   legal: 'Northwind Capital Advisors Pvt Ltd',
   edition: 'Joyspan@Work · Team Joyspan edition',
   stage: 'Design-partner pilot ahead of J3',
-  cycle: 'Cycle 1 · Day 0 on 21 Oct 2026 · Day 90 closed 19 Jan 2027',
+  cycle: 'Cycle 1 · Day 0 on 23 Oct 2026 · Day 90 closed 21 Jan 2027',
   admin: 'Rhea Kapoor · Head of People',
   region: 'India · Mumbai cell (pooled)',
   recovery: 'Hyderabad',
@@ -25,10 +25,12 @@ export const TENANT_PROFILE = {
   lastPublished: '2027-01-22',
 }
 
+// Cycle 1 Day 0 is 23 Oct 2026, the day after method v1.0 was published (22 Oct), so every Day-0 figure is on v1.0.
+// Wave 3 is the one reminder, sent to the 241 invited in waves 1–2 who had not enrolled (900 − 659); 812 enrolled in all.
 export const INVITE_WAVES = [
   { id: 'w1', name: 'Wave 1 · Engineering and Operations', sent: '2026-10-07', invited: 420, opened: 372, enrolled: 318 },
   { id: 'w2', name: 'Wave 2 · Sales, Finance, People & Legal', sent: '2026-10-14', invited: 480, opened: 401, enrolled: 341 },
-  { id: 'w3', name: 'Wave 3 · Gentle reminder, all not yet enrolled', sent: '2026-10-28', invited: 340, opened: 214, enrolled: 153 },
+  { id: 'w3', name: 'Wave 3 · Gentle reminder, all not yet enrolled', sent: '2026-10-19', invited: 241, opened: 198, enrolled: 153 },
 ]
 
 // EAP routing volume — counts only; Ease flags are routed by AIWO, never shown to the employer.
@@ -58,7 +60,9 @@ export const ELIGIBILITY_COLUMNS = [
 ]
 
 // Insurer view — Star Health, J3 first institutional tenant (Memo p.25, decision 7).
-export const INSURER = {
+// The pilot is still in conversation (Decision 7 open, tenant routes off), so the outcome figures below are a
+// J3 PROJECTION for the pilot conversation, not measured results. The earliest possible Day 90 is 2 Mar 2027.
+const INSURER_BASE = {
   name: 'Star Health · Joy OS policy benefit',
   stage: 'Pilot cohort in conversation · J3',
   enrolled: 5000,
@@ -67,7 +71,6 @@ export const INSURER = {
   burdenD0: 41,
   burdenD90: 35,
   burdenFalling: 0.58,
-  routed: 214,
   pricePerMember: 1000,
   outcomeShare: 0.3,
   bands: [
@@ -76,6 +79,13 @@ export const INSURER = {
     { label: 'Unchanged', share: 0.24 },
     { label: 'Burden rose', share: 0.18 },
   ],
+}
+export const INSURER = {
+  ...INSURER_BASE,
+  /** Everyone whose Burden rose is offered a clinician call, so the count of offers is that share of the re-measured. */
+  routed: Math.round(INSURER_BASE.measured * INSURER_BASE.remeasureRate * INSURER_BASE.bands[3].share),
+  projection: true,
+  firstDay90: '2 Mar 2027',
 }
 
 // ─── Science Office ───────────────────────────────────────────────────────
@@ -154,7 +164,7 @@ export const CLAIMS_LOG = [
 
 export const JOY_REPORT = {
   edition: 'India Joy Report 2027',
-  window: 'Oct 2026 – Mar 2027',
+  window: 'Oct – Dec 2026',
   publish: '2027-05-15',
   records: 1180,
   states: [
@@ -234,19 +244,22 @@ export const COSTS = [
   { service: 'events · passes', now: 3, budget: 4 },
 ]
 
+// Members and tenants per cell are derived from TENANTS in the console, so the card and the table agree.
 export const CELLS = [
-  { name: 'India · Mumbai', status: 'Live', when: 'Now', region: 'ap-south-1', recovery: 'Hyderabad', law: 'DPDP Act 2023 · ABDM', tenants: 4, members: '1,180' },
-  { name: 'GCC · Dubai', status: 'Planned', when: 'J4 · FY29', region: 'me-central-1', recovery: 'In region', law: 'UAE PDPL · DHA licensing', tenants: 0, members: '—' },
-  { name: 'UK · London', status: 'Planned', when: 'FY30', region: 'eu-west-2', recovery: 'In region', law: 'UK GDPR · CQC partner', tenants: 0, members: '—' },
-  { name: 'Singapore', status: 'Planned', when: 'FY30', region: 'ap-southeast-1', recovery: 'In region', law: 'PDPA', tenants: 0, members: '—' },
-  { name: 'US diaspora', status: 'Later', when: 'FY31+', region: 'us-east-1', recovery: 'In region', law: 'HIPAA-aligned · state law', tenants: 0, members: '—' },
+  { name: 'India · Mumbai', status: 'Live', when: 'Now', region: 'ap-south-1', recovery: 'Hyderabad', law: 'DPDP Act 2023 · ABDM' },
+  { name: 'GCC · Dubai', status: 'Planned', when: 'J4 · FY29', region: 'me-central-1', recovery: 'In region', law: 'UAE PDPL · DHA licensing' },
+  { name: 'UK · London', status: 'Planned', when: 'FY30', region: 'eu-west-2', recovery: 'In region', law: 'UK GDPR · CQC partner' },
+  { name: 'Singapore', status: 'Planned', when: 'FY30', region: 'ap-southeast-1', recovery: 'In region', law: 'PDPA' },
+  { name: 'US diaspora', status: 'Later', when: 'FY31+', region: 'us-east-1', recovery: 'In region', law: 'HIPAA-aligned · state law' },
 ]
 
+// budget = infra + AI ₹ per active member-year for that tenant. Member-weighted mean:
+// (1,180 × 70 + 812 × 64 + 140 × 75) / 2,132 = 145,068 / 2,132 ≈ ₹68, the COSTS total.
 export const TENANTS = [
-  { id: 'tnt_aiwo', name: 'AIWO members', kind: 'Direct', cell: 'India · Mumbai', tenancy: 'Pooled · RLS', keys: 'Region key', members: 1180, budget: 64 },
-  { id: 'tnt_northwind', name: 'Northwind Capital · Joyspan@Work', kind: 'Employer', cell: 'India · Mumbai', tenancy: 'Pooled · RLS', keys: 'Region key', members: 812, budget: 58 },
+  { id: 'tnt_aiwo', name: 'AIWO members', kind: 'Direct', cell: 'India · Mumbai', tenancy: 'Pooled · RLS', keys: 'Region key', members: 1180, budget: 70 },
+  { id: 'tnt_northwind', name: 'Northwind Capital · Joyspan@Work', kind: 'Employer', cell: 'India · Mumbai', tenancy: 'Pooled · RLS', keys: 'Region key', members: 812, budget: 64 },
   { id: 'tnt_fairmont', name: 'Fairmont Mumbai', kind: 'Venue partner', cell: 'India · Mumbai', tenancy: 'Pooled · no PHI', keys: 'Region key', members: 0, budget: 0 },
-  { id: 'tnt_house_chn', name: 'Joyspan House Chennai', kind: 'House', cell: 'India · Mumbai', tenancy: 'Pooled · RLS', keys: 'Region key', members: 140, budget: 71 },
+  { id: 'tnt_house_chn', name: 'Joyspan House Chennai', kind: 'House', cell: 'India · Mumbai', tenancy: 'Pooled · RLS', keys: 'Region key', members: 140, budget: 75 },
   { id: 'tnt_star', name: 'Star Health', kind: 'Insurer', cell: 'India · Mumbai', tenancy: 'Bridge schema at J4', keys: 'Own key at J4', members: 0, budget: 0 },
 ]
 
@@ -274,12 +287,13 @@ export const SIGNAL_SOURCES = [
   { key: 'labs', name: 'Lab pipeline', path: 'Partner lab → FHIR Observation → method carried', members: 212, p95: 95, p95Series: [90, 92, 95, 96, 94, 95, 97, 95, 94, 93, 95, 95], batchesHr: 14, errors: 0, status: 'ok' as const, note: 'Batch by design; not on the 15-minute SLO.' },
 ]
 
-export const RIGHTS_JOBS = [
+// deliveredAt = opened + elapsedH, for the member notice in each delivered job.
+export const RIGHTS_JOBS: { id: string; kind: 'export' | 'erase' | 'withdraw'; opened: string; elapsedH: number; stores: number; done: number; status: 'running' | 'delivered'; deliveredAt?: string; note: string }[] = [
   { id: 'RQ-2291', kind: 'erase' as const, opened: '28 Jan 09:40', elapsedH: 11.5, stores: 7, done: 6, status: 'running' as const, note: 'Clinical records retained only where law requires; member told which.' },
-  { id: 'RQ-2290', kind: 'export' as const, opened: '27 Jan 14:05', elapsedH: 31, stores: 9, done: 9, status: 'delivered' as const, note: 'JSON + FHIR bundle + PDFs; signed link, 72 h expiry.' },
-  { id: 'RQ-2288', kind: 'withdraw' as const, opened: '27 Jan 10:12', elapsedH: 3.2, stores: 5, done: 5, status: 'delivered' as const, note: 'Cohort consent withdrawn; caches purged; consent.changed fanned out.' },
+  { id: 'RQ-2290', kind: 'export' as const, opened: '27 Jan 14:05', elapsedH: 31, stores: 9, done: 9, status: 'delivered' as const, deliveredAt: '28 Jan 21:05', note: 'JSON + FHIR bundle + PDFs; signed link, 72 h expiry.' },
+  { id: 'RQ-2288', kind: 'withdraw' as const, opened: '27 Jan 10:12', elapsedH: 3.2, stores: 5, done: 5, status: 'delivered' as const, deliveredAt: '27 Jan 13:24', note: 'Cohort consent withdrawn; caches purged; consent.changed fanned out.' },
   { id: 'RQ-2286', kind: 'export' as const, opened: '26 Jan 18:30', elapsedH: 50.7, stores: 9, done: 8, status: 'running' as const, note: 'Waiting on PDF render of the Day-90 card.' },
-  { id: 'RQ-2283', kind: 'erase' as const, opened: '25 Jan 08:55', elapsedH: 19.8, stores: 7, done: 7, status: 'delivered' as const, note: 'Verified by erasure worker per store.' },
+  { id: 'RQ-2283', kind: 'erase' as const, opened: '25 Jan 08:55', elapsedH: 19.8, stores: 7, done: 7, status: 'delivered' as const, deliveredAt: '26 Jan 04:43', note: 'Verified by erasure worker per store.' },
 ]
 
 // ─── Leadership ──────────────────────────────────────────────────────────
@@ -311,7 +325,7 @@ export const SCOREBOARD_STATUS: { tone: 'ok' | 'watch' | 'info'; label: string }
 
 export const REVENUE = [
   { fy: 'FY28', plus: 1.5, licensed: 0.5, fees: 0, total: 2, share: '2%', plusN: '3 k', licN: '5 k' },
-  { fy: 'FY31', plus: 75, licensed: 59.5, fees: 15, total: 150, share: '15%', plusN: '150 k', licN: '850 k' },
+  { fy: 'FY31', plus: 75, licensed: 60, fees: 15, total: 150, share: '15%', plusN: '150 k', licN: '850 k' },
   { fy: 'FY36', plus: 750, licensed: 800, fees: 150, total: 1700, share: '31%', plusN: '1.5 M', licN: '8 M' },
 ]
 
@@ -476,10 +490,14 @@ export const INSURER_FLAGS = [
   { key: 'ease_detail', label: 'Ease screens, journals or any term below aggregate', state: 'Never', on: false, note: 'Architecture p.24: tenants never receive these.' },
 ]
 
-/** The last four quarters of the north star and the Day-90 re-measure rate (specimen). */
+/**
+ * The last four quarters of the north star and the Day-90 re-measure rate (specimen).
+ * Method v1.0 was published on 22 Oct 2026, so only Q3 FY27 is a v1.0 quarter. The three earlier points are
+ * ’Cation suite-cohort pilots measured on the pre-v1.0 pilot instrument: shown, marked, and not like for like.
+ */
 export const NS_TREND = [
-  { q: 'Q4 FY26', perLakh: 1.2, remeasure: 0.66 },
-  { q: 'Q1 FY27', perLakh: 1.6, remeasure: 0.69 },
-  { q: 'Q2 FY27', perLakh: 2.1, remeasure: 0.71 },
-  { q: 'Q3 FY27', perLakh: 2.9, remeasure: 0.74 },
+  { q: 'Q4 FY26', perLakh: 1.2, remeasure: 0.66, pilot: true },
+  { q: 'Q1 FY27', perLakh: 1.6, remeasure: 0.69, pilot: true },
+  { q: 'Q2 FY27', perLakh: 2.1, remeasure: 0.71, pilot: true },
+  { q: 'Q3 FY27', perLakh: 2.9, remeasure: 0.74, pilot: false },
 ]

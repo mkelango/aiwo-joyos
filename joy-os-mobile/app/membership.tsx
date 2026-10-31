@@ -4,7 +4,7 @@ import { router } from 'expo-router'
 import { ArrowLink, Body, Button, Card, DaybreakButton, Divider, Eyebrow, Icon, ListRow, Meta, Mono, Numeral, Pill, Screen, ScreenHeader, SectionTitle, Serif, Sheet, SpecimenTag, Title, fmtDate } from '@/components'
 import { MEMBER } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
-import { ENTITLEMENTS, GSTIN_AIWO, GST_RATE, INVOICES } from '@/screens/b/accountData'
+import { ENTITLEMENTS, GSTIN_AIWO, GST_RATE, INVOICES, SPECIMEN_NOW } from '@/screens/b/accountData'
 import { PLANS, inr } from '@/screens/b/_data'
 import { accountStore, refCode, useStore } from '@/screens/b/bStore'
 import { CheckLine, ChoiceCard, Done, KeyValue, memberOnly } from '@/screens/b/parts'
@@ -19,6 +19,7 @@ import { useCommon, useTx } from '@/screens/b/i18n/common'
 type PlanKey = (typeof PLANS)[number]['key']
 const RENEWS = '2027-02-01'
 const CIRCLE_RENEWS = '2027-12-15'
+const addYear = (iso: string) => `${Number(iso.slice(0, 4)) + 1}${iso.slice(4, 10)}`
 
 export default memberOnly(Membership)
 
@@ -31,6 +32,8 @@ function Membership() {
   const [invoice, setInvoice] = useState<(typeof INVOICES)[number] | null>(null)
   const current = PLANS.find((p) => p.key === acct.plan)!
   const pending = acct.planChange
+  // Monthly plans renew on the 1st; a yearly plan renews a year after it took effect.
+  const renews = current.cadence === '/ year' && acct.planSince ? addYear(acct.planSince) : RENEWS
   const base = current.price
   // Prices include GST at 18% (as on every invoice); the GST inside the price is shown.
   const gstIn = (n: number) => Math.round((n - n / (1 + GST_RATE)) * 100) / 100
@@ -50,8 +53,8 @@ function Membership() {
   }
   const doChange = () => {
     const upgrade = PLANS.findIndex((p) => p.key === pick) > PLANS.findIndex((p) => p.key === acct.plan)
-    const effective = upgrade ? new Date().toISOString().slice(0, 10) : RENEWS
-    setAcct((a) => ({ ...a, planChange: { to: pick, effective, ref: refCode('PLN') }, plan: upgrade ? pick : a.plan }))
+    const effective = upgrade ? SPECIMEN_NOW : renews
+    setAcct((a) => ({ ...a, planChange: { to: pick, effective, ref: refCode('PLN') }, plan: upgrade ? pick : a.plan, planSince: upgrade ? effective : a.planSince }))
     setConfirm(true)
   }
 
@@ -82,7 +85,7 @@ function Membership() {
         </View>
         <Meta>
           {base ? t('inclGst', { gst: inr(gst) }) : t('noCharge')}
-          <Mono tone="ink2">{fmtDate(RENEWS)}</Mono>
+          <Mono tone="ink2">{fmtDate(renews)}</Mono>
         </Meta>
         <Meta>
           {t('circleMem')}
@@ -231,7 +234,7 @@ function Membership() {
             <Meta>
               {PLANS.findIndex((p) => p.key === pick) > PLANS.findIndex((p) => p.key === acct.plan)
                 ? t('upgradeNote')
-                : t('downNote', { date: fmtDate(RENEWS) })}
+                : t('downNote', { date: fmtDate(renews) })}
             </Meta>
           </>
         )}

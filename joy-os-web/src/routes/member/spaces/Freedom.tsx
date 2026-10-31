@@ -7,8 +7,9 @@ import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recha
 import { DaybreakButton, Eyebrow, SpecimenTag } from '@/components/joy/primitives'
 import { Button, Pill, Progress, Tabs } from '@/components/ui'
 import { NO_SUGGESTIONS, PEACE_OF_MIND, TIME_AUDIT, TIME_KINDS } from './_data'
-import { ChartTip, SpaceShell, ToolCard, axisTick, useCrisisGuard, Toggle } from './_SpaceShell'
+import { ChartTip, SpaceShell, ToolCard, axisTick, rovingRadio, useCrisisGuard, Toggle } from './_SpaceShell'
 import { useSpaceText } from './_i18n'
+import { useSpaceState } from './_state'
 
 // FREEDOM (Memo p.19): the time audit (two weeks of calendar, consented,
 // summarised then discarded: whose time is it?), the No list, the digital
@@ -35,7 +36,7 @@ export default function Freedom() {
 
 function TimeAudit() {
   const [view, setView] = useState<'day' | 'total'>('day')
-  const [rerun, setRerun] = useState<'idle' | 'asked'>('idle')
+  const [rerun, setRerun] = useSpaceState<'idle' | 'asked'>('freedom.audit.rerun.v1', 'idle')
   const { t, d, r, day } = useSpaceText()
   const dayLabel = (v: string) => { const [w, n] = v.split(' '); return `${day(w)} ${n}` }
   const totals = useMemo(() => {
@@ -107,12 +108,14 @@ function TimeAudit() {
 
 function NoList() {
   const guard = useCrisisGuard()
-  const [items, setItems] = useState<string[]>(['Checking email after 21:00', '', ''])
-  const [kept, setKept] = useState(false)
+  // The kept list persists; the inputs are a draft of it, and "kept" means the draft still matches it.
+  const [keptItems, setKeptItems] = useSpaceState<string[] | null>('freedom.noList.v1', null)
+  const [items, setItems] = useState<string[]>(() => (keptItems && keptItems.length === 3 ? keptItems : ['Checking email after 21:00', '', '']))
   const [err, setErr] = useState<number | null>(null)
   const { t, d, r } = useSpaceText()
   const filled = items.filter((i) => i.trim()).length
-  const setAt = (i: number, v: string) => { setItems((x) => x.map((y, j) => (j === i ? v : y))); setKept(false); setErr(null) }
+  const kept = !!keptItems && keptItems.length === items.length && keptItems.every((k, i) => k === items[i].trim())
+  const setAt = (i: number, v: string) => { setItems((x) => x.map((y, j) => (j === i ? v : y))); setErr(null) }
   const suggest = (s: string) => {
     const i = items.findIndex((x) => !x.trim())
     if (i === -1 || items.includes(s) || items.includes(d(s))) return
@@ -121,7 +124,9 @@ function NoList() {
   const keep = () => {
     if (filled < 3) return setErr(3 - filled)
     if (guard(...items)) return
-    setKept(true)
+    const clean = items.map((i) => i.trim())
+    setItems(clean)
+    setKeptItems(clean)
   }
   return (
     <ToolCard className="w-full" eyebrow={t('fr.no.eyebrow')} title={t('fr.no.title')} sub={t('fr.no.sub')}>
@@ -158,49 +163,65 @@ function NoList() {
 
 // ─── Digital sabbath ──────────────────────────────────────────────────────
 
+const SABBATH_DAYS = ['Sat', 'Sun'] as const
+type SabbathPlan = { day: (typeof SABBATH_DAYS)[number]; from: string; to: string; off: { email: boolean; social: boolean; news: boolean; calls: boolean }; withKavya: boolean }
+const SABBATH_START: SabbathPlan = { day: 'Sun', from: '08:00', to: '18:00', off: { email: true, social: true, news: true, calls: false }, withKavya: true }
+
+/** 'HH:MM' → hours as a number; NaN for anything else (an empty or half-typed time input). */
+function parseHm(v: string) {
+  if (!/^\d{2}:\d{2}$/.test(v)) return NaN
+  const [h, m] = v.split(':').map(Number)
+  return h + m / 60
+}
+
 function Sabbath() {
-  const days = ['Sat', 'Sun']
-  const [day, setDay] = useState('Sun')
-  const [from, setFrom] = useState('08:00')
-  const [to, setTo] = useState('18:00')
-  const [off, setOff] = useState({ email: true, social: true, news: true, calls: false })
-  const [withKavya, setWithKavya] = useState(true)
-  const [scheduled, setScheduled] = useState(false)
+  // The plan in the calendar persists and re-arms the form; editing any field un-schedules it until it is put back.
+  const [plan, setPlan] = useSpaceState<SabbathPlan | null>('freedom.sabbath.v1', null)
+  const start = plan && SABBATH_DAYS.includes(plan.day) ? plan : SABBATH_START
+  const [day, setDay] = useState(start.day)
+  const [from, setFrom] = useState(start.from)
+  const [to, setTo] = useState(start.to)
+  const [off, setOff] = useState(start.off)
+  const [withKavya, setWithKavya] = useState(start.withKavya)
+  const scheduled = !!plan && plan.day === day && plan.from === from && plan.to === to && plan.withKavya === withKavya && (Object.keys(off) as (keyof typeof off)[]).every((k) => plan.off?.[k] === off[k])
+  const setScheduled = (v: boolean) => setPlan(v ? { day, from, to, off, withKavya } : null)
   const { t, r } = useSpaceText()
   const dayName = (x: string) => (x === 'Sat' ? t('c.saturday') : t('c.sunday'))
+  const dayRadio = rovingRadio(SABBATH_DAYS, day, (d) => setDay(d))
+  // An emptied or partial time input gives ''; treat it as no time rather than as 00:00 or NaN.
   const hours = (() => {
-    const [a, b] = [from, to].map((t) => { const [h, m] = t.split(':').map(Number); return h + m / 60 })
+    const [a, b] = [from, to].map(parseHm)
     return Math.max(0, Math.round((b - a) * 10) / 10)
   })()
-  const invalid = hours <= 0
+  const invalid = !Number.isFinite(hours) || hours <= 0
   const labels: Record<keyof typeof off, string> = { email: t('fr.sb.email'), social: t('fr.sb.social'), news: t('fr.sb.news'), calls: t('fr.sb.calls') }
   const timeCls = 'num h-11 w-full rounded-xl border border-line-strong bg-paper px-3 text-[16px] text-ink focus-ring'
   return (
     <ToolCard className="w-full" eyebrow={t('fr.sb.eyebrow')} title={t('fr.sb.title')} sub={t('fr.sb.sub')}>
       <div role="radiogroup" aria-label={t('fr.sb.day')} className="inline-flex self-start rounded-full bg-paper-sunk p-1">
-        {days.map((d) => (
-          <button key={d} role="radio" aria-checked={day === d} onClick={() => { setDay(d); setScheduled(false) }} className={clsx('rounded-full px-4 py-1.5 text-[14px] focus-ring', day === d ? 'bg-paper-raised text-ink shadow-card' : 'text-ink-2')}>{dayName(d)}</button>
+        {SABBATH_DAYS.map((d) => (
+          <button key={d} type="button" {...dayRadio(d)} className={clsx('rounded-full px-4 py-1.5 text-[14px] focus-ring', day === d ? 'bg-paper-raised text-ink shadow-card' : 'text-ink-2')}>{dayName(d)}</button>
         ))}
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3">
-        <label><span className="text-[13px] text-ink-2">{t('fr.sb.from')}</span><input type="time" value={from} onChange={(e) => { setFrom(e.target.value); setScheduled(false) }} className={timeCls} /></label>
-        <label><span className="text-[13px] text-ink-2">{t('fr.sb.until')}</span><input type="time" value={to} onChange={(e) => { setTo(e.target.value); setScheduled(false) }} aria-invalid={invalid} className={timeCls} /></label>
+        <label><span className="text-[13px] text-ink-2">{t('fr.sb.from')}</span><input type="time" value={from} onChange={(e) => setFrom(e.target.value)} aria-invalid={invalid} aria-describedby={invalid ? 'sb-err' : undefined} className={timeCls} /></label>
+        <label><span className="text-[13px] text-ink-2">{t('fr.sb.until')}</span><input type="time" value={to} onChange={(e) => setTo(e.target.value)} aria-invalid={invalid} aria-describedby={invalid ? 'sb-err' : undefined} className={timeCls} /></label>
       </div>
-      {invalid && <p role="alert" className="mt-2 text-[13px] text-error">{t('fr.sb.invalid')}</p>}
+      {invalid && <p id="sb-err" role="alert" className="mt-2 text-[13px] text-error">{t('fr.sb.invalid')}</p>}
       <fieldset className="mt-5">
         <legend className="eyebrow text-ink-3">{t('fr.sb.off')}</legend>
         <div className="mt-2.5 flex flex-wrap gap-2">
           {(Object.keys(off) as (keyof typeof off)[]).map((k) => (
-            <button key={k} onClick={() => { setOff((o) => ({ ...o, [k]: !o[k] })); setScheduled(false) }} aria-pressed={off[k]} className={clsx('inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] focus-ring', off[k] ? 'bg-ink text-paper' : 'border border-line text-ink-2')}>
+            <button key={k} onClick={() => setOff((o) => ({ ...o, [k]: !o[k] }))} aria-pressed={off[k]} className={clsx('inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] focus-ring', off[k] ? 'bg-ink text-paper' : 'border border-line text-ink-2')}>
               {off[k] && <Check size={12} aria-hidden />} {labels[k]}
             </button>
           ))}
         </div>
       </fieldset>
-      <div className="mt-5"><Toggle checked={withKavya} onChange={(v) => { setWithKavya(v); setScheduled(false) }} label={t('fr.sb.invite')} description={t('fr.sb.inviteDesc')} /></div>
+      <div className="mt-5"><Toggle checked={withKavya} onChange={setWithKavya} label={t('fr.sb.invite')} description={t('fr.sb.inviteDesc')} /></div>
       <div className="mt-auto pt-6">
-        <p className="mb-3 text-[15px] text-ink" aria-live="polite">{r('fr.sb.summary', { day: dayName(day), from: <span className="num">{from}</span>, to: <span className="num">{to}</span>, h: <span className="num">{hours}</span>, with: withKavya ? t('fr.sb.withKavya') : '' })}</p>
-        {scheduled ? <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px] text-ink-2" role="status"><span className="flex items-center gap-2"><Check size={15} className="shrink-0" aria-hidden /> {t('fr.sb.scheduled', { day: dayName(day), inv: withKavya ? t('fr.sb.invSent') : '' })}</span><button type="button" onClick={() => setScheduled(false)} className="rounded text-ink underline underline-offset-4 focus-ring">{t('c.remove')}</button></p> : <Button variant="ink" disabled={invalid} onClick={() => setScheduled(true)}><CalendarCheck size={15} /> {t('fr.sb.put')}</Button>}
+        <p className="mb-3 text-[15px] text-ink" aria-live="polite">{!invalid && r('fr.sb.summary', { day: dayName(day), from: <span className="num">{from}</span>, to: <span className="num">{to}</span>, h: <span className="num">{hours}</span>, with: withKavya ? t('fr.sb.withKavya') : '' })}</p>
+        {scheduled && !invalid ? <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px] text-ink-2" role="status"><span className="flex items-center gap-2"><Check size={15} className="shrink-0" aria-hidden /> {t('fr.sb.scheduled', { day: dayName(day), inv: withKavya ? t('fr.sb.invSent') : '' })}</span><button type="button" onClick={() => setScheduled(false)} className="rounded text-ink underline underline-offset-4 focus-ring">{t('c.remove')}</button></p> : <Button variant="ink" disabled={invalid} onClick={() => setScheduled(true)}><CalendarCheck size={15} /> {t('fr.sb.put')}</Button>}
       </div>
     </ToolCard>
   )
@@ -209,7 +230,7 @@ function Sabbath() {
 // ─── Peace of mind ────────────────────────────────────────────────────────
 
 function PeaceOfMind() {
-  const [done, setDone] = useState<Record<string, boolean>>(() => Object.fromEntries(PEACE_OF_MIND.map((p) => [p.id, p.done])))
+  const [done, setDone] = useSpaceState<Record<string, boolean>>('freedom.peaceOfMind.v1', () => Object.fromEntries(PEACE_OF_MIND.map((p) => [p.id, p.done])))
   const n = Object.values(done).filter(Boolean).length
   const { t, d } = useSpaceText()
   return (

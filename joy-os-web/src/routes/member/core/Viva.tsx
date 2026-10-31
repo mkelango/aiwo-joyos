@@ -139,7 +139,7 @@ export default function Viva() {
     }
     setMsgs((m) => [...m, mine])
     setTyping(true)
-    const reply = route(routeText, memoryOn, core, band)
+    const reply = route(routeText, memoryOn, memory, core, band)
     if (reply.extra === 'route-adviser') reply.question = text
     const id = window.setTimeout(() => {
       timers.current = timers.current.filter((x) => x !== id)
@@ -268,7 +268,8 @@ export default function Viva() {
                     el.style.height = `${Math.min(el.scrollHeight, 128)}px`
                   }}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
+                    // Never send mid-composition: ta/hi IME keyboards use Enter to commit a word.
+                    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) {
                       e.preventDefault()
                       ;(e.currentTarget.form as HTMLFormElement).requestSubmit()
                     }
@@ -549,11 +550,13 @@ function AdviserNote({ question, onAdd }: { question?: string; onAdd: (m: Msg) =
 }
 
 // ─── Scripted router (no live model in this front end) ──────────────────────
-function route(text: string, memoryOn: Record<TermKey, boolean>, core: Core, band: Band): Msg {
+function route(text: string, memoryOn: Record<TermKey, boolean>, memory: Record<TermKey, MemoryItem[]>, core: Core, band: Band): Msg {
   const { t: c, lang, name, pick, when } = core
   const t = text.toLowerCase()
   const latest = INDEX_HISTORY[0]
   const viva = (tool: string, body: string, extra?: Msg['extra'], kind: Kind = 'reply'): Msg => ({ id: mid(), from: 'viva', kind, tool, text: body, extra })
+  // VIVA only quotes a memory while its space's switch is on AND the item is still kept.
+  const remembers = (k: TermKey, ...ids: string[]) => memoryOn[k] && (memory[k] ?? []).some((m) => ids.includes(m.id))
 
   if (/\b(phq|isi|pss|screen(ing)? result|depress(ion)? score|anxiety score)\b/.test(t))
     return {
@@ -608,12 +611,12 @@ function route(text: string, memoryOn: Record<TermKey, boolean>, core: Core, ban
   if (/\b(purpose|ikigai|tomorrow|meaning)\b/.test(t))
     return viva(
       'ikigai_coach',
-      memoryOn.P
+      remembers('P', 'mp1', 'mp2')
         ? c('rtIkigaiMem')
         : c('rtIkigai'),
     )
   if (/\b(kavya|partner|couple|wife|husband|state of us|marriage|relationship)\b/.test(t))
-    return viva('couples_prompt', c('rtCouples'))
+    return viva('couples_prompt', remembers('R', 'mr2') ? c('rtCouples') : c('rtCouplesPlain'))
   if (/\b(savour|enjoy|pleasure|evening)\b/.test(t))
     return viva('savour_prompt', c('rtSavour'))
   if (/\b(practice|book|lesson|chapter)\b/.test(t)) {

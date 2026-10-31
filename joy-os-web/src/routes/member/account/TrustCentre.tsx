@@ -11,7 +11,7 @@ import { METHODS } from '@/domain/indexEngine'
 import type { AccessEvent, Consent } from '@/domain/types'
 import { CLAIMS_LOG, DEFAULT_NOMINEE, EXPORTS_PAST, EXTRA_ACCESS, SPECIMEN_NOW } from './_data'
 import { Checkbox, Field, Section, Segmented, Select, Toggle } from './_parts'
-import { inputCls, rich, syncWhatsAppChannel, usePersisted, useToast } from './_util'
+import { inputCls, rich, syncWhatsAppChannel, useMemberProfile, usePersisted, useToast } from './_util'
 import { AbhaCard } from './_abha'
 import { useDict } from '@/lib/i18n'
 import { TRUST, useData } from './_i18n'
@@ -56,7 +56,7 @@ export default function TrustCentre() {
 
       <Section id="data" className="mt-16" eyebrow={t('dataEyebrow')} title={t('dataTitle')}>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <ExportCard onDone={showToast} />
+          <ExportCard consents={consents} onDone={showToast} />
           <DeleteCard />
           <NomineeCard onSaved={showToast} />
           <div className="grid gap-6">
@@ -229,16 +229,22 @@ function Consents({ state, setConsent, onChange }: { state: Record<string, { on:
 }
 
 type ExportStatus = 'idle' | 'requested' | 'preparing' | 'ready'
-function ExportCard({ onDone }: { onDone: (m: string) => void }) {
+function ExportCard({ consents, onDone }: { consents: Record<string, { on: boolean; pending?: boolean }>; onDone: (m: string) => void }) {
   const t = useDict(TRUST)
   const dx = useData()
-  const [format, setFormat] = useState<'json' | 'fhir'>('fhir')
-  const [status, setStatus] = useState<ExportStatus>('idle')
-  const [downloaded, setDownloaded] = useState(false)
+  const profile = useMemberProfile()
+  // A request in progress is kept per viewer, like the other Trust centre cards.
+  const [exp, setExp] = usePersisted<{ format: 'json' | 'fhir'; status: ExportStatus; downloaded: boolean }>('export', { format: 'fhir', status: 'idle', downloaded: false })
+  const { format, status, downloaded } = exp
+  const setFormat = (v: 'json' | 'fhir') => setExp((e) => ({ ...e, format: v }))
+  const setStatus = (v: ExportStatus) => setExp((e) => ({ ...e, status: v }))
+  const setDownloaded = (v: boolean) => setExp((e) => ({ ...e, downloaded: v }))
   const download = () => {
+    // The file says what the screen says: the member's own consent choices, not the seeded ones.
+    const granted = (c: (typeof CONSENTS)[number]) => consents[c.id]?.on ?? c.granted
     const body = format === 'fhir'
-      ? { resourceType: 'Bundle', type: 'collection', timestamp: `${SPECIMEN_NOW}T17:40:00+05:30`, meta: { tag: [{ code: 'specimen', display: 'Specimen · not a real member' }] }, entry: [{ resource: { resourceType: 'Patient', identifier: [{ system: 'https://aiwo.in/id', value: MEMBER.aiwoId }], name: [{ given: [MEMBER.firstName], family: MEMBER.lastName }] } }, ...INDEX_HISTORY.map((ix) => ({ resource: { resourceType: 'Observation', status: 'final', code: { text: 'Joyspan Index' }, effectiveDateTime: ix.takenOn, valueQuantity: { value: ix.value, unit: '/100' }, method: { text: `Method ${ix.method}` } } })), ...CONSENTS.map((c) => ({ resource: { resourceType: 'Consent', status: c.granted ? 'active' : 'inactive', scope: { text: c.scope }, category: [{ text: c.name }], dateTime: c.since ?? null, policyRule: { text: c.purpose } } }))] }
-      : { specimen: true, aiwoId: MEMBER.aiwoId, method: 'v1.0', exportedAt: SPECIMEN_NOW, index: INDEX_HISTORY, consents: CONSENTS }
+      ? { resourceType: 'Bundle', type: 'collection', timestamp: `${SPECIMEN_NOW}T17:40:00+05:30`, meta: { tag: [{ code: 'specimen', display: 'Specimen · not a real member' }] }, entry: [{ resource: { resourceType: 'Patient', identifier: [{ system: 'https://aiwo.in/id', value: MEMBER.aiwoId }], name: [{ given: [profile.firstName], family: profile.lastName }] } }, ...INDEX_HISTORY.map((ix) => ({ resource: { resourceType: 'Observation', status: 'final', code: { text: 'Joyspan Index' }, effectiveDateTime: ix.takenOn, valueQuantity: { value: ix.value, unit: '/100' }, method: { text: `Method ${ix.method}` } } })), ...CONSENTS.map((c) => ({ resource: { resourceType: 'Consent', status: granted(c) ? 'active' : 'inactive', scope: { text: c.scope }, category: [{ text: c.name }], dateTime: c.since ?? null, policyRule: { text: c.purpose } } }))] }
+      : { specimen: true, aiwoId: MEMBER.aiwoId, method: 'v1.0', exportedAt: SPECIMEN_NOW, index: INDEX_HISTORY, consents: CONSENTS.map((c) => ({ ...c, granted: granted(c) })) }
     try {
       const blob = new Blob([JSON.stringify(body, null, 2)], { type: format === 'fhir' ? 'application/fhir+json' : 'application/json' })
       const url = URL.createObjectURL(blob)
@@ -318,7 +324,10 @@ function DeleteCard() {
   const [step, setStep] = useState<DeleteStep>('closed')
   const [typed, setTyped] = useState('')
   const [understood, setUnderstood] = useState(false)
-  const [scheduled, setScheduled] = useState(false)
+  // Kept per viewer: an erasure scheduled after the passkey step stays scheduled until cancelled.
+  const [erasure, setErasure] = usePersisted('erasure', { scheduled: false })
+  const scheduled = erasure.scheduled
+  const setScheduled = (v: boolean) => setErasure({ scheduled: v })
   const [tried, setTried] = useState(false)
   const close = () => { setStep('closed'); setTyped(''); setUnderstood(false); setTried(false) }
   return (
@@ -332,7 +341,7 @@ function DeleteCard() {
       </ul>
       {scheduled ? (
         <div className="mt-6 rounded-card border border-line-strong p-4" role="status">
-          <p className="text-[16px] text-ink">{rich(t('erasureScheduled'), { when: <span className="num">29 Jan 2027, 17:40</span> })}</p>
+          <p className="text-[16px] text-ink">{rich(t('erasureScheduled'), { when: <><span className="num">{fmtDate('2027-01-29')}</span>, <span className="num">17:40</span></> })}</p>
           <p className="mt-1 text-[14px] text-ink-2">{t('changeMind')}</p>
           <Button size="sm" variant="secondary" className="mt-3" onClick={() => setScheduled(false)}>{t('cancelErasure')}</Button>
           <p className="mt-3 text-[13px] text-ink-3">{t('linkWorks')}</p>
@@ -456,7 +465,9 @@ function ResearchCard({ onChange }: { onChange: (m: string) => void }) {
 type InsurerState = 'not-granted' | 'granted' | 'declined'
 function Aggregates({ onChange }: { onChange: (m: string) => void }) {
   const t = useDict(TRUST)
-  const [insurer, setInsurer] = useState<InsurerState>('not-granted')
+  const [ins, setIns] = usePersisted<{ state: InsurerState }>('insurer', { state: 'not-granted' })
+  const insurer = ins.state
+  const setInsurer = (v: InsurerState) => setIns({ state: v })
   const [review, setReview] = useState(false)
   const decide = (v: InsurerState) => {
     setInsurer(v)

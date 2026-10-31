@@ -9,6 +9,7 @@ import type { Band, TermKey, TermScore } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { BAND_PETAL, BAND_PETAL_BURDEN, BAND_WORDS, CHECK_NEXT_STEP, CHECK_STATEMENTS, SCALE, SCALE_BURDEN, checkBand, checkStanding } from '@/screens/b/entryData'
 import { Field, ORDER, useCrisisGuard } from '@/screens/b/parts'
+import { sessionStore, useStore } from '@/screens/b/bStore'
 import { INSTRUMENT_NOTE, useDict, useLang, useTermText } from '@/lib/i18n'
 import { CHECK, NEXT_STEP_TEXT, BAND_WORDS_TEXT } from '@/screens/b/i18n/check'
 import { BAND, COMMON, useTx } from '@/screens/b/i18n/common'
@@ -37,24 +38,24 @@ export default function Check() {
   }
   useEffect(() => clearPending, [])
 
+  // Each move opens the next screen at the top, so the statement and its term chip are in view.
+  // `i` is this render's statement; the delayed advance after an answer captures the same one.
   const goNext = () => {
     clearPending()
-    setI((n) => {
-      if (n >= TOTAL - 1) {
-        setPhase('result')
-        top()
-        return n
-      }
-      return n + 1
-    })
+    if (i >= TOTAL - 1) setPhase('result')
+    else setI(i + 1)
+    top()
   }
   const goBack = () => {
     clearPending()
-    if (i === 0) {
-      setPhase('intro')
-      return
-    }
-    setI((n) => n - 1)
+    if (i === 0) setPhase('intro')
+    else setI(i - 1)
+    top()
+  }
+  const begin = () => {
+    setPhase('q')
+    setI(0)
+    top()
   }
   const answer = (v: number) => {
     const s = CHECK_STATEMENTS[i]
@@ -83,7 +84,7 @@ export default function Check() {
       </View>
 
       <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: space.gutter, paddingTop: space.s1, paddingBottom: insets.bottom + space.s5, gap: space.s3, width: '100%', maxWidth: 640, alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
-        {phase === 'intro' ? <Intro onBegin={() => { setPhase('q'); setI(0) }} /> : null}
+        {phase === 'intro' ? <Intro onBegin={begin} /> : null}
         {phase === 'q' ? <Question i={i} answers={answers} onAnswer={answer} onBack={goBack} onNext={goNext} /> : null}
         {phase === 'result' ? <Result answers={answers} onRestart={restart} /> : null}
       </ScrollView>
@@ -250,6 +251,8 @@ function Result({ answers, onRestart }: { answers: Record<string, number>; onRes
   const tt = useTermText()
   const tx = useTx()
   const lang = useLang()
+  const [session] = useStore(sessionStore)
+  const signedIn = sessionStore.hydrated() && session.signedIn
 
   const result = useMemo(() => {
     const rows = ORDER.map((k) => {
@@ -268,7 +271,12 @@ function Result({ answers, onRestart }: { answers: Record<string, number>; onRes
   }, [answers])
 
   const lowest = termByKey(result.lowest)
-  const lowName = lang === 'en' ? lowest.name.toLowerCase() : tt.name(result.lowest)
+  // Ease is scored as a burden, so its term name (preventable suffering) would read as the
+  // opposite of the result ("lowest … suffering"). Name the Space instead: "ease".
+  const lowName =
+    result.lowest === 'B'
+      ? lang === 'en' ? tt.space('B').toLowerCase() : tt.space('B')
+      : lang === 'en' ? lowest.name.toLowerCase() : tt.name(result.lowest)
   const next = CHECK_NEXT_STEP[result.lowest]
   const nextT = NEXT_STEP_TEXT[result.lowest]
   const bandWord = (b: Band) => (b === 'not-yet-measured' ? b : tx(BAND[b], b))
@@ -391,22 +399,28 @@ function Result({ answers, onRestart }: { answers: Record<string, number>; onRes
           </View>
           <Title size={22}>{t('door2Title')}</Title>
           <Body tone="ink2">{t('door2Body')}</Body>
-          <DaybreakButton icon="arrow-right" onPress={() => router.push('/signin?next=onboarding')} accessibilityHint={t('getNumberHint')}>
+          <DaybreakButton icon="arrow-right" onPress={() => router.push(signedIn ? '/index-take' : '/signin?next=onboarding')} accessibilityHint={signedIn ? undefined : t('getNumberHint')}>
             {t('getNumber')}
           </DaybreakButton>
-          <Meta size={14} align="center">
-            {t('freeWithId')}
-          </Meta>
+          {/* The sign-in and consents route only applies to someone not yet in. */}
+          {signedIn ? null : (
+            <Meta size={14} align="center">
+              {t('freeWithId')}
+            </Meta>
+          )}
         </Card>
 
 
-        <Card tone="sunk" style={{ gap: space.s1 }}>
-          <Eyebrow>{t('door3')}</Eyebrow>
-          <Body>{t('door3Body')}</Body>
-          <Button variant="link" onPress={() => router.push('/onboarding')}>
-            {t('setUp')}
-          </Button>
-        </Card>
+        {/* Door 3 sets up the app; someone already onboarded has nothing to set up. */}
+        {signedIn && session.onboarded ? null : (
+          <Card tone="sunk" style={{ gap: space.s1 }}>
+            <Eyebrow>{t('door3')}</Eyebrow>
+            <Body>{t('door3Body')}</Body>
+            <Button variant="link" onPress={() => router.push('/onboarding')}>
+              {t('setUp')}
+            </Button>
+          </Card>
+        )}
       </View>
 
       <Button variant="ghost" icon="rotate-ccw" onPress={onRestart} style={{ alignSelf: 'center' }}>

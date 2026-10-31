@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import { Activity, Building2, FlaskConical, Gauge, HeartPulse, Hotel, LayoutGrid, Stethoscope, Users } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { JoyOsLockup } from '@/components/joy/Brand'
+import { EnglishOnly } from '@/lib/i18n'
 import { useApp } from '@/lib/store'
 import { DEMO_ROLES } from './DemoBar'
 import { ThemeToggle } from './shared'
@@ -24,11 +25,14 @@ function roleFor(to: string) {
 }
 
 export default function ConsoleLayout() {
-  const { setRole } = useApp()
-  // Following a console link keeps the Demo switcher in step with the console on screen.
-  const enter = (to: string) => () => { const r = roleFor(to); if (r) setRole(r) }
+  const { role, setRole } = useApp()
+  // A visitor who has not chosen a console role yet takes the role of the first console they
+  // open, so the Demo switcher stays in step. Once a role is chosen, a nav link never changes it:
+  // other consoles open as a read-only preview, and "Sign in as …" or the Demo switcher is the
+  // only way to change role (otherwise the role gate could be crossed with one click).
+  const enter = (to: string) => () => { const r = roleFor(to); if (r && role === 'member') setRole(r) }
   return (
-    <div className="min-h-screen bg-paper">
+    <div lang="en" className="min-h-screen bg-paper">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col border-r border-line bg-paper-sunk/40 xl:flex">
         <div className="flex h-16 items-center px-5"><JoyOsLockup to="/console" sub="Consoles" /></div>
         <nav aria-label="Consoles" className="flex-1 px-3 py-2">
@@ -51,10 +55,11 @@ export default function ConsoleLayout() {
           </div>
           <div className="flex min-w-0 items-center gap-1 sm:gap-2">
             <select aria-label="Region cell" className="h-9 w-[128px] min-w-0 truncate rounded-full border border-line bg-paper-raised px-3 text-[13px] text-ink focus-ring sm:w-auto">
+              {/* J4 regions are not live in this specimen: shown, not selectable. */}
               <option>India · Mumbai</option>
-              <option>GCC · Dubai (J4)</option>
-              <option>UK · London (J4)</option>
-              <option>Singapore (J4)</option>
+              <option disabled>GCC · Dubai (J4)</option>
+              <option disabled>UK · London (J4)</option>
+              <option disabled>Singapore (J4)</option>
             </select>
             <ThemeToggle />
           </div>
@@ -65,7 +70,7 @@ export default function ConsoleLayout() {
           ))}
         </nav>
         <main id="main" className="mx-auto w-full max-w-[1400px] px-5 pb-24 pt-8 md:px-8">
-          <Outlet />
+          <EnglishOnly><Outlet /></EnglishOnly>
         </main>
       </div>
     </div>

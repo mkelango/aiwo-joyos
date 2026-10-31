@@ -9,7 +9,7 @@ import { CIRCLE, PRACTICE_WEEKS } from '@/data/platform'
 import { INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
 import { PRACTICE_CONTENT } from './_data'
 import { AudioPlayer, PrimaryChip, Quote, fade } from './_parts'
-import { addDays, practisedToday, saveReflection, setWeekPractised, togglePractisedToday, useJourney, weekPractised } from './_store'
+import { addDays, isoDate, practisedToday, saveReflection, setWeekPractised, togglePractisedToday, useJourney, weekPractised } from './_store'
 import { useJ, type JourneyKey } from './_i18n'
 
 // PRACTICE WEEK (Memo p.21): one week of the Joyspiration Practice in full —
@@ -49,7 +49,10 @@ function WeekView({ n }: { n: string }) {
   const prev = PRACTICE_WEEKS.find((w) => w.week === num - 1)
   const next = PRACTICE_WEEKS.find((w) => w.week === num + 1)
   // Week n runs Monday to Sunday; the circle talks it over the Monday after.
-  const opens = new Date(2027, 0, 4 + (num - 1) * 7, 12)
+  // Built as a local YYYY-MM-DD (never toISOString(), which is the UTC date), and
+  // read back at local noon so the day shown is the same in every time zone.
+  const opens = isoDate(new Date(2027, 0, 4 + (num - 1) * 7, 12))
+  const day = (iso: string) => fmtDate(`${iso}T12:00:00`)
   const practised = status === 'now' ? practisedToday(journey) : status === 'done' ? weekPractised(journey, num) : false
   const setPractised = (v: boolean) => (status === 'now' ? togglePractisedToday(v) : setWeekPractised(num, v))
   const before = INDEX_HISTORY[0]
@@ -76,13 +79,13 @@ function WeekView({ n }: { n: string }) {
             <PrimaryChip primary={week.term} size="md" />
             {status === 'done' && (practised ? <Pill tone="ink"><Check size={12} /> {t('practised')}</Pill> : <Pill>{t('earlierWeek')}</Pill>)}
             {status === 'now' && <Pill tone="daybreak">{t('thisWeekPill')}</Pill>}
-            {status === 'next' && <Pill>{t('opensOn', { d: fmtDate(opens.toISOString()) })}</Pill>}
+            {status === 'next' && <Pill>{t('opensOn', { d: day(opens) })}</Pill>}
           </div>
         }
       />
 
       {status === 'next' && (
-        <p className="mb-6 flex items-start gap-2 rounded-card bg-paper-sunk px-4 py-3 text-[15px] text-ink-2"><Lock size={16} className="mt-0.5 shrink-0" /> {t('readAhead', { d: fmtDate(opens.toISOString()), d2: fmtDate(addDays(opens.toISOString(), 7)) })}</p>
+        <p className="mb-6 flex items-start gap-2 rounded-card bg-paper-sunk px-4 py-3 text-[15px] text-ink-2"><Lock size={16} className="mt-0.5 shrink-0" /> {t('readAhead', { d: day(opens), d2: day(addDays(opens, 7)) })}</p>
       )}
 
       <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
@@ -139,7 +142,7 @@ function WeekView({ n }: { n: string }) {
             <AnimatePresence mode="wait">
               {status === 'next' ? (
                 <motion.div key="locked" {...fade} className="mt-6">
-                  <Button variant="secondary" disabled className="w-full"><Lock size={15} /> {t('opensOn', { d: fmtDate(opens.toISOString()) })}</Button>
+                  <Button variant="secondary" disabled className="w-full"><Lock size={15} /> {t('opensOn', { d: day(opens) })}</Button>
                   <p className="mt-2 text-center text-[13px] text-ink-3">{t('readAheadFreely')}</p>
                 </motion.div>
               ) : !practised ? (
@@ -179,12 +182,12 @@ function WeekView({ n }: { n: string }) {
                   </div>
                 ))}
               </div>
-              <p className="mt-3 text-[13px] text-ink-2">{r('afterFills8', { n: 76, d: fmtDate(remeasureOpens) })}</p>
+              <p className="mt-3 text-[13px] text-ink-2">{r('afterFills8', { n: 76, d: day(remeasureOpens) })}</p>
               <MethodLine className="mt-2" method={before.method} grade={before.grade} takenOn={before.takenOn} next={before.nextMeasure} />
               <div className="mt-5 flex flex-col gap-2">
                 {/* One Daybreak: only once today's practice is marked does Re-take become the primary action. */}
                 {status === 'next'
-                  ? <Button variant="secondary" disabled className="w-full"><Lock size={15} /> {t('retakeOpens', { d: fmtDate(opens.toISOString()) })}</Button>
+                  ? <Button variant="secondary" disabled className="w-full"><Lock size={15} /> {t('retakeOpens', { d: day(opens) })}</Button>
                   : status === 'now' && practised
                   ? <Link to="/app/index/take" className="btn-daybreak w-full"><RotateCcw size={16} /> {t('retake')}</Link>
                   : <Link to="/app/index/take" className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-line-strong bg-paper-raised px-4 text-[15px] text-ink hover:bg-paper-sunk focus-ring"><RotateCcw size={16} /> {t('retake')}</Link>}

@@ -38,17 +38,18 @@ export const PAST_CONSULTS = [
 ]
 
 export interface Marker { name: string; value: string; unit: string; range: string; flag: 'in' | 'watch' }
+// Same draw and values as the Body space vault (BIOMARKERS / PANEL_META, 21 Jan 2027).
 export const RESULTS: { id: string; name: string; lab: string; drawn: string; status: 'signed' | 'awaiting'; signedBy?: string; signedOn?: string; note?: string; markers: Marker[] }[] = [
   {
     id: 'r1', name: 'AIWO Metabolic panel', lab: 'AIWO lab partner · home draw, Chennai', drawn: '2027-01-21', status: 'signed', signedBy: 'Dr Meera Iyer', signedOn: '2027-01-24',
     note: 'Steady overall. Vitamin D is low; I have written a short course and we will re-check at Day 90. LDL-C is a little above where I would like it — we will talk on Thursday. — Meera',
     markers: [
-      { name: 'HbA1c', value: '5.6', unit: '%', range: '< 5.7', flag: 'in' },
-      { name: 'Fasting glucose', value: '94', unit: 'mg/dL', range: '70 – 99', flag: 'in' },
+      { name: 'HbA1c', value: '5.8', unit: '%', range: '< 5.7', flag: 'watch' },
+      { name: 'Fasting glucose', value: '98', unit: 'mg/dL', range: '70 – 99', flag: 'in' },
       { name: 'LDL-C', value: '118', unit: 'mg/dL', range: '< 100', flag: 'watch' },
       { name: 'ApoB', value: '92', unit: 'mg/dL', range: '< 90', flag: 'watch' },
-      { name: 'hs-CRP', value: '1.1', unit: 'mg/L', range: '< 2.0', flag: 'in' },
-      { name: 'Vitamin D (25-OH)', value: '19', unit: 'ng/mL', range: '30 – 100', flag: 'watch' },
+      { name: 'hs-CRP', value: '1.4', unit: 'mg/L', range: '< 2.0', flag: 'in' },
+      { name: 'Vitamin D (25-OH)', value: '24', unit: 'ng/mL', range: '30 – 100', flag: 'watch' },
       { name: 'TSH', value: '2.1', unit: 'mIU/L', range: '0.4 – 4.0', flag: 'in' },
     ],
   },
@@ -193,7 +194,7 @@ export const ENTITLEMENTS = [
   { name: 'The Joyspiration Practice', from: 'Plus', use: 'Week 4 of 8' },
   { name: 'Circle of eight', from: 'Plus', use: 'Mondays 19:00 with Priya' },
   { name: 'Named coach and concierge', from: 'Circle', use: 'Priya Natarajan · Ravi Shankar' },
-  { name: 'Quarterly Index', from: 'Circle', use: 'Next: 2 Apr 2027' },
+  { name: 'Quarterly Index', from: 'Circle', use: 'Next: 5 Apr 2027' },
   { name: 'Joyspan Sessions', from: 'Circle', use: 'Two seats held · 20 Feb, Chennai' },
   { name: 'The ninety days, continued', from: 'Circle', use: 'Day 23 of 90' },
 ]
@@ -254,13 +255,13 @@ export interface Notif { id: string; kind: NotifKind; day: 'today' | 'week' | 'u
 /** Specimen notifications for Thu 28 Jan 2027 (Day 23) and earlier that week. */
 export const NOTIFICATIONS: Notif[] = [
   { id: 'n1', kind: 'ledger', day: 'today', at: '12:40', ago: '1 h ago', title: 'Anything good in the last few hours?', body: 'Ten seconds for your Joy Ledger. Skipping is never counted.', to: '/app/ledger', read: false },
-  { id: 'n2', kind: 'people', day: 'today', at: '10:05', ago: '3 h ago', title: 'Priya Natarajan wrote', body: 'Shall we use Monday’s circle to talk about protecting one evening a week?', to: '/app/care/messages?p=p_priya', personId: 'p_priya', read: false },
   { id: 'n3', kind: 'action', day: 'today', at: '07:45', ago: '6 h ago', title: 'Today’s one action is ready', body: `${TODAY_ACTION.title} ${TODAY_ACTION.detail}`, to: '/app', read: true },
+  { id: 'n2', kind: 'people', day: 'week', at: 'Wed 27 Jan · 18:02', ago: '1 day ago', title: 'Priya Natarajan wrote', body: 'Shall we use Monday’s circle to talk about protecting one evening a week?', to: '/app/care/messages?p=p_priya', personId: 'p_priya', read: false },
   { id: 'n4', kind: 'people', day: 'week', at: 'Mon 25 Jan · 09:10', ago: '3 days ago', title: 'Dr Meera Iyer wrote', body: 'Nothing urgent. Start the Vitamin D sachet this Sunday, after lunch.', to: '/app/care/messages?p=p_meera', personId: 'p_meera', read: false },
   { id: 'n5', kind: 'circle', day: 'week', at: 'Mon 25 Jan · 18:00', ago: '3 days ago', title: 'Your circle meets in an hour', body: 'Monday 19:00 with Priya — thirty minutes, the same eight people.', to: '/app/circles', read: true },
   { id: 'n6', kind: 'loop', day: 'week', at: 'Wed 20 Jan · 08:00', ago: '8 days ago', title: 'Day 15 review with Priya', body: 'Fifteen days in. A short look at what is working, with a person.', to: '/app/index', read: true },
   { id: 'n7', kind: 'loop', day: 'upcoming', at: 'Fri 19 Feb · 18:00', ago: 'in 22 days', title: 'Day 45 review with Priya', body: 'By video, thirty minutes. You will hear about it the day before — never at night.', to: '/app/index', read: true },
-  { id: 'n8', kind: 'loop', day: 'upcoming', at: 'Mon 22 Mar · 08:00', ago: 'in 53 days', title: 'Day 76 · your re-measure window opens', body: 'Two weeks to take the Index again, ahead of Day 90 on 2 Apr.', to: '/app/index/day-90', read: true },
+  { id: 'n8', kind: 'loop', day: 'upcoming', at: 'Mon 22 Mar · 08:00', ago: 'in 53 days', title: 'Day 76 · your re-measure window opens', body: 'Fourteen days to take the Index again, ahead of Day 90 on 5 Apr.', to: '/app/index/day-90', read: true },
 ]
 
 // ─── Profile ──────────────────────────────────────────────────────────────

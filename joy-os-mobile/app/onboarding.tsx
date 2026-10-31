@@ -12,6 +12,7 @@ import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { DEVICES, INTENTS, type DeviceId } from '@/screens/b/entryData'
 import { notifPrefsStore, onboardingStore, sessionStore, useStore, validatePrefs, type NotifPrefs, type OnboardingDraft } from '@/screens/b/bStore'
+import { SPECIMEN_AIWO_ID } from '@/screens/b/_data'
 import { CheckLine, ChoiceCard, Done, KeyValue, StepHead, StepProgress, TimeStepper, TimelineStep } from '@/screens/b/parts'
 
 // ONBOARDING (Plan §4B; intent first, device last): intent tiles → language → three
@@ -50,6 +51,11 @@ export default function Onboarding() {
   const [tomorrowOpen, setTomorrowOpen] = useState(false)
   const [resumed, setResumed] = useState<string | null>(null)
   const resumeChecked = useRef(false)
+  // The "Save & exit" leave runs after a short confirmation; one at a time, cancelled by Back.
+  const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => {
+    if (exitTimer.current) clearTimeout(exitTimer.current)
+  }, [])
   const t = useDict(ONB)
   const tc = useCommon()
   const tx = useTx()
@@ -120,7 +126,14 @@ export default function Onboarding() {
     setError(null)
     go(Math.min(STEPS.length - 1, step + 1))
   }
+  const cancelExit = () => {
+    if (!exitTimer.current) return
+    clearTimeout(exitTimer.current)
+    exitTimer.current = null
+    setToast(null)
+  }
   const back = () => {
+    cancelExit()
     setError(null)
     if (step === 0) return exit()
     go(step - 1)
@@ -128,12 +141,18 @@ export default function Onboarding() {
   const exit = () => (router.canGoBack() ? router.back() : router.replace('/'))
   const saveAndExit = () => {
     setDraft((d) => ({ ...d, started: true }))
+    if (exitTimer.current) return
     setToast(t('savedExit', { step: stepLabel(STEPS[step]) }))
-    setTimeout(exit, 1200)
+    exitTimer.current = setTimeout(() => {
+      exitTimer.current = null
+      exit()
+    }, 1200)
   }
   const complete = () => {
     setDraft((d) => ({ ...d, completedAt: new Date().toISOString(), step: 0 }))
-    // Finishing onboarding created and secured the AIWO ID (Account step), so the member is signed in.
+    // SPECIMEN: mobile onboarding has no Account step yet (the web build collects name, contact
+    // and verification). Finishing here signs the member in as the specimen AIWO ID shown on the
+    // Begin step, so Sign in later has an ID to use. A real Account step is a parity follow-up.
     setSession((s) => ({ ...s, signedIn: true, onboarded: true, at: s.at ?? new Date().toISOString() }))
   }
   const toggleIntent = (k: TermKey) => {
@@ -434,6 +453,9 @@ export default function Onboarding() {
                     </View>
                   ))}
                 </View>
+              </KeyValue>
+              <KeyValue k="AIWO ID">
+                <Mono tone="ink" size={17}>{SPECIMEN_AIWO_ID}</Mono>
               </KeyValue>
               <KeyValue k={tc('language')}>{LANGS.find((l) => l.value === lang)!.native}</KeyValue>
               <KeyValue k={t('kConsents')}>{`${t('consSum')}${consents.publishing ? t('consPub') : t('consNoPub')}`}</KeyValue>

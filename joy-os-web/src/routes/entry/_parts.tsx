@@ -106,3 +106,23 @@ export function LSpecimenTag({ className }: { className?: string }) {
   const t = useDict(E)
   return <span className={clsx('eyebrow rounded-full border border-dashed border-line px-2 py-0.5 text-ink-3', className)}>{t('specimenTag')}</span>
 }
+
+/**
+ * One-time-code boxes: what a change to box `i` does to the six digits. Typing over a
+ * digit keeps the new one; autofill or several digits at once spread across this box
+ * and the ones after it. `focus` is the box to move to next (null: stay).
+ */
+export function enterCodeDigits(cur: string[], i: number, raw: string): { code: string[]; focus: number | null } {
+  let d = raw.replace(/\D/g, '')
+  const old = cur[i]
+  // Typed into a box that already held a digit (caret before or after it): keep the new one.
+  if (d.length === 2 && old && d.includes(old)) d = d.replace(old, '')
+  if (d.length <= 1) {
+    const code = cur.map((x, n) => (n === i ? d : x))
+    return { code, focus: d && i < cur.length - 1 ? i + 1 : null }
+  }
+  const code = [...cur]
+  for (let k = 0; k < d.length && i + k < cur.length; k++) code[i + k] = d[k]
+  const empty = code.findIndex((x) => !x)
+  return { code, focus: empty === -1 ? Math.min(cur.length - 1, i + d.length - 1) : empty }
+}

@@ -38,17 +38,18 @@ export const PAST_CONSULTS = [
 ]
 
 export interface Marker { name: string; value: string; unit: string; range: string; flag: 'in' | 'watch' }
+// Same draw and values as the Body space vault (BIOMARKERS / PANEL_META, 21 Jan 2027).
 export const RESULTS: { id: string; name: string; lab: string; drawn: string; status: 'signed' | 'awaiting'; signedBy?: string; signedOn?: string; note?: string; markers: Marker[] }[] = [
   {
     id: 'r1', name: 'AIWO Metabolic panel', lab: 'AIWO lab partner · home draw, Chennai', drawn: '2027-01-21', status: 'signed', signedBy: 'Dr Meera Iyer', signedOn: '2027-01-24',
     note: 'Steady overall. Vitamin D is low; I have written a short course and we will re-check at Day 90. LDL-C is a little above where I would like it — we will talk on Thursday. — Meera',
     markers: [
-      { name: 'HbA1c', value: '5.6', unit: '%', range: '< 5.7', flag: 'in' },
-      { name: 'Fasting glucose', value: '94', unit: 'mg/dL', range: '70 – 99', flag: 'in' },
+      { name: 'HbA1c', value: '5.8', unit: '%', range: '< 5.7', flag: 'watch' },
+      { name: 'Fasting glucose', value: '98', unit: 'mg/dL', range: '70 – 99', flag: 'in' },
       { name: 'LDL-C', value: '118', unit: 'mg/dL', range: '< 100', flag: 'watch' },
       { name: 'ApoB', value: '92', unit: 'mg/dL', range: '< 90', flag: 'watch' },
-      { name: 'hs-CRP', value: '1.1', unit: 'mg/L', range: '< 2.0', flag: 'in' },
-      { name: 'Vitamin D (25-OH)', value: '19', unit: 'ng/mL', range: '30 – 100', flag: 'watch' },
+      { name: 'hs-CRP', value: '1.4', unit: 'mg/L', range: '< 2.0', flag: 'in' },
+      { name: 'Vitamin D (25-OH)', value: '24', unit: 'ng/mL', range: '30 – 100', flag: 'watch' },
       { name: 'TSH', value: '2.1', unit: 'mIU/L', range: '0.4 – 4.0', flag: 'in' },
     ],
   },
@@ -187,7 +188,7 @@ export const ENTITLEMENTS = [
   { name: 'The Joyspiration Practice', from: 'Plus', use: 'Week 4 of 8' },
   { name: 'Circle of eight', from: 'Plus', use: 'Mondays 19:00 with Priya' },
   { name: 'Named coach and concierge', from: 'Circle', use: 'Priya Natarajan · Ravi Shankar' },
-  { name: 'Quarterly Index', from: 'Circle', use: 'Next: 2 Apr 2027' },
+  { name: 'Quarterly Index', from: 'Circle', use: 'Next: 5 Apr 2027' },
   { name: 'Joyspan Sessions', from: 'Circle', use: 'Two seats held · 20 Feb, Chennai' },
   { name: 'The ninety days, continued', from: 'Circle', use: 'Day 23 of 90' },
 ]

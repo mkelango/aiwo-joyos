@@ -119,15 +119,19 @@ export default function Creds() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // a control on the slide (e.g. a Wheel petal) already handled this key
+      if (e.defaultPrevented) return
       if (e.metaKey || e.ctrlKey || e.altKey) return
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
       const k = e.key
+      // Space / Enter activate whatever control has focus; only arrows and paging keys page the deck from there
+      const onControl = !!t?.closest?.('button, a, [role="button"], select, [data-no-advance]')
       if (overview) {
         if (k === 'Escape' || k === 'g' || k === 'G') { e.preventDefault(); setOverview(false) }
         return
       }
-      if (k === 'ArrowRight' || k === 'PageDown' || (k === ' ' && t?.tagName !== 'BUTTON')) { e.preventDefault(); next() }
+      if (k === 'ArrowRight' || k === 'PageDown' || (k === ' ' && !onControl)) { e.preventDefault(); next() }
       else if (k === 'ArrowLeft' || k === 'PageUp') { e.preventDefault(); prev() }
       else if (k === 'Home') { e.preventDefault(); go(0) }
       else if (k === 'End') { e.preventDefault(); go(N - 1) }

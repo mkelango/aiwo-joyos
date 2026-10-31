@@ -36,7 +36,9 @@ export function Screen({ children, scroll = true, inTabs = false, top, contentSt
     <View style={{ flex: 1, backgroundColor: c.paper, paddingTop: insets.top }}>
       {top}
       {scroll ? (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={[pad, contentStyle]} keyboardShouldPersistTaps="handled">
+        // automaticallyAdjustKeyboardInsets (iOS) scrolls a focused Field above the keyboard;
+        // Android resizes the window itself.
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={[pad, contentStyle]} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
           {children}
         </ScrollView>
       ) : (

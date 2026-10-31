@@ -59,7 +59,7 @@ export function Delta({ value, className, inverse = false }: { value: number | n
   const t = useDict(SHARED)
   if (value === null || value === undefined) return <span className={clsx('font-mono text-ink-3', className)}>—</span>
   const Icon = value > 0 ? ArrowUp : value < 0 ? ArrowDown : Minus
-  const key = inverse ? (value < 0 ? 'deltaEased' : 'deltaRose') : value > 0 ? 'deltaUp' : value < 0 ? 'deltaDown' : 'deltaSame'
+  const key = inverse ? (value < 0 ? 'deltaEased' : value > 0 ? 'deltaRose' : 'deltaSame') : value > 0 ? 'deltaUp' : value < 0 ? 'deltaDown' : 'deltaSame'
   return (
     <span className={clsx('inline-flex items-center gap-0.5 font-mono tabular-nums text-ink-2', className)} aria-label={t(key, { n: Math.abs(value) })}>
       <Icon size={13} strokeWidth={1.75} aria-hidden />
@@ -102,9 +102,19 @@ export function SpecimenTag({ className }: { className?: string }) {
 // Month names follow the member's language; digits stay Latin (numbers are Mono, Latin).
 const DATE_LOCALE: Record<Lang, string> = { en: 'en-GB', ta: 'ta-IN', hi: 'hi-IN' }
 
+/** A date-only ISO string ('2027-01-02') is a calendar day, not UTC midnight: `new Date()` would
+ *  parse it as UTC and show the day before anywhere west of Greenwich. Parse it as a local date. */
+export function parseIsoDate(iso: string) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+    const [y, m, d] = iso.split('-').map(Number)
+    return new Date(y, m - 1, d)
+  }
+  return new Date(iso)
+}
+
 /** Pass the member's lang (useLang()) to localise the month; English by default. */
 export function fmtDate(iso: string, lang: Lang = activeLang()) {
-  const d = new Date(iso)
+  const d = parseIsoDate(iso)
   if (Number.isNaN(d.getTime())) return iso
   return d.toLocaleDateString(DATE_LOCALE[lang], { day: '2-digit', month: 'short', year: 'numeric', numberingSystem: 'latn' })
 }

@@ -235,14 +235,14 @@ export const CORE = {
   },
   hsEyebrow: { en: 'History · {n} measures · methods v0.9 → v1.0', ta: 'வரலாறு · {n} அளவீடுகள் · முறைகள் v0.9 → v1.0', hi: 'इतिहास · {n} माप · पद्धतियाँ v0.9 → v1.0' },
   hsRisen: {
-    en: 'Your Index has risen from {a} to {b} over {n} measures, with {low}. The July baseline was scored with the pilot method; each change of method is marked on the line, and scores are never silently recomputed.',
-    ta: 'உங்கள் குறியீடு {n} அளவீடுகளில் {a} இலிருந்து {b} ஆக உயர்ந்துள்ளது; {low}. ஜூலை அடிப்படை அளவீடு சோதனை முறையில் மதிப்பிடப்பட்டது; ஒவ்வொரு முறை மாற்றமும் கோட்டில் குறிக்கப்பட்டுள்ளது, மதிப்பெண்கள் ஒருபோதும் சொல்லாமல் மீண்டும் கணக்கிடப்படுவதில்லை.',
-    hi: 'आपका इंडेक्स {n} मापों में {a} से बढ़कर {b} हुआ है, {low}। जुलाई का आधार माप पायलट पद्धति से आँका गया था; पद्धति का हर बदलाव रेखा पर दिखाया गया है, और स्कोर कभी चुपचाप दोबारा नहीं गिने जाते।',
+    en: 'Your Index has risen from {a} to {b} over {n} measures, with {low}. The July baseline and the October measure were scored with the pilot method; each change of method is marked on the line, and scores are never silently recomputed.',
+    ta: 'உங்கள் குறியீடு {n} அளவீடுகளில் {a} இலிருந்து {b} ஆக உயர்ந்துள்ளது; {low}. ஜூலை அடிப்படை அளவீடும் அக்டோபர் அளவீடும் சோதனை முறையில் மதிப்பிடப்பட்டன; ஒவ்வொரு முறை மாற்றமும் கோட்டில் குறிக்கப்பட்டுள்ளது, மதிப்பெண்கள் ஒருபோதும் சொல்லாமல் மீண்டும் கணக்கிடப்படுவதில்லை.',
+    hi: 'आपका इंडेक्स {n} मापों में {a} से बढ़कर {b} हुआ है, {low}। जुलाई का आधार माप और अक्टूबर का माप पायलट पद्धति से आँके गए थे; पद्धति का हर बदलाव रेखा पर दिखाया गया है, और स्कोर कभी चुपचाप दोबारा नहीं गिने जाते।',
   },
   hsMoved: {
-    en: 'Your Index has moved from {a} to {b} over {n} measures, with {low}. The July baseline was scored with the pilot method; each change of method is marked on the line, and scores are never silently recomputed.',
-    ta: 'உங்கள் குறியீடு {n} அளவீடுகளில் {a} இலிருந்து {b} ஆக மாறியுள்ளது; {low}. ஜூலை அடிப்படை அளவீடு சோதனை முறையில் மதிப்பிடப்பட்டது; ஒவ்வொரு முறை மாற்றமும் கோட்டில் குறிக்கப்பட்டுள்ளது, மதிப்பெண்கள் ஒருபோதும் சொல்லாமல் மீண்டும் கணக்கிடப்படுவதில்லை.',
-    hi: 'आपका इंडेक्स {n} मापों में {a} से {b} पर आया है, {low}। जुलाई का आधार माप पायलट पद्धति से आँका गया था; पद्धति का हर बदलाव रेखा पर दिखाया गया है, और स्कोर कभी चुपचाप दोबारा नहीं गिने जाते।',
+    en: 'Your Index has moved from {a} to {b} over {n} measures, with {low}. The July baseline and the October measure were scored with the pilot method; each change of method is marked on the line, and scores are never silently recomputed.',
+    ta: 'உங்கள் குறியீடு {n} அளவீடுகளில் {a} இலிருந்து {b} ஆக மாறியுள்ளது; {low}. ஜூலை அடிப்படை அளவீடும் அக்டோபர் அளவீடும் சோதனை முறையில் மதிப்பிடப்பட்டன; ஒவ்வொரு முறை மாற்றமும் கோட்டில் குறிக்கப்பட்டுள்ளது, மதிப்பெண்கள் ஒருபோதும் சொல்லாமல் மீண்டும் கணக்கிடப்படுவதில்லை.',
+    hi: 'आपका इंडेक्स {n} मापों में {a} से {b} पर आया है, {low}। जुलाई का आधार माप और अक्टूबर का माप पायलट पद्धति से आँके गए थे; पद्धति का हर बदलाव रेखा पर दिखाया गया है, और स्कोर कभी चुपचाप दोबारा नहीं गिने जाते।',
   },
   hsLowEach: { en: '{term} lowest each time', ta: 'ஒவ்வொரு முறையும் {term} மிகக் குறைவு', hi: 'हर बार {term} सबसे कम रहा' },
   hsLowNow: { en: '{term} lowest now', ta: 'இப்போது {term} மிகக் குறைவு', hi: 'अभी {term} सबसे कम है' },
@@ -811,6 +811,11 @@ export const CORE = {
     en: 'This week’s State of Us: each of you names one moment in the last seven days when you felt on the same side. Share them at Friday dinner, phones in the basket. Kavya’s answers in the Couples Check stay hers; I will never tell you what she said.',
     ta: 'இந்த வாரத்தின் State of Us: கடந்த ஏழு நாட்களில் நீங்கள் இருவரும் ஒரே பக்கம் இருப்பதாக உணர்ந்த ஒரு தருணத்தை ஒவ்வொருவரும் சொல்லுங்கள். வெள்ளிக்கிழமை இரவு உணவின்போது, ஃபோன்களைக் கூடையில் வைத்துவிட்டு, பகிர்ந்துகொள்ளுங்கள். Couples Check இல் Kavya-வின் பதில்கள் அவருடையவை மட்டுமே; அவர் என்ன சொன்னார் என்று நான் உங்களிடம் ஒருபோதும் சொல்ல மாட்டேன்.',
     hi: 'इस हफ़्ते का State of Us: पिछले सात दिनों का एक ऐसा पल आप दोनों बताएँ, जब आपको लगा कि आप एक ही तरफ़ हैं। शुक्रवार के डिनर पर, फ़ोन टोकरी में रखकर, इन्हें साझा करें। Couples Check में Kavya के जवाब सिर्फ़ उनके हैं; उन्होंने क्या कहा, यह आपको कभी नहीं बताया जाएगा।',
+  },
+  rtCouplesPlain: {
+    en: 'This week’s State of Us: each of you names one moment in the last seven days when you felt on the same side. Share them when you next sit down together, without screens. Kavya’s answers in the Couples Check stay hers; I will never tell you what she said.',
+    ta: 'இந்த வாரத்தின் State of Us: கடந்த ஏழு நாட்களில் நீங்கள் இருவரும் ஒரே பக்கம் இருப்பதாக உணர்ந்த ஒரு தருணத்தை ஒவ்வொருவரும் சொல்லுங்கள். அடுத்த முறை நீங்கள் இருவரும் சேர்ந்து அமரும்போது, திரைகள் இல்லாமல், பகிர்ந்துகொள்ளுங்கள். Couples Check இல் Kavya-வின் பதில்கள் அவருடையவை மட்டுமே; அவர் என்ன சொன்னார் என்று நான் உங்களிடம் ஒருபோதும் சொல்ல மாட்டேன்.',
+    hi: 'इस हफ़्ते का State of Us: पिछले सात दिनों का एक ऐसा पल आप दोनों बताएँ, जब आपको लगा कि आप एक ही तरफ़ हैं। अगली बार जब आप साथ बैठें, बिना स्क्रीन के, तब इन्हें साझा करें। Couples Check में Kavya के जवाब सिर्फ़ उनके हैं; उन्होंने क्या कहा, यह आपको कभी नहीं बताया जाएगा।',
   },
   rtSavour: {
     en: 'When the tea is poured, wait before the first sip. Name three things: one you can see, one you can hear, and one you are glad of right now. Stay ten seconds longer than feels natural, then tell Kavya one of them.',

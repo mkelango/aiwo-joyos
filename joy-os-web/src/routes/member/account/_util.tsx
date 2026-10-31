@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { DEFAULT_NOTIF_PREFS, type NotifPrefs } from './_data'
+import { MEMBER } from '@/data/member'
 import { activeLang } from '@/lib/store'
 
 // Plain helpers for the account lane (kept apart from components for fast refresh).
@@ -20,6 +21,15 @@ export function fmtDay(iso: string) {
   const lang = activeLang()
   if (lang === 'en') return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
   return d.toLocaleDateString(`${lang}-IN`, { weekday: 'short', day: 'numeric', month: 'short', numberingSystem: 'latn' })
+}
+
+/** Short day + month ("28 Jan"), localised; never a bare weekday. */
+export function fmtShortDate(iso: string) {
+  // A bare YYYY-MM-DD is a calendar day: read it in local time so it never slips back a day.
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T00:00:00`) : new Date(iso)
+  const lang = activeLang()
+  if (lang === 'en') return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  return d.toLocaleDateString(`${lang}-IN`, { day: 'numeric', month: 'short', numberingSystem: 'latn' })
 }
 
 /** Fill a translated string whose {slots} hold styled nodes (numbers in Mono, an <em>). */
@@ -76,6 +86,11 @@ export function usePersisted<T>(key: string, initial: T) {
     }
   }, [key, v])
   return [v, setV] as const
+}
+
+/** The member's own name and city as edited on Profile (falls back to the specimen member). */
+export function useMemberProfile() {
+  return usePersisted('profile', { firstName: MEMBER.firstName, lastName: MEMBER.lastName, city: MEMBER.city })[0]
 }
 
 const MOTION_STYLE_ID = 'joyos-reduce-motion'

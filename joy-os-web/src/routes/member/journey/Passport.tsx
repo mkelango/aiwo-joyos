@@ -64,14 +64,14 @@ export default function Passport() {
         <div>
           <div className="[perspective:1600px]">
             <motion.div
-              className="relative [transform-style:preserve-3d]"
+              className="relative grid [transform-style:preserve-3d]"
               animate={{ rotateY: flipped ? 180 : 0 }}
               transition={{ duration: reduce ? 0 : 0.5, ease: [0.2, 0, 0, 1] }}
             >
               {/* Front */}
-              <div className={`relative overflow-hidden rounded-[22px] bg-ink-ground p-6 ${FG} shadow-lift ring-1 ring-[color:color-mix(in_srgb,var(--aiwo-stone)_10%,transparent)] [backface-visibility:hidden] md:p-8`} aria-hidden={flipped}>
+              <div className={`relative overflow-hidden rounded-[22px] bg-ink-ground p-6 [grid-area:1/1] ${FG} shadow-lift ring-1 ring-[color:color-mix(in_srgb,var(--aiwo-stone)_10%,transparent)] [backface-visibility:hidden] md:p-8`} aria-hidden={flipped}>
                 <div aria-hidden className="pointer-events-none absolute -right-20 -top-28 h-80 w-80 rounded-full opacity-40 blur-3xl" style={{ background: 'var(--daybreak)' }} />
-                <div aria-hidden className="pointer-events-none absolute -bottom-32 -left-16 h-72 w-72 rounded-full opacity-25 blur-3xl" style={{ background: 'var(--term-p)' }} />
+                <div aria-hidden className="pointer-events-none absolute -bottom-32 -left-16 h-72 w-72 rounded-full opacity-25 blur-3xl" style={{ background: 'color-mix(in srgb, var(--aiwo-stone) 30%, transparent)' }} />
                 <div className="relative flex items-start justify-between">
                   <div className="flex items-center gap-2.5">
                     <AiwoMark size={22} className="!text-[color:var(--aiwo-stone)]" />
@@ -98,13 +98,13 @@ export default function Passport() {
               </div>
 
               {/* Back */}
-              <div className="absolute inset-0 flex items-center gap-5 overflow-hidden rounded-[22px] border border-line bg-paper-raised p-6 shadow-lift [backface-visibility:hidden] [transform:rotateY(180deg)] md:p-8" aria-hidden={!flipped}>
-                <QRCode value={`${PASSPORT.number}:${MEMBER.aiwoId}`} size={150} className="shrink-0" />
+              <div className="flex flex-col items-start justify-center gap-5 overflow-hidden rounded-[22px] border border-line bg-paper-raised p-6 shadow-lift [backface-visibility:hidden] [grid-area:1/1] [transform:rotateY(180deg)] sm:flex-row sm:items-center md:p-8" aria-hidden={!flipped}>
+                <QRCode value={`${PASSPORT.number}:${MEMBER.aiwoId}`} size={150} className="h-[120px] w-[120px] shrink-0 sm:h-[150px] sm:w-[150px]" />
                 <div className="min-w-0">
                   <p className="eyebrow text-ink-3">{t('scanAny')}</p>
                   <p className="mt-2 text-[15px] text-ink">{t('showsName')}</p>
                   <p className="mt-1 text-[14px] text-ink-2">{t('neverIndex')}</p>
-                  <p className={clsx('num mt-3 text-[12px] text-ink-3', en && 'whitespace-nowrap')}>{t('refreshes')}</p>
+                  <p className={clsx('num mt-3 text-[12px] text-ink-3', en && 'sm:whitespace-nowrap')}>{t('refreshes')}</p>
                 </div>
               </div>
             </motion.div>

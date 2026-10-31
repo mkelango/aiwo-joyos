@@ -3,15 +3,14 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, CalendarClock, Check, ChevronRight, Lock, Users, Video } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { DaybreakButton, Delta, Eyebrow, SpecimenTag, TermChip } from '@/components/joy/primitives'
+import { DaybreakButton, Delta, Eyebrow, SpecimenTag } from '@/components/joy/primitives'
 import { Avatar, Button, Card, LoopRing, PageHeader, Sheet } from '@/components/ui'
 import { DRIFT_RULES } from '@/data/platform'
 import type { DriftTask } from '@/domain/types'
-import { termByKey } from '@/data/terms'
 import { CIRCLES_LED, CIRCLE_ROSTER, COACH_CASELOAD, DAY_N, PRIYA } from './_data'
 import { PreviewBanner, useConsoleAccess } from './_gate'
 import { coach, isClinicalTask, isMyTask, taskLabel, useCoachState, type CoachTask } from './_store'
-import { AccessNote, CardHead, Kpi, PriorityTag, ScrollTabs, SlaChip, areaCls, fieldCls, fmtClock, labelCls, parseIst, useConsoleNow } from './_parts'
+import { AccessNote, CardHead, ConsoleTermChip, Kpi, PriorityTag, ScrollTabs, SlaChip, areaCls, fieldCls, fmtClock, fmtOpened, labelCls, parseIst, useConsoleNow } from './_parts'
 
 // COACH & CONCIERGE CONSOLE (Memo p.15, p.18; Architecture p6): caseload by loop day,
 // drift tasks with SLA timers, circles, Day-N. Coaches see term scores and bands only.
@@ -54,6 +53,9 @@ export default function Coach() {
         .sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority] || deadlineOf(a) - deadlineOf(b)),
     [tasks, filter, mineOnly, showDone],
   )
+
+  // Tab counts follow the same Mine only and Show closed toggles as the list below them.
+  const countable = tasks.filter((t) => (mineOnly ? isMine(t) : true)).filter((t) => (showDone ? true : t.status !== 'done'))
 
   const nextForMe = tasks
     .filter((t) => isMine(t) && t.status === 'open')
@@ -139,10 +141,10 @@ export default function Coach() {
               value={filter}
               onChange={setFilter}
               items={[
-                { value: 'all', label: 'All', count: tasks.filter((t) => showDone || t.status !== 'done').length },
-                { value: 'P0', label: 'P0', count: tasks.filter((t) => t.priority === 'P0' && (showDone || t.status !== 'done')).length },
-                { value: 'P1', label: 'P1', count: tasks.filter((t) => t.priority === 'P1' && (showDone || t.status !== 'done')).length },
-                { value: 'P2', label: 'P2', count: tasks.filter((t) => t.priority === 'P2' && (showDone || t.status !== 'done')).length },
+                { value: 'all', label: 'All', count: countable.length },
+                { value: 'P0', label: 'P0', count: countable.filter((t) => t.priority === 'P0').length },
+                { value: 'P1', label: 'P1', count: countable.filter((t) => t.priority === 'P1').length },
+                { value: 'P2', label: 'P2', count: countable.filter((t) => t.priority === 'P2').length },
               ]}
             />
             <div className="flex flex-wrap gap-2">
@@ -176,12 +178,12 @@ export default function Coach() {
                 <li key={task.id} className={clsx('grid gap-3 py-4 md:grid-cols-[auto_1fr_auto] md:items-start md:gap-5', task.status === 'done' && 'opacity-60')}>
                   <div className="flex items-center gap-2 md:flex-col md:items-start">
                     <PriorityTag p={task.priority} />
-                    <span className="num text-[12px] text-ink-3">{task.openedAt.slice(5).replace('-', '/')}</span>
+                    <span className="num whitespace-nowrap text-[12px] text-ink-3">{fmtOpened(task.openedAt)}</span>
                   </div>
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <Link to={`/console/coach/member/${task.memberId}`} className="text-[16px] text-ink underline-offset-4 hover:underline focus-ring">{task.memberName}</Link>
-                      <TermChip term={task.term} />
+                      <ConsoleTermChip term={task.term} />
                       <span className="text-[14px] text-ink-2">{labelOf(task)}</span>
                     </div>
                     {clinical ? (
@@ -295,7 +297,7 @@ export default function Coach() {
         />
         <div className="relative overflow-x-auto">
           <table className="w-full min-w-[820px] border-collapse text-left text-[14px]">
-            <caption className="sr-only">Caseload by loop day. Select a row to open the member digest.</caption>
+            <caption className="sr-only">Caseload by loop day. Each member’s name opens their digest.</caption>
             <thead>
               <tr className="border-b border-line">
                 {['Member', 'Loop', 'Index', 'Lowest term', '’Cation', 'Next contact', ''].map((h, i) => (
@@ -305,19 +307,16 @@ export default function Coach() {
             </thead>
             <tbody>
               {caseload.map((m) => {
-                const term = termByKey(m.lowest)
                 const watch = m.risk !== 'low'
                 return (
+                  // The name is the keyboard and screen-reader target; the row click is a mouse convenience.
                   <tr
                     key={m.id}
-                    tabIndex={0}
                     onClick={() => navigate(`/console/coach/member/${m.id}`)}
-                    onKeyDown={(e) => e.key === 'Enter' && navigate(`/console/coach/member/${m.id}`)}
-                    className="cursor-pointer border-b border-line last:border-0 hover:bg-paper-sunk focus-ring"
-                    aria-label={`Open digest for ${m.name}`}
+                    className="cursor-pointer border-b border-line last:border-0 hover:bg-paper-sunk"
                   >
                     <td className="py-3 pr-4">
-                      <span className="block text-[15px] text-ink">{m.name}</span>
+                      <Link to={`/console/coach/member/${m.id}`} onClick={(e) => e.stopPropagation()} className="block text-[15px] text-ink underline-offset-4 hover:underline focus-ring">{m.name}</Link>
                       <span className="num block text-[12px] text-ink-3">{m.id}</span>
                     </td>
                     <td className="py-3 pr-4">
@@ -327,10 +326,7 @@ export default function Coach() {
                       <span className="flex items-baseline gap-2"><span className="num text-[18px] font-light text-ink">{m.index}</span><Delta value={m.trend} className="text-[13px]" /></span>
                     </td>
                     <td className="py-3 pr-4">
-                      <span className="flex items-center gap-2">
-                        <TermChip term={m.lowest} />
-                        <span className="sr-only">{term.name}</span>
-                      </span>
+                      <ConsoleTermChip term={m.lowest} />
                     </td>
                     <td className="py-3 pr-4 text-ink-2">{m.cation}</td>
                     <td className="py-3 pr-4">
@@ -351,7 +347,7 @@ export default function Coach() {
       <section className="mt-8" aria-labelledby="circles-h">
         <div className="mb-4 flex items-baseline justify-between">
           <h2 id="circles-h" className="eyebrow text-ink-3">Circles you lead · {CIRCLES_LED.length}</h2>
-          <span className="text-[13px] text-ink-3">Eight people, thirty minutes, weekly</span>
+          <span className="text-[13px] text-ink-3">Up to eight people, thirty minutes, weekly</span>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
           {CIRCLES_LED.map((c) => {
@@ -366,7 +362,7 @@ export default function Coach() {
                   <h3 className="mt-3 text-[1.15rem] font-light leading-snug text-ink">{c.name}</h3>
                   <p className="mt-1 text-[14px] text-ink-2">{c.theme}</p>
                   <div className="mt-4 flex items-center gap-3">
-                    <TermChip term={c.term} />
+                    <ConsoleTermChip term={c.term} />
                     <span className="text-[13px] text-ink-3"><span className="num">{c.members}</span> members</span>
                   </div>
                   <div className="mt-4 w-full" aria-label={`Week ${c.week} of ${c.of}`}>
@@ -465,7 +461,7 @@ function CircleSheet({ id, onClose, canAct, now }: { id: string | null; onClose:
           <p className="eyebrow text-daybreak-ink">{c.when}</p>
           <p className="mt-2 text-[17px] text-ink">{c.theme}</p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <TermChip term={c.term} />
+            <ConsoleTermChip term={c.term} />
             <span className="num text-[13px] text-ink-3">Week {c.week} of {c.of}</span>
           </div>
           <Link to={`/app/practice/week/${c.week}`} className="mt-3 inline-flex items-center gap-1.5 text-[15px] text-ink underline-offset-4 hover:underline focus-ring">
@@ -483,7 +479,7 @@ function CircleSheet({ id, onClose, canAct, now }: { id: string | null; onClose:
             </div>
           ) : (
             <div className="mt-2">
-              <p className="text-[14px] text-ink-2">Thirty minutes. Opens for all eight at once; recordings are off by design.</p>
+              <p className="text-[14px] text-ink-2">Thirty minutes. Opens for all <span className="num">{roster.length}</span> at once; recordings are off by design.</p>
               <Button size="sm" variant="secondary" className="mt-3" disabled={!canAct} onClick={() => coach.updateCircle(c.id, (w) => ({ ...w, room: 'open' }))}><Video size={14} aria-hidden /> Start call room</Button>
             </div>
           )}

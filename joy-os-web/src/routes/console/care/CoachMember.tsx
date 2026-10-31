@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
-import { BandLabel, DaybreakButton, Delta, Eyebrow, MethodLine, SpecimenTag, TermChip, TermDot } from '@/components/joy/primitives'
+import { DaybreakButton, Delta, Eyebrow, MethodLine, SpecimenTag, TermDot } from '@/components/joy/primitives'
 import { Button, Card, LoopRing, PageHeader, Pill } from '@/components/ui'
 import { ACTION_LIBRARY } from '@/data/member'
 import { termByKey } from '@/data/terms'
@@ -13,7 +13,8 @@ import { lowestTerm } from '@/domain/indexEngine'
 import type { TermKey } from '@/domain/types'
 import { COACH_CASELOAD, CURATED_ACTIONS, DAY_N, OVERRIDE_REASONS, PRIYA, digestFor, type CoachDigest } from './_data'
 import { PreviewBanner, useConsoleAccess } from './_gate'
-import { AccessNote, AuditList, CardHead, SlaChip, areaCls, fieldCls, fmtClock, labelCls, parseIst, useConsoleNow, type AuditEvent } from './_parts'
+import { AccessNote, AuditList, CardHead, ConsoleTermChip, SlaChip, areaCls, fieldCls, fmtClock, labelCls, parseIst, useConsoleNow, type AuditEvent } from './_parts'
+import { useClinicalState } from './_clinicalStore'
 import { coach, isClinicalTask, taskLabel, useCoachState } from './_store'
 
 // MEMBER DIGEST for the coach (Memo p.18, p.24 coach_digest): a VIVA-drafted quarter
@@ -30,7 +31,7 @@ const ALL_ACTIONS = [
 ]
 
 const baseAudit = (d: CoachDigest): AuditEvent[] => [
-  { at: `${TODAY} · 21:10`, who: PRIYA.name, what: 'Opened member digest (term scores, bands, Ledger counts)', purpose: 'coach_digest · Care consent v3' },
+  { at: `${TODAY} · 21:10`, who: PRIYA.name, what: 'Opened member digest (term scores, bands, Ledger counts)', purpose: `coach_digest · Care consent v3 (granted ${d.consentGranted})` },
   ...(d.summaryPaused ? [] : [
     { at: '27 Jan 2027 · 18:02', who: PRIYA.name, what: 'Reviewed VIVA quarter summary', purpose: 'Weekly review' },
     { at: '27 Jan 2027 · 17:55', who: 'VIVA · coach_digest', what: 'Drafted quarter summary from scoped fields', purpose: 'Care · prompt coach_digest@1.2.0' },
@@ -95,6 +96,11 @@ function Digest({ d }: { d: CoachDigest }) {
   const coachTask = memberTasks.find((t) => t.id === taskParam && !isClinicalTask(t)) ?? memberTasks.find((t) => t.status !== 'done' && !isClinicalTask(t))
   const clinicalTask = memberTasks.find((t) => t.status !== 'done' && isClinicalTask(t))
   const holder = d.safetyHold?.match(/Held by (Dr [^·]+?) ·/)?.[1] ?? clinicalTask?.owner
+  // The clinical portal is the source of truth for safety alerts. Once every alert on this
+  // member is closed there, the hold is lifted here (the coach sees that, never why).
+  const { alerts } = useClinicalState()
+  const memberAlerts = alerts.filter((a) => a.memberId === d.id)
+  const holdLifted = !!d.safetyHold && memberAlerts.length > 0 && memberAlerts.every((a) => a.status === 'closed')
 
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(summary)
@@ -172,10 +178,19 @@ function Digest({ d }: { d: CoachDigest }) {
       <PreviewBanner path="/console/coach" />
 
       <AccessNote className="mb-8" icon="shield">
-        Opened for purpose <span className="num text-ink">coach_digest</span> under Care consent v3 (granted 05 Jan 2027). This read is logged and {d.firstName} sees it in the trust centre. Raw biomarkers, Ease screen answers and Ledger words are not available here.
+        Opened for purpose <span className="num text-ink">coach_digest</span> under Care consent v3 (granted <span className="num">{d.consentGranted}</span>). This read is logged and {d.firstName} sees it in the trust centre. Raw biomarkers, Ease screen answers and Ledger words are not available here.
       </AccessNote>
 
-      {d.safetyHold && (
+      {d.safetyHold && holdLifted && (
+        <Card tone="outline" className="mb-6 flex items-start gap-4">
+          <Check size={22} className="mt-0.5 shrink-0 text-ink" aria-hidden />
+          <div>
+            <p className="text-[17px] text-ink">Closed by {holder ?? 'the clinician'} in the clinical portal.</p>
+            <p className="mt-1 text-[15px] text-ink-2">What was found and agreed stays with the clinical team. Get back in touch with {d.firstName} as usual; the VIVA digest resumes at the next weekly draft.</p>
+          </div>
+        </Card>
+      )}
+      {d.safetyHold && !holdLifted && (
         <Card tone="outline" className="mb-6 flex items-start gap-4">
           <ShieldAlert size={22} className="mt-0.5 shrink-0 text-ink" aria-hidden />
           <div>
@@ -229,7 +244,7 @@ function Digest({ d }: { d: CoachDigest }) {
 
         {/* Term scores */}
         <Card className="min-w-0">
-          <CardHead eyebrow="Term scores and bands" aside={<span className="flex items-baseline gap-2"><span className="num text-[2.2rem] font-light leading-none text-ink">{d.index}</span><BandLabel band={d.band} /></span>} />
+          <CardHead eyebrow="Term scores and bands" aside={<span className="flex items-baseline gap-2"><span className="num text-[2.2rem] font-light leading-none text-ink">{d.index}</span><span className="eyebrow text-ink-2">{d.band}</span></span>} />
           <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start lg:flex-col lg:items-center 2xl:flex-row 2xl:items-start">
             <div className="shrink-0"><JoyspanWheel terms={d.terms} size={140} /></div>
             <ul className="w-full min-w-0 flex-1 space-y-2">
@@ -281,7 +296,7 @@ function Digest({ d }: { d: CoachDigest }) {
         {/* Ledger counts */}
         <Card className="min-w-0">
           <CardHead eyebrow="Joy Ledger · counts only" aside={<Lock size={15} className="text-ink-3" aria-hidden />} />
-          <p className="text-[15px] text-ink-2">Moments logged per week. <span className="num text-ink">{ledgerTotal}</span> in the last four weeks.</p>
+          <p className="text-[15px] text-ink-2">Moments logged per week. <span className="num text-ink">{ledgerTotal}</span> in the last <span className="num">{d.ledgerWeeks.length}</span> {d.ledgerWeeks.length === 1 ? 'week' : 'weeks'}.</p>
           <div className="mt-3 h-36" role="img" aria-label={`Ledger moments per week: ${d.ledgerWeeks.map((w) => `${w.week} ${w.moments}`).join(', ')}`}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={d.ledgerWeeks} margin={{ top: 4, right: 4, bottom: 0, left: -24 }}>
@@ -313,7 +328,7 @@ function Digest({ d }: { d: CoachDigest }) {
               <Eyebrow>The ninety days</Eyebrow>
               <p className="mt-1 text-[17px] text-ink">
                 {(() => {
-                  const next = DAY_N.find((x) => x.day > d.day) ?? DAY_N[DAY_N.length - 1]
+                  const next = DAY_N.find((x) => x.day >= d.day) ?? DAY_N[DAY_N.length - 1]
                   return d.day >= 76 ? <>The re-measure window is open until Day 90.</> : <>Next: {next.name.toLowerCase()} {next.day - d.day === 0 ? 'today' : <>in <span className="num">{next.day - d.day}</span> {next.day - d.day === 1 ? 'day' : 'days'}</>}.</>
                 })()}
               </p>
@@ -371,9 +386,9 @@ function Digest({ d }: { d: CoachDigest }) {
             </div>
             <fieldset>
               <legend className={labelCls}>The action</legend>
-              <div className="inline-flex rounded-full bg-paper-sunk p-1" role="radiogroup">
+              <div className="inline-flex rounded-full bg-paper-sunk p-1" role="group" aria-label="The action">
                 {(['keep', 'adjust'] as const).map((v) => (
-                  <button key={v} type="button" role="radio" aria-checked={adjust === v} onClick={() => setAdjust(v)} className={clsx('rounded-full px-4 py-1.5 text-[14px] focus-ring', adjust === v ? 'bg-paper-raised text-ink shadow-card' : 'text-ink-2')}>
+                  <button key={v} type="button" aria-pressed={adjust === v} onClick={() => setAdjust(v)} className={clsx('rounded-full px-4 py-1.5 text-[14px] focus-ring', adjust === v ? 'bg-paper-raised text-ink shadow-card' : 'text-ink-2')}>
                     {v === 'keep' ? 'Keep as is' : 'Adjust it'}
                   </button>
                 ))}
@@ -420,7 +435,7 @@ function Digest({ d }: { d: CoachDigest }) {
             <p className="eyebrow text-ink-3">{override ? <>Override active · until Day <span className="num">{override.until}</span></> : 'Chosen by the engine'}</p>
             <p className="mt-1.5 text-[17px] text-ink">{activeTitle}</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <TermChip term={override ? override.term : d.currentAction.term} />
+              <ConsoleTermChip term={override ? override.term : d.currentAction.term} />
               {override && <span className="text-[13px] text-ink-2">Reason · {override.reason}</span>}
             </div>
             {override && <Button variant="link" className="mt-2 text-[14px]" disabled={!canAct} onClick={() => { coach.updateMember(d.id, (w) => ({ ...w, override: null })); addAudit({ who: PRIYA.name, what: 'Removed action override; engine resumes', purpose: 'Coach judgement' }); setOvDone(false) }}>Return to the engine’s choice</Button>}
@@ -429,10 +444,10 @@ function Digest({ d }: { d: CoachDigest }) {
           <div className="mt-5 space-y-4">
             <div>
               <span className={labelCls} id="ov-term-l">Term</span>
-              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-labelledby="ov-term-l">
+              <div className="flex flex-wrap gap-1.5" role="group" aria-labelledby="ov-term-l">
                 {(['H', 'P', 'R', 'F', 'D', 'B'] as TermKey[]).map((k) => (
-                  <button key={k} type="button" role="radio" aria-checked={ovTerm === k} onClick={() => { setOvTerm(k); setOvAction('') }} className={clsx('rounded-full focus-ring', ovTerm === k ? 'ring-2 ring-[color:var(--ink)] ring-offset-1 ring-offset-[color:var(--paper-sunk)]' : '')}>
-                    <TermChip term={k} />
+                  <button key={k} type="button" aria-pressed={ovTerm === k} onClick={() => { setOvTerm(k); setOvAction('') }} className={clsx('rounded-full focus-ring', ovTerm === k ? 'ring-2 ring-[color:var(--ink)] ring-offset-1 ring-offset-[color:var(--paper-sunk)]' : '')}>
+                    <ConsoleTermChip term={k} />
                   </button>
                 ))}
               </div>

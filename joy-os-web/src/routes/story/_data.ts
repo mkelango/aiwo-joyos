@@ -158,7 +158,7 @@ export const MODULES: Module[] = [
   },
   {
     n: '13', name: 'Households and tenants', what: 'Couples, families, Family Joy Office; Joyspan@Work, insurer, hospital, House and residence tenants; aggregate dashboards.',
-    terms: ['R', 'H', 'P', 'F', 'D', 'B'], termNote: 'Relationships · all', release: 'J3', releaseNote: 'J3 households · J4 tenants', kept: 'Corporate portal, RLS',
+    terms: ['R', 'H', 'P', 'F', 'D', 'B'], termNote: 'Relationships · all', release: 'J3', releaseNote: 'J3 households, Joyspan@Work and the first insurer tenant · J4 licensed tenants at scale', kept: 'Corporate portal, RLS',
     surfaces: ['app', 'tenant'], outcomes: ['remeasure', 'cost'],
     data: ['Household (partner answers private)', 'Tenant · eligibility · SSO', 'Aggregates, k ≥ 10, ≥ 50'],
     arch: ['households', 'identity', 'analytics'],
@@ -278,7 +278,7 @@ export const JOURNEY_DETAIL: Record<string, { persona: string; arrives: string; 
       { when: 'Day −14', what: 'Couples Check, each privately; CSI-4 per partner', does: 'Each partner answers alone on their own phone. Joy OS shows where they agree and differ, never who said what.', who: ['Each partner'], term: 'R', surface: 'Member app', route: { label: 'People space', to: '/app/spaces/people' } },
       { when: '3 nights', what: 'Signature dates; love maps; one shared step, two private ones', does: 'The ’cation itinerary runs offline on the floor; checkout hands off one shared step and one private step each.', who: ['Venue', 'Coach'], term: 'R', surface: 'Member app', route: { label: 'Lovecation', to: '/app/cation/lovecation' } },
       { when: 'Weekly', what: 'State of Us, 20 minutes, in the app', does: 'VIVA’s couples_prompt drafts the week’s three questions. It never reveals one partner to the other.', who: ['Both partners', 'VIVA'], term: 'R', surface: 'Member app', route: { label: 'People space', to: '/app/spaces/people' } },
-      { when: 'Monthly', what: 'A date planned in the People space', does: 'One planned pleasure, shared. It lands in both calendars like a meeting.', who: ['Both partners'], term: 'D', surface: 'Member app', route: { label: 'Pleasure space', to: '/app/spaces/pleasure' } },
+      { when: 'Monthly', what: 'A date planned in the Pleasure space', does: 'One planned pleasure, shared. It lands in both calendars like a meeting.', who: ['Both partners'], term: 'D', surface: 'Member app', route: { label: 'Pleasure space', to: '/app/spaces/pleasure' } },
       { when: 'Day 90', what: 'CSI-4 re-score; household page shows only what both share', does: 'Each partner’s CSI-4 is re-scored privately. The household page shows only what both agreed to share.', who: ['Each partner', 'Engine'], term: 'R', surface: 'Member app', route: { label: 'Household', to: '/app/household' } },
     ],
   },

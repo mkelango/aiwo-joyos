@@ -116,6 +116,7 @@ export const CATION = dict({
   'Your named outcome': ['உங்கள் பெயரிட்ட இலக்கு', 'आपका तय नतीजा'],
   'In your words. We measure the ’cation against it.': ['உங்கள் சொற்களில். ’கேஷனை இதை வைத்தே அளவிடுகிறோம்.', 'आपके शब्दों में। हम ’केशन को इसी पर मापते हैं।'],
   'Dietary note (optional)': ['உணவுக் குறிப்பு (விருப்பத்தேர்வு)', 'खाने का नोट (वैकल्पिक)'],
+  'Dietary note': ['உணவுக் குறிப்பு', 'खाने का नोट'],
   'Shared with the venue. Nothing clinical is.': ['இடத்துடன் பகிரப்படும். மருத்துவத் தகவல் எதுவும் பகிரப்படாது.', 'जगह के साथ साझा होता है। कोई क्लिनिकल जानकारी नहीं।'],
   'e.g. vegetarian, no onion or garlic': ['எ.கா. சைவம், வெங்காயம் பூண்டு இல்லாமல்', 'जैसे शाकाहारी, बिना प्याज़-लहसुन'],
   'No payment now. Payment by Razorpay in INR once your dates are confirmed; GST at 18% added on the invoice. Specimen pricing.': ['இப்போது கட்டணம் இல்லை. தேதிகள் உறுதியானதும் Razorpay மூலம் INR-இல் கட்டணம்; விலைப்பட்டியலில் 18% GST சேர்க்கப்படும். மாதிரி விலைகள்.', 'अभी कोई भुगतान नहीं। तारीख़ें पक्की होने पर Razorpay से INR में भुगतान; इनवॉइस पर 18% GST जुड़ेगा। नमूना क़ीमतें।'],

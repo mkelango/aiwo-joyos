@@ -33,7 +33,10 @@ export function ToolsHeading({ children }: { children: string }) {
 }
 
 export const shortDate = (iso: string, lang: Lang = 'en') => {
-  const d = new Date(iso)
+  // A date-only ISO string is read as local midnight (new Date('YYYY-MM-DD') would be UTC and
+  // show the day before west of Greenwich); anything with a time goes to Date as is.
+  const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
+  const d = day ? new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3])) : new Date(iso)
   if (Number.isNaN(d.getTime())) return iso
   return localDate(d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }), lang)
 }

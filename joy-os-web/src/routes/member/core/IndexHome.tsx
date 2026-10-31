@@ -225,7 +225,7 @@ function TermDetailPanel({ termKey }: { termKey: TermKey }) {
               <span>
                 {rich(c('ixShareLine'), { s: <span className="num text-ink">{detail.survey}%</span>, g: <span className="num text-ink">{detail.signals}%</span> })}
               </span>
-              <Pill tone={detail.confidence === 'High' ? 'positive' : 'neutral'}>{c('ixConfidence', { c: c(CONFIDENCE_KEY[detail.confidence]) })}</Pill>
+              <Pill tone={detail.confidence === 'High' ? 'ink' : 'neutral'}>{c('ixConfidence', { c: c(CONFIDENCE_KEY[detail.confidence]) })}</Pill>
             </div>
             {detail.signalSources.length > 0 ? (
               <p className="mt-2 text-[13px] text-ink-3">{detail.signalSources.map((src) => pick(SIGNAL_SOURCE_TEXT[src], src)).join(' · ')}</p>
@@ -343,6 +343,7 @@ function FormulaCard() {
                 value={vals[k]}
                 onChange={(e) => {
                   setVals((v) => ({ ...v, [k]: Number(e.target.value) }))
+                  setBumped({}) // a drag replaces the +10 comparison, so its status line goes
                 }}
                 className="mt-1 w-full"
                 style={{ accentColor: termColor[k] }}

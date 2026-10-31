@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, Baby, Check, Clock, Equal, Eye, EyeOff, HandHeart, Lock, Mic, Plus, ScrollText, Settings2, Type, Undo2, X } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { BandLabel, DaybreakButton, MethodLine, SpecimenTag, TermChip, TermDot, fmtDate } from '@/components/joy/primitives'
 import { Avatar, Button, Card, PageHeader, Pill, Sheet } from '@/components/ui'
@@ -99,7 +99,7 @@ export default function Household() {
                     <p className="mt-3 text-[15px] leading-relaxed text-ink-2">{rich(tr('inviteSent', { after: tr(INVITE_ROLE[iv.role].after) }), { contact: <span className="num">{iv.contact}</span>, date: <span className="num">{fmtDate(iv.expires)}</span> })}</p>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <Pill tone="caution">{tr('waiting')}</Pill>
-                      <Button size="sm" variant="ghost" onClick={() => { void copyLink(iv.link); showToast(tr('copiedAgain', { name: iv.name.split(' ')[0] })) }}>{tr('copyLink')}</Button>
+                      <Button size="sm" variant="ghost" onClick={async () => { const copied = await copyLink(iv.link); showToast(tr(copied ? 'copiedAgain' : 'copyFailed', { name: iv.name.split(' ')[0] })) }}>{tr('copyLink')}</Button>
                       <Button size="sm" variant="ghost" onClick={() => setCancelInvite(iv)}>{tr('cancelInvite')}</Button>
                     </div>
                   </div>
@@ -422,6 +422,13 @@ function ShareSheet({ open, offered, onClose, onPropose }: { open: boolean; offe
   const [mode, setMode] = useState<'index' | 'terms'>('terms')
   const [terms, setTerms] = useState<GrantScope[]>(['P'])
   const [error, setError] = useState<string | null>(null)
+  // Each opening starts fresh: per-term, Purpose suggested unless it is already offered.
+  useEffect(() => {
+    if (!open) return
+    setMode('terms')
+    setTerms((['P'] as GrantScope[]).filter((k) => !offered.includes(k)))
+    setError(null)
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
   const me = INDEX_HISTORY[0]
   const scope: GrantScope[] = mode === 'index' ? ['index'] : terms
   const toggle = (k: GrantScope) => { setError(null); setTerms((t) => (t.includes(k) ? t.filter((x) => x !== k) : [...t, k])) }
@@ -437,11 +444,12 @@ function ShareSheet({ open, offered, onClose, onPropose }: { open: boolean; offe
             <legend className="text-[15px] text-ink">{tr('terms')}</legend>
             <div className="mt-2 grid grid-cols-2 gap-2">
               {TERMS.map((t) => {
-                const on = terms.includes(t.key)
+                const was = offered.includes(t.key)
+                const on = was || terms.includes(t.key)
                 return (
-                  <button key={t.key} type="button" role="checkbox" aria-checked={on} onClick={() => toggle(t.key)} className={clsx('flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5 text-left text-[15px] focus-ring', on ? 'border-ink bg-paper-raised text-ink' : 'border-line text-ink-2')}>
+                  <button key={t.key} type="button" role="checkbox" aria-checked={on} aria-disabled={was || undefined} onClick={() => { if (!was) toggle(t.key) }} className={clsx('flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5 text-left text-[15px] focus-ring', was ? 'cursor-default border-dashed border-line bg-paper-sunk text-ink-3' : on ? 'border-ink bg-paper-raised text-ink' : 'border-line text-ink-2')}>
                     <span className="flex items-center gap-2"><TermDot term={t.key} /> {tt.name(t.key)}</span>
-                    {offered.includes(t.key) ? <span className="eyebrow text-ink-3">{tr('offered')}</span> : on ? <Check size={15} /> : <X size={15} className="text-ink-3" />}
+                    {was ? <span className="eyebrow text-ink-3">{tr('offered')}</span> : on ? <Check size={15} /> : <X size={15} className="text-ink-3" />}
                   </button>
                 )
               })}

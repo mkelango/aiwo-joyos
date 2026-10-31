@@ -1,14 +1,14 @@
 import clsx from 'clsx'
 import { motion } from 'framer-motion'
 import { Building2, Check, Copy, Download, FileSpreadsheet, KeyRound, Lock, Mail, Plus, ShieldCheck, Upload, UserMinus, Users } from 'lucide-react'
-import { useId, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from 'react'
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { DaybreakButton, Delta, Eyebrow, MethodLine, SpecimenTag, TermChip, TermDot } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill, Sheet, Tabs, Toggle } from '@/components/ui'
 import { TENANT } from '@/data/platform'
 import { termByKey, termColor } from '@/data/terms'
 import { EAP_ROUTING, INSURER, INSURER_FLAGS, INSURER_PROFILE, TENANT_FLAGS, TENANT_KIND, TENANT_PROFILE, type AdminRole, type TenantKind } from './_data'
-import { AccessNote, CardHead, ChartLead, Field, Kpi, Legend, Meter, Row, ScrollTabs, StatusTag, Swatch, downloadHtml, esc, fieldCls, fmtDate, inr, pct, tick, tipLabel, tipStyle, useTabParam } from './_parts'
+import { AccessNote, CardHead, ChartLead, Field, Kpi, Legend, Meter, Row, ScrollTabs, StatusTag, Swatch, downloadHtml, esc, fieldCls, fmtDate, inr, pct, tabPanelProps, tick, tipLabel, tipStyle, useTabParam } from './_parts'
 
 // TENANT ADMIN (Memo p.25; Architecture p.24): Joyspan@Work and insurer tenants.
 // Aggregates only: k ≥ 10 for any cell, employers see groups of 50 or more, no drill-down,
@@ -67,8 +67,8 @@ export default function Tenant() {
         title={view === 'employer' ? <>How your people are, <em>together</em></> : <>Paid for a measured <em>fall</em> in suffering</>}
         lead={
           view === 'employer'
-            ? <>Aggregate outcomes for Cycle 1, Day 0 on 21 Oct 2026 to Day 90 on 19 Jan 2027. Every figure is a group of {TENANT.minCohort} or more, no cell under {TENANT.minCell}, and none of it leads back to a person.</>
-            : <>{INSURER.stage}. Joy OS as a policy benefit: the insurer sees aggregate outcomes only and pays on an audited fall in preventable suffering. Never individual underwriting.</>
+            ? <>Aggregate outcomes for Cycle 1, Day 0 on 23 Oct 2026 to Day 90 on 21 Jan 2027. Every figure is a group of {TENANT.minCohort} or more, no cell under {TENANT.minCell}, and none of it leads back to a person.</>
+            : <>{INSURER.stage}. A projection of the J3 pilot, for the conversation with Star Health: no policyholder has reached Day 90, and the first could on {INSURER.firstDay90}. Joy OS as a policy benefit: the insurer sees aggregate outcomes only and pays on an audited fall in preventable suffering. Never individual underwriting.</>
         }
         actions={
           <div className="flex flex-col items-start gap-3 md:items-end">
@@ -86,6 +86,7 @@ export default function Tenant() {
       </AccessNote>
 
       <ScrollTabs<Tab>
+        idBase="tenant"
         label="Tenant admin sections"
         value={tab}
         onChange={setTab}
@@ -106,7 +107,7 @@ export default function Tenant() {
           // Outcomes holds charts and no work in progress: unmount it when hidden, so no chart measures a zero-size box.
           if (!active && t === 'outcomes') return null
           return (
-            <motion.div key={id} hidden={!active} role="tabpanel" aria-label={`${k} ${t}`} initial={{ opacity: 0, y: 6 }} animate={active ? { opacity: 1, y: 0 } : { opacity: 0, y: 6 }} transition={{ duration: 0.2 }}>
+            <motion.div key={id} hidden={!active} {...(active ? tabPanelProps('tenant', t) : { role: 'tabpanel', 'aria-label': `${k} ${t}` })} initial={{ opacity: 0, y: 6 }} animate={active ? { opacity: 1, y: 0 } : { opacity: 0, y: 6 }} transition={{ duration: 0.2 }}>
               {panel(k, t)}
             </motion.div>
           )
@@ -137,7 +138,7 @@ function ReportSheet({ view, reports, stepUp, onPrepared, onDownloaded }: { view
       <ul className="mt-5 space-y-3 text-[15px] text-ink-2">
         {(view === 'employer'
           ? ['Funnel: eligible, enrolled, measured, re-measured', 'Day-0 and Day-90 term means, with Ease shown as a fall', `Departments of ${group} or more; smaller groups suppressed`, 'EAP routing volume, counts only, cells under ten shown as “fewer than 10”']
-          : ['Enrolled, measured and re-measured policyholders', 'Cohort Burden at Day 0 and Day 90, and how it changed', `Groups of ${group} or more; smaller cells suppressed`, 'The outcome-linked fee condition, met or not, as measured']
+          : ['Enrolled, measured and re-measured policyholders', 'Cohort Burden at Day 0 and Day 90, and how it changed', `Groups of ${group} or more; smaller cells suppressed`, 'The outcome-linked fee condition, met or not, as measured', 'Until the first Day 90 on ' + INSURER.firstDay90 + ', Day-90 figures are a J3 projection and say so']
         ).map((l) => (
           <li key={l} className="flex gap-2.5"><Check size={16} className="mt-0.5 shrink-0 text-ink" aria-hidden />{l}</li>
         ))}
@@ -175,7 +176,7 @@ function reportBody(view: View, r: Report) {
     const rows = TENANT.termMeans.map((t) => `<tr><td>${esc(termByKey(t.key).name)}</td><td class="num">${t.key === 'B' ? '−' : ''}${t.d0}</td><td class="num">${t.key === 'B' ? '−' : ''}${t.d90}</td></tr>`).join('')
     return `${head}<h2>Three numbers</h2><table><tr><td>People measured</td><td class="num">${TENANT.measured}</td></tr><tr><td>People re-measured at Day 90</td><td class="num">${re}</td></tr><tr><td>Improved their lowest term</td><td class="num">${pct(TENANT.improvedLowest)}</td></tr></table><h2>Funnel</h2><table><tr><td>Eligible</td><td class="num">${TENANT.eligible}</td></tr><tr><td>Enrolled</td><td class="num">${TENANT.enrolled}</td></tr><tr><td>Measured at Day 0</td><td class="num">${TENANT.measured}</td></tr><tr><td>Re-measured at Day 90</td><td class="num">${re}</td></tr></table><h2>Term means</h2><table><tr><th>Term</th><th>Day 0</th><th>Day 90</th></tr>${rows}</table><p class="meta">Preventable Suffering is a burden: a lower Day-90 figure is the improvement.</p>${never}`
   }
-  return `${head}<h2>Three numbers</h2><table><tr><td>Policyholders enrolled</td><td class="num">${INSURER.enrolled}</td></tr><tr><td>Measured at Day 0</td><td class="num">${INSURER.measured}</td></tr><tr><td>Re-measured at Day 90</td><td class="num">${pct(INSURER.remeasureRate)}</td></tr></table><h2>Preventable Suffering</h2><table><tr><td>Cohort mean, Day 0</td><td class="num">−${INSURER.burdenD0}</td></tr><tr><td>Cohort mean, Day 90</td><td class="num">−${INSURER.burdenD90}</td></tr><tr><td>Share whose Burden fell</td><td class="num">${pct(INSURER.burdenFalling)}</td></tr></table><p class="meta">Never for individual underwriting, pricing or a claim decision.</p>${never}`
+  return `${head}<p class="meta">Projection for the J3 pilot conversation (Decision 7). Not measured results: the first possible Day 90 is ${esc(INSURER.firstDay90)}.</p><h2>Three numbers</h2><table><tr><td>Policyholders enrolled</td><td class="num">${INSURER.enrolled}</td></tr><tr><td>Measured at Day 0</td><td class="num">${INSURER.measured}</td></tr><tr><td>Re-measured at Day 90, projected</td><td class="num">${pct(INSURER.remeasureRate)}</td></tr></table><h2>Preventable Suffering</h2><table><tr><td>Cohort mean, Day 0</td><td class="num">−${INSURER.burdenD0}</td></tr><tr><td>Cohort mean, Day 90</td><td class="num">−${INSURER.burdenD90}</td></tr><tr><td>Share whose Burden fell</td><td class="num">${pct(INSURER.burdenFalling)}</td></tr></table><p class="meta">Never for individual underwriting, pricing or a claim decision.</p>${never}`
 }
 
 function ReportLibrary({ view, reports, stepUp, onDownloaded, className }: { view: View; reports: Report[]; stepUp: boolean; onDownloaded: (id: string) => void; className?: string }) {
@@ -276,7 +277,7 @@ function Outcomes() {
             </li>
           ))}
         </ol>
-        <MethodLine method="v1.0" grade="index" takenOn="2027-01-19" className="mt-6" />
+        <MethodLine method="v1.0" grade="index" takenOn="2027-01-21" className="mt-6" />
       </Card>
 
       <Card className="lg:col-span-7">
@@ -397,7 +398,7 @@ function EapBars() {
 // ─── Eligibility & enrolment ─────────────────────────────────────────────
 
 type UploadState = { phase: 'idle' } | { phase: 'error'; message: string } | { phase: 'checking'; name: string } | { phase: 'checked'; name: string } | { phase: 'applied'; name: string }
-type Wave = { id: string; name: string; sent: string; invited: number; opened: number; enrolled: number; scheduled: boolean }
+type Wave = { id: string; name: string; sent: string; invited: number; opened: number; enrolled: number; scheduled: boolean; audience?: string }
 
 function Enrolment({ kind }: { kind: View }) {
   const cfg = TENANT_KIND[kind]
@@ -406,24 +407,33 @@ function Enrolment({ kind }: { kind: View }) {
   const [drag, setDrag] = useState(false)
   const [waves, setWaves] = useState<Wave[]>(() => cfg.waves.map((w) => ({ ...w, scheduled: false })))
   const [date, setDate] = useState('')
-  const [audience, setAudience] = useState('not-enrolled')
   const [dateErr, setDateErr] = useState<string | null>(null)
-  const [lastScheduled, setLastScheduled] = useState<Wave | null>(null)
+  // Only the id: the table renumbers waves on cancel, so the confirmation reads the current wave from the list.
+  const [lastScheduledId, setLastScheduledId] = useState<string | null>(null)
+  const lastScheduled = waves.find((w) => w.id === lastScheduledId) ?? null
+  // One check at a time: a new file cancels the check in flight, so a late timer cannot overwrite a newer result.
+  const checkTimer = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(checkTimer.current), [])
   const invitedBase = cfg.waves.slice(0, 2).reduce((a, w) => a + w.invited, 0)
   const enrolledNow = kind === 'employer' ? TENANT.enrolled : INSURER.enrolled
   const notEnrolled = kind === 'employer' ? TENANT.eligible - TENANT.enrolled : invitedBase - INSURER.enrolled
-  const audiences = cfg.audiences.map((a) => ({ ...a, n: a.value === 'not-enrolled' ? notEnrolled : a.n }))
+  // "Never more than one reminder": the not-enrolled audience gets one reminder wave, sent or scheduled, ever.
+  const reminderUsed = waves.some((w) => w.audience === 'not-enrolled' || /reminder/i.test(w.name))
+  const audiences = cfg.audiences.map((a) => ({ ...a, n: a.value === 'not-enrolled' ? notEnrolled : a.n, closed: a.value === 'not-enrolled' && reminderUsed }))
+  const [audience, setAudience] = useState(() => audiences.find((a) => !a.closed)?.value ?? audiences[0].value)
+  const audienceNow = audiences.find((a) => a.value === audience)?.closed ? audiences.find((a) => !a.closed)?.value ?? audience : audience
   const sentWaves = waves.filter((w) => !w.scheduled).length
   const scheduledWaves = waves.filter((w) => w.scheduled).length
   const ids = { aud: `${kind}-aud`, date: `${kind}-send-date` }
 
   const take = (name: string) => {
+    window.clearTimeout(checkTimer.current)
     if (!/\.csv$/i.test(name)) {
       setUpload({ phase: 'error', message: `“${name}” is not a .csv file. Export the sheet as CSV (UTF-8) and try again.` })
       return
     }
     setUpload({ phase: 'checking', name })
-    window.setTimeout(() => setUpload({ phase: 'checked', name }), 900)
+    checkTimer.current = window.setTimeout(() => setUpload({ phase: 'checked', name }), 900)
   }
   const onFile = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
@@ -441,17 +451,18 @@ function Enrolment({ kind }: { kind: View }) {
     if (!date) return setDateErr('Choose a send date.')
     if (date < '2027-01-29') return setDateErr('Choose a date from tomorrow, 29 Jan 2027.')
     if (waves.some((w) => w.scheduled && w.sent === date)) return setDateErr('A wave is already scheduled for that day. Choose another date.')
+    const a = audiences.find((x) => x.value === audienceNow)!
+    if (a.closed) return setDateErr('They have already had their one reminder.')
     setDateErr(null)
-    const a = audiences.find((x) => x.value === audience)!
-    const w: Wave = { id: `w${Date.now()}`, name: `Wave ${waves.length + 1} · ${a.label}`, sent: date, invited: a.n, opened: 0, enrolled: 0, scheduled: true }
+    const w: Wave = { id: `w${Date.now()}`, name: `Wave ${waves.length + 1} · ${a.label}`, sent: date, invited: a.n, opened: 0, enrolled: 0, scheduled: true, audience: a.value }
     setWaves((ws) => [...ws, w])
-    setLastScheduled(w)
+    setLastScheduledId(w.id)
   }
   const cancel = (id: string) => {
     setWaves((ws) => ws.filter((w) => w.id !== id).map((w, i) => (w.scheduled ? { ...w, name: w.name.replace(/^Wave \d+/, `Wave ${i + 1}`) } : w)))
-    if (lastScheduled?.id === id) setLastScheduled(null)
+    if (lastScheduledId === id) setLastScheduledId(null)
   }
-  const another = () => { setLastScheduled(null); setDate(''); setDateErr(null) }
+  const another = () => { setLastScheduledId(null); setDate(''); setDateErr(null) }
 
   return (
     <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
@@ -575,8 +586,8 @@ function Enrolment({ kind }: { kind: View }) {
             <div className="space-y-4">
               <p className="text-[17px] text-ink">Schedule wave {waves.length + 1}</p>
               <Field label="Audience" htmlFor={ids.aud}>
-                <select id={ids.aud} className={fieldCls} value={audience} onChange={(e) => setAudience(e.target.value)}>
-                  {audiences.map((a) => <option key={a.value} value={a.value}>{a.label} · {a.n.toLocaleString('en-IN')}</option>)}
+                <select id={ids.aud} className={fieldCls} value={audienceNow} onChange={(e) => { setAudience(e.target.value); setDateErr(null) }}>
+                  {audiences.map((a) => <option key={a.value} value={a.value} disabled={a.closed}>{a.label} · {a.n.toLocaleString('en-IN')}{a.closed ? ' · reminder already sent' : ''}</option>)}
                 </select>
               </Field>
               <Field label="Send on" htmlFor={ids.date} error={dateErr} hint="Invitations go at 10:00 IST. Never more than one reminder.">
@@ -637,7 +648,11 @@ function Access({ kind, stepUp, setStepUp }: { kind: View; stepUp: boolean; setS
   const valid = !issuerErr && !clientErr && !metaErr && !domainErr
   const dirty = edited || proto !== savedProto
   const protoLabel = (p: 'oidc' | 'saml') => (p === 'oidc' ? 'OIDC' : 'SAML 2.0')
-  const edit = <T,>(set: (v: T) => void) => (v: T) => { set(v); setEdited(true); setSaved(false); setTest('idle') }
+  // A test covers the exact settings it ran with: any edit cancels a test in flight and clears its result.
+  const testTimer = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(testTimer.current), [])
+  const resetTest = () => { window.clearTimeout(testTimer.current); setTest('idle') }
+  const edit = <T,>(set: (v: T) => void) => (v: T) => { set(v); setEdited(true); setSaved(false); resetTest() }
 
   const copy = (k: string, v: string) => {
     // writeText rejects (not throws) when the page lacks focus or permission; the value stays visible to copy by hand.
@@ -645,7 +660,7 @@ function Access({ kind, stepUp, setStepUp }: { kind: View; stepUp: boolean; setS
     setCopied(k)
     window.setTimeout(() => setCopied(null), 1400)
   }
-  const runTest = () => { setTest('running'); window.setTimeout(() => setTest('ok'), 1000) }
+  const runTest = () => { window.clearTimeout(testTimer.current); setTest('running'); testTimer.current = window.setTimeout(() => setTest('ok'), 1000) }
   const save = () => { setSavedProto(proto); setSavedDomain(domain); setEdited(false); setSaved(true) }
 
   const base = `https://joy.aiwo.com`
@@ -669,7 +684,7 @@ function Access({ kind, stepUp, setStepUp }: { kind: View; stepUp: boolean; setS
           aside={dirty ? <StatusTag tone="draft">Draft · not saved</StatusTag> : <StatusTag tone="ok">Connected · {protoLabel(savedProto)}</StatusTag>}
           lead={kind === 'employer' ? 'SSO proves someone is eligible. It never tells Northwind whether they signed in, or what they did.' : 'SSO here admits the insurer’s console admins. Policyholders sign in with their own AIWO ID and confirm their policy once; Star Health never learns whether they did.'}
         />
-        <Tabs<'oidc' | 'saml'> value={proto} onChange={(v) => { setProto(v); setTest('idle'); setSaved(false) }} items={[{ value: 'oidc', label: 'OIDC' }, { value: 'saml', label: 'SAML 2.0' }]} className="mb-6" />
+        <Tabs<'oidc' | 'saml'> value={proto} onChange={(v) => { setProto(v); resetTest(); setSaved(false) }} items={[{ value: 'oidc', label: 'OIDC' }, { value: 'saml', label: 'SAML 2.0' }]} className="mb-6" />
 
         <div className="grid gap-5 sm:grid-cols-2">
           {proto === 'oidc' ? (
@@ -928,6 +943,7 @@ function InsurerOutcomes() {
             <div>
               <p className="text-[1.35rem] font-light leading-snug text-ink">The insurer pays for a measured fall in preventable suffering.</p>
               <p className="mt-1 text-[15px] text-ink-2">Never individual underwriting. No person’s score, flag or term leaves AIWO, and the contract forbids using any figure here to price or decide a claim for a person.</p>
+              <p className="mt-3 flex flex-wrap items-center gap-2 text-[14px] text-ink-2"><StatusTag tone="draft">Projection · J3</StatusTag> The pilot is still in conversation (Decision 7). Every Day-90 figure below is projected from direct-member cohorts, not measured: the earliest policyholder Day 90 is {INSURER.firstDay90}.</p>
             </div>
           </div>
           <TermChip term="B" withSpace size="md" className="shrink-0 self-start" />
@@ -937,13 +953,13 @@ function InsurerOutcomes() {
       <div className="grid gap-4 sm:grid-cols-2 lg:col-span-12 xl:grid-cols-4">
         <Kpi label="Policyholders enrolled" value={INSURER.enrolled.toLocaleString('en-IN')} sub="Pilot cohort, opt-in" />
         <Kpi label="Measured at Day 0" value={INSURER.measured.toLocaleString('en-IN')} sub={`${pct(INSURER.measured / INSURER.enrolled)} of enrolled`} />
-        <Kpi label="Re-measured at Day 90" value={pct(INSURER.remeasureRate)} sub="Lower than direct members; circles not yet offered" />
-        <Kpi label="Burden, cohort mean" value={<span className="flex items-baseline gap-3">−{INSURER.burdenD90}<Delta value={-fall} inverse className="text-[15px]" /></span>} sub={<>Eased from −{INSURER.burdenD0}. {pct(INSURER.burdenFalling)} saw it fall.</>} />
+        <Kpi label="Re-measured at Day 90 · projected" value={pct(INSURER.remeasureRate)} sub="Lower than direct members; circles not yet offered" />
+        <Kpi label="Burden, cohort mean · projected" value={<span className="flex items-baseline gap-3">−{INSURER.burdenD90}<Delta value={-fall} inverse className="text-[15px]" /></span>} sub={<>From −{INSURER.burdenD0} at Day 0. {pct(INSURER.burdenFalling)} projected to see it fall.</>} />
       </div>
 
       <Card className="lg:col-span-7">
-        <CardHead eyebrow="Preventable Suffering · change at Day 90" title="Where the fall came from" />
-        <ChartLead>Share of re-measured policyholders by how their Burden score changed between Day 0 and Day 90. Burden is the minus in the equation; a fall is the outcome the insurer buys.</ChartLead>
+        <CardHead eyebrow="Preventable Suffering · change at Day 90 · projection" title="Where the fall would come from" aside={<StatusTag tone="draft">Projection · J3</StatusTag>} />
+        <ChartLead>Projected share of re-measured policyholders by how their Burden score would change between Day 0 and Day 90, from direct-member cohorts on method v1.0. Burden is the minus in the equation; a fall is the outcome the insurer buys.</ChartLead>
         <div className="h-[200px]" aria-hidden>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={bandData} layout="vertical" margin={{ top: 0, right: 32, bottom: 0, left: 8 }}>
@@ -963,8 +979,8 @@ function InsurerOutcomes() {
           </ResponsiveContainer>
         </div>
         <ul className="sr-only">{bandData.map((b) => <li key={b.label}>{b.label}: {b.value}%</li>)}</ul>
-        <p className="mt-4 text-[14px] text-ink-2">{pct(INSURER.bands[3].share)} saw their Burden rise. Each of them was offered a call with a named AIWO clinician; the insurer is told the count of offers ({INSURER.routed}), nothing more.</p>
-        <MethodLine method="v1.0" grade="index" takenOn="2027-01-19" className="mt-5" />
+        <p className="mt-4 text-[14px] text-ink-2">On this projection {pct(INSURER.bands[3].share)} would see their Burden rise, about <span className="num">{INSURER.routed.toLocaleString('en-IN')}</span> people. Each of them is offered a call with a named AIWO clinician; the insurer is told the count of offers, nothing more.</p>
+        <MethodLine method="v1.0" grade="index" className="mt-5" />
       </Card>
 
       <Card className="lg:col-span-5">
@@ -973,10 +989,10 @@ function InsurerOutcomes() {
           <Row k="Per member per year" v={<span className="num">{inr(INSURER.pricePerMember)}</span>} />
           <Row k="Fixed component" v={<span className="num">{lakh(base)}</span>} />
           <Row k={<>Released on a cohort Burden fall of ≥{threshold} points</>} v={<span className="num">{lakh(outcome)}</span>} />
-          <Row k="Measured fall at Day 90" v={<span className="num">{fall} points</span>} />
+          <Row k="Projected fall at Day 90" v={<span className="num">{fall} points</span>} />
         </dl>
         <div className={clsx('mt-4 rounded-card p-4 text-[15px]', met ? 'bg-paper-sunk text-ink' : 'border border-line text-ink-2')}>
-          {met ? <>Condition met. The outcome component is released after the independent check of the cohort record.</> : <>Condition not met. The outcome component is not paid, and the result is published as it is.</>}
+          {met ? <>On this projection the condition would be met. The outcome component is released only on the measured Day-90 record, after its independent check.</> : <>On this projection the condition would not be met. If the measured record agrees, the outcome component is not paid, and the result is published as it is.</>}
         </div>
         <p className="mt-4 text-[13px] text-ink-3">Illustrative pilot terms for discussion with Star Health (Decision 7). Not an offer.</p>
       </Card>

@@ -22,7 +22,7 @@ export const MEMBER = {
   dayOfLoop: 23,
   loopLength: 90,
   loopStarted: '2027-01-05',
-  nextMeasure: '2027-04-02',
+  nextMeasure: '2027-04-05',
   cohort: 'AIWO Joyspan 2027 · Fairmont Mumbai',
   device: 'Oura Ring Gen 4',
   quietHours: '21:45 – 07:30',
@@ -33,24 +33,26 @@ export const INDEX_HISTORY: IndexScore[] = [
   {
     id: 'ix_003',
     memberId: MEMBER.id,
-    grade: 'index',
+    // Taken on site at the Joycation and signed by the physician before checkout.
+    grade: 'clinical',
     method: 'v1.0',
     engineBuild: 'engine 1.0.4',
     takenOn: '2027-01-02',
-    nextMeasure: '2027-04-02',
+    nextMeasure: '2027-04-05',
     terms: [
-      { key: 'H', value: 71, band: 'steady', delta: 3 },
+      { key: 'H', value: 71, band: 'steady', delta: 4 },
       { key: 'P', value: 84, band: 'steady', delta: 2 },
       { key: 'R', value: 77, band: 'steady', delta: 1 },
       { key: 'F', value: 62, band: 'uneven', delta: -4 },
       { key: 'D', value: 58, band: 'uneven', delta: 5 },
-      { key: 'B', value: 24, band: 'uneven', delta: -3 },
+      { key: 'B', value: 24, band: 'steady', delta: -3 },
     ],
     gm: 69.8,
     lambda: 0.25,
     value: 64,
     band: 'uneven',
     lowestTerm: 'D',
+    signedBy: 'Dr Meera Iyer',
   },
   {
     id: 'ix_002',
@@ -61,12 +63,12 @@ export const INDEX_HISTORY: IndexScore[] = [
     takenOn: '2026-10-04',
     nextMeasure: '2027-01-02',
     terms: [
-      { key: 'H', value: 68, band: 'uneven' },
+      { key: 'H', value: 67, band: 'uneven' },
       { key: 'P', value: 82, band: 'steady' },
       { key: 'R', value: 76, band: 'steady' },
       { key: 'F', value: 66, band: 'uneven' },
       { key: 'D', value: 53, band: 'uneven' },
-      { key: 'B', value: 27, band: 'uneven' },
+      { key: 'B', value: 27, band: 'steady' },
     ],
     gm: 68.1,
     lambda: 0.25,
@@ -147,14 +149,17 @@ export const LEDGER: LedgerEntry[] = [
 ]
 
 /** Joy moments per tag, this week — feeds "this week, joy came most from". */
+// Tag counts of the seed LEDGER above (seven entries, 25 to 28 Jan), so the weekly bars and
+// the Ledger list agree. One entry can carry several tags, so these add up to more than 7.
 export const LEDGER_WEEK = [
-  { tag: 'People', count: 9 },
-  { tag: 'Food', count: 6 },
-  { tag: 'Rest', count: 4 },
-  { tag: 'Nature', count: 3 },
-  { tag: 'Learning', count: 3 },
-  { tag: 'Music', count: 2 },
+  { tag: 'People', count: 3 },
+  { tag: 'Food', count: 2 },
   { tag: 'Beauty', count: 1 },
+  { tag: 'Learning', count: 1 },
+  { tag: 'Movement', count: 1 },
+  { tag: 'Music', count: 1 },
+  { tag: 'Nature', count: 1 },
+  { tag: 'Rest', count: 1 },
 ]
 
 export const TEAM: Person[] = [

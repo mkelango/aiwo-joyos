@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
 import { BookOpen, Check, FileText, FlaskConical, Lock, PenLine, Play, RotateCcw, ShieldCheck, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MutableRefObject } from 'react'
 import { Bar, BarChart, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { DaybreakButton, Eyebrow, MethodLine, SpecimenTag, TermChip, TermDot } from '@/components/joy/primitives'
 import { Avatar, Button, Card, PageHeader, Pill, Sheet, Tabs } from '@/components/ui'
@@ -11,7 +11,7 @@ import { TERMS, termByKey } from '@/data/terms'
 import { FIVE, METHODS, geometricMean } from '@/domain/indexEngine'
 import type { MethodVersion, TermKey } from '@/domain/types'
 import { CLAIMS_LOG, COUNCIL_REVIEW, DATA_REQUESTS, INSTRUMENT_LICENCE, GOLDEN_CASES, JOY_REPORT, METHOD_V10_META, NEEDS_CITATION, REFUSED, RESEARCH, SIGNERS, WEIGHTS_V10, WEIGHTS_V11_PROPOSAL, type WeightSet } from './_data'
-import { AccessNote, CardHead, ChartLead, Field, Kpi, ScrollTabs, StatusTag, areaCls, fieldCls, pct, tick, tipLabel, tipStyle, useTabParam } from './_parts'
+import { AccessNote, CardHead, ChartLead, Field, Kpi, ScrollTabs, StatusTag, areaCls, fieldCls, pct, tabPanelProps, tick, tipLabel, tipStyle, useTabParam } from './_parts'
 
 // SCIENCE OFFICE (Memo p.10–11, p.22, p.38; Architecture p.16): methods are configuration,
 // versioned, immutable once published, and need two signers. Results are published up and down;
@@ -47,13 +47,30 @@ function useDraft() {
   const [tests, setTests] = useState<'idle' | 'running' | 'done'>('idle')
   const [signed, setSigned] = useState<string[]>([])
   const [published, setPublished] = useState(false)
-  return { weights, setWeights, lambda, setLambda, tests, setTests, signed, setSigned, published, setPublished }
+  // The golden-file run is held here, not in the Methods panel, so it survives a tab change; any edit cancels it,
+  // because a pass (and a signature) covers exact content. Cleared when the page unmounts.
+  const testTimer = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(testTimer.current), [])
+  const runTests = () => {
+    window.clearTimeout(testTimer.current)
+    setTests('running')
+    testTimer.current = window.setTimeout(() => setTests('done'), 1100)
+  }
+  // Any edit after testing or signing invalidates both.
+  const touch = () => {
+    window.clearTimeout(testTimer.current)
+    setTests('idle')
+    setSigned([])
+  }
+  return { weights, setWeights, lambda, setLambda, tests, runTests, touch, signed, setSigned, published, setPublished }
 }
 type Draft = ReturnType<typeof useDraft>
 
 export default function Science() {
   const [tab, setTab] = useTabParam(TABS, 'methods')
   const [focusDraft, setFocusDraft] = useState(0)
+  // Set by the header action; Methods scrolls to the draft once it has mounted, then clears it.
+  const scrollToDraft = useRef(false)
   const draft = useDraft()
   const [inst, setInst] = useState<Record<string, InstRow>>(() => Object.fromEntries(INSTRUMENTS.map((i) => [i.code, { status: i.status, licence: i.licence }])))
   const [redesign, setRedesign] = useState<Record<string, boolean>>({})
@@ -62,9 +79,9 @@ export default function Science() {
   const countInst = (st: string) => instRows.filter((i) => i.status === st).length
 
   const openDraft = () => {
+    scrollToDraft.current = true
     setTab('methods')
     setFocusDraft((n) => n + 1)
-    window.setTimeout(() => document.getElementById('draft-v11')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
   }
 
   const flagged = COHORTS.filter((c) => c.improved !== null && c.improved < 0.5).length
@@ -91,6 +108,7 @@ export default function Science() {
       </div>
 
       <ScrollTabs<Tab>
+        idBase="sci"
         label="Science Office sections"
         value={tab}
         onChange={setTab}
@@ -106,8 +124,8 @@ export default function Science() {
       />
 
       <AnimatePresence mode="wait">
-        <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
-          {tab === 'methods' && <Methods focusKey={focusDraft} d={draft} />}
+        <motion.div key={tab} {...tabPanelProps('sci', tab)} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+          {tab === 'methods' && <Methods focusKey={focusDraft} scrollRequest={scrollToDraft} d={draft} />}
           {tab === 'instruments' && <Instruments rows={instRows} onConfirm={(code, ref) => setInst((x) => ({ ...x, [code]: { status: 'live', licence: 'Confirmed in writing · 28 Jan 2027', ref } }))} />}
           {tab === 'cohorts' && <Cohorts redesign={redesign} setRedesign={setRedesign} />}
           {tab === 'research' && <Research />}
@@ -126,10 +144,30 @@ function cloneWeights(w: WeightSet): WeightSet {
 }
 const sumOf = (arr: { w: number }[]) => Math.round(arr.reduce((a, c) => a + c.w, 0) * 100) / 100
 
-function Methods({ focusKey, d }: { focusKey: number; d: Draft }) {
-  const { weights, setWeights, lambda, setLambda, tests, setTests, signed, setSigned, published, setPublished } = d
+function Methods({ focusKey, scrollRequest, d }: { focusKey: number; scrollRequest: MutableRefObject<boolean>; d: Draft }) {
+  const { weights, setWeights, lambda, setLambda, tests, runTests, touch, signed, setSigned, published, setPublished } = d
   const [term, setTerm] = useState<TermKey>('H')
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const running = tests === 'running'
+
+  // Runs after this panel has mounted (from another tab, once AnimatePresence has finished the exit) or, when
+  // Methods is already open, after the click. Only a request from the header action scrolls; opening the tab by hand does not.
+  useEffect(() => {
+    if (!scrollRequest.current) return
+    scrollRequest.current = false
+    document.getElementById('draft-v11')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [focusKey, scrollRequest])
+
+  // Term picker: a radio group, so one stop in the Tab order and arrow keys move selection and focus.
+  const onTermKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    const i = SIX.indexOf(term)
+    const n = SIX.length
+    const to = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? (i + 1) % n : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? (i - 1 + n) % n : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -1
+    if (to < 0) return
+    e.preventDefault()
+    setTerm(SIX[to])
+    document.getElementById(`term-radio-${SIX[to]}`)?.focus()
+  }
 
   const sums = useMemo(() => Object.fromEntries(SIX.map((k) => [k, sumOf(weights[k])])) as Record<TermKey, number>, [weights])
   const weightsOk = SIX.every((k) => sums[k] === 1)
@@ -137,19 +175,10 @@ function Methods({ focusKey, d }: { focusKey: number; d: Draft }) {
   const testsOk = tests === 'done' && weightsOk && lambdaOk
   const ready = testsOk && signed.length === 2
 
-  // Any edit after testing or signing invalidates both: a signature covers exact content.
-  const touch = () => {
-    setTests('idle')
-    setSigned([])
-  }
   const setW = (k: TermKey, i: number, v: number) => {
-    if (published) return
+    if (published || running) return
     setWeights((w) => ({ ...w, [k]: w[k].map((c, j) => (j === i ? { ...c, w: Math.round(v * 100) / 100 } : c)) }))
     touch()
-  }
-  const runTests = () => {
-    setTests('running')
-    window.setTimeout(() => setTests('done'), 1100)
   }
 
   const spec = INDEX_HISTORY[0]
@@ -182,7 +211,7 @@ function Methods({ focusKey, d }: { focusKey: number; d: Draft }) {
                 <p className="mt-2 text-[15px] text-ink-2">{m.label}</p>
                 <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-3 text-[14px]">
                   <div><dt className="eyebrow normal-case text-ink-3">λ</dt><dd className="num mt-0.5 text-ink">{isDraft ? lambda.toFixed(2) : m.lambda.toFixed(2)}</dd></div>
-                  <div><dt className="eyebrow text-ink-3">{v === 'v1.0' ? 'Published' : 'Planned'}</dt><dd className="num mt-0.5 text-ink">{v === 'v1.0' ? '22 Oct 2026' : isDraft ? (published ? '28 Jan 2027' : '30 Jun 2027') : m.published}</dd></div>
+                  <div><dt className="eyebrow text-ink-3">{v === 'v1.0' || (isDraft && published) ? 'Published' : 'Planned'}</dt><dd className="num mt-0.5 text-ink">{v === 'v1.0' ? '22 Oct 2026' : isDraft ? (published ? '28 Jan 2027' : '31 Mar 2028') : m.published}</dd></div>
                 </dl>
                 {v === 'v1.0' && (
                   <div className="mt-3 space-y-1 text-[13px] text-ink-3">
@@ -225,12 +254,15 @@ function Methods({ focusKey, d }: { focusKey: number; d: Draft }) {
           <AccessNote icon="lock" className="mb-5">Published 28 Jan 2027 · <span className="num">sha256:3b7f…a912</span>. These fields are locked. Any further change starts v1.2 and needs two new signatures.</AccessNote>
         )}
 
-        <div role="radiogroup" aria-label="Term to edit" className="mb-5 flex flex-wrap gap-2">
+        <div role="radiogroup" aria-label="Term to edit" onKeyDown={onTermKey} className="mb-5 flex flex-wrap gap-2">
           {SIX.map((k) => (
             <button
               key={k}
+              id={`term-radio-${k}`}
+              type="button"
               role="radio"
               aria-checked={term === k}
+              tabIndex={term === k ? 0 : -1}
               onClick={() => setTerm(k)}
               className={clsx('inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[14px] transition-colors focus-ring', term === k ? 'border-ink bg-paper-sunk text-ink' : 'border-line text-ink-2 hover:text-ink')}
             >
@@ -240,7 +272,7 @@ function Methods({ focusKey, d }: { focusKey: number; d: Draft }) {
           ))}
         </div>
 
-        <fieldset disabled={published}>
+        <fieldset disabled={published || running}>
           <legend className="sr-only">Weights for {termByKey(term).name}</legend>
           <ul className="space-y-4">
             {weights[term].map((c, i) => {
@@ -276,7 +308,7 @@ function Methods({ focusKey, d }: { focusKey: number; d: Draft }) {
               <label htmlFor="lambda" className="text-[15px] text-ink">λ · the weight of Preventable Suffering</label>
               <span className="num text-[1.4rem] font-light text-ink">{lambda.toFixed(2)}</span>
             </div>
-            <input id="lambda" type="range" min={0.15} max={0.35} step={0.01} value={lambda} onChange={(e) => { setLambda(Number(e.target.value)); touch() }} className="mt-2 w-full accent-[color:var(--ink)]" aria-valuetext={`λ ${lambda.toFixed(2)}`} />
+            <input id="lambda" type="range" min={0.15} max={0.35} step={0.01} value={lambda} onChange={(e) => { if (running) return; setLambda(Number(e.target.value)); touch() }} className="mt-2 w-full accent-[color:var(--ink)]" aria-valuetext={`λ ${lambda.toFixed(2)}`} />
             <div className="num mt-1 flex justify-between text-[12px] text-ink-3"><span>0.15</span><span>v1.0 · 0.25</span><span>0.35</span></div>
           </div>
         </fieldset>
@@ -295,7 +327,7 @@ function Methods({ focusKey, d }: { focusKey: number; d: Draft }) {
             ))}
           </ul>
           {!published && (
-            <Button variant="ghost" size="sm" className="mt-4" onClick={() => { setWeights(cloneWeights(WEIGHTS_V11_PROPOSAL)); setLambda(METHODS['v1.1'].lambda); touch() }}><RotateCcw size={14} aria-hidden /> Reset to the calibration proposal</Button>
+            <Button variant="ghost" size="sm" className="mt-4" disabled={running} onClick={() => { setWeights(cloneWeights(WEIGHTS_V11_PROPOSAL)); setLambda(METHODS['v1.1'].lambda); touch() }}><RotateCcw size={14} aria-hidden /> Reset to the calibration proposal</Button>
           )}
         </div>
       </Card>

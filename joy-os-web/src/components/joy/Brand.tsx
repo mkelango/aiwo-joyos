@@ -7,8 +7,8 @@ import { SHARED } from '@/components/_i18n'
 // under or beside the mark, caps, +240 tracking (Playbook p20–27).
 export function AiwoMark({ className, size = 22 }: { className?: string; size?: number }) {
   return (
-    <span className={clsx('font-sans font-light text-ink', className)} style={{ fontSize: size, letterSpacing: '0.18em' }} aria-label="AIWO">
-      A<span className="mx-[0.02em] inline-block -skew-x-0 font-extralight">\</span>WO
+    <span className={clsx('font-sans font-light text-ink', className)} style={{ fontSize: size, letterSpacing: '0.18em' }} role="img" aria-label="AIWO">
+      A<span className="mx-[0.02em] inline-block -skew-x-0 font-extralight" aria-hidden>\</span>WO
     </span>
   )
 }

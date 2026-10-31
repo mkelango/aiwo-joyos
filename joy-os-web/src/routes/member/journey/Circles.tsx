@@ -23,7 +23,8 @@ const DISC = { background: 'var(--paper-sunk)', color: 'var(--ink-2)' } as const
 const callDate = new Date(`${CIRCLE_NEXT.date}T${CIRCLE_NEXT.time}:00`)
 const weekdayIn = (locale: string) => callDate.toLocaleDateString(locale, { weekday: 'long' })
 const shortDayIn = (locale: string) => callDate.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short', numberingSystem: 'latn' })
-const opensAt = new Date(callDate.getTime() - 10 * 60000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+/** The room opens ten minutes early; shown through the member's clock() helper, like the call time. */
+const opensDate = new Date(callDate.getTime() - 10 * 60000)
 const CALL_OPEN = TODAY >= CIRCLE_NEXT.date
 
 type RoomMode = 'waiting' | 'live'
@@ -44,6 +45,7 @@ export default function Circles() {
   const { t, r, tx, term, locale, clock } = useJ()
   const fmtDate = useFmtDate()
   const shortDay = shortDayIn(locale)
+  const opensAt = clock(opensDate.getHours(), opensDate.getMinutes())
 
   // Arriving from Events (“Book for two, from your circle”) lands on the salons.
   useEffect(() => {
@@ -123,10 +125,10 @@ export default function Circles() {
           <Card>
             <Eyebrow>{t('attendance')}</Eyebrow>
             <p className="mt-2 text-[15px] text-ink-2">{t('attendanceLead')}</p>
-            <ol className="mt-4 space-y-2.5">
+            <ol className="mt-4 grid grid-cols-[minmax(3.5rem,auto)_1fr_2.5rem] items-center gap-x-3 gap-y-2.5">
               {sessions.map((s) => (
-                <li key={s.week} className="grid grid-cols-[3.5rem_1fr_2.5rem] items-center gap-3">
-                  <span className="eyebrow min-w-0 truncate text-ink-3">{s.week === 0 ? t('formed') : `W${s.week}`}</span>
+                <li key={s.week} className="col-span-3 grid grid-cols-subgrid items-center">
+                  <span className="eyebrow whitespace-nowrap text-ink-3">{s.week === 0 ? t('formed') : `W${s.week}`}</span>
                   <span className="flex gap-1" aria-hidden>
                     {Array.from({ length: 8 }, (_, i) => (
                       <span key={i} className="h-2.5 flex-1 rounded-full" style={{ background: i < s.attended ? 'var(--term-r)' : 'var(--line)' }} />
@@ -265,8 +267,9 @@ function CallRoom({ mode, onMode, onLeave }: { mode: RoomMode; onMode: (m: RoomM
   const rootRef = useRef<HTMLDivElement>(null)
   const leaveRef = useRef<HTMLButtonElement>(null)
   const live = mode === 'live'
-  const { t, r, tx, locale } = useJ()
+  const { t, r, tx, locale, clock } = useJ()
   const shortDay = shortDayIn(locale)
+  const opensAt = clock(opensDate.getHours(), opensDate.getMinutes())
   const prompt = PRACTICE_CONTENT.find((p) => p.week === CIRCLE.week)!.circlePrompt
   const others = CIRCLE.members.filter((m) => m !== MEMBER.firstName)
   const present = others.filter((m) => m !== 'Thomas')

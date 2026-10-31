@@ -7,6 +7,7 @@ import { Toggle } from '@/components/ui'
 import type { TermKey } from '@/domain/types'
 import type { ItemKind } from './_data'
 import { useJ } from './_i18n'
+import { setOffline as setOfflineWeek, useJourney } from './_store'
 
 const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 
@@ -86,8 +87,11 @@ export function AudioPlayer({ week, title, seconds, transcript, term }: { week: 
   const [playing, setPlaying] = useState(false)
   const [pos, setPos] = useState(week === 4 ? 74 : 0)
   const [rate, setRate] = useState<1 | 1.25 | 0.8>(1)
-  const [offline, setOffline] = useState(false)
-  const [downloading, setDownloading] = useState(0)
+  // Kept for offline in the journey store, so it survives leaving the screen
+  // and shows the same on Practice and the week page.
+  const offline = useJourney().offlineWeeks.includes(week)
+  const setOffline = (on: boolean) => setOfflineWeek(week, on)
+  const [downloading, setDownloading] = useState(offline ? 100 : 0)
   const [showText, setShowText] = useState(false)
   const reduce = useReducedMotion()
   const { t, r, en } = useJ()
@@ -170,7 +174,7 @@ export function AudioPlayer({ week, title, seconds, transcript, term }: { week: 
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => setPos((p) => Math.max(0, p - 15))} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line px-3 text-[13px] text-ink-2 hover:text-ink focus-ring" aria-label={t('back15')}>
-          <RotateCcw size={14} /> <span className="num">15</span>s
+          <RotateCcw size={14} /> {r('back15Short', { n: { n: '15' } })}
         </button>
         <button type="button" onClick={() => setRate((r) => (r === 1 ? 1.25 : r === 1.25 ? 0.8 : 1))} className="inline-flex h-9 items-center rounded-full border border-line px-3 font-mono text-[13px] text-ink-2 hover:text-ink focus-ring" aria-label={t('speed', { rate })}>
           {rate}×

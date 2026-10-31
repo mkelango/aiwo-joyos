@@ -12,6 +12,8 @@ export function Toggle({ checked, onChange, label, description, disabled }: { ch
       disabled={disabled}
       accessibilityRole="switch"
       accessibilityLabel={label}
+      // The label replaces the row's text for VoiceOver/TalkBack, so the description is read as the hint.
+      accessibilityHint={typeof description === 'string' ? description : undefined}
       accessibilityState={{ checked, disabled: !!disabled }}
       // react-native-web drops accessibilityState, so say it in ARIA too.
       aria-checked={checked}

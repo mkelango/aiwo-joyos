@@ -266,8 +266,8 @@ export const PASSPORT = {
   issued: '2026-12-31',
   issuedAt: 'Fairmont Mumbai',
   stamps: [
-    { id: 's1', place: 'Fairmont Mumbai', what: 'Joycation · AIWO Joyspan 2027', when: '31 Dec 2026 – 5 Jan 2027', kind: '’Cation', term: 'ALL' as const, done: true },
-    { id: 's2', place: 'Joyspan House Chennai', what: 'Joyspan Session', when: 'Sat 20 Feb 2027', kind: 'House', term: 'R' as TermKey, done: false },
+    { id: 's1', place: 'Fairmont Mumbai', what: 'Joycation · AIWO Joyspan 2027', when: '31 Dec 2026 – 5 Jan 2027', date: '2026-12-31', to: '2027-01-05' as string | undefined, kind: '’Cation', term: 'ALL' as const, done: true },
+    { id: 's2', place: 'Joyspan House Chennai', what: 'Joyspan Session', when: 'Sat 20 Feb 2027', date: '2027-02-20', to: undefined as string | undefined, kind: 'House', term: 'R' as TermKey, done: false },
   ],
   entitlements: [
     { label: 'Named coach and concierge', detail: 'Priya Natarajan · Ravi Shankar', used: null as null | string },
@@ -381,9 +381,9 @@ export const OTHER_CIRCLES = [
 ]
 
 export const SALONS = [
-  { id: 'sa1', title: 'Food & memory', host: 'Chef Revathi', when: 'Thu 4 Mar 2027 · 19:30', where: 'Adyar, Chennai', term: 'D' as TermKey, seats: 16 },
-  { id: 'sa2', title: 'Old friends, new questions', host: 'Priya Natarajan', when: 'Sat 20 Mar 2027 · 17:00', where: 'Joyspan House Chennai', term: 'R' as TermKey, seats: 20 },
-  { id: 'sa3', title: 'Music we grew up with', host: 'Vidwan T. Krishnan', when: 'Sun 11 Apr 2027 · 18:00', where: 'Mylapore, Chennai', term: 'D' as TermKey, seats: 24 },
+  { id: 'sa1', title: 'Food & memory', host: 'Chef Revathi', when: 'Thu 4 Mar 2027 · 19:30', date: '2027-03-04', time: '19:30', where: 'Adyar, Chennai', term: 'D' as TermKey, seats: 16 },
+  { id: 'sa2', title: 'Old friends, new questions', host: 'Priya Natarajan', when: 'Sat 20 Mar 2027 · 17:00', date: '2027-03-20', time: '17:00', where: 'Joyspan House Chennai', term: 'R' as TermKey, seats: 20 },
+  { id: 'sa3', title: 'Music we grew up with', host: 'Vidwan T. Krishnan', when: 'Sun 11 Apr 2027 · 18:00', date: '2027-04-11', time: '18:00', where: 'Mylapore, Chennai', term: 'D' as TermKey, seats: 24 },
 ]
 
 // ─── Events ───────────────────────────────────────────────────────────────
@@ -413,10 +413,19 @@ export const ZONES: { term: TermKey; title: string; what: string; where: string 
   { term: 'B', title: 'Ease Zone', what: 'Sleep pods, the quiet room and a psychologist present all day.', where: 'Quiet room' },
 ]
 
+/** ISO dates for the shared EVENTS (src/shared/platform.ts keeps English display strings), so
+ *  dates render through the member's language with fmtDate. */
+export const EVENT_DATES: Record<string, { date: string; to?: string; time?: string }> = {
+  ev1: { date: '2026-12-31', to: '2027-01-05' },
+  ev2: { date: '2027-02-20', time: '10:00' },
+  ev3: { date: '2027-03-04', time: '19:30' },
+  ev4: { date: '2027-04-09', time: '10:00' },
+}
+
 export const SESSIONS_OPEN = [
-  { id: 'ev4', city: 'Dubai', when: 'Fri 9 Apr 2027 · 10:00', where: 'Dubai (GCC region)', price: 'Included · Circle' },
-  { id: 'ev5', city: 'Bengaluru', when: 'Sat 15 May 2027 · 10:00', where: 'Bengaluru', price: 'Included · Circle' },
-  { id: 'ev6', city: 'Coimbatore', when: 'Sat 12 Jun 2027 · 10:00', where: 'Coimbatore', price: 'Included · Circle' },
+  { id: 'ev4', city: 'Dubai', when: 'Fri 9 Apr 2027 · 10:00', date: '2027-04-09', time: '10:00', where: 'Dubai (GCC region)', price: 'Included · Circle' },
+  { id: 'ev5', city: 'Bengaluru', when: 'Sat 15 May 2027 · 10:00', date: '2027-05-15', time: '10:00', where: 'Bengaluru', price: 'Included · Circle' },
+  { id: 'ev6', city: 'Coimbatore', when: 'Sat 12 Jun 2027 · 10:00', date: '2027-06-12', time: '10:00', where: 'Coimbatore', price: 'Included · Circle' },
 ]
 
 export const FLAGSHIP_RECAP = {

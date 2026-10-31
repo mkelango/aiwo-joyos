@@ -1,4 +1,4 @@
-import { router } from 'expo-router'
+import { Redirect, router } from 'expo-router'
 import { View } from 'react-native'
 import { AiwoMark, Body, Button, DaybreakButton, Eyebrow, JoyspanWheel, Meta, Mono, Screen, Serif, TermDot, Title } from '@/components'
 import { useApp } from '@/lib/store'
@@ -9,6 +9,7 @@ import { ORDER } from '@/screens/b/parts'
 import { useDict, useTermText } from '@/lib/i18n'
 import { WELCOME } from '@/screens/b/i18n/entry'
 import { useCommon } from '@/screens/b/i18n/common'
+import { sessionStore, useStore } from '@/screens/b/bStore'
 
 // WELCOME (first run; Playbook p62): the Wheel blooming, the promise in one line, and two
 // doors — Begin (onboarding) or Sign in. The free Check for anyone not ready to join.
@@ -23,6 +24,10 @@ export default function Welcome() {
   const t = useDict(WELCOME)
   const tc = useCommon()
   const tt = useTermText()
+  const [session] = useStore(sessionStore)
+  // Welcome is for someone not yet in. A signed-in member who lands here again (back from the
+  // Index after onboarding, or Android back after Sign in) goes to Today instead.
+  if (sessionStore.hydrated() && session.signedIn) return <Redirect href="/" />
   return (
     <Screen contentStyle={{ paddingTop: space.s3, gap: space.s4, flexGrow: 1 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>

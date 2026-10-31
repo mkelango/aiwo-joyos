@@ -172,7 +172,7 @@ function TomorrowQuestion() {
       setCrisisOpen(true)
       return
     }
-    setAnswers((a) => [{ week: 4, date: '2027-01-28', text: v }, ...a])
+    setAnswers((a) => [{ id: `t${Date.now()}`, week: 4, date: SPACE_TODAY, text: v }, ...a])
     setText('')
     setSaved(true)
   }
@@ -193,8 +193,8 @@ function TomorrowQuestion() {
         ) : null}
       </View>
       <View style={{ gap: space.s1 }}>
-        {answers.map((a) => (
-          <View key={`${a.week}-${a.date}-${a.text}`} style={{ flexDirection: 'row', gap: 12 }}>
+        {answers.map((a, i) => (
+          <View key={a.id ?? `old-${i}`} style={{ flexDirection: 'row', gap: 12 }}>
             <Mono size={13} tone="ink3" style={{ width: 52 }}>
               {shortDate(a.date, lang)}
             </Mono>
@@ -271,7 +271,7 @@ function Statement() {
         }
       >
         <Meta>{t('Who do you want to be in twenty-five years, and who will be with you? A few honest sentences are enough.')}</Meta>
-        <TextField label={t('Your statement')} hideLabel value={draft} onChangeText={setDraft} multiline style={{ minHeight: 200 }} />
+        <TextField label={t('Your statement')} hideLabel value={draft} onChangeText={setDraft} multiline inputStyle={{ minHeight: 200 }} />
         <Meta size={14} tone="ink3">
           {t('Private to you. Not read by VIVA unless you ask it to.')}
         </Meta>

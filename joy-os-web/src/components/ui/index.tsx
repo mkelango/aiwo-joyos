@@ -59,14 +59,16 @@ export function Button({ children, variant = 'secondary', size = 'md', className
 }
 
 export function Pill({ children, className, tone = 'neutral' }: { children: ReactNode; className?: string; tone?: 'neutral' | 'daybreak' | 'ink' | 'positive' | 'caution' }) {
+  // Status tones stay in Ink: the Spectrum is reserved for the six terms (a green "Paid" would
+  // read as Healthspan) and Daybreak for the one primary action. 1px border, 1px less padding.
   const t = {
-    neutral: 'bg-paper-sunk text-ink-2',
-    daybreak: 'bg-daybreak-soft text-daybreak-ink',
-    ink: 'bg-ink text-paper',
-    positive: 'bg-[color:var(--term-h-soft)] text-[color:var(--term-h-ink)]',
-    caution: 'bg-[color:var(--term-d-soft)] text-[color:var(--term-d-ink)]',
+    neutral: 'bg-paper-sunk px-2.5 py-1 text-ink-2',
+    daybreak: 'bg-daybreak-soft px-2.5 py-1 text-daybreak-ink',
+    ink: 'bg-ink px-2.5 py-1 text-paper',
+    positive: 'border border-line-strong bg-paper-sunk px-[9px] py-[3px] text-ink',
+    caution: 'border border-dashed border-line-strong bg-transparent px-[9px] py-[3px] text-ink-2',
   }
-  return <span className={clsx('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium', t[tone], className)}>{children}</span>
+  return <span className={clsx('inline-flex items-center gap-1.5 rounded-full text-[12px] font-medium', t[tone], className)}>{children}</span>
 }
 
 /** Initials on a neutral Paper ground: the Spectrum is reserved for the six terms, so a person's tone is not painted. */
@@ -188,6 +190,9 @@ export function Sheet({ open, onClose, title, children, side = 'right' }: { open
     if (!open) return
     const prev = document.activeElement as HTMLElement | null
     const el = dialog.current
+    // Lock the page behind the scrim so it does not scroll (or rubber-band on iOS) under the sheet.
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
     ;(el?.querySelector<HTMLElement>('button[data-sheet-close]') ?? el)?.focus()
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') return close.current()
@@ -202,6 +207,7 @@ export function Sheet({ open, onClose, title, children, side = 'right' }: { open
     window.addEventListener('keydown', onKey)
     return () => {
       window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prevOverflow
       if (prev && document.contains(prev)) prev.focus()
     }
   }, [open])

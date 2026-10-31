@@ -538,6 +538,7 @@ export const OB = {
   vCare: { en: 'Care is needed so a named person can respond if your scores need attention.', ta: 'உங்கள் மதிப்பெண்களுக்குக் கவனம் தேவைப்பட்டால், பெயர் கொண்ட ஒருவர் பதிலளிக்க ‘கவனிப்பு’ தேவை.', hi: 'अगर आपके स्कोर पर ध्यान देने की ज़रूरत हो, तो कोई नामित व्यक्ति जवाब दे सके, इसके लिए ‘देखभाल’ ज़रूरी है।' },
   vData: { en: 'Data is needed to keep your record and compute your Index.', ta: 'உங்கள் பதிவை வைத்திருக்கவும் குறியீட்டைக் கணக்கிடவும் ‘தரவு’ தேவை.', hi: 'आपका रिकॉर्ड रखने और इंडेक्स निकालने के लिए ‘डेटा’ ज़रूरी है।' },
   vHousehold: { en: 'You have an unfinished invitation. Add it, or clear it to skip.', ta: 'முடிக்காத ஒரு அழைப்பு உள்ளது. அதைச் சேருங்கள், அல்லது தவிர்க்க அழித்துவிடுங்கள்.', hi: 'एक न्योता अधूरा है। उसे जोड़ें, या छोड़ने के लिए साफ़ करें।' },
+  vQuietEmpty: { en: 'Quiet hours need both a start and an end time.', ta: 'அமைதி நேரத்துக்குத் தொடக்க நேரமும் முடிவு நேரமும் இரண்டும் தேவை.', hi: 'शांत समय के लिए शुरुआत और अंत, दोनों का समय चाहिए।' },
   vQuietSame: { en: 'Quiet hours need a different start and end time.', ta: 'அமைதி நேரத்துக்குத் தொடக்கமும் முடிவும் வேறு வேறு நேரமாக இருக்க வேண்டும்.', hi: 'शांत समय की शुरुआत और अंत अलग-अलग होने चाहिए।' },
   vChannel: { en: 'Choose at least one way to hear from us, or set reminders to none.', ta: 'எங்களிடமிருந்து தகவல் பெறக் குறைந்தது ஒரு வழியைத் தேர்ந்தெடுங்கள், அல்லது நினைவூட்டல்களை 0 ஆக்குங்கள்.', hi: 'हमसे सुनने का कम से कम एक तरीक़ा चुनें, या रिमाइंडर शून्य कर दें।' },
   optionalSuffix: { en: ' · optional', ta: ' · விருப்பத்துக்குரியது', hi: ' · वैकल्पिक' },

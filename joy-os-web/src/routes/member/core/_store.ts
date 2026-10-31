@@ -1,6 +1,7 @@
 import { useCallback, useSyncExternalStore } from 'react'
 import type { LedgerEntry, TermKey, TermScore } from '@/domain/types'
 import { LEDGER, LEDGER_WEEK, MEMBER } from '@/data/member'
+import { DAY90_DATES, LEDGER_WEEK_ENTRIES } from './_data'
 
 // Lane-local persisted state for the member core (Today, Index, Ledger, VIVA).
 // Per-viewer conveniences in localStorage, every access wrapped in try/catch so the
@@ -92,6 +93,11 @@ export function localDay(d: Date) {
 }
 export const SPECIMEN_TODAY = addDays(MEMBER.loopStarted, MEMBER.dayOfLoop)
 export const IN_REMEASURE_WINDOW = MEMBER.dayOfLoop >= 76
+/**
+ * The day the re-measure window opens: Day 76 counted from the loop's Day 0
+ * (DAY90_DATES.day0), so Day 90 lands on DAY90_DATES.day90 as every screen shows.
+ */
+export const REMEASURE_OPENS = addDays(DAY90_DATES.day0, 76)
 
 // ─── Joy Ledger helpers ─────────────────────────────────────────────────────
 const SEED_IDS = new Set(LEDGER.map((e) => e.id))
@@ -151,6 +157,23 @@ export function weekCounts(ledger: LedgerEntry[], removed: string[]) {
     .map(([tag, count]) => ({ tag, count }))
     .filter((r) => r.count > 0)
     .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
+}
+
+/**
+ * Moments (entries, not tags) kept this week: the specimen baseline
+ * (LEDGER_WEEK_ENTRIES, which already includes the seed entries) plus entries kept
+ * here, minus seed entries removed.
+ */
+export function weekEntryCount(ledger: LedgerEntry[], removed: string[]) {
+  const week = new Set(specimenWeek())
+  const gone = new Set(removed)
+  let n = LEDGER_WEEK_ENTRIES
+  for (const e of ledger) {
+    if (!week.has(specimenAt(e).slice(0, 10))) continue
+    if (isSeed(e)) n -= gone.has(e.id) ? 1 : 0
+    else n += gone.has(e.id) ? 0 : 1
+  }
+  return Math.max(0, n)
 }
 
 // ─── Ledger prompt schedule ─────────────────────────────────────────────────

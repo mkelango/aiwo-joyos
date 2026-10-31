@@ -40,6 +40,7 @@ function JourneyExplorer() {
   const [jid, setJid] = useState(JOURNEYS[0].id)
   const [step, setStep] = useState(0)
   const stepRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
   const uid = useId()
   const enterAs = useEnterAs()
   const j = JOURNEYS.find((x) => x.id === jid)!
@@ -50,6 +51,19 @@ function JourneyExplorer() {
   const choose = (id: string) => {
     setJid(id)
     setStep(0)
+  }
+  // journey tabs: roving tabIndex, arrows move between journeys and select them
+  const onTabKey = (e: KeyboardEvent) => {
+    const last = JOURNEYS.length - 1
+    let n: number | null = null
+    if (e.key === 'ArrowRight') n = ji >= last ? 0 : ji + 1
+    else if (e.key === 'ArrowLeft') n = ji <= 0 ? last : ji - 1
+    else if (e.key === 'Home') n = 0
+    else if (e.key === 'End') n = last
+    if (n === null) return
+    e.preventDefault()
+    choose(JOURNEYS[n].id)
+    tabRefs.current[n]?.focus()
   }
   const go = (n: number) => {
     const next = Math.max(0, Math.min(d.steps.length - 1, n))
@@ -67,16 +81,18 @@ function JourneyExplorer() {
     <section aria-labelledby="journeys-h" className="pb-16">
       <h2 id="journeys-h" className="sr-only">The five journeys</h2>
       {/* Journey chooser */}
-      <div role="tablist" aria-label="Journeys" className="-mx-5 flex snap-x scroll-px-5 gap-3 overflow-x-auto px-5 pb-2 md:mx-0 md:grid md:grid-cols-5 md:overflow-visible md:px-0 md:pb-0">
+      <div role="tablist" aria-label="Journeys" aria-orientation="horizontal" onKeyDown={onTabKey} className="-mx-5 flex snap-x scroll-px-5 gap-3 overflow-x-auto px-5 pb-2 md:mx-0 md:grid md:grid-cols-5 md:overflow-visible md:px-0 md:pb-0">
         {JOURNEYS.map((x, i) => {
           const on = x.id === jid
           return (
             <button
               key={x.id}
+              ref={(el) => { tabRefs.current[i] = el }}
               role="tab"
               id={`${uid}-tab-${x.id}`}
               aria-selected={on}
               aria-controls={`${uid}-panel`}
+              tabIndex={on ? 0 : -1}
               onClick={() => choose(x.id)}
               className={clsx(
                 'flex w-[240px] shrink-0 snap-start flex-col rounded-card border p-4 text-left transition-all duration-200 focus-ring md:w-auto',
@@ -122,6 +138,8 @@ function JourneyExplorer() {
                 <button
                   ref={(el) => { stepRefs.current[i] = el }}
                   role="tab"
+                  id={`${uid}-step-${i}`}
+                  aria-controls={`${uid}-step-panel`}
                   aria-selected={on}
                   tabIndex={on ? 0 : -1}
                   onClick={() => setStep(i)}
@@ -152,8 +170,10 @@ function JourneyExplorer() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
+            id={`${uid}-step-panel`}
+            role="tabpanel"
+            aria-labelledby={`${uid}-step-${step}`}
             className="mt-8 grid gap-6 rounded-card bg-paper-sunk p-5 md:p-7 lg:grid-cols-[1.4fr_1fr]"
-            aria-live="polite"
           >
             <div>
               <p className="eyebrow text-ink-3">Step {step + 1} of {d.steps.length} · {s.when} · what Joy OS does</p>

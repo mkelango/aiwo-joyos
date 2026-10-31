@@ -29,16 +29,25 @@ export type PillTone = 'neutral' | 'daybreak' | 'ink' | 'positive' | 'caution'
 /** Small status pill (not a badge: no counts, no rewards). */
 export function Pill({ children, tone = 'neutral', style }: { children: string; tone?: PillTone; style?: StyleProp<ViewStyle> }) {
   const { c, radius, fonts, textScale } = useTheme()
-  const tones: Record<PillTone, { bg: string; fg: string }> = {
+  // Status tones stay in Ink: the Spectrum is reserved for the six terms (a green "Paid" would
+  // read as Healthspan) and Daybreak for the one primary action.
+  const tones: Record<PillTone, { bg: string; fg: string; border?: string; dashed?: boolean }> = {
     neutral: { bg: c.paperSunk, fg: c.ink2 },
     daybreak: { bg: c.daybreakSoft, fg: c.daybreakInk },
     ink: { bg: c.ink, fg: c.paper },
-    positive: { bg: c.termHSoft, fg: c.termHInk },
-    caution: { bg: c.termDSoft, fg: c.termDInk },
+    positive: { bg: c.paperSunk, fg: c.ink, border: c.lineStrong },
+    caution: { bg: 'transparent', fg: c.ink2, border: c.lineStrong, dashed: true },
   }
+  const tn = tones[tone]
   return (
-    <View style={[{ alignSelf: 'flex-start', maxWidth: '100%', backgroundColor: tones[tone].bg, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 3 }, style]}>
-      <Text maxFontSizeMultiplier={1.6} style={{ fontFamily: fonts.sansSemi, fontSize: 13 * textScale, color: tones[tone].fg }}>
+    <View
+      style={[
+        { alignSelf: 'flex-start', maxWidth: '100%', backgroundColor: tn.bg, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 3 },
+        tn.border ? { borderWidth: 1, borderColor: tn.border, borderStyle: tn.dashed ? 'dashed' : 'solid', paddingHorizontal: 9, paddingVertical: 2 } : null,
+        style,
+      ]}
+    >
+      <Text maxFontSizeMultiplier={1.6} style={{ fontFamily: fonts.sansSemi, fontSize: 13 * textScale, color: tn.fg }}>
         {children}
       </Text>
     </View>

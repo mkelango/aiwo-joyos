@@ -88,6 +88,7 @@ export function Checkbox({ checked, onChange, children }: { checked: boolean; on
     <div className="flex items-start gap-3">
       <button
         id={id}
+        type="button"
         role="checkbox"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
@@ -107,6 +108,7 @@ export function Segmented<T extends string>({ value, onChange, items, label, cla
       {items.map((it) => (
         <button
           key={it.value}
+          type="button"
           role="radio"
           aria-checked={value === it.value}
           onClick={() => onChange(it.value)}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AccessibilityInfo, Pressable, View } from 'react-native'
+import { AccessibilityInfo, Pressable, View, useWindowDimensions } from 'react-native'
 import Svg, { Circle, ClipPath, Defs, G, Path, Text as SvgText } from 'react-native-svg'
 import { TERM_TEXT, useLang } from '../lib/i18n'
 import type { Lang } from '../lib/store'
@@ -100,14 +100,30 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
   const full = petalPath(inner, outer)
   const interactive = !!onSelect
 
+  // With labels the box is size + 112, wider than a 360pt phone's content column (check.tsx at
+  // size 220 is a 332pt box in 320pt). Scale the whole Wheel down to fit: the window's content
+  // width (Screen caps it at 640 with a gutter each side), then whatever the parent really gives
+  // us (measured on layout, since cards add their own padding). The viewBox stays the same.
+  const { width: winW } = useWindowDimensions()
+  const [fit, setFit] = useState(1)
+  useEffect(() => setFit(1), [box])
+  const avail = Math.min(winW, 640) - 2 * t.space.gutter
+  const scale = Math.min(1, avail > 0 ? avail / box : 1, fit)
+  const px = box * scale
+
   return (
     <View
       accessible={!interactive}
       accessibilityRole={interactive ? undefined : 'image'}
       accessibilityLabel={interactive ? undefined : describeWheel(terms, value, lang)}
-      style={{ width: box, height: box, maxWidth: '100%' }}
+      style={{ width: px, height: px, maxWidth: '100%' }}
+      onLayout={(e) => {
+        const w = e.nativeEvent.layout.width
+        // maxWidth clamped us: shrink to the width we were given.
+        if (w > 0 && w < px - 0.5) setFit(Math.min(1, w / box))
+      }}
     >
-      <Svg width={box} height={box} viewBox={`0 0 ${box} ${box}`}>
+      <Svg width={px} height={px} viewBox={`0 0 ${box} ${box}`}>
         <Defs>
           <HatchPattern id={`${uid}-hatch`} main={c.termB} soft={c.termBSoft} />
           {WHEEL_ORDER.map((k, i) => {
@@ -170,7 +186,7 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
           const tv = terms.find((x) => x.key === k)
           const a = ((i * 60 - 90) * Math.PI) / 180
           const rr = inner + len * 0.55
-          const hit = Math.max(44, len * 0.62)
+          const hit = Math.max(44, len * 0.62 * scale)
           return (
             <Pressable
               key={`hit-${k}`}
@@ -179,7 +195,7 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
               accessibilityLabel={petalLabel(lang, k, tv, ' ')}
               accessibilityState={{ selected: highlight === k }}
               aria-selected={highlight === k}
-              style={{ position: 'absolute', left: cx + Math.cos(a) * rr - hit / 2, top: cx + Math.sin(a) * rr - hit / 2, width: hit, height: hit, borderRadius: hit / 2 }}
+              style={{ position: 'absolute', left: (cx + Math.cos(a) * rr) * scale - hit / 2, top: (cx + Math.sin(a) * rr) * scale - hit / 2, width: hit, height: hit, borderRadius: hit / 2 }}
             />
           )
         })}

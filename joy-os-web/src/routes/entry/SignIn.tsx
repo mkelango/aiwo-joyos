@@ -13,7 +13,7 @@ import { useDict, useLang, useTermText } from '@/lib/i18n'
 import { useApp } from '@/lib/store'
 import { COUNTRIES, DEMO_ACCOUNTS, EMAIL_RE, OPS_ACCOUNT, countryName, phoneError, type CountryCode, type DemoAccount } from './_data'
 import { E, SI } from './_i18n'
-import { FlowTopBar, rich } from './_parts'
+import { FlowTopBar, enterCodeDigits, rich } from './_parts'
 
 // AIWO ID SIGN IN (Architecture: one identity across LifeOS and Joy OS).
 // Passkey first, then phone OTP, then email link. No real authentication:
@@ -230,10 +230,10 @@ function PhonePanel({ onDone }: { onDone: () => void }) {
   }
 
   const setDigit = (i: number, v: string) => {
-    const d = v.replace(/\D/g, '').slice(-1)
-    setCode((cur) => cur.map((x, n) => (n === i ? d : x)))
+    const next = enterCodeDigits(code, i, v)
+    setCode(next.code)
     setError(null)
-    if (d && i < 5) boxes.current[i + 1]?.focus()
+    if (next.focus !== null) boxes.current[next.focus]?.focus()
   }
   const onKey = (i: number, e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Backspace' && !code[i] && i > 0) boxes.current[i - 1]?.focus()
@@ -297,9 +297,9 @@ function PhonePanel({ onDone }: { onDone: () => void }) {
               onChange={(e) => setDigit(i, e.target.value)}
               onKeyDown={(e) => onKey(i, e)}
               onPaste={onPaste}
+              onFocus={(e) => e.currentTarget.select()}
               inputMode="numeric"
               autoComplete={i === 0 ? 'one-time-code' : 'off'}
-              maxLength={1}
               aria-label={te('digit', { n: i + 1 })}
               aria-invalid={!!error}
               className={clsx('num h-14 w-full min-w-0 rounded-xl border bg-paper text-center text-[22px] text-ink focus-ring', error && !d ? 'border-error' : 'border-line-strong')}

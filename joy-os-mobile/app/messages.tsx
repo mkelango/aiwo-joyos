@@ -1,10 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router'
-import { useEffect, useMemo, useState } from 'react'
-import { Pressable, View } from 'react-native'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { KeyboardAvoidingView, Platform, Pressable, View } from 'react-native'
 import { ArrowLink, Avatar, Body, Button, Card, DaybreakButton, Eyebrow, Icon, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Serif } from '@/components'
 import { TEAM } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
-import { PEOPLE_DETAIL, THREADS, type Msg, type Thread } from '@/screens/b/accountData'
+import { PEOPLE_DETAIL, SPECIMEN_NOW, THREADS, type Msg, type Thread } from '@/screens/b/accountData'
 import { messagesStore, useStore } from '@/screens/b/bStore'
 import { ChoiceCard, Done, Field, useCrisisGuard, memberOnly } from '@/screens/b/parts'
 import { useDict, useLang } from '@/lib/i18n'
@@ -19,11 +19,19 @@ import { ROLE, useTx } from '@/screens/b/i18n/common'
 const shortName = (name: string) => (name.startsWith('Dr') ? `Dr ${name.split(' ')[1]}` : name.split(' ')[0])
 const person = (id: string) => TEAM.find((p) => p.id === id)!
 const stamp = (iso: string) => `${iso.slice(8, 10)}.${iso.slice(5, 7)} · ${iso.slice(11, 16)}`
+/** Sent messages are stamped on the specimen day (28 Jan 2027) at the phone's clock time, so a
+ *  reply never reads as older than the message it answers. */
 const nowIso = () => {
   const d = new Date()
   const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+  return `${SPECIMEN_NOW}T${p(d.getHours())}:${p(d.getMinutes())}`
 }
+/** Keeps the reply and compose fields above the iOS keyboard (Screen is a plain ScrollView). */
+const KeyboardSafe = ({ children }: { children: ReactNode }) => (
+  <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    {children}
+  </KeyboardAvoidingView>
+)
 
 function useThreads() {
   const [state, set] = useStore(messagesStore)
@@ -63,7 +71,7 @@ function Inbox() {
   return (
     <Screen>
       <ScreenHeader
-        back={t('care')}
+        back
         eyebrow={t('inboxEyebrow')}
         title={
           <>
@@ -164,6 +172,7 @@ function ThreadView({ id }: { id: string }) {
   }
 
   return (
+    <KeyboardSafe>
     <Screen>
       <ScreenHeader back={t('messages')} eyebrow={`${pt.role(p.role)}${thread.clinical ? t('clinicalEyebrow') : ''}`} title={p.name} lead={thread.subject} />
       {thread.clinical ? (
@@ -212,6 +221,7 @@ function ThreadView({ id }: { id: string }) {
       </Card>
       <ArrowLink onPress={() => router.push('/messages')}>{t('allMessages')}</ArrowLink>
     </Screen>
+    </KeyboardSafe>
   )
 }
 
@@ -270,6 +280,7 @@ function Compose({ initialTo }: { initialTo: string }) {
   }
 
   return (
+    <KeyboardSafe>
     <Screen>
       <ScreenHeader back eyebrow={t('newMessage')} title={t('whoTitle')} lead={t('whoLead')} />
       <View style={{ gap: space.s1 }} accessibilityRole="radiogroup" accessibilityLabel={t('recipient')}>
@@ -340,5 +351,6 @@ function Compose({ initialTo }: { initialTo: string }) {
         {t('personReads')}
       </Meta>
     </Screen>
+    </KeyboardSafe>
   )
 }

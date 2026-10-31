@@ -25,6 +25,14 @@ type Env = 'sandbox' | 'live'
 type Delivery = { at: string; event: string; code: number; ms: number }
 type Device = (typeof SIGNAL_POINTS)[number] & { reported: boolean }
 type Arrival = (typeof ARRIVALS)[number]
+type Hook = (typeof WEBHOOKS)[number] & { env: Env }
+/** Logs an event to every endpoint in that environment that subscribes to it. Returns whether any did. */
+type Deliver = (event: string, detail?: string, env?: Env) => boolean
+
+const SEED_HOOKS: Hook[] = [
+  ...WEBHOOKS.map((h) => ({ ...h, env: 'live' as Env })),
+  { id: 'wh-sbx1', url: 'https://staging.fairmont-mumbai.example/joyos/hooks', events: ['arrival.created', 'zone.capacity'], status: 'healthy', last: '18:22 · 200 · 64 ms', env: 'sandbox' },
+]
 
 const SEED_LOGS: Record<Env, Delivery[]> = {
   live: [
@@ -45,14 +53,22 @@ export default function Partner() {
   const [arrivals, setArrivals] = useState<Arrival[]>(ARRIVALS)
   const [devices, setDevices] = useState<Device[]>(SIGNAL_POINTS.map((d) => ({ ...d, reported: false })))
   const [logs, setLogs] = useState(SEED_LOGS)
+  const [hooks, setHooks] = useState<Hook[]>(SEED_HOOKS)
   const online = devices.filter((s) => s.status === 'online').length
   const calibrating = devices.filter((s) => s.status === 'calibration').length
   const checkedIn = arrivals.filter((a) => a.status === 'arrived').length
   const newlyIn = arrivals.filter((a) => a.status === 'arrived' && !INITIALLY_IN.has(a.id)).length
   const sellable = PACKAGES.filter((p) => p.hotel / p.price <= RULE)
 
-  const deliver = (event: string, env: Env = 'live') =>
-    setLogs((l) => ({ ...l, [env]: [{ at: new Date(now).toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata' }), event, code: 200, ms: 80 + Math.floor(Math.random() * 70) }, ...l[env]].slice(0, 8) }))
+  const deliver: Deliver = (event, detail, env = 'live') => {
+    const targets = hooks.filter((h) => h.env === env && h.events.includes(event))
+    if (!targets.length) return false
+    const at = new Date(now).toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata' })
+    const ms = 80 + Math.floor(Math.random() * 70)
+    setLogs((l) => ({ ...l, [env]: [{ at, event: detail ? `${event} · ${detail}` : event, code: 200, ms }, ...l[env]].slice(0, 8) }))
+    setHooks((xs) => xs.map((h) => (targets.some((t) => t.id === h.id) ? { ...h, last: `${at.slice(0, 5)} · 200 · ${ms} ms`, status: 'healthy' } : h)))
+    return true
+  }
 
   return (
     <div>
@@ -101,9 +117,9 @@ export default function Partner() {
       <div className="mt-6">
         {/* Working tabs stay mounted (hidden) so passes, zones, itineraries and webhooks survive a tab switch. */}
         <div hidden={tab !== 'floor'}><Floor arrivals={arrivals} setArrivals={setArrivals} devices={devices} setDevices={setDevices} now={now} canAct={canAct} onEvent={deliver} /></div>
-        <div hidden={tab !== 'itinerary'}><Itinerary now={now} canAct={canAct} onPublish={(guest, v) => deliver(`itinerary.published · ${guest} v${v}`)} /></div>
+        <div hidden={tab !== 'itinerary'}><Itinerary now={now} canAct={canAct} onPublish={(guest, v) => deliver('itinerary.published', `${guest} v${v}`)} /></div>
         {tab === 'commerce' && <Commerce />}
-        <div hidden={tab !== 'developers'}><Developers logs={logs} setLogs={setLogs} now={now} canAct={canAct} /></div>
+        <div hidden={tab !== 'developers'}><Developers logs={logs} setLogs={setLogs} hooks={hooks} setHooks={setHooks} now={now} canAct={canAct} /></div>
       </div>
     </div>
   )
@@ -112,6 +128,14 @@ export default function Partner() {
 // ─── Arrivals, Signal Points, passes & zones ───────────────────────────────
 
 type Pass = (typeof PASSES)[number] & { inZone: string | null }
+const SEED_ZONE: Record<string, string> = { 'JX-2401': 'z2', 'JX-2402': 'z4' }
+/** The hotel arrival a pass belongs to: same first name and surname (e.g. Mrs Lalitha Pillai). */
+const arrivalForPass = (name: string, arrivals: Arrival[]) => {
+  const parts = name.split(' ')
+  const first = parts[1]
+  const last = parts[parts.length - 1]
+  return parts.length >= 3 ? arrivals.find((a) => a.name.includes(first) && a.name.includes(last)) : undefined
+}
 
 function Floor({ arrivals, setArrivals, devices, setDevices, now, canAct, onEvent }: {
   arrivals: Arrival[]
@@ -120,10 +144,11 @@ function Floor({ arrivals, setArrivals, devices, setDevices, now, canAct, onEven
   setDevices: (f: (d: Device[]) => Device[]) => void
   now: number
   canAct: boolean
-  onEvent: (event: string) => void
+  onEvent: Deliver
 }) {
-  // Passes already in house start in the studio (matches the specimen zone counts).
-  const [passes, setPasses] = useState<Pass[]>(PASSES.map((p) => ({ ...p, inZone: p.checkedIn ? (p.code === 'JX-2401' ? 'z2' : 'z4') : null })))
+  // Passes scanned in earlier start in the zone they are in (part of the specimen zone counts);
+  // any other scanned pass is checked in but not in a zone right now.
+  const [passes, setPasses] = useState<Pass[]>(PASSES.map((p) => ({ ...p, inZone: p.checkedIn ? (SEED_ZONE[p.code] ?? null) : null })))
   const [zones, setZones] = useState(ZONES)
   const [code, setCode] = useState('')
   const [zone, setZone] = useState(ZONES[1].id)
@@ -137,6 +162,15 @@ function Floor({ arrivals, setArrivals, devices, setDevices, now, canAct, onEven
   }, [undoFor])
 
   const zoneName = (id: string) => zones.find((z) => z.id === id)?.name ?? id
+  // A pass check-in is a zone scan, not the hotel arrival; the label says which is which.
+  const passState = (p: Pass) => {
+    if (p.inZone) return `In ${zoneName(p.inZone)}`
+    if (p.checkedIn) return 'Checked in · not in a zone'
+    const a = arrivalForPass(p.name, arrivals)
+    if (a?.status === 'arrived') return 'In house · not scanned in yet'
+    if (a) return `Not yet arrived · ETA ${a.eta}`
+    return 'Not scanned in yet'
+  }
 
   const checkIn = () => {
     if (!canAct) return
@@ -292,7 +326,7 @@ function Floor({ arrivals, setArrivals, devices, setDevices, now, canAct, onEven
                   <span className="min-w-0">
                     <span className="num mr-2 text-ink">{p.code}</span>
                     <span className="text-ink-2">{p.name}</span>
-                    <span className="block text-[12px] text-ink-3">{p.inZone ? `In ${zoneName(p.inZone)}` : p.checkedIn ? 'Checked in · not in a zone' : 'Not yet arrived'}</span>
+                    <span className="block text-[12px] text-ink-3">{passState(p)}</span>
                   </span>
                   {p.inZone && <Button size="sm" variant="ghost" disabled={!canAct} onClick={() => checkOut(p.code)}><LogOut size={13} aria-hidden /> Check out</Button>}
                 </li>
@@ -313,38 +347,44 @@ const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5))
 const fromMin = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
 const blockOf = (id: string) => BLOCK_LIBRARY.find((b) => b.id === id)!
 
-const planFor = (cation: string, gid: string): Plan => ({
-  slots: (ITINERARY_TEMPLATES[cation] ?? ITINERARY_TEMPLATES.Healthcation).map((s, i) => ({ ...s, uid: `${gid}-${i}` })),
+/** Day-1 template blocks that start before the guest arrives are left out of their plan. */
+const planFor = (cation: string, gid: string, eta: string): Plan => ({
+  slots: (ITINERARY_TEMPLATES[cation] ?? ITINERARY_TEMPLATES.Healthcation)
+    .map((s, i) => ({ ...s, uid: `${gid}-${i}` }))
+    .filter((s) => s.day !== 1 || toMin(s.start) >= toMin(eta)),
   version: 1,
   published: null,
   dirty: true,
 })
 
-function Itinerary({ now, canAct, onPublish }: { now: number; canAct: boolean; onPublish: (guest: string, v: number) => void }) {
+function Itinerary({ now, canAct, onPublish }: { now: number; canAct: boolean; onPublish: (guest: string, v: number) => boolean }) {
   const guests = ARRIVALS
   const [guestId, setGuestId] = useState(guests[0].id)
   const guest = guests.find((g) => g.id === guestId)!
   const days = guest.nights + 1
-  const [plans, setPlans] = useState<Record<string, Plan>>(() => Object.fromEntries(guests.map((g) => [g.id, planFor(g.cation, g.id)])))
+  const [plans, setPlans] = useState<Record<string, Plan>>(() => Object.fromEntries(guests.map((g) => [g.id, planFor(g.cation, g.id, g.eta)])))
   const plan = plans[guestId]
   const slots = plan.slots
   const [add, setAdd] = useState({ blockId: BLOCK_LIBRARY[1].id, day: 2, start: '08:00' })
   const [addErr, setAddErr] = useState('')
-  const [justPublished, setJustPublished] = useState(false)
+  const [justPublished, setJustPublished] = useState<null | { delivered: boolean }>(null)
 
-  const update = (f: (p: Plan) => Plan) => { setPlans((ps) => ({ ...ps, [guestId]: f(ps[guestId]) })); setJustPublished(false) }
+  const update = (f: (p: Plan) => Plan) => { setPlans((ps) => ({ ...ps, [guestId]: f(ps[guestId]) })); setJustPublished(null) }
 
+  /** Each conflicting slot and why: it overlaps another block, or it starts before the guest arrives. */
   const conflicts = useMemo(() => {
-    const ids = new Set<string>()
+    const why = new Map<string, 'overlap' | 'before-arrival'>()
     for (let d = 1; d <= days; d++) {
       const day = slots.filter((s) => s.day === d).sort((a, b) => toMin(a.start) - toMin(b.start))
       for (let i = 1; i < day.length; i++) {
         const prev = day[i - 1]
-        if (toMin(prev.start) + blockOf(prev.blockId).minutes > toMin(day[i].start)) { ids.add(prev.uid); ids.add(day[i].uid) }
+        if (toMin(prev.start) + blockOf(prev.blockId).minutes > toMin(day[i].start)) { why.set(prev.uid, 'overlap'); why.set(day[i].uid, 'overlap') }
       }
     }
-    return ids
-  }, [slots, days])
+    for (const s of slots) if (s.day === 1 && toMin(s.start) < toMin(guest.eta)) why.set(s.uid, 'before-arrival')
+    return why
+  }, [slots, days, guest.eta])
+  const beforeArrival = [...conflicts.values()].filter((v) => v === 'before-arrival').length
 
   const addSlot = () => {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(add.start)) return setAddErr('Use a 24-hour time, like 07:30.')
@@ -358,11 +398,10 @@ function Itinerary({ now, canAct, onPublish }: { now: number; canAct: boolean; o
     if (!canAct || conflicts.size) return
     const v = plan.published ? plan.version + 1 : plan.version
     setPlans((ps) => ({ ...ps, [guestId]: { ...ps[guestId], version: v, published: { v, at: fmtClock(now) }, dirty: false } }))
-    onPublish(guest.room, v)
-    setJustPublished(true)
+    setJustPublished({ delivered: onPublish(guest.room, v) })
   }
   // Resetting the draft keeps the published history, so the next publish is still the next version.
-  const reset = () => update((p) => ({ ...planFor(guest.cation, `${guestId}-r${Date.now()}`), version: p.version, published: p.published }))
+  const reset = () => update((p) => ({ ...planFor(guest.cation, `${guestId}-r${Date.now()}`, guest.eta), version: p.version, published: p.published }))
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1fr_340px]">
@@ -373,13 +412,13 @@ function Itinerary({ now, canAct, onPublish }: { now: number; canAct: boolean; o
           aside={
             <>
               <label htmlFor="it-guest" className="sr-only">Guest</label>
-              <select id="it-guest" value={guestId} onChange={(e) => { setGuestId(e.target.value); setJustPublished(false); setAdd((a) => ({ ...a, day: 2 })) }} className="h-9 max-w-[260px] rounded-full border border-line-strong bg-paper-raised px-3 text-[13px] text-ink focus-ring">
+              <select id="it-guest" value={guestId} onChange={(e) => { setGuestId(e.target.value); setJustPublished(null); setAdd((a) => ({ ...a, day: 2 })) }} className="h-9 max-w-[260px] rounded-full border border-line-strong bg-paper-raised px-3 text-[13px] text-ink focus-ring">
                 {guests.map((g) => <option key={g.id} value={g.id}>{g.name} · {g.cation}</option>)}
               </select>
             </>
           }
         />
-        <p className="-mt-1 mb-4 text-[14px] text-ink-2"><span className="num">{guest.nights}</span> nights, <span className="num">{days}</span> days. Day 1 is arrival ({guest.eta}); Day <span className="num">{days}</span> is checkout. Starts from the {guest.cation} template.</p>
+        <p className="-mt-1 mb-4 text-[14px] text-ink-2"><span className="num">{guest.nights}</span> nights, <span className="num">{days}</span> days. Day 1 is arrival (<span className="num">{guest.eta}</span>); Day <span className="num">{days}</span> is checkout. Starts from the {guest.cation} template, without the Day 1 blocks that begin before the guest arrives.</p>
         <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {Array.from({ length: days }, (_, i) => i + 1).map((d) => {
             const day = slots.filter((s) => s.day === d).sort((a, b) => toMin(a.start) - toMin(b.start))
@@ -390,7 +429,7 @@ function Itinerary({ now, canAct, onPublish }: { now: number; canAct: boolean; o
                 <ul className="space-y-2">
                   {day.map((s) => {
                     const b = blockOf(s.blockId)
-                    const clash = conflicts.has(s.uid)
+                    const clash = conflicts.get(s.uid)
                     return (
                       <li key={s.uid} className={clsx('rounded-lg px-3 py-2', clash ? 'border border-ink bg-paper-sunk' : 'bg-paper-sunk')}>
                         <div className="flex items-start justify-between gap-2">
@@ -398,7 +437,8 @@ function Itinerary({ now, canAct, onPublish }: { now: number; canAct: boolean; o
                             <p className="num text-[12px] text-ink-3">{s.start}–{fromMin(toMin(s.start) + b.minutes)}</p>
                             <p className="text-[14px] text-ink">{b.name}</p>
                             <p className="text-[12px] text-ink-3">{b.place}{b.kind === 'Clinical' && ' · time and room only'}</p>
-                            {clash && <p className="mt-1 text-[12px] text-ink">Overlaps another block · nudge by 15 min</p>}
+                            {clash === 'overlap' && <p className="mt-1 text-[12px] text-ink">Overlaps another block · nudge by 15 min</p>}
+                            {clash === 'before-arrival' && <p className="mt-1 text-[12px] text-ink">Before arrival · ETA <span className="num">{guest.eta}</span></p>}
                           </div>
                           <div className="flex shrink-0 flex-col items-end gap-0.5">
                             <div className="flex">
@@ -449,7 +489,7 @@ function Itinerary({ now, canAct, onPublish }: { now: number; canAct: boolean; o
         <Card>
           <Eyebrow>Publish</Eyebrow>
           <p className="mt-2 text-[15px] text-ink-2">
-            {conflicts.size > 0 ? <><span className="num text-ink">{conflicts.size}</span> blocks overlap. Resolve them before publishing.</> : plan.published && !plan.dirty ? <>Published v<span className="num">{plan.published.v}</span> at <span className="num">{plan.published.at}</span>. Make a change to publish again.</> : <>No overlaps. The guest app, concierge Ravi and your PMS get the same schedule.</>}
+            {conflicts.size > 0 ? <><span className="num text-ink">{conflicts.size}</span> {conflicts.size === 1 ? 'block needs' : 'blocks need'} attention{beforeArrival ? <> (<span className="num">{beforeArrival}</span> before arrival)</> : null}. Resolve them before publishing.</> : plan.published && !plan.dirty ? <>Published v<span className="num">{plan.published.v}</span> at <span className="num">{plan.published.at}</span>. Make a change to publish again.</> : <>No overlaps. The guest app, concierge Ravi and your PMS get the same schedule.</>}
           </p>
           <DaybreakButton className="mt-4 w-full" disabled={conflicts.size > 0 || !canAct || (!!plan.published && !plan.dirty)} onClick={publish}>
             {plan.published ? `Publish v${plan.version + 1}` : 'Publish itinerary'}
@@ -457,7 +497,13 @@ function Itinerary({ now, canAct, onPublish }: { now: number; canAct: boolean; o
           <AnimatePresence>
             {justPublished && plan.published && (
               <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mt-3 flex items-start gap-2 text-[14px] text-ink" role="status">
-                <Check size={15} className="mt-0.5 shrink-0" aria-hidden /> <span>Published v<span className="num">{plan.published.v}</span> for room <span className="num">{guest.room}</span> at <span className="num">{plan.published.at}</span>. Webhook <span className="num">itinerary.published</span> delivered to live; see API &amp; webhooks.</span>
+                <Check size={15} className="mt-0.5 shrink-0" aria-hidden />
+                <span>
+                  Published v<span className="num">{plan.published.v}</span> for room <span className="num">{guest.room}</span> at <span className="num">{plan.published.at}</span>.{' '}
+                  {justPublished.delivered
+                    ? <>Webhook <span className="num">itinerary.published</span> delivered to live; see API &amp; webhooks.</>
+                    : <>The guest app and concierge have it. No live webhook subscribes to <span className="num">itinerary.published</span>, so nothing was sent to your PMS; add one under API &amp; webhooks.</>}
+                </span>
               </motion.p>
             )}
           </AnimatePresence>
@@ -466,7 +512,7 @@ function Itinerary({ now, canAct, onPublish }: { now: number; canAct: boolean; o
               const p = plans[g.id]
               return (
                 <li key={g.id} className="flex items-baseline justify-between gap-2">
-                  <button onClick={() => { setGuestId(g.id); setJustPublished(false); setAdd((a) => ({ ...a, day: 2 })) }} className={clsx('truncate text-left focus-ring', g.id === guestId ? 'text-ink' : 'text-ink-2 hover:text-ink')}>Room <span className="num">{g.room}</span> · {g.cation}</button>
+                  <button onClick={() => { setGuestId(g.id); setJustPublished(null); setAdd((a) => ({ ...a, day: 2 })) }} className={clsx('truncate text-left focus-ring', g.id === guestId ? 'text-ink' : 'text-ink-2 hover:text-ink')}>Room <span className="num">{g.room}</span> · {g.cation}</button>
                   <span className="shrink-0 text-ink-3">{p.published ? <>v<span className="num">{p.published.v}</span> · <span className="num">{p.published.at}</span></> : 'Draft'}</span>
                 </li>
               )
@@ -604,33 +650,46 @@ function Commerce() {
 
 // ─── API credentials, webhooks, sandbox ────────────────────────────────────
 
+/** Says "Copied" only when the clipboard actually took the text (it is unavailable outside secure contexts). */
 function CopyButton({ text, label }: { text: string; label: string }) {
-  const [copied, setCopied] = useState(false)
+  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle')
   useEffect(() => {
-    if (!copied) return
-    const t = window.setTimeout(() => setCopied(false), 2000)
+    if (state !== 'copied') return
+    const t = window.setTimeout(() => setState('idle'), 2000)
     return () => window.clearTimeout(t)
-  }, [copied])
+  }, [state])
+  const copy = () => {
+    const write = navigator.clipboard?.writeText(text)
+    if (!write) return setState('failed')
+    write.then(() => setState('copied'), () => setState('failed'))
+  }
   return (
-    <button
-      type="button"
-      onClick={() => { navigator.clipboard?.writeText(text).catch(() => {}); setCopied(true) }}
-      className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-[12px] text-ink-3 hover:text-ink focus-ring"
-      aria-label={copied ? `${label} copied` : `Copy ${label}`}
-    >
-      {copied ? <><Check size={13} aria-hidden /> <span className="font-sans">Copied</span></> : <Copy size={13} aria-hidden />}
-    </button>
+    <span className="inline-flex items-center gap-1">
+      <button
+        type="button"
+        onClick={copy}
+        className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-[12px] text-ink-3 hover:text-ink focus-ring"
+        aria-label={state === 'copied' ? `${label} copied` : `Copy ${label}`}
+      >
+        {state === 'copied' ? <><Check size={13} aria-hidden /> <span className="font-sans">Copied</span></> : <Copy size={13} aria-hidden />}
+      </button>
+      {state === 'failed' && <span role="status" className="font-sans text-[12px] text-ink-2">Copy failed · select and copy</span>}
+    </span>
   )
 }
 
-type Hook = (typeof WEBHOOKS)[number] & { env: Env }
-
-function Developers({ logs, setLogs, now, canAct }: { logs: Record<Env, Delivery[]>; setLogs: (f: (l: Record<Env, Delivery[]>) => Record<Env, Delivery[]>) => void; now: number; canAct: boolean }) {
+function Developers({ logs, setLogs, hooks, setHooks, now, canAct }: {
+  logs: Record<Env, Delivery[]>
+  setLogs: (f: (l: Record<Env, Delivery[]>) => Record<Env, Delivery[]>) => void
+  hooks: Hook[]
+  setHooks: (f: (h: Hook[]) => Hook[]) => void
+  now: number
+  canAct: boolean
+}) {
   const [env, setEnv] = useState<Env>('sandbox')
   const [secret, setSecret] = useState<string | null>(null)
   const [rotatedAt, setRotatedAt] = useState<Record<Env, string>>({ sandbox: '12 Jan 2027', live: '12 Jan 2027' })
   const [confirmRotate, setConfirmRotate] = useState(false)
-  const [hooks, setHooks] = useState<Hook[]>([...WEBHOOKS.map((h) => ({ ...h, env: 'live' as Env })), { id: 'wh-sbx1', url: 'https://staging.fairmont-mumbai.example/joyos/hooks', events: ['arrival.created', 'zone.capacity'], status: 'healthy', last: '18:22 · 200 · 64 ms', env: 'sandbox' }])
   const [url, setUrl] = useState('')
   const [events, setEvents] = useState<string[]>(['arrival.created'])
   const [err, setErr] = useState('')
@@ -671,9 +730,9 @@ function Developers({ logs, setLogs, now, canAct }: { logs: Record<Env, Delivery
       <div className="min-w-0 space-y-6">
         <Card className="min-w-0">
           <CardHead eyebrow="Partner API · OpenAPI 3.1" title="Credentials" aside={<KeyRound size={17} className="text-ink-3" aria-hidden />} />
-          <div className="inline-flex rounded-full bg-paper-sunk p-1" role="radiogroup" aria-label="Environment">
+          <div className="inline-flex rounded-full bg-paper-sunk p-1" role="group" aria-label="Environment">
             {(['sandbox', 'live'] as const).map((e) => (
-              <button key={e} role="radio" aria-checked={env === e} onClick={() => { setEnv(e); setSecret(null); setConfirmRotate(false); setAdded(null); setErr('') }} className={clsx('rounded-full px-4 py-1.5 text-[14px] capitalize focus-ring', env === e ? 'bg-paper-raised text-ink shadow-card' : 'text-ink-2')}>{e}</button>
+              <button key={e} type="button" aria-pressed={env === e} onClick={() => { setEnv(e); setSecret(null); setConfirmRotate(false); setAdded(null); setErr('') }} className={clsx('rounded-full px-4 py-1.5 text-[14px] capitalize focus-ring', env === e ? 'bg-paper-raised text-ink shadow-card' : 'text-ink-2')}>{e}</button>
             ))}
           </div>
           <dl className="mt-4 space-y-3 text-[14px]">

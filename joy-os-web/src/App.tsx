@@ -1,5 +1,5 @@
 import { MotionConfig } from 'framer-motion'
-import { lazy, Suspense, useEffect, type ComponentType } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState, type ComponentType, type ErrorInfo, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppProvider } from '@/lib/store'
 import StoryLayout from '@/layouts/StoryLayout'
@@ -7,6 +7,7 @@ import MemberLayout from '@/layouts/MemberLayout'
 import ConsoleLayout from '@/layouts/ConsoleLayout'
 import { DemoBar } from '@/layouts/DemoBar'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { EnglishOnly, useDict } from '@/lib/i18n'
 import { applyReducedMotion } from '@/routes/member/account/_util'
 
 const p = (f: () => Promise<{ default: ComponentType }>) => lazy(f)
@@ -64,14 +65,64 @@ const Science = p(() => import('@/routes/console/biz/Science'))
 const Ops = p(() => import('@/routes/console/biz/Ops'))
 const Exec = p(() => import('@/routes/console/biz/Exec'))
 
+// A new page starts at the top, unless the link names a section (/app/method#ai,
+// /app/trust#data): then that section, once the (lazy) page has mounted it.
+// Pages with their own hash handler scroll to the same element, so the two agree.
 function ScrollToTop() {
-  const { pathname } = useLocation()
-  useEffect(() => { window.scrollTo({ top: 0 }) }, [pathname])
+  const { pathname, hash } = useLocation()
+  const lastPath = useRef<string | null>(null)
+  useEffect(() => {
+    const newPage = lastPath.current !== pathname
+    lastPath.current = pathname
+    if (newPage) window.scrollTo({ top: 0 })
+    let id = ''
+    try { id = decodeURIComponent(hash.slice(1)) } catch { id = hash.slice(1) }
+    if (!id) return
+    let tries = 0
+    let timer = 0
+    const seek = () => {
+      const el = document.getElementById(id)
+      if (el) return el.scrollIntoView({ block: 'start' })
+      // Not there yet: the page's chunk may still be loading. Give up after ~3 s.
+      if (++tries < 50) timer = window.setTimeout(seek, 60)
+    }
+    seek()
+    return () => window.clearTimeout(timer)
+  }, [pathname, hash])
   return null
 }
 
+// App-level words not owned by any screen area.
+const APP_T = {
+  loading: { en: 'Loading', ta: 'ஏற்றுகிறது', hi: 'लोड हो रहा है' },
+}
+
 function Loading() {
-  return <div className="flex min-h-[40vh] items-center justify-center"><span className="eyebrow text-ink-3">Loading</span></div>
+  const t = useDict(APP_T)
+  return <div role="status" className="flex min-h-[40vh] items-center justify-center"><span className="eyebrow text-ink-3">{t('loading')}</span></div>
+}
+
+/** The shared boundary, which also says when it has caught something. */
+class ReportingBoundary extends ErrorBoundary {
+  declare props: Readonly<{ children: ReactNode; onCatch?: () => void }>
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    super.componentDidCatch(error, info)
+    this.props.onCatch?.()
+  }
+}
+
+// One screen failing must not take the app with it for good: once a screen has
+// thrown, the next navigation (browser Back, a tab, the Demo menu) gets a fresh
+// boundary. Without an error nothing remounts, so layouts keep their state.
+function RouteBoundary({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation()
+  const [failedAt, setFailedAt] = useState<string | null>(null)
+  const [gen, setGen] = useState(0)
+  if (failedAt !== null && failedAt !== pathname) {
+    setFailedAt(null)
+    setGen((g) => g + 1)
+  }
+  return <ReportingBoundary key={gen} onCatch={() => setFailedAt(pathname)}>{children}</ReportingBoundary>
 }
 
 // The member's "Reduce motion" setting (Settings) applies from the first paint, not only after Settings opens.
@@ -82,23 +133,41 @@ function storedReduceMotion() {
     return false
   }
 }
-const REDUCE_MOTION = storedReduceMotion()
-applyReducedMotion(REDUCE_MOTION)
+applyReducedMotion(storedReduceMotion())
+
+/** Follows the setting live: Settings marks <html data-motion="reduce">; another tab writes storage. */
+function useReduceMotion() {
+  const [reduce, setReduce] = useState(storedReduceMotion)
+  useEffect(() => {
+    const el = document.documentElement
+    const read = () => setReduce(el.dataset.motion === 'reduce')
+    read()
+    const mo = new MutationObserver(read)
+    mo.observe(el, { attributes: true, attributeFilter: ['data-motion'] })
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === null || e.key === 'joyos:acct:prefs') applyReducedMotion(storedReduceMotion())
+    }
+    window.addEventListener('storage', onStorage)
+    return () => { mo.disconnect(); window.removeEventListener('storage', onStorage) }
+  }, [])
+  return reduce
+}
 
 export default function App() {
+  const reduce = useReduceMotion()
   return (
-    <MotionConfig reducedMotion={REDUCE_MOTION ? 'always' : 'user'}>
+    <MotionConfig reducedMotion={reduce ? 'always' : 'user'}>
     <AppProvider>
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <ScrollToTop />
-        <ErrorBoundary>
+        <RouteBoundary>
         <Suspense fallback={<Loading />}>
           <Routes>
             <Route index element={<SignIn />} />
             <Route path="signin" element={<Navigate to="/" replace />} />
             <Route path="check" element={<Check />} />
             <Route path="onboarding" element={<Onboarding />} />
-            <Route path="creds" element={<Creds />} />
+            <Route path="creds" element={<EnglishOnly><Creds /></EnglishOnly>} />
             <Route element={<StoryLayout />}>
               <Route path="platform-map" element={<PlatformMap />} />
               <Route path="journeys" element={<Journeys />} />
@@ -162,7 +231,7 @@ export default function App() {
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
-        </ErrorBoundary>
+        </RouteBoundary>
         <DemoBar />
       </BrowserRouter>
     </AppProvider>

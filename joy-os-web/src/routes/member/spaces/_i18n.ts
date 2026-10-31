@@ -1,5 +1,6 @@
 import { Fragment, createElement, type ReactNode } from 'react'
 import { useDict, useLang, useTermText, type Dict } from '@/lib/i18n'
+import type { Lang } from '@/lib/store'
 
 // Tamil and Hindi for the six Spaces and the hub. English stays exactly as it was.
 // SP holds the screen copy by key; DT translates specimen data by its English text,
@@ -252,6 +253,7 @@ export const SP = {
   'pur.ik.save': { en: 'Save the map', ta: 'வரைபடத்தைச் சேமி', hi: 'नक्शा सहेजें' },
   'pur.ik.saved': { en: 'Saved. Coach Priya sees that it changed, not what it says, unless you share it.', ta: 'சேமிக்கப்பட்டது. நீங்கள் பகிராத வரை, இது மாறியது என்பது மட்டுமே பயிற்சியாளர் Priya-வுக்குத் தெரியும், அதில் என்ன இருக்கிறது என்பது அல்ல.', hi: 'सहेजा गया। जब तक आप साझा न करें, कोच Priya को सिर्फ़ इतना दिखता है कि यह बदला, यह नहीं कि इसमें क्या लिखा है।' },
   'pur.ik.lastChanged': { en: 'Last changed 18 Jan 2027 · private to you', ta: 'கடைசியாக மாற்றியது 18 Jan 2027 · உங்களுக்கு மட்டும்', hi: 'आख़िरी बदलाव 18 Jan 2027 · सिर्फ़ आपके लिए' },
+  'pur.ik.changedOn': { en: 'Last changed {d} · private to you', ta: 'கடைசியாக மாற்றியது {d} · உங்களுக்கு மட்டும்', hi: 'आख़िरी बदलाव {d} · सिर्फ़ आपके लिए' },
   'pur.tq.eyebrow': { en: 'The Tomorrow Question · week {n}', ta: 'நாளைய கேள்வி · வாரம் {n}', hi: 'कल का सवाल · हफ़्ता {n}' },
   'pur.tq.title': { en: 'What would make tomorrow {e} waking for?', ta: 'நாளையை எழுந்திருக்கத் {e} எது ஆக்கும்?', hi: 'कल को उठने {e} क्या बनाएगा?' },
   'pur.tq.titleE': { en: 'worth', ta: 'தகுந்ததாக', hi: 'लायक' },
@@ -640,6 +642,9 @@ export const SP = {
   'ease.route.ISI': { en: 'Routed to Dr Meera Iyer. She will review within 48 hours and talk with you about whether a sleep study would help.', ta: 'Dr Meera Iyer-க்கு அனுப்பப்பட்டது. அவர் 48 மணி நேரத்துக்குள் பரிசீலித்து, தூக்க ஆய்வு உதவுமா என்று உங்களுடன் பேசுவார்.', hi: 'Dr Meera Iyer को भेजा गया। वह 48 घंटे के भीतर देखेंगी और आपसे बात करेंगी कि क्या नींद की जाँच से मदद मिलेगी।' },
   'ease.route.PSS-4': { en: 'Shared with Coach Priya. She will be in touch this week.', ta: 'பயிற்சியாளர் Priya-வுடன் பகிரப்பட்டது. இந்த வாரம் அவர் தொடர்புகொள்வார்.', hi: 'कोच Priya से साझा किया गया। वह इस हफ़्ते संपर्क करेंगी।' },
   'ease.route.Pain': { en: 'Routed to Dr Meera Iyer. She will review within 48 hours and call you.', ta: 'Dr Meera Iyer-க்கு அனுப்பப்பட்டது. அவர் 48 மணி நேரத்துக்குள் பரிசீலித்து உங்களை அழைப்பார்.', hi: 'Dr Meera Iyer को भेजा गया। वह 48 घंटे के भीतर देखेंगी और आपको फ़ोन करेंगी।' },
+  'ease.sp.errTime': { en: 'Enter both times as hours and minutes, for example 06:30.', ta: 'இரண்டு நேரங்களையும் மணி, நிமிடமாக உள்ளிடுங்கள், எடுத்துக்காட்டாக 06:30.', hi: 'दोनों समय घंटे और मिनट में भरें, जैसे 06:30।' },
+  'pl.pp.errTime': { en: 'Choose a time for it, for example 19:00.', ta: 'அதற்கு ஒரு நேரத்தைத் தேர்ந்தெடுங்கள், எடுத்துக்காட்டாக 19:00.', hi: 'इसके लिए एक समय चुनें, जैसे 19:00।' },
+  'ppl.cc.noDiffer': { en: 'This time you see every area the same way.', ta: 'இந்த முறை எல்லாப் பகுதிகளையும் நீங்கள் இருவரும் ஒரே மாதிரி பார்க்கிறீர்கள்.', hi: 'इस बार आप दोनों हर पहलू को एक जैसा देखते हैं।' },
   // @more
 } satisfies Dict
 
@@ -671,6 +676,17 @@ export const DT: Record<string, T2> = {
   'Autonomy, time affluence, CFPB financial wellbeing': { ta: 'சுய முடிவு, நேர வளம், CFPB நிதி நலம்', hi: 'अपनी मर्ज़ी, समय की भरपूरता, CFPB वित्तीय भलाई' },
   'SPANE balance, joy moments per day, savouring': { ta: 'SPANE சமநிலை, நாளுக்கு மகிழ்ச்சித் தருணங்கள், ரசித்தல்', hi: 'SPANE संतुलन, रोज़ के खुशी के पल, रस लेना' },
   'Burden falling: mood, sleep, stress, pain, avoidance': { ta: 'சுமை குறைதல்: மனநிலை, தூக்கம், மன அழுத்தம், வலி, தவிர்த்தல்', hi: 'बोझ का घटना: मूड, नींद, तनाव, दर्द, टालना' },
+  // Instrument chips (descriptive names translate; acronyms and CFPB Financial Well-Being stay as named)
+  'LE8 self-report': { ta: 'LE8 சுய அறிக்கை', hi: 'LE8 ख़ुद की जानकारी' },
+  'Capacity battery': { ta: 'திறன் சோதனைகள்', hi: 'क्षमता जाँचें' },
+  'Self-rated health': { ta: 'சுய மதிப்பீட்டில் ஆரோக்கியம்', hi: 'ख़ुद आँकी गई सेहत' },
+  'AIWO panels (clinical)': { ta: 'AIWO பேனல்கள் (மருத்துவம்)', hi: 'AIWO पैनल (क्लिनिकल)' },
+  'Support items': { ta: 'ஆதரவுக் கேள்விகள்', hi: 'सहारे के सवाल' },
+  'CSI-4 (couples)': { ta: 'CSI-4 (தம்பதியர்)', hi: 'CSI-4 (दंपति)' },
+  'BPNSFS autonomy': { ta: 'BPNSFS சுய முடிவு', hi: 'BPNSFS अपनी मर्ज़ी' },
+  'Time affluence': { ta: 'நேர வளம்', hi: 'समय की भरपूरता' },
+  'Joy Ledger density': { ta: 'Joy Ledger அடர்த்தி', hi: 'Joy Ledger घनत्व' },
+  'Savouring scale': { ta: 'ரசித்தல் அளவுகோல்', hi: 'रस लेने का पैमाना' },
   // Parts of the formulas and of Burden
   Capacity: { ta: 'திறன்', hi: 'क्षमता' },
   'Self-rated': { ta: 'சுய மதிப்பீடு', hi: 'ख़ुद का आकलन' },
@@ -746,7 +762,7 @@ export const DT: Record<string, T2> = {
   'Schedule the succession conversation.': { ta: 'வாரிசுத் திட்டம் பற்றிய உரையாடலுக்கு நேரம் குறியுங்கள்.', hi: 'उत्तराधिकार की बातचीत का समय तय कीजिए।' },
   'Thirty minutes, with Kavya and your adviser.': { ta: 'முப்பது நிமிடங்கள், Kavya மற்றும் உங்கள் ஆலோசகருடன்.', hi: 'तीस मिनट, Kavya और अपने सलाहकार के साथ।' },
   'Choice and peace of mind (Freedom Triad · Choice).': { ta: 'தேர்வும் மன நிம்மதியும் (சுதந்திர முக்கோணம் · தேர்வு).', hi: 'चुनाव और मन की शांति (स्वतंत्रता त्रिकोण · चुनाव)।' },
-  'It is the open item on your peace-of-mind list.': { ta: 'உங்கள் மன நிம்மதிப் பட்டியலில் இன்னும் முடியாமல் இருப்பது இதுதான்.', hi: 'आपकी मन की शांति वाली सूची में यही काम बाक़ी है।' },
+  'It is the bigger of the two open items on your peace-of-mind list.': { ta: 'உங்கள் மன நிம்மதிப் பட்டியலில் இன்னும் முடியாத இரண்டில் இதுவே பெரியது.', hi: 'आपकी मन की शांति वाली सूची के दो बाक़ी कामों में यह बड़ा है।' },
   'Answer the Tomorrow Question.': { ta: 'நாளைய கேள்விக்குப் பதில் சொல்லுங்கள்.', hi: 'कल के सवाल का जवाब दीजिए।' },
   'What would make tomorrow worth waking for?': { ta: 'நாளை எழுந்திருக்கத் தகுந்ததாக எது ஆக்கும்?', hi: 'कल सुबह उठने लायक क्या बनाएगा?' },
   'Meaning presence (MLQ-P).': { ta: 'வாழ்க்கையில் அர்த்தம் இருப்பது (MLQ-P).', hi: 'ज़िंदगी में मायने का होना (MLQ-P)।' },
@@ -763,11 +779,11 @@ export const DT: Record<string, T2> = {
   'Part of your capacity battery.': { ta: 'உங்கள் திறன் சோதனைகளின் ஒரு பகுதி.', hi: 'आपकी क्षमता जाँचों का हिस्सा।' },
   'WHO ICOPE locomotor capacity.': { ta: 'WHO ICOPE நடமாட்டத் திறன்.', hi: 'WHO ICOPE चलने-फिरने की क्षमता।' },
   'Keeps your capacity reading current.': { ta: 'உங்கள் திறன் அளவீட்டைப் புதுப்பித்து வைக்கிறது.', hi: 'आपकी क्षमता की रीडिंग ताज़ा रखता है।' },
-  'Walk after dinner for twenty minutes.': { ta: 'இரவு உணவுக்குப் பிறகு இருபது நிமிடங்கள் நடங்கள்.', hi: 'रात के खाने के बाद बीस मिनट टहलिए।' },
+  'Walk after dinner for half an hour.': { ta: 'இரவு உணவுக்குப் பிறகு அரை மணி நேரம் நடங்கள்.', hi: 'रात के खाने के बाद आधा घंटा टहलिए।' },
   'With Kavya if she is free.': { ta: 'Kavya-வுக்கு நேரம் இருந்தால் அவருடன்.', hi: 'Kavya ख़ाली हों तो उनके साथ।' },
   'Post-meal walking lowers glucose excursions (LE8 · blood glucose).': { ta: 'உணவுக்குப் பின் நடப்பது சர்க்கரை ஏற்றத்தைக் குறைக்கிறது (LE8 · இரத்தச் சர்க்கரை).', hi: 'खाने के बाद टहलने से शुगर का उछाल कम होता है (LE8 · ब्लड शुगर)।' },
   'HbA1c is at the edge of its range.': { ta: 'HbA1c அதன் வரம்பின் விளிம்பில் உள்ளது.', hi: 'HbA1c अपनी सीमा के किनारे पर है।' },
-  'Fifteen minutes of morning sun.': { ta: 'காலை வெயிலில் பதினைந்து நிமிடங்கள்.', hi: 'सुबह की धूप में पंद्रह मिनट।' },
+  'Ten minutes of morning sun.': { ta: 'காலை வெயிலில் பத்து நிமிடங்கள்.', hi: 'सुबह की धूप में दस मिनट।' },
   'Arms and face, before 10 am.': { ta: 'கைகளிலும் முகத்திலும், காலை 10 மணிக்கு முன்.', hi: 'बाँहों और चेहरे पर, सुबह 10 बजे से पहले।' },
   'Sun exposure supports vitamin D status; your physician advises on supplements.': { ta: 'வெயில் வைட்டமின் D அளவுக்கு உதவுகிறது; சப்ளிமென்ட்கள் பற்றி உங்கள் மருத்துவர் ஆலோசனை கூறுவார்.', hi: 'धूप विटामिन D में मदद करती है; सप्लीमेंट के बारे में आपके डॉक्टर सलाह देंगे।' },
   'Vitamin D was below range in January.': { ta: 'ஜனவரியில் வைட்டமின் D வரம்புக்குக் கீழே இருந்தது.', hi: 'जनवरी में विटामिन D सीमा से नीचे था।' },
@@ -834,7 +850,7 @@ export const DT: Record<string, T2> = {
   'Blood lipids': { ta: 'இரத்தக் கொழுப்புகள்', hi: 'ख़ून में चर्बी (लिपिड)' },
   'Blood glucose': { ta: 'இரத்தச் சர்க்கரை', hi: 'ब्लड शुगर' },
   'Blood pressure': { ta: 'இரத்த அழுத்தம்', hi: 'ब्लड प्रेशर' },
-  'MEPA 11 of 16': { ta: 'MEPA 16-இல் 11', hi: 'MEPA 16 में से 11' },
+  'MEPA 12 of 16': { ta: 'MEPA 16-இல் 12', hi: 'MEPA 16 में से 12' },
   '165 min / week': { ta: '165 நிமி / வாரம்', hi: '165 मिनट / हफ़्ता' },
   Never: { ta: 'ஒருபோதும் இல்லை', hi: 'कभी नहीं' },
   '6 h 40 m average': { ta: 'சராசரி 6 h 40 m', hi: 'औसत 6 h 40 m' },
@@ -1065,6 +1081,36 @@ export function rich(s: string, vars: Record<string, ReactNode>): ReactNode[] {
 
 export type SpKey = keyof typeof SP & string
 
+// ─── Dates and times ─────────────────────────────────────────────────────
+// Locale formatters instead of slicing a formatted string: cutting '06 ஜூலை, 2026'
+// or '04 अक्टू॰ 2026' by UTF-16 units splits Tamil and Hindi letters.
+
+const DATE_LOCALE: Record<Lang, string> = { en: 'en-GB', ta: 'ta-IN', hi: 'hi-IN' }
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
+
+/** A bare 'YYYY-MM-DD' is a calendar day, so read it in UTC; a date-time is shown in local time. */
+function fmtParts(iso: string, lang: Lang, opts: Intl.DateTimeFormatOptions, time = false) {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  const o: Intl.DateTimeFormatOptions = { numberingSystem: 'latn', ...opts, ...(DATE_ONLY.test(iso) ? { timeZone: 'UTC' } : {}) }
+  return time ? d.toLocaleTimeString(DATE_LOCALE[lang], o) : d.toLocaleDateString(DATE_LOCALE[lang], o)
+}
+
+/** '28 Jan' · '28 ஜன.' · '28 जन॰'. Returns the input unchanged when it is not a date. */
+export function fmtDayMonth(iso: string, lang: Lang) {
+  return fmtParts(iso, lang, { day: '2-digit', month: 'short' })
+}
+
+/** 'Jan 2027' in the member's language. */
+export function fmtMonthYear(iso: string, lang: Lang) {
+  return fmtParts(iso, lang, { month: 'short', year: 'numeric' })
+}
+
+/** 24-hour clock time ('07:12'), for specimen 'YYYY-MM-DDTHH:mm' and real ISO timestamps alike. */
+export function fmtClock(iso: string, lang: Lang) {
+  return fmtParts(iso, lang, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }, true)
+}
+
 export function useSpaceText() {
   const lang = useLang()
   const t = useDict(SP)
@@ -1079,5 +1125,9 @@ export function useSpaceText() {
     if (lang === 'en' || !w) return short ? en.slice(0, 2) : en
     return lang === 'ta' ? (short ? w.taShort : w.ta) : short ? w.hiShort : w.hi
   }
-  return { lang, t, tt, d, r, day }
+  /** Day and month ('28 Jan'), month and year, and clock time, in the member's language. */
+  const dm = (iso: string) => fmtDayMonth(iso, lang)
+  const my = (iso: string) => fmtMonthYear(iso, lang)
+  const clock = (iso: string) => fmtClock(iso, lang)
+  return { lang, t, tt, d, r, day, dm, my, clock }
 }

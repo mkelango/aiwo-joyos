@@ -60,6 +60,11 @@
   .btn-daybreak:active { transform: scale(0.985); }
   .btn-daybreak:disabled { opacity: 0.5; }
   .focus-ring:focus-visible { outline: 2px solid var(--daybreak); outline-offset: 2px; }
+  /* Joyspan Wheel petals: SVG <g> outlines are unreliable outside Chrome, so focus strokes the petal. */
+  .wheel-petal { outline: none; }
+  .wheel-petal:focus-visible { outline: none; }
+  .wheel-petal-ring { stroke: transparent; stroke-width: 2.5; pointer-events: none; }
+  .wheel-petal:focus-visible .wheel-petal-ring { stroke: var(--daybreak); }
   .hatch-b {
     background: repeating-linear-gradient(45deg, var(--term-b) 0 2px, var(--term-b-soft) 2px 4.5px);
   }
@@ -68,4 +73,20 @@
   .link { color: var(--daybreak-ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, var(--daybreak-ink) 35%, transparent); }
   .link:hover { text-decoration-color: currentColor; }
   .rule { border-top: 1px solid var(--line); }
+}
+
+/* Larger-text zoom (tokens.css) multiplies viewport units too, so a 100vh layout would grow to
+   112.5% / 125% of the screen. These divide the zoom back out; at default size --text-zoom is 1
+   and nothing changes. Kept unlayered and #root-scoped so they win over the utilities. */
+#root .min-h-screen { min-height: calc(100vh / var(--text-zoom, 1)); }
+#root .min-h-\[60vh\] { min-height: calc(60vh / var(--text-zoom, 1)); }
+#root .min-h-\[calc\(100vh-4rem\)\] { min-height: calc(100vh / var(--text-zoom, 1) - 4rem); }
+#root .min-h-\[calc\(100vh-3\.5rem\)\] { min-height: calc(100vh / var(--text-zoom, 1) - 3.5rem); }
+#root .h-\[calc\(100dvh-210px\)\] { height: calc(100dvh / var(--text-zoom, 1) - 210px); }
+@media (min-width: 1024px) {
+  #root .lg\:max-h-\[calc\(100vh-7rem\)\] { max-height: calc(100vh / var(--text-zoom, 1) - 7rem); }
+  #root .lg\:h-auto { height: auto; }
+}
+@media (min-width: 768px) {
+  #root .md\:min-h-0 { min-height: 0; }
 }

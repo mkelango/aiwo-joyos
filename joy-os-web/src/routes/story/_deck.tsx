@@ -166,8 +166,8 @@ function Problem() {
         <div className="flex flex-col justify-between border-l border-line pl-[48px]">
           <p className="text-[30px] font-light leading-[1.3] text-ink">“None of them asks the question the equation asks, or can show that the answer moved.”</p>
           <div>
-            <p className="num text-[96px] font-light leading-none text-ink">≤2<span className="text-[48px] text-ink-3">/5</span></p>
-            <p className="mt-3 text-[18px] leading-snug text-ink-2">Whole-life rows covered by any one of <span className="num">15</span> competitors: purpose, relationships, freedom, pleasure, retreats.</p>
+            <p className="num text-[96px] font-light leading-none text-ink">≤1<span className="text-[48px] text-ink-3">/5</span></p>
+            <p className="mt-3 text-[18px] leading-snug text-ink-2">Whole-life rows covered strongly by any one of <span className="num">15</span> competitors: purpose, relationships, freedom, pleasure, retreats. The best reach <span className="num">3</span>, and only partly.</p>
           </div>
         </div>
       </div>
@@ -353,7 +353,7 @@ function Grades() {
           <div className="text-center">
             <p className="num text-[72px] font-light leading-none text-ink">{clinical.value}</p>
             <p className="eyebrow mt-3 !text-[12px] text-ink-2">Signed · {clinical.signedBy}</p>
-            <p className="eyebrow mt-1 !text-[11px] text-ink-3">Method {clinical.method} · <span className="num">{fmtDate(clinical.takenOn)}</span></p>
+            <p className="eyebrow mt-1 !text-[11px] text-ink-3">Method {clinical.method} · <span className="num">{fmtDate(clinical.takenOn, 'en')}</span></p>
           </div>
         ))}
       </div>
@@ -502,12 +502,12 @@ function Screens() {
             </div>
             <JoyspanWheel terms={latest.terms} size={108} animate={!st} />
           </div>
-          <p className="eyebrow mt-2 !text-[9px] text-ink-3">Method {latest.method} · next measure <span className="num">{fmtDate(latest.nextMeasure)}</span></p>
+          <p className="eyebrow mt-2 !text-[9px] text-ink-3">Method {latest.method} · next measure <span className="num">{fmtDate(latest.nextMeasure, 'en')}</span></p>
           <div className="mt-4 flex flex-1 flex-col rounded-[12px] bg-paper-sunk p-3">
             <p className="eyebrow !text-[9px] text-ink-3">Today · Daily Pleasure</p>
             <p className="mt-2 text-[17px] font-light leading-snug text-ink">{TODAY_ACTION.title} <em>Notice</em> three things.</p>
             <span className="btn-daybreak mt-auto !h-10 !px-4 !text-[14px]" aria-hidden>Done for today</span>
-            <p className="mt-2 text-center text-[11px] text-ink-2">Not now</p>
+            <p className="mt-2 text-center text-[11px] text-ink-2">Not today</p>
           </div>
           <div className="mt-3 flex justify-between border-t border-line pt-2">
             {['Today', 'Spaces', '’Cation', 'Practice', 'Care'].map((t, i) => <span key={t} className={clsx('text-[9px]', i === 0 ? 'text-ink' : 'text-ink-3')}>{t}</span>)}
@@ -710,7 +710,7 @@ function Landscape() {
   return (
     <>
       <div className="flex items-end justify-between gap-6">
-        <H2 className="!text-[46px]">No one covers more than two <em>whole-life</em> rows.</H2>
+        <H2 className="!text-[46px]">No one fully covers more than one <em>whole-life</em> row.</H2>
         <span className="eyebrow mb-2 shrink-0 rounded-full border border-dashed border-line-strong px-3 py-1 !text-[12px] text-ink-3">For internal analysis</span>
       </div>
       <div className="mt-[10px] flex-1">
@@ -734,7 +734,7 @@ function Landscape() {
           <tbody>
             {MATRIX.map((r) => (
               <tr key={r.cap} className={clsx('border-t border-line', r.whole && 'bg-paper-sunk')}>
-                <td className="whitespace-nowrap py-[4px] pl-2 text-[15px] leading-[18px] text-ink">{r.whole && <span className="mr-2 inline-block h-[7px] w-[7px] rounded-full border border-ink align-middle" aria-label="whole-life row" />}{r.cap}</td>
+                <td className="whitespace-nowrap py-[4px] pl-2 text-[15px] leading-[18px] text-ink">{r.whole && <span className="mr-2 inline-block h-[7px] w-[7px] rounded-full border border-ink align-middle" aria-hidden="true" />}{r.whole && <span className="sr-only">Whole-life row: </span>}{r.cap}</td>
                 {r.row.split('').map((v, i) => <td key={i} className="py-[4px] text-center leading-[18px]"><MatrixMark v={v} size={12} /></td>)}
                 <td className="border-x border-ink py-[4px] text-center leading-[18px]"><MatrixMark v="f" size={12} /></td>
               </tr>
@@ -940,7 +940,7 @@ function Ask() {
   return (
     <>
       <H2 className="!text-[50px]">Eight decisions that let the build <em>begin</em>.</H2>
-      <p className="mt-2 text-[19px] text-ink-2">Requested by <span className="num text-ink">15 Nov 2026</span>, starting with the separate app on a shared core and a Head of Joy OS.</p>
+      <p className="mt-2 text-[19px] text-ink-2"><span className="num text-ink">4</span> requested by <span className="num text-ink">15 Nov 2026</span>, starting with the separate app on a shared core and a Head of Joy OS.</p>
       <table className="mt-[18px] w-full border-collapse text-left">
         <thead>
           <tr className="border-b border-line-strong">
@@ -1114,17 +1114,17 @@ const DEMO_PATH: [string, string][] = [
 // Reading view for phones: the slide as plain text, from the same data as the canvas.
 const OUTLINES: Record<string, string[]> = {
   cover: ['The operating system for a joyful life.', 'Span is what you gain. ’Cation is how you get it. Joy OS is how it lasts.', 'Prepared for C. Sivasankaran, Mentor, AIWO Limited.'],
-  problem: [...MARKET.map(([k, has, miss]) => `${termByKey(k).name}: ${has} exist; missing: ${miss.toLowerCase()}.`), 'No competitor covers more than two of five whole-life rows.'],
+  problem: [...MARKET.map(([k, has, miss]) => `${termByKey(k).name}: ${has} exist; missing: ${miss.toLowerCase()}.`), 'No competitor fully covers more than one of five whole-life rows; the best reach three, only partly.'],
   category: ['Longevity medicine, wellness travel, mental wellbeing and the experience economy, given one number and one loop: Joyspan management.', ...SIX_ONLY.map(([h, b]) => `${h}: ${b}`)],
   equation: ['Joyspan = Healthspan + Purpose + Relationships + Freedom + Daily Pleasure − Preventable Suffering.', `JI = GM(H, P, R, F, D) − ${METHODS['v1.0'].lambda}·B, method ${latest.method}.`, `Specimen member: ${latest.terms.map((t) => `${termByKey(t.key).name} ${t.key === 'B' ? '−' : ''}${t.value}`).join(', ')} → Index ${latest.value} (${indexDelta >= 0 ? 'up' : 'down'} ${Math.abs(indexDelta)}).`, 'A geometric mean rewards balance: the thin term is not hidden by the strong ones.'],
-  grades: ['Check: free, no login, 18 statements in 5 minutes, bands only.', `Index: about 60 items in two sittings, re-measured every 90 days (specimen ${latest.value}).`, `Clinical: physician-signed, LONGEVIS and SIIS from the shared core (specimen ${clinical.value}, ${fmtDate(clinical.takenOn)}).`],
+  grades: ['Check: free, no login, 18 statements in 5 minutes, bands only.', `Index: about 60 items in two sittings, re-measured every 90 days (specimen ${latest.value}).`, `Clinical: physician-signed, LONGEVIS and SIIS from the shared core (specimen ${clinical.value}, ${fmtDate(clinical.takenOn, 'en')}).`],
   loop: LOOP_STATIONS.map((st) => `${st.when}: ${st.does}`),
   product: [...TABS.map(([t, d]) => `${t}: ${d}`), 'Six spaces, one per term: the equation is the information architecture.'],
-  screens: [`01 · Today: Index ${latest.value}, the Wheel, one action, next measure ${fmtDate(latest.nextMeasure)}.`, `02 · Day 90, when it went down: ${DAY90_SPECIMEN.sentence}`, '03 · The Joy Ledger: one tap, a word or a photo, ten seconds.', 'A fall is a sentence and a named person: never red, never pushed.'],
+  screens: [`01 · Today: Index ${latest.value}, the Wheel, one action, next measure ${fmtDate(latest.nextMeasure, 'en')}.`, `02 · Day 90, when it went down: ${DAY90_SPECIMEN.sentence}`, '03 · The Joy Ledger: one tap, a word or a photo, ten seconds.', 'A fall is a sentence and a named person: never red, never pushed.'],
   journeys: JOURNEYS.map((j) => `${j.title} (${j.who}): ${j.steps.map(([w]) => w).join(' → ')}.`),
   ai: [...GUARDRAILS.slice(0, 4), `Typed tools: ${VIVA_TOOLS.map((t) => t.tool).join(', ')}.`],
   trust: ['The member sees everything; coach and clinician are named and audited for seven years.', 'Employers and insurers see aggregates of 50 or more, no cell under 10.', 'Venues get no health data; partner answers stay private to each partner.', 'Consent withdrawn within 24 h; export within 72 h.'],
-  landscape: [`${COMPETITORS.length} competitors profiled against ${MATRIX.length} capabilities.`, 'None covers more than two whole-life rows: purpose, relationships, freedom, pleasure, retreats.', 'For internal analysis only.'],
+  landscape: [`${COMPETITORS.length} competitors profiled against ${MATRIX.length} capabilities.`, 'None fully covers more than one whole-life row (purpose, relationships, freedom, pleasure, retreats); the best reach three, only partly.', 'For internal analysis only.'],
   'white-space': WHITE_SPACE.map((w) => `${w.h}. ${w.b}`),
   moats: MOATS.map((m) => `${m.k}: ${m.h}. ${m.b}`),
   roadmap: RELEASES.map((r) => `${r.id} · ${r.name} (${r.when}): gate, ${r.gate.charAt(0).toLowerCase()}${r.gate.slice(1)}.`),
@@ -1137,7 +1137,7 @@ const OUTLINES: Record<string, string[]> = {
 
 export const SLIDES: SlideDef[] = [
   { id: 'cover', title: 'Joy OS — the operating system for a joyful life', section: 'Cover', ground: 'ink', accent: true, bare: true, Body: Cover, notes: 'Joy OS is the operating system for a joyful life: it measures a person’s Joyspan on six terms, names the one term to raise next, delivers the ’cation, practice or habit that raises it, and holds the gain ninety days at a time, on the phone, the web and WhatsApp.', outline: OUTLINES['cover'] },
-  { id: 'problem', title: 'The problem', section: 'The problem', ground: 'paper', accent: true, Body: Problem, notes: 'Wearables count sleep and strain. Meditation apps calm the mind. Lab subscriptions read the blood. Each sells one term of the equation as if it were the whole. Across fifteen competitors and 59 screenshots, none covers more than two of the five whole-life rows, and the market has converged on wearable + blood test + an “age” number + an AI companion, all body-only.', outline: OUTLINES['problem'] },
+  { id: 'problem', title: 'The problem', section: 'The problem', ground: 'paper', accent: true, Body: Problem, notes: 'Wearables count sleep and strain. Meditation apps calm the mind. Lab subscriptions read the blood. Each sells one term of the equation as if it were the whole. Across fifteen competitors and 59 screenshots, none fully covers more than one of the five whole-life rows (the best reach three, and only partly), and the market has converged on wearable + blood test + an “age” number + an AI companion, all body-only.', outline: OUTLINES['problem'] },
   { id: 'category', title: 'The category', section: 'The category', ground: 'sunk', accent: true, Body: Category, notes: 'Joy OS takes four markets and gives them one number and one loop. That is a new category, Joyspan management, and the first company to define its unit owns it.', outline: OUTLINES['category'] },
   { id: 'equation', title: 'The equation and the Index', section: 'The equation and the Index', ground: 'paper', accent: true, Body: Equation, notes: 'JI = GM(H, P, R, F, D) − 0.25·B, method v1.0, pinned on every score. Hover, focus or click a term (or a petal) to light it on the Wheel; click again to clear. The geometric mean rewards balance; the burden term subtracts. Movements are shown both ways.', outline: OUTLINES['equation'] },
   { id: 'grades', title: 'Three grades, one method', section: 'Three grades', ground: 'paper', accent: true, Body: Grades, notes: 'The Check is free and shows bands only, never a number. The Index is about sixty items in two sittings, re-measured every ninety days. The Clinical grade is physician-signed, using the shared clinical core. One engine scores all three.', outline: OUTLINES['grades'] },
@@ -1147,13 +1147,13 @@ export const SLIDES: SlideDef[] = [
   { id: 'journeys', title: 'The five journeys', section: 'Journeys', ground: 'paper', accent: true, Body: JourneysSlide, notes: 'The ’cation guest, the couple, the founder after exit, the employee or policyholder, and the reader anywhere. Five ways in; every one ends on the same ninety-day loop. The Journeys page lets you click from each step into its screen: the link is on the slide.', outline: OUTLINES['journeys'] },
   { id: 'ai', title: 'AI that drafts, a person signs', section: 'Joyspan intelligence', ground: 'paper', accent: true, Body: Ai, notes: 'VIVA stays at six agents; Joy OS adds typed tools. Emergency intercept first. Nothing AI-written on a Suffering result. No diagnosis, no treatment, no financial advice. Every output is attributable to a model, a prompt version and a reviewer.', outline: OUTLINES['ai'] },
   { id: 'trust', title: 'Trust and privacy', section: 'Trust and privacy', ground: 'ink', accent: true, Body: Trust, notes: 'The trust centre is a feature: who has seen my data, consents, export and delete live one tap from the Index. Employers and insurers see aggregates only, venues get no health data, and partner answers stay private to each partner.', outline: OUTLINES['trust'] },
-  { id: 'landscape', title: 'Competitive landscape', section: 'Competitive landscape', ground: 'paper', accent: true, Body: Landscape, notes: 'Internal analysis only. Fifteen competitors across wearables, longevity clinics, mind apps, employer platforms and India. No competitor has more than two of the five whole-life rows, and none combines a composite index with explainability, multi-brand aggregation and rupee pricing.', outline: OUTLINES['landscape'] },
+  { id: 'landscape', title: 'Competitive landscape', section: 'Competitive landscape', ground: 'paper', accent: true, Body: Landscape, notes: 'Internal analysis only. Fifteen competitors across wearables, longevity clinics, mind apps, employer platforms and India. No competitor fully covers more than one of the five whole-life rows (the best reach three, and only partly), and none combines a composite index with explainability, multi-brand aggregation and rupee pricing.', outline: OUTLINES['landscape'] },
   { id: 'white-space', title: 'Where Joy OS wins', section: 'Where Joy OS wins', ground: 'sunk', accent: true, Body: WhiteSpace, notes: 'The white space: a measured index of a whole life; balance rewarded; an aggregator above the hardware war; pleasure and meaning as practices; real people and places; India-native rails; an HR outcome that is not illness. And what we refuse to copy, even where competitors win with it.', outline: OUTLINES['white-space'] },
   { id: 'moats', title: 'Seven moats and the flywheel', section: 'Category leadership', ground: 'paper', accent: true, Body: Moats, notes: 'The unit, the record, the standard, the habit, the places, the channels and the trust. More members measured make the cohort larger; a larger cohort validates the Index and sharpens the actions; better actions produce larger deltas; deltas are what insurers and employers pay for; volume lowers cost per member.', outline: OUTLINES['moats'] },
   { id: 'roadmap', title: 'Milk → Mountain → Moonshot', section: 'The releases', ground: 'paper', accent: true, Body: Roadmap, notes: 'Six releases on three layers. J0–J3 in Milk to March 2028, J4 licensed Joy OS in Mountain, J5 public Joy OS and the open standard in Moonshot. Every release has a gate; nothing starts before the last gate is met.', outline: OUTLINES['roadmap'] },
   { id: 'economics', title: 'Economics', section: 'Economics', ground: 'sunk', accent: true, Body: Economics, notes: 'Subscriptions plus per-member licences to insurers, employers and hospitals: about ₹1,700 Cr of an ambition ₹5,500 Cr FY36 mix. Arithmetic, not a forecast. The unit economics to hold are as important as the top line.', outline: OUTLINES['economics'] },
   { id: 'scoreboard', title: 'Scoreboard and what we refuse', section: 'The scoreboard', ground: 'paper', accent: true, Body: Scoreboard, notes: 'Joy OS is ranked by records captured per rupee, not downloads or minutes. Safety and trust rows are fixed at 100%. What we refuse: selling the Index to underwriters, ad-funded tiers, league tables, vendor scores inside the Index, any claim ahead of the evidence.', outline: OUTLINES['scoreboard'] },
   { id: 'team', title: 'The team', section: 'Team and organisation', ground: 'paper', accent: true, Body: Team, notes: 'A Joy OS office under the CTO, accountable by term: product managers by term pair, fifteen people for J0 to J2, thirty at J3, sixty-three at J4. The Head of Joyspan Science owns the Index method and Joy OS cannot change it; the Medical Director signs every clinical rule; the CMO and Clinical share the claims gate.', outline: OUTLINES['team'] },
-  { id: 'ask', title: 'The ask', section: 'The ask', ground: 'ink', accent: true, Body: Ask, notes: 'Eight decisions by 15 November 2026. Span is what you gain. ’Cation is how you get it. Joy OS is how it lasts.', outline: OUTLINES['ask'] },
+  { id: 'ask', title: 'The ask', section: 'The ask', ground: 'ink', accent: true, Body: Ask, notes: 'Eight decisions, the first four by 15 November 2026 and the rest on the dates shown. Span is what you gain. ’Cation is how you get it. Joy OS is how it lasts.', outline: OUTLINES['ask'] },
   { id: 'walk', title: 'Walk the platform', section: 'After the deck', ground: 'sunk', accent: true, Body: Walk, notes: 'Close by opening the product. Each card signs in as a specimen role and opens its surface: Arjun in the member app, Priya in the coach console, Dr Meera Iyer in the clinical portal, and so on. Nothing here is a real person or a real record.', outline: OUTLINES['walk'] },
 ]

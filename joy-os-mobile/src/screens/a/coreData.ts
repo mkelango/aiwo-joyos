@@ -344,10 +344,10 @@ export const DAY90_TERMS: TermScore[] = [
   { key: 'R', value: 77, band: 'steady', delta: 0 },
   { key: 'F', value: 51, band: 'uneven', delta: -11 },
   { key: 'D', value: 60, band: 'uneven', delta: 2 },
-  { key: 'B', value: 27, band: 'uneven', delta: 3 },
+  { key: 'B', value: 27, band: 'steady', delta: 3 },
 ]
 
-export const DAY90_DATES = { day0: '2027-01-02', day90: '2027-04-02', call: 'Thursday 8 April · 18:30' }
+export const DAY90_DATES = { day0: '2027-01-05', day90: '2027-04-05', call: 'Thursday 8 April · 18:30' }
 
 export const DAY90_WHY: Record<TermKey, string> = {
   H: 'Capacity battery and sleep efficiency both a touch better.',
@@ -379,7 +379,7 @@ export const LEDGER_CALENDAR = [
   2, 1, 3, 0, 2, 3, 1,
   1, 2, 2, 3, 0, 0, 2,
   3, 2, 1, 2, 3, 3, 2,
-  2, 3, 3, 1, 2, 3,
+  2, 3, 3, 1, 2, 2,
 ]
 
 export const LEDGER_STORY = {

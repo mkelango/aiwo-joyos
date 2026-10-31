@@ -1,3 +1,4 @@
+import { createContext, createElement, useContext, type ReactNode } from 'react'
 import { useApp, type Lang } from './store'
 import type { TermKey } from '@/domain/types'
 
@@ -22,7 +23,7 @@ const STRINGS = {
 export type StringKey = keyof typeof STRINGS
 
 export function useT() {
-  const { lang } = useApp()
+  const lang = useLang()
   return (key: StringKey, vars?: Record<string, string | number>) => {
     let s: string = STRINGS[key][lang] ?? STRINGS[key].en
     return fill(s, vars)
@@ -40,12 +41,23 @@ export function fill(s: string, vars?: Record<string, string | number>) {
   return s
 }
 
+// Staff consoles and the creds deck are English on purpose. Shared primitives (MethodLine,
+// SpecimenTag, Delta, Sheet) read the language through these hooks, so inside <EnglishOnly>
+// they stay English whatever language the member app is set to.
+const LangOverride = createContext<Lang | null>(null)
+
+export function EnglishOnly({ children }: { children: ReactNode }) {
+  return createElement(LangOverride.Provider, { value: 'en' }, children)
+}
+
 export function useLang(): Lang {
-  return useApp().lang
+  const forced = useContext(LangOverride)
+  const { lang } = useApp()
+  return forced ?? lang
 }
 
 export function useDict<D extends Dict>(dict: D) {
-  const { lang } = useApp()
+  const lang = useLang()
   return (key: keyof D & string, vars?: Record<string, string | number>) => fill(dict[key][lang] ?? dict[key].en, vars)
 }
 
@@ -60,7 +72,7 @@ export const TERM_TEXT: Record<TermKey, { name: Record<Lang, string>; space: Rec
 }
 
 export function useTermText() {
-  const { lang } = useApp()
+  const lang = useLang()
   return { name: (k: TermKey) => TERM_TEXT[k].name[lang], space: (k: TermKey) => TERM_TEXT[k].space[lang] }
 }
 

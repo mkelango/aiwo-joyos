@@ -62,12 +62,14 @@ export const MEMBERSHIPS = [
 
 // ─── Consoles ──────────────────────────────────────────────────────────────
 
+// Arjun (m_0001) is on day 23 of 90 in CASELOAD, so his task must be one that can fire mid-cycle;
+// an index-fall task only opens at re-measure (DRIFT_RULES, a fall of 5 or more).
 export const DRIFT_TASKS: DriftTask[] = [
   { id: 'd1', memberId: 'm_0142', memberName: 'Nikhil S.', signal: 'self-harm-language', detail: 'Language in Second Arrow journal matched crisis intercept. Tele-MANAS shown; named person paged.', priority: 'P0', slaHours: 0.25, openedAt: '2027-01-28 21:04', owner: 'Dr Sanjay Menon', status: 'in-progress', term: 'B' },
   { id: 'd2', memberId: 'm_0088', memberName: 'Farah K.', signal: 'screen-threshold', detail: 'PHQ-4 = 7 (threshold ≥ 6). Clinician review required.', priority: 'P1', slaHours: 48, openedAt: '2027-01-28 09:12', owner: 'Dr Sanjay Menon', status: 'open', term: 'B' },
-  { id: 'd3', memberId: 'm_0001', memberName: 'Arjun R.', signal: 'index-fall', detail: 'Index fell 64 → 61 at re-measure. Freedom −11.', priority: 'P2', slaHours: 72, openedAt: '2027-01-27 18:30', owner: 'Priya Natarajan', status: 'open', term: 'F' },
+  { id: 'd3', memberId: 'm_0001', memberName: 'Arjun R.', signal: 'sleep-regularity', detail: '14 days of sleep regularity below personal baseline.', priority: 'P2', slaHours: 72, openedAt: '2027-01-27 18:30', owner: 'Priya Natarajan', status: 'open', term: 'B' },
   { id: 'd4', memberId: 'm_0203', memberName: 'Deepa V.', signal: 'sleep-regularity', detail: '14 days of sleep regularity below personal baseline.', priority: 'P2', slaHours: 72, openedAt: '2027-01-26 07:45', owner: 'Priya Natarajan', status: 'open', term: 'B' },
-  { id: 'd5', memberId: 'm_0175', memberName: 'Thomas M.', signal: 'ledger-silent', detail: 'Joy Ledger silent for 10 days.', priority: 'P2', slaHours: 96, openedAt: '2027-01-25 08:00', owner: 'Circle lead · Shalini', status: 'open', term: 'D' },
+  { id: 'd5', memberId: 'm_0175', memberName: 'Thomas M.', signal: 'ledger-silent', detail: 'Joy Ledger silent for 10 days.', priority: 'P2', slaHours: 96, openedAt: '2027-01-25 08:00', owner: 'Priya Natarajan · circle lead', status: 'open', term: 'D' },
   { id: 'd6', memberId: 'm_0119', memberName: 'Vikram P.', signal: 'screen-threshold', detail: 'ISI = 16 (threshold ≥ 15). Sleep study suggested.', priority: 'P1', slaHours: 48, openedAt: '2027-01-24 15:20', owner: 'Dr Meera Iyer', status: 'done', term: 'B' },
 ]
 
@@ -110,12 +112,14 @@ export const TENANT = {
     { key: 'B' as const, d0: 36, d90: 31 },
   ],
   departments: [
-    { name: 'Engineering', n: 214, ji: 58, delta: 4 },
-    { name: 'Sales', n: 162, ji: 54, delta: 6 },
-    { name: 'Operations', n: 131, ji: 60, delta: 3 },
-    { name: 'Finance', n: 88, ji: 57, delta: 2 },
-    { name: 'People & Legal', n: 60, ji: 63, delta: 5 },
-    { name: 'Leadership', n: 34, ji: null, delta: null },
+    // Re-measured base (measured × remeasureRate ≈ 465). The weighted mean stays at or below the
+    // JI of the Day-90 term means (≈53): a geometric mean is concave, so a group's mean JI cannot exceed it.
+    { name: 'Engineering', n: 140, ji: 53, delta: 5 },
+    { name: 'Sales', n: 104, ji: 50, delta: 6 },
+    { name: 'Operations', n: 86, ji: 54, delta: 4 },
+    { name: 'Finance', n: 58, ji: 51, delta: 3 },
+    { name: 'People & Legal', n: 52, ji: 55, delta: 6 },
+    { name: 'Leadership', n: 25, ji: null, delta: null },
   ],
 }
 
@@ -156,7 +160,7 @@ export const SCOREBOARD = [
 ]
 
 export const RELEASES = [
-  { id: 'J0', name: 'Edition 01', when: 'Now → Dec 2026', layer: 'Milk', ships: 'Index engine v1.0; Check → app hand-off; events module; circle of eight; Health Connect; iOS TestFlight', gate: 'Every January guest has an Index and a circle on 5 Jan' },
+  { id: 'J0', name: 'Edition 01', when: 'Oct – Dec 2026', layer: 'Milk', ships: 'Index engine v1.0; Check → app hand-off; events module; circle of eight; Health Connect; iOS TestFlight', gate: 'Every January guest has an Index and a circle on 5 Jan' },
   { id: 'J1', name: 'Joy OS 1.0', when: 'Jan – Mar 2027', layer: 'Milk', ships: 'Standalone app; Today and six spaces; HealthKit; Oura via Terra; Joy Ledger; Day 15/45/90; trust centre; web', gate: 'Day-90 re-score ≥70% of the January cohort' },
   { id: 'J2', name: '’Cations', when: 'Apr – Sep 2027', layer: 'Milk', ships: '’Cation engine; coach console; Lovecation, Mindcation; the Practice; partner console; Plus', gate: 'Every ’cation’s 90 days run in Joy OS' },
   { id: 'J3', name: 'Index v1.1', when: 'Oct 2027 – Mar 2028', layer: 'Milk', ships: 'Calibrated weights and λ; JALY; Hindi and Tamil; Joyspan@Work; guarded bandit; Star Health', gate: 'Validation paper; 10,000 in the cohort' },
@@ -166,7 +170,7 @@ export const RELEASES = [
 
 export const JOURNEYS = [
   { id: 'guest', title: 'The New Year guest', who: 'Promoter couple, 58 and 55 · AIWO Joyspan at Fairmont Mumbai', steps: [['Dec', 'Invited; app installed with the concierge; consents; Index baseline'], ['31 Dec – 5 Jan', 'Joycation and the Summit; Clinical Index card handed over; circle formed'], ['5 Jan', 'Lowest term Freedom for him, Pleasure for her; actions start'], ['Day 60', 'Wealthcation suggested for him; Savourcation for her'], ['Day 90', 'Re-measure; Patron membership renews on the delta']] },
-  { id: 'couple', title: 'The couple', who: 'Married 31 years, empty nest · Lovecation', steps: [['Day −14', 'Couples Check, each privately; CSI-4 per partner'], ['3 nights', 'Signature dates; love maps; one shared step, two private ones'], ['Weekly', 'State of Us, 20 minutes, in the app'], ['Monthly', 'A date planned in the People space'], ['Day 90', 'CSI-4 re-score; household page shows only what both share']] },
+  { id: 'couple', title: 'The couple', who: 'Married 31 years, empty nest · Lovecation', steps: [['Day −14', 'Couples Check, each privately; CSI-4 per partner'], ['3 nights', 'Signature dates; love maps; one shared step, two private ones'], ['Weekly', 'State of Us, 20 minutes, in the app'], ['Monthly', 'A date planned in the Pleasure space'], ['Day 90', 'CSI-4 re-score; household page shows only what both share']] },
   { id: 'founder', title: 'The founder after exit', who: 'Age 49, sold the company · Mindcation and the Practice', steps: [['Book', 'Reads Joyspiration; QR opens the Check: Purpose thin'], ['App', 'Self-assessed Index; first practice free'], ['8 weeks', 'Joy OS Plus; the Practice; founders’ circle'], ['4 nights', 'Mindcation; 25-year statement drafted'], ['Day 90', 'Ikigai-9 re-score; Executive Energy as continuation']] },
   { id: 'employee', title: 'The employee or policyholder', who: 'Senior manager, 41 · via Joyspan@Work or an insurer', steps: [['Invite', 'Employer or insurer sends a link; AIWO, not the employer, holds the data'], ['Index', 'Self-assessed; Ease flags route to an EAP or clinician'], ['Daily', 'One action; circles with colleagues only if chosen'], ['Quarter', 'Re-measure; employer sees aggregates of 50+ only'], ['Year', 'Insurer pays for a measured fall in preventable suffering']] },
   { id: 'reader', title: 'The reader, anywhere', who: 'Anyone, any language · the free Check', steps: [['WhatsApp', '18 statements in 5 minutes; bands, never a number'], ['Door', 'Three doors: the Letter, a baseline, or the app'], ['App', 'Free Index and Joy Ledger; one practice'], ['Upgrade', 'Plus, a Session, or a ’cation for the lowest term'], ['Count', 'Every consented re-measure adds to the joyful-years count']] },

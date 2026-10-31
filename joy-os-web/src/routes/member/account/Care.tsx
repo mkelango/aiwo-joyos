@@ -8,7 +8,7 @@ import { Avatar, Button, Card, EmptyState, PageHeader, Pill, Sheet } from '@/com
 import { MEMBER, TEAM } from '@/data/member'
 import { CARE_LADDER, CLINICIANS, CONSULTS, ERX, PAST_CONSULTS, PEOPLE_DETAIL, RESULTS, THREADS } from './_data'
 import { Checkbox, Field, LinkButton, Section, Segmented, Select, TeleManasStrip } from './_parts'
-import { inputCls, rich, usePersisted, useToast } from './_util'
+import { inputCls, rich, useMemberProfile, usePersisted, useToast } from './_util'
 import { useDict } from '@/lib/i18n'
 import { CARE, useData } from './_i18n'
 
@@ -21,7 +21,6 @@ interface Consult { id: string; who: Who; title: string; mode: string; when: str
 /** Registrations shown on the pre-consult screen (TPG 2020). Specimen numbers. */
 const REG: Record<string, string> = { 'Dr Meera Iyer': 'TNMC 84213', 'Dr Sanjay Menon': 'RCI A47812', 'Dr Anitha Krishnan': 'RCI A39105', 'Dr Farhan Qureshi': 'RCI A52230', 'Dr Rohit Bansal': 'KMC 120944', 'Dr Lalitha Subramaniam': 'RCI A30417', 'Dr Neha Kapoor': 'MMC 2009/04/1187' }
 const ALT_SLOTS = ['Fri 5 Feb · 17:30', 'Mon 8 Feb · 18:00', 'Thu 11 Feb · 09:30']
-const unreadMessages = THREADS.reduce((a, t) => a + t.unread, 0)
 
 export default function Care() {
   const t = useDict(CARE)
@@ -37,6 +36,8 @@ export default function Care() {
   const [resched, setResched] = useState<Consult | null>(null)
   const [room, setRoom] = useState<Consult | null>(null)
   const [role, setRole] = useState<'Psychologist' | 'Physician'>('Psychologist')
+  // Same per-viewer thread store as Messages, so the badge follows what the member has read.
+  const unreadMessages = usePersisted('threads', { list: THREADS })[0].list.reduce((a, th) => a + th.unread, 0)
   const findClinician = (r: 'Psychologist' | 'Physician') => { setRole(r); document.getElementById('match')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
 
   return (
@@ -47,7 +48,7 @@ export default function Care() {
         lead={t('lead')}
         actions={
           <>
-            <LinkButton to="/app/care/messages"><MessageCircle size={16} /> {t('messages')} {unreadMessages > 0 && <span className="num rounded-full bg-paper-sunk px-1.5 text-[12px]" aria-label={t('unread', { n: unreadMessages })}>{unreadMessages}</span>}</LinkButton>
+            <LinkButton to="/app/care/messages"><MessageCircle size={16} /> {t('messages')} {unreadMessages > 0 && <><span className="num rounded-full bg-paper-sunk px-1.5 text-[12px]" aria-hidden>{unreadMessages}</span><span className="sr-only">{t('unread', { n: unreadMessages })}</span></>}</LinkButton>
           </>
         }
       />
@@ -117,7 +118,7 @@ export default function Care() {
                   </div>
                   <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[15px] text-ink">
                     <span className="flex items-center gap-1.5"><CalendarClock size={16} className="text-ink-3" /> <span className="num">{c.when} · {c.time}</span></span>
-                    <span className="flex items-center gap-1.5 text-ink-2"><Video size={16} className="text-ink-3" /> {dx(c.mode)} · <span className="num">{c.minutes}</span> min</span>
+                    <span className="flex items-center gap-1.5 text-ink-2"><Video size={16} className="text-ink-3" /> {dx(c.mode)} · {rich(t('minutes'), { n: <span className="num">{c.minutes}</span> })}</span>
                   </p>
                   <p className="mt-3 text-[14px] text-ink-2">{dx(c.prep)}</p>
                   <div className="mt-4 flex flex-wrap gap-2">
@@ -557,7 +558,7 @@ function BookingSheet({ clinician, onClose, onBooked }: { clinician: (typeof CLI
             <div className="mt-2 grid gap-2" role="radiogroup">
               {slots.map((s) => (
                 <button type="button" role="radio" aria-checked={slot === s} key={s} onClick={() => setSlot(s)} className={clsx('num flex items-center justify-between rounded-lg border px-4 py-3 text-left text-[15px] focus-ring', slot === s ? 'border-ink bg-paper-raised text-ink' : 'border-line text-ink-2 hover:border-line-strong')}>
-                  {s} <span className="text-[13px] text-ink-3">45 min</span>
+                  {s} <span className="text-[13px] text-ink-3">{rich(t('minutes'), { n: <span className="num">45</span> })}</span>
                 </button>
               ))}
             </div>
@@ -597,7 +598,7 @@ function RescheduleSheet({ consult, onClose, onRequest, onCancel }: { consult: C
             <div className="mt-2 grid gap-2" role="radiogroup">
               {ALT_SLOTS.map((s) => (
                 <button type="button" role="radio" aria-checked={slot === s} key={s} onClick={() => setSlot(s)} className={clsx('num flex items-center justify-between rounded-lg border px-4 py-3 text-left text-[15px] focus-ring', slot === s ? 'border-ink bg-paper-raised text-ink' : 'border-line text-ink-2 hover:border-line-strong')}>
-                  {s} <span className="text-[13px] text-ink-3">{consult.minutes} min</span>
+                  {s} <span className="text-[13px] text-ink-3">{rich(t('minutes'), { n: <span className="num">{consult.minutes}</span> })}</span>
                 </button>
               ))}
             </div>
@@ -628,6 +629,7 @@ function RescheduleSheet({ consult, onClose, onRequest, onCancel }: { consult: C
 /** Pre-consult screen under TPG 2020: clinician identity, member identity, consent — then the call. */
 function WaitingRoom({ consult, onClose, onEnded }: { consult: Consult | null; onClose: () => void; onEnded: () => void }) {
   const t = useDict(CARE)
+  const profile = useMemberProfile()
   const [me, setMe] = useState(false)
   const [consent, setConsent] = useState(false)
   const [inCall, setInCall] = useState(false)
@@ -651,12 +653,12 @@ function WaitingRoom({ consult, onClose, onEnded }: { consult: Consult | null; o
             <div>
               <p className="text-[17px] text-ink">{consult.who.name}</p>
               <p className="text-[14px] text-ink-2">{consult.who.reg?.startsWith('RCI') ? t('regPsych') : t('regDoc')} · {t('reg')} <span className="num">{consult.who.reg ?? t('onFile')}</span></p>
-              <p className="num text-[13px] text-ink-3">{consult.when} · {consult.time} · {consult.minutes} min · {t('video')}</p>
+              <p className="text-[13px] text-ink-3"><span className="num">{consult.when} · {consult.time}</span> · {rich(t('minutes'), { n: <span className="num">{consult.minutes}</span> })} · {t('video')}</p>
             </div>
           </div>
           <div className="space-y-3">
             <p className="eyebrow text-ink-3">{t('yourIdentity')}</p>
-            <Checkbox checked={me} onChange={setMe}>{rich(t('iAm', { name: `${MEMBER.firstName} ${MEMBER.lastName}` }), { age: <span className="num">{MEMBER.age}</span>, id: <span className="num">{MEMBER.aiwoId}</span> })}</Checkbox>
+            <Checkbox checked={me} onChange={setMe}>{rich(t('iAm', { name: `${profile.firstName} ${profile.lastName}` }), { age: <span className="num">{MEMBER.age}</span>, id: <span className="num">{MEMBER.aiwoId}</span> })}</Checkbox>
           </div>
           <div className="space-y-3">
             <p className="eyebrow text-ink-3">{t('yourConsent')}</p>

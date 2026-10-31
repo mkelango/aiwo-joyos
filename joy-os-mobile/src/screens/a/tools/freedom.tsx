@@ -92,6 +92,7 @@ function NoList() {
   const { setCrisisOpen } = useApp()
   const [list, setList] = useLocal<string[]>('noList', ['Checking email after 21:00'])
   const [draft, setDraft] = useState('')
+  const [already, setAlready] = useState(false)
   const full = list.length >= 3
   const toggle = (s: string) => setList((l) => (l.includes(s) ? l.filter((x) => x !== s) : l.length >= 3 ? l : [...l, s]))
   const add = () => {
@@ -101,20 +102,28 @@ function NoList() {
       setCrisisOpen(true)
       return
     }
-    if (list.length < 3) setList((l) => [...l, v])
+    // Full: keep what was typed, so nothing is lost; the "Full" line below says what to do.
+    if (list.length >= 3) return
+    // Already listed (as typed, or as a suggestion): keep one copy and say so.
+    if (list.some((x) => x.toLowerCase() === v.toLowerCase() || tx(x).toLowerCase() === v.toLowerCase())) {
+      setAlready(true)
+      return
+    }
+    setList((l) => [...l, v])
     setDraft('')
+    setAlready(false)
   }
   return (
     <ToolCard title={t('The No list')} aside={<Mono tone="ink3" size={13}>{t('{a} of {b}', { a: list.length, b: 3 })}</Mono>} lead={t('Three things to stop this quarter. Saying no to these is saying yes to your evenings.')}>
       <View style={{ gap: 4 }}>
         {list.length === 0 ? <Meta tone="ink3">{t('Nothing yet. Pick from below or write your own.')}</Meta> : null}
         {list.map((n, i) => (
-          <View key={n} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 }}>
+          <View key={`${i}:${n}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 }}>
             <Mono size={13} tone="ink3">
               {String(i + 1)}
             </Mono>
             <Body style={{ flex: 1 }}>{tx(n)}</Body>
-            <IconButton icon="x" label={t('Remove {n}', { n: tx(n) })} onPress={() => setList((l) => l.filter((x) => x !== n))} />
+            <IconButton icon="x" label={t('Remove {n}', { n: tx(n) })} onPress={() => setList((l) => l.filter((_, j) => j !== i))} />
           </View>
         ))}
       </View>
@@ -134,9 +143,14 @@ function NoList() {
         </View>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.s1 }}>
-        <TextField label={t('Your own')} value={draft} onChangeText={setDraft} placeholder={t('Something to stop')} onSubmitEditing={add} style={{ flex: 1 }} />
+        <TextField label={t('Your own')} value={draft} onChangeText={(v) => (setDraft(v), setAlready(false))} placeholder={t('Something to stop')} onSubmitEditing={add} style={{ flex: 1 }} />
         <IconButton icon="plus" label={t('Add to the No list')} onPress={add} tone="ink" disabled={!draft.trim() || list.length >= 3} />
       </View>
+      {already ? (
+        <Meta tone="ink2" accessibilityLiveRegion="polite">
+          {t('That one is already on your list.')}
+        </Meta>
+      ) : null}
     </ToolCard>
   )
 }

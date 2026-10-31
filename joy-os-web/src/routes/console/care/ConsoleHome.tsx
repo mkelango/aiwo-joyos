@@ -7,9 +7,8 @@ import { DaybreakButton, Eyebrow, SpecimenTag } from '@/components/joy/primitive
 import { Button, Card, PageHeader, Pill } from '@/components/ui'
 import { CONSOLES } from '@/layouts/ConsoleLayout'
 import { ACCESS_LOG } from '@/data/member'
-import { useApp } from '@/lib/store'
 import { AccessRequestSheet } from './_access'
-import { GATE, ROLE_OPTIONS } from './_gate'
+import { GATE, ROLE_OPTIONS, useConsoleRole } from './_gate'
 import { AccessNote } from './_parts'
 
 // ALL CONSOLES (Memo p.16; Architecture p21, p25): who uses each console, the access rule
@@ -26,17 +25,18 @@ const RELATIONSHIP: Record<string, string> = {
 }
 
 type Level = 'full' | 'bands' | 'counts' | 'aggregate' | 'schedule' | 'none'
+/** One column per console, in the order the console cards list them. */
 const DATA_CLASSES: { cls: string; note: string; cells: Level[] }[] = [
-  //                                  coach     clinical  partner     tenant      science      ops
-  { cls: 'Index and term scores', note: 'Six terms, band, method', cells: ['bands', 'full', 'none', 'aggregate', 'aggregate', 'none'] },
-  { cls: 'Raw biomarkers and labs', note: 'Panels, vitals, e-Rx', cells: ['none', 'full', 'none', 'none', 'none', 'none'] },
-  { cls: 'Ease screens', note: 'PHQ-4, ISI, PSS-4 answers', cells: ['none', 'full', 'none', 'none', 'aggregate', 'none'] },
-  { cls: 'Ledger, journals, Ikigai map', note: 'Free text, field-encrypted', cells: ['counts', 'none', 'none', 'none', 'none', 'none'] },
-  { cls: 'Partner-in-a-couple answers', note: 'Private to each partner', cells: ['none', 'none', 'none', 'none', 'none', 'none'] },
-  { cls: 'Name, room, dietary, schedule', note: 'For a booked stay only', cells: ['full', 'full', 'schedule', 'none', 'none', 'none'] },
-  { cls: 'Audit and access records', note: 'Actor, role, purpose, time', cells: ['none', 'none', 'none', 'none', 'none', 'full'] },
+  //                                  coach     clinical  partner     tenant      science      ops     exec
+  { cls: 'Index and term scores', note: 'Six terms, band, method', cells: ['bands', 'full', 'none', 'aggregate', 'aggregate', 'none', 'aggregate'] },
+  { cls: 'Raw biomarkers and labs', note: 'Panels, vitals, e-Rx', cells: ['none', 'full', 'none', 'none', 'none', 'none', 'none'] },
+  { cls: 'Ease screens', note: 'PHQ-4, ISI, PSS-4 answers', cells: ['none', 'full', 'none', 'none', 'aggregate', 'none', 'none'] },
+  { cls: 'Ledger, journals, Ikigai map', note: 'Free text, field-encrypted', cells: ['counts', 'none', 'none', 'none', 'none', 'none', 'none'] },
+  { cls: 'Partner-in-a-couple answers', note: 'Private to each partner', cells: ['none', 'none', 'none', 'none', 'none', 'none', 'none'] },
+  { cls: 'Name, room, dietary, schedule', note: 'For a booked stay only', cells: ['full', 'full', 'schedule', 'none', 'none', 'none', 'none'] },
+  { cls: 'Audit and access records', note: 'Actor, role, purpose, time', cells: ['none', 'none', 'none', 'none', 'none', 'full', 'none'] },
 ]
-const COLS = ['Coach', 'Clinical', 'Venue', 'Tenant', 'Science', 'Ops']
+const COLS = ['Coach', 'Clinical', 'Venue', 'Tenant', 'Science', 'Ops', 'Exec']
 
 const LEVEL: Record<Level, { label: string; cls: string }> = {
   full: { label: 'Yes', cls: 'bg-ink text-paper' },
@@ -48,12 +48,13 @@ const LEVEL: Record<Level, { label: string; cls: string }> = {
 }
 
 export default function ConsoleHome() {
-  const { role, setRole } = useApp()
+  const { role, setRole, chosen, roleLabel, person } = useConsoleRole()
   const navigate = useNavigate()
   const reduce = useReducedMotion()
-  const current = ROLE_OPTIONS.find((r) => r.value === role) ?? ROLE_OPTIONS[0]
-  const activeRole = ROLE_OPTIONS.some((r) => r.value === role) ? role : 'coach'
-  const home = CONSOLES.find((c) => GATE[c.to]?.includes(activeRole)) ?? CONSOLES[0]
+  // No console role chosen (the member default): nothing is locked or requested; each console
+  // opens as its own specimen person, exactly as the console gate treats that visitor.
+  const activeRole = chosen ? role : null
+  const home = (activeRole && CONSOLES.find((c) => GATE[c.to]?.includes(activeRole))) || CONSOLES[0]
   const [requesting, setRequesting] = useState<(typeof CONSOLES)[number] | null>(null)
   const [requested, setRequested] = useState<Record<string, string>>({})
   const [params, setParams] = useSearchParams()
@@ -63,7 +64,7 @@ export default function ConsoleHome() {
   useEffect(() => {
     if (!requestParam) return
     const target = CONSOLES.find((c) => c.to === requestParam)
-    if (target && !GATE[target.to]?.includes(activeRole) && !requested[target.to]) setRequesting(target)
+    if (target && activeRole && !GATE[target.to]?.includes(activeRole) && !requested[target.to]) setRequesting(target)
     const next = new URLSearchParams(params)
     next.delete('request')
     setParams(next, { replace: true })
@@ -82,17 +83,23 @@ export default function ConsoleHome() {
       <Card tone="sunk" className="mb-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-xl">
-            <Eyebrow tone="daybreak">Signed in as · specimen</Eyebrow>
-            <p className="mt-2 text-[1.5rem] font-light leading-snug text-ink">{current.person}</p>
-            <p className="mt-1 text-[15px] text-ink-2">
-              Role <span className="text-ink">{current.label.toLowerCase()}</span>. Consoles your role cannot open stay locked below; there is no override, only a request.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2" role="radiogroup" aria-label="Demo role">
+            <Eyebrow tone="daybreak">{chosen ? 'Signed in as · specimen' : 'Console role · specimen'}</Eyebrow>
+            <p className="mt-2 text-[1.5rem] font-light leading-snug text-ink">{person}</p>
+            {chosen ? (
+              <p className="mt-1 text-[15px] text-ink-2">
+                Role <span className="text-ink">{roleLabel.toLowerCase()}</span>. Consoles your role cannot open stay locked below; there is no override, only a request.
+              </p>
+            ) : (
+              <p className="mt-1 text-[15px] text-ink-2">
+                No console role chosen · each console opens as its own specimen person. Choose a role to see which consoles it can open and which stay locked.
+              </p>
+            )}
+            <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Demo role">
               {ROLE_OPTIONS.map((r) => (
                 <button
                   key={r.value}
-                  role="radio"
-                  aria-checked={activeRole === r.value}
+                  type="button"
+                  aria-pressed={activeRole === r.value}
                   onClick={() => setRole(r.value)}
                   className={clsx('rounded-full px-3.5 py-1.5 text-[14px] transition-colors focus-ring', activeRole === r.value ? 'bg-ink text-paper' : 'border border-line-strong bg-paper-raised text-ink-2 hover:text-ink')}
                 >
@@ -118,7 +125,8 @@ export default function ConsoleHome() {
         </div>
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {CONSOLES.map((c, i) => {
-            const open = GATE[c.to]?.includes(activeRole)
+            const open = !!activeRole && !!GATE[c.to]?.includes(activeRole)
+            const specimen = !activeRole
             const Icon = c.icon
             return (
               <motion.li
@@ -126,13 +134,13 @@ export default function ConsoleHome() {
                 initial={reduce ? false : { opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.24, delay: reduce ? 0 : i * 0.03 }}
-                className={clsx('group flex flex-col rounded-card border p-5 md:p-6', open ? 'border-line bg-paper-raised shadow-card' : 'border-dashed border-line-strong bg-paper')}
+                className={clsx('group flex flex-col rounded-card border p-5 md:p-6', open || specimen ? 'border-line bg-paper-raised shadow-card' : 'border-dashed border-line-strong bg-paper')}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <span className={clsx('flex h-11 w-11 items-center justify-center rounded-full', open ? 'bg-paper-sunk text-ink' : 'bg-paper-sunk text-ink-3')}>
+                  <span className={clsx('flex h-11 w-11 items-center justify-center rounded-full', open || specimen ? 'bg-paper-sunk text-ink' : 'bg-paper-sunk text-ink-3')}>
                     <Icon size={20} strokeWidth={1.6} aria-hidden />
                   </span>
-                  {open ? <Pill tone="ink"><Check size={12} aria-hidden /> Your role</Pill> : <Pill><Lock size={12} aria-hidden /> {c.to === '/console/ops' ? 'JIT only' : 'Locked'}</Pill>}
+                  {open ? <Pill tone="ink"><Check size={12} aria-hidden /> Your role</Pill> : specimen ? <Pill><Eye size={12} aria-hidden /> Opens as specimen</Pill> : <Pill><Lock size={12} aria-hidden /> {c.to === '/console/ops' ? 'JIT only' : 'Locked'}</Pill>}
                 </div>
                 <h3 className="mt-4 text-[1.25rem] font-light text-ink">{c.label}</h3>
                 <p className="mt-1 text-[15px] text-ink-2">{c.who}</p>
@@ -148,9 +156,9 @@ export default function ConsoleHome() {
                 </dl>
                 <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-2 pt-5">
                   <Link to={c.to} className="inline-flex items-center gap-1.5 whitespace-nowrap text-[15px] text-ink underline-offset-4 hover:underline focus-ring">
-                    {open ? 'Open' : 'Preview as specimen'} <ArrowRight size={15} aria-hidden />
+                    {open ? 'Open' : specimen ? 'Open as specimen' : 'Preview as specimen'} <ArrowRight size={15} aria-hidden />
                   </Link>
-                  {!open && (requested[c.to] ? (
+                  {!open && !specimen && (requested[c.to] ? (
                     <span className="text-[12px] text-ink-2">Requested · <span className="num">{requested[c.to]}</span></span>
                   ) : (
                     <Button size="sm" variant="secondary" className="whitespace-nowrap" onClick={() => setRequesting(c)}>{c.to === '/console/ops' ? 'JIT request' : 'Request from DPO'}</Button>
@@ -201,7 +209,7 @@ export default function ConsoleHome() {
             <span className="text-[13px] text-ink-3">Employers see aggregates of 50 or more</span>
           </div>
           <div className="relative overflow-x-auto">
-            <table className="w-full min-w-[600px] border-collapse text-left text-[14px]">
+            <table className="w-full min-w-[680px] border-collapse text-left text-[14px]">
               <caption className="sr-only">Access by data class and console</caption>
               <thead>
                 <tr className="border-b border-line">
@@ -278,8 +286,8 @@ export default function ConsoleHome() {
 
       <AccessRequestSheet
         console={requesting}
-        roleLabel={current.label}
-        person={current.person}
+        roleLabel={roleLabel}
+        person={person}
         onClose={() => setRequesting(null)}
         onSent={(to, ref) => setRequested((r) => ({ ...r, [to]: ref }))}
       />

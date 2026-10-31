@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, Check, Moon, Phone, Plus, MessageCircle, ShieldCheck, Sparkles, Stethoscope, Trash2 } from 'lucide-react'
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
 import { Link } from 'react-router-dom'
 import { DaybreakButton, Eyebrow, fmtDate } from '@/components/joy/primitives'
 import { Button, Pill, Sheet, Tabs } from '@/components/ui'
@@ -9,6 +9,7 @@ import { TEAM } from '@/data/member'
 import { BURDEN_PARTS, JOURNAL_START, KEEP_MEANING_START, SCREEN_FORMS, SCREEN_HISTORY, SCREEN_META, SPACE_TODAY, WIND_DOWN, type Screen } from './_data'
 import { SpaceShell, ToolCard, useCrisisGuard } from './_SpaceShell'
 import { useSpaceText, type SpKey } from './_i18n'
+import { useSpaceState } from './_state'
 import { INSTRUMENT_NOTE } from '@/lib/i18n'
 
 // EASE · Preventable Suffering (Memo p.19, p.24): the Second Arrow journal, sleep
@@ -23,7 +24,7 @@ export default function Ease() {
   const [talkOpen, setTalkOpen] = useState(false)
   const { t, r } = useSpaceText()
   // Screen history lives here so the sleep plan and clinician routing read the same results.
-  const [history, setHistory] = useState(SCREEN_HISTORY)
+  const [history, setHistory] = useSpaceState('ease.screens.v1', SCREEN_HISTORY)
   const isi = history.ISI[history.ISI.length - 1].score
   const tasks = (Object.keys(history) as Screen[]).flatMap((s) => {
     const last = history[s][history[s].length - 1]
@@ -113,7 +114,7 @@ function LowerIsBetter() {
 
 function SecondArrow() {
   const guard = useCrisisGuard()
-  const [entries, setEntries] = useState(JOURNAL_START)
+  const [entries, setEntries] = useSpaceState('ease.journal.v1', JOURNAL_START)
   const [problem, setProblem] = useState('')
   const [arrow, setArrow] = useState('')
   const [err, setErr] = useState(false)
@@ -182,7 +183,7 @@ function SecondArrow() {
 
 function KeepMeaningTo() {
   const guard = useCrisisGuard()
-  const [items, setItems] = useState(KEEP_MEANING_START)
+  const [items, setItems] = useSpaceState('ease.keepMeaning.v1', KEEP_MEANING_START)
   const [v, setV] = useState('')
   const { t, r } = useSpaceText()
   const open = items.filter((i) => !i.done)
@@ -237,7 +238,7 @@ function Screens({ history, setHistory }: { history: History; setHistory: Dispat
   const [answers, setAnswers] = useState<(number | null)[]>([])
   const [pain, setPain] = useState<number | null>(null)
   const [err, setErr] = useState<{ k: SpKey; v?: Record<string, number> } | null>(null)
-  const { t, d, r, lang } = useSpaceText()
+  const { t, d, r, lang, dm } = useSpaceText()
   const label = (x: Screen) => (x === 'Pain' ? t('ease.pain') : x)
   const [justTook, setJustTook] = useState<Screen | null>(null)
   const meta = SCREEN_META[screen]
@@ -282,7 +283,7 @@ function Screens({ history, setHistory }: { history: History; setHistory: Dispat
             ))}
           </div>
           <div className="mt-2 flex gap-3">
-            {h.map((x, i) => <span key={x.date + i} className="eyebrow flex-1 text-center text-ink-3">{fmtDate(x.date).slice(0, 6)}</span>)}
+            {h.map((x, i) => <span key={x.date + i} className="eyebrow flex-1 text-center text-ink-3">{dm(x.date)}</span>)}
           </div>
           <ul className="mt-5 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-ink-3" aria-label={t('ease.sc.bands')}>
             {meta.bands.map((b, i) => <li key={b.label}><span className="num">{i === 0 ? 0 : meta.bands[i - 1].upTo + 1}–{b.upTo}</span> {d(b.label)}</li>)}
@@ -329,19 +330,23 @@ function Screens({ history, setHistory }: { history: History; setHistory: Dispat
                   </fieldset>
                 ) : (
                   <div className="mt-4 space-y-4">
-                    {form.items.map((q, qi) => (
+                    {form.items.map((q, qi) => {
+                      // Some instruments (ISI items 4–7) label their options per item; the scoring stays 0…n−1.
+                      const opts = form.itemOptions?.[qi] ?? form.options
+                      return (
                       <fieldset key={q}>
                         <legend className="text-[15px] text-ink"><span className="num mr-1.5 text-ink-3">{qi + 1}</span>{q}</legend>
-                        <div className={clsx('mt-2 grid grid-cols-2 gap-1.5', form.options.length === 5 ? 'sm:grid-cols-5' : 'sm:grid-cols-4')}>
-                          {form.options.map((o, oi) => (
-                            <label key={o} className={clsx('cursor-pointer rounded-xl border px-2.5 py-2 text-center text-[12.5px] leading-tight has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-[color:var(--daybreak)]', answers[qi] === oi ? 'border-ink bg-ink text-paper' : 'border-line text-ink-2 hover:border-line-strong')}>
+                        <div className={clsx('mt-2 grid grid-cols-2 gap-1.5', opts.length === 5 ? 'sm:grid-cols-5' : 'sm:grid-cols-4')}>
+                          {opts.map((o, oi) => (
+                            <label key={oi} className={clsx('cursor-pointer rounded-xl border px-2.5 py-2 text-center text-[12.5px] leading-tight has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-[color:var(--daybreak)]', answers[qi] === oi ? 'border-ink bg-ink text-paper' : 'border-line text-ink-2 hover:border-line-strong')}>
                               <input type="radio" name={`${screen}-${qi}`} className="sr-only" checked={answers[qi] === oi} onChange={() => { setAnswers((a) => a.map((x, j) => (j === qi ? oi : x))); setErr(null) }} />
                               {o}
                             </label>
                           ))}
                         </div>
                       </fieldset>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
                 {err && <p role="alert" className="mt-3 text-[13px] text-error">{t(err.k, err.v)}</p>}
@@ -368,35 +373,48 @@ const ROUTE_COPY: Record<Screen, SpKey> = {
 
 // ─── Sleep plan & wind-down ───────────────────────────────────────────────
 
+const HM = /^\d{2}:\d{2}$/
+
 function SleepPlan({ isi }: { isi: number }) {
-  const [wake, setWake] = useState('06:30')
-  const [windDown, setWindDown] = useState('22:00')
+  // The saved plan persists and re-arms the times; editing a time shows the save button again
+  // (the reminder stays on the saved plan until a new one is saved or it is turned off).
+  const [saved, setSaved] = useSpaceState<{ wake: string; windDown: string } | null>('ease.sleepPlan.v1', null)
+  const savedOk = !!saved && HM.test(saved.wake) && HM.test(saved.windDown)
+  const [wake, setWake] = useState(savedOk ? saved!.wake : '06:30')
+  const [windDown, setWindDown] = useState(savedOk ? saved!.windDown : '22:00')
   const [done, setDone] = useState<number[]>([])
-  const [saved, setSaved] = useState<{ wake: string; windDown: string } | null>(null)
   const { t, d, r } = useSpaceText()
-  const dirty = !saved || saved.wake !== wake || saved.windDown !== windDown
-  useEffect(() => { if (saved && (saved.wake !== wake || saved.windDown !== windDown)) setSaved(null) }, [wake, windDown]) // eslint-disable-line react-hooks/exhaustive-deps
+  // An emptied or half-typed time input gives '', which must not turn into NaN:NaN.
+  const valid = HM.test(wake) && HM.test(windDown)
+  const dirty = !savedOk || saved!.wake !== wake || saved!.windDown !== windDown
   const addMins = (t: string, m: number) => {
+    if (!HM.test(t)) return '--:--'
     const [h, mm] = t.split(':').map(Number)
     const total = (h * 60 + mm + m + 1440) % 1440
     return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
   }
   const bed = addMins(windDown, 75)
   const sleepWindow = (() => {
+    if (!valid) return NaN
     const [bh, bm] = bed.split(':').map(Number)
     const [wh, wm] = wake.split(':').map(Number)
     return Math.round((((wh * 60 + wm) - (bh * 60 + bm) + 1440) % 1440) / 6) / 10
   })()
+  const tooShort = valid && !(sleepWindow >= 5)
   const timeCls = 'num h-11 w-full rounded-xl border border-line-strong bg-paper px-3 text-[16px] text-ink focus-ring'
   return (
     <ToolCard className="w-full" eyebrow={<span className="inline-flex items-center gap-1.5"><Moon size={13} aria-hidden /> {t('ease.sp.eyebrow')}</span>} title={t('ease.sp.title')} sub={isi >= 15
       ? <>{r('ease.sp.subHigh', { isi: <span className="num">{isi}</span> })}</>
       : <>{r('ease.sp.subLow', { isi: <span className="num">{isi}</span>, c: <span className="num">15</span> })}</>}>
       <div className="grid grid-cols-2 gap-3">
-        <label><span className="text-[13px] text-ink-2">{t('ease.sp.wake')}</span><input type="time" value={wake} onChange={(e) => setWake(e.target.value)} className={timeCls} /></label>
-        <label><span className="text-[13px] text-ink-2">{t('ease.sp.windDown')}</span><input type="time" value={windDown} onChange={(e) => setWindDown(e.target.value)} className={timeCls} /></label>
+        <label><span className="text-[13px] text-ink-2">{t('ease.sp.wake')}</span><input type="time" value={wake} onChange={(e) => setWake(e.target.value)} aria-invalid={!HM.test(wake)} aria-describedby={!valid ? 'sp-err' : undefined} className={timeCls} /></label>
+        <label><span className="text-[13px] text-ink-2">{t('ease.sp.windDown')}</span><input type="time" value={windDown} onChange={(e) => setWindDown(e.target.value)} aria-invalid={!HM.test(windDown)} aria-describedby={!valid ? 'sp-err' : undefined} className={timeCls} /></label>
       </div>
-      <p className="mt-3 text-[15px] text-ink-2" aria-live="polite">{r('ease.sp.bed', { bed: <span className="num text-ink">{bed}</span>, w: <span className="num text-ink">{sleepWindow}</span> })}</p>
+      <p className="mt-3 text-[15px] text-ink-2" aria-live="polite">
+        {valid
+          ? r('ease.sp.bed', { bed: <span className="num text-ink">{bed}</span>, w: <span className="num text-ink">{sleepWindow}</span> })
+          : <span id="sp-err" role="alert" className="text-error">{t('ease.sp.errTime')}</span>}
+      </p>
       <ol className="relative mt-5 space-y-1 border-l border-line pl-5">
         {WIND_DOWN.map((w, i) => (
           <li key={w.title} className="relative">
@@ -414,17 +432,17 @@ function SleepPlan({ isi }: { isi: number }) {
       </ol>
       <p className="mt-3 text-[13px] text-ink-3" aria-live="polite">{r('ease.sp.steps', { a: <span className="num">{done.length}</span>, b: <span className="num">{WIND_DOWN.length}</span> })}</p>
       <div className="mt-5 rounded-2xl bg-paper-sunk p-4">
-        {saved && !dirty ? (
+        {savedOk && !dirty ? (
           <div role="status" className="flex flex-wrap items-start justify-between gap-3">
-            <p className="flex items-start gap-2 text-[15px] text-ink"><Check size={16} className="mt-1 shrink-0" aria-hidden /><span>{r('ease.sp.saved', { t: <span className="num">{saved.windDown}</span>, t2: <span className="num">{addMins(saved.windDown, 75)}</span> })}</span></p>
+            <p className="flex items-start gap-2 text-[15px] text-ink"><Check size={16} className="mt-1 shrink-0" aria-hidden /><span>{r('ease.sp.saved', { t: <span className="num">{saved!.windDown}</span>, t2: <span className="num">{addMins(saved!.windDown, 75)}</span> })}</span></p>
             <Button size="sm" variant="ghost" onClick={() => setSaved(null)}>{t('ease.sp.off')}</Button>
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-3">
-            <Button variant="ink" onClick={() => setSaved({ wake, windDown })} disabled={sleepWindow < 5} className="!whitespace-normal"><Moon size={14} /> {r('ease.sp.save', { t: <span className="num">{windDown}</span> })}</Button>
-            {sleepWindow < 5
-              ? <span role="alert" className="text-[13px] text-error">{t('ease.sp.short')}</span>
-              : <span className="text-[13px] text-ink-3">{t('ease.sp.one')}</span>}
+            <Button variant="ink" onClick={() => { if (valid && sleepWindow >= 5) setSaved({ wake, windDown }) }} disabled={!valid || !(sleepWindow >= 5)} aria-describedby={!valid ? 'sp-err' : tooShort ? 'sp-short' : undefined} className="!whitespace-normal"><Moon size={14} /> {r('ease.sp.save', { t: <span className="num">{valid ? windDown : '--:--'}</span> })}</Button>
+            {tooShort
+              ? <span id="sp-short" role="alert" className="text-[13px] text-error">{t('ease.sp.short')}</span>
+              : valid && <span className="text-[13px] text-ink-3">{t('ease.sp.one')}</span>}
           </div>
         )}
       </div>
@@ -451,7 +469,7 @@ const ROUTED_BEFORE = [
 function ClinicianRouting({ tasks, onTalk }: { tasks: { screen: Screen; score: number }[]; onTalk: () => void }) {
   const sanjay = TEAM.find((p) => p.role === 'Psychologist')!
   const meera = TEAM.find((p) => p.role === 'Physician')!
-  const { t, d, r } = useSpaceText()
+  const { t, d, r, dm } = useSpaceText()
   const label = (x: Screen) => (x === 'Pain' ? t('ease.pain') : x)
   const rules = [
     { when: t('ease.cr.r1w'), then: t('ease.cr.r1t', { name: sanjay.name }) },
@@ -484,7 +502,7 @@ function ClinicianRouting({ tasks, onTalk }: { tasks: { screen: Screen; score: n
         <ul className={clsx('space-y-2', tasks.length > 0 && 'mt-2.5')} aria-live="polite">
           {tasks.map((task) => (
             <li key={task.screen} className="rounded-xl border border-line-strong bg-paper-raised p-3 text-[14px]">
-              <span className="flex items-center justify-between gap-2 text-ink"><span>{label(task.screen)} <span className="num">{task.score}</span> · {d(ROUTE_TO[task.screen].who)}</span><span className="num shrink-0 text-[12px] text-ink-3">{fmtDate(SPACE_TODAY).slice(0, 6)}</span></span>
+              <span className="flex items-center justify-between gap-2 text-ink"><span>{label(task.screen)} <span className="num">{task.score}</span> · {d(ROUTE_TO[task.screen].who)}</span><span className="num shrink-0 text-[12px] text-ink-3">{dm(SPACE_TODAY)}</span></span>
               <span className="mt-0.5 block text-[13px] text-ink-2">{t('ease.cr.task', { within: d(ROUTE_TO[task.screen].within) })}</span>
             </li>
           ))}

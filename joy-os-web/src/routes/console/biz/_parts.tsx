@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { Lock, ShieldCheck } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useId, type KeyboardEvent, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 // Shared parts for the platform consoles (Tenant, Science, Control plane, Leadership).
@@ -19,26 +19,57 @@ export function useTabParam<T extends string>(values: readonly T[], fallback: T,
   return [value, set]
 }
 
-/** Scrollable pill tabs that never cause horizontal page scroll. */
-export function ScrollTabs<T extends string>({ value, onChange, items, label, className }: { value: T; onChange: (v: T) => void; items: { value: T; label: ReactNode; count?: number }[]; label: string; className?: string }) {
+/**
+ * Scrollable pill tabs that never cause horizontal page scroll.
+ * ARIA tabs: one tab in the Tab order (roving tabIndex), arrows / Home / End move selection and focus,
+ * and each tab names its panel. A panel opts in with tabPanelProps(idBase, value).
+ */
+export function ScrollTabs<T extends string>({ value, onChange, items, label, className, idBase }: { value: T; onChange: (v: T) => void; items: { value: T; label: ReactNode; count?: number }[]; label: string; className?: string; idBase?: string }) {
+  const auto = useId()
+  const base = idBase ?? `tabs${auto.replace(/:/g, '')}`
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const n = items.length
+    const i = items.findIndex((it) => it.value === value)
+    const to = e.key === 'ArrowRight' ? (i + 1) % n : e.key === 'ArrowLeft' ? (i - 1 + n) % n : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -1
+    if (to < 0 || n === 0) return
+    e.preventDefault()
+    onChange(items[to].value)
+    const el = document.getElementById(tabId(base, items[to].value))
+    el?.focus()
+    el?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }
   return (
     <div className={clsx('-mx-1 overflow-x-auto px-1 pb-1', className)}>
-      <div role="tablist" aria-label={label} className="inline-flex min-w-max gap-1 rounded-full bg-paper-sunk p-1">
-        {items.map((it) => (
-          <button
-            key={it.value}
-            role="tab"
-            aria-selected={value === it.value}
-            onClick={() => onChange(it.value)}
-            className={clsx('flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-[14px] transition-colors focus-ring', value === it.value ? 'bg-paper-raised text-ink shadow-card' : 'text-ink-2 hover:text-ink')}
-          >
-            {it.label}
-            {it.count !== undefined && <span className={clsx('num rounded-full px-1.5 text-[11px]', value === it.value ? 'bg-paper-sunk text-ink-2' : 'bg-paper text-ink-3')}>{it.count}</span>}
-          </button>
-        ))}
+      <div role="tablist" aria-label={label} onKeyDown={onKeyDown} className="inline-flex min-w-max gap-1 rounded-full bg-paper-sunk p-1">
+        {items.map((it) => {
+          const selected = value === it.value
+          return (
+            <button
+              key={it.value}
+              type="button"
+              role="tab"
+              id={tabId(base, it.value)}
+              aria-selected={selected}
+              aria-controls={selected ? panelId(base, it.value) : undefined}
+              tabIndex={selected ? 0 : -1}
+              onClick={() => onChange(it.value)}
+              className={clsx('flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-[14px] transition-colors focus-ring', selected ? 'bg-paper-raised text-ink shadow-card' : 'text-ink-2 hover:text-ink')}
+            >
+              {it.label}
+              {it.count !== undefined && <span className={clsx('num rounded-full px-1.5 text-[11px]', selected ? 'bg-paper-sunk text-ink-2' : 'bg-paper text-ink-3')}>{it.count}</span>}
+            </button>
+          )
+        })}
       </div>
     </div>
   )
+}
+
+const tabId = (base: string, v: string) => `${base}-tab-${v}`
+const panelId = (base: string, v: string) => `${base}-panel-${v}`
+/** Props for the panel a ScrollTabs tab controls (pass the same idBase). */
+export function tabPanelProps(idBase: string, value: string) {
+  return { role: 'tabpanel' as const, id: panelId(idBase, value), 'aria-labelledby': tabId(idBase, value) }
 }
 
 export function CardHead({ eyebrow, title, aside, lead, className }: { eyebrow?: ReactNode; title?: ReactNode; aside?: ReactNode; lead?: ReactNode; className?: string }) {
@@ -49,7 +80,7 @@ export function CardHead({ eyebrow, title, aside, lead, className }: { eyebrow?:
         {title && <h2 className="mt-1.5 text-[1.35rem] font-light leading-snug text-ink">{title}</h2>}
         {lead && <p className="mt-1.5 text-[15px] leading-relaxed text-ink-2">{lead}</p>}
       </div>
-      {aside && <div className="flex flex-wrap items-center gap-2">{aside}</div>}
+      {aside && <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{aside}</div>}
     </div>
   )
 }
@@ -76,20 +107,23 @@ export function AccessNote({ children, icon = 'lock', className }: { children: R
   )
 }
 
-/** Status tag — never red. Ink for "needs a person", hatch-free neutral tones otherwise. */
+/**
+ * Status tag — never red, and never a Spectrum colour: the Spectrum belongs to the six terms only.
+ * Ink fill for "needs a person"; ink outline for ok; a ringed sunk ground for watch; quieter neutrals otherwise.
+ */
 export type StatusTone = 'ok' | 'watch' | 'act' | 'off' | 'draft' | 'info'
 export function StatusTag({ tone, children, className }: { tone: StatusTone; children: ReactNode; className?: string }) {
   const cls: Record<StatusTone, string> = {
-    ok: 'bg-[color:var(--term-h-soft)] text-[color:var(--term-h-ink)]',
-    watch: 'bg-[color:var(--term-d-soft)] text-[color:var(--term-d-ink)]',
+    ok: 'border border-ink text-ink',
+    watch: 'bg-paper-sunk text-ink ring-1 ring-inset ring-line-strong',
     act: 'bg-ink text-paper',
     off: 'border border-line-strong text-ink-3',
     draft: 'border border-dashed border-line-strong text-ink-2',
     info: 'bg-paper-sunk text-ink-2',
   }
   const dot: Record<StatusTone, string> = {
-    ok: 'var(--term-h)',
-    watch: 'var(--term-d-ink)',
+    ok: 'var(--ink)',
+    watch: 'var(--ink-2)',
     act: 'var(--paper)',
     off: 'var(--ink-3)',
     draft: 'var(--ink-3)',

@@ -55,7 +55,15 @@ export default function PlatformMap() {
 
       <ArchitectureSection mod={mod} />
       <TwoAppsSection />
-      <OutcomesSection onSelect={(n) => { select(n); document.getElementById('map')?.scrollIntoView({ behavior: 'smooth' }) }} sel={sel} />
+      <OutcomesSection
+        onSelect={(n) => {
+          select(n)
+          // desktop shows the traced map; below lg the map is a long picker, so go straight to the module's card
+          const target = window.matchMedia('(min-width: 1024px)').matches ? 'map' : 'module-detail'
+          document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }}
+        sel={sel}
+      />
     </div>
   )
 }
@@ -219,10 +227,12 @@ function ConnectionMap({ sel, onSelect }: { sel: string; onSelect: (n: string) =
                   onClick={() => { setPinned((p) => (p === t.key ? null : t.key)); setHovered(null) }}
                   aria-pressed={pinned === t.key}
                   aria-label={`${t.name}: ${MODULES.filter((m) => m.terms.includes(t.key)).length} modules raise it. ${pinned === t.key ? 'Click to clear the trace.' : 'Click to pin the trace.'}`}
-                  className={clsx('w-full rounded-lg border px-3 py-2 text-left transition-all duration-200 focus-ring', pinned === t.key ? 'border-ink bg-paper-raised' : termOn(t.key) ? 'border-line-strong bg-paper-raised' : 'border-transparent opacity-40')}
+                  // always an opaque box, so a line routed across the column (Commerce, Trust centre) passes behind it;
+                  // a dimmed term fades its text, never the box
+                  className={clsx('w-full rounded-lg border bg-paper-raised px-3 py-2 text-left transition-all duration-200 focus-ring', pinned === t.key ? 'border-ink' : termOn(t.key) ? 'border-line-strong' : 'border-transparent')}
                 >
-                  <span className="flex items-center gap-2 text-[14px] text-ink"><TermDot term={t.key} /> {t.key === 'B' ? '− ' : ''}{t.name}</span>
-                  <span className="mt-0.5 block pl-[18px] text-[12px] text-ink-3">{t.space} space</span>
+                  <span className={clsx('flex items-center gap-2 text-[14px] text-ink transition-opacity duration-200', !termOn(t.key) && pinned !== t.key && 'opacity-40')}><TermDot term={t.key} /> {t.key === 'B' ? '− ' : ''}{t.name}</span>
+                  <span className={clsx('mt-0.5 block pl-[18px] text-[12px] text-ink-3 transition-opacity duration-200', !termOn(t.key) && pinned !== t.key && 'opacity-40')}>{t.space} space</span>
                 </button>
               </li>
             ))}

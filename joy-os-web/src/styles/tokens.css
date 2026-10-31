@@ -100,6 +100,7 @@
   --daybreak-ink: #f08a72;
   --daybreak-soft: #3a2420;
   --daybreak-label: #1c1314;
+  --error: #f08a8a; /* #9f1d1d is ~2.3:1 on Ink; this clears AA on paper, raised and sunk */
   --term-h-soft: #17352b;
   --term-p-soft: #2c2234;
   --term-r-soft: #34202a;
@@ -119,6 +120,14 @@
   color-scheme: dark;
 }
 
-/* Text size preference (Dynamic Type equivalent, up to 200%) */
-:root[data-text='large'] { font-size: 112.5%; }
-:root[data-text='xlarge'] { font-size: 125%; }
+/* Text size preference (Dynamic Type equivalent, up to 125%).
+   One mechanism only: zoom on the app root. Most type is set in px (body is 17px, plus
+   text-[15px]-style classes) and the Wheel's names are SVG units, none of which follow the
+   root font-size, so zoom is what makes "everything scales" true. The root font-size stays
+   at 100% so rem text is not scaled twice. --text-zoom lets viewport-height rules divide the
+   zoom back out (see index.css) so 100vh layouts still fit the screen. */
+:root { --text-zoom: 1; }
+:root[data-text='large'] { --text-zoom: 1.125; }
+:root[data-text='xlarge'] { --text-zoom: 1.25; }
+:root[data-text='large'] #root,
+:root[data-text='xlarge'] #root { zoom: var(--text-zoom); }

@@ -268,7 +268,7 @@ export default function Settings() {
       </div>
 
       {/* Save bar — the one Daybreak */}
-      <div className={clsx('fixed inset-x-0 bottom-[68px] z-20 border-t border-line bg-paper px-4 py-3 backdrop-blur transition-transform duration-200 lg:bottom-0 lg:left-[264px]', dirty ? 'translate-y-0' : 'pointer-events-none translate-y-[200%]')} aria-hidden={!dirty}>
+      <div className={clsx('fixed inset-x-0 bottom-[calc(68px+env(safe-area-inset-bottom))] z-20 border-t border-line bg-paper px-4 py-3 backdrop-blur transition-transform duration-200 lg:bottom-0 lg:left-[264px]', dirty ? 'translate-y-0' : 'pointer-events-none translate-y-[200%]')} aria-hidden={!dirty}>
         <div className="mx-auto flex max-w-[1120px] flex-col items-start gap-2 pr-24 sm:flex-row sm:items-center sm:justify-between sm:gap-4 md:px-4 lg:pr-28">
           <p className="text-[14px] text-ink-2">{overBudget ? t('barOver') : n.quietFrom === n.quietTo ? t('barQuiet') : t('barDirty')}</p>
           <div className="flex items-center gap-2">

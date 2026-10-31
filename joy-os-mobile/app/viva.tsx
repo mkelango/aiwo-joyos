@@ -1,6 +1,6 @@
 import { router } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View, type ScrollViewInstance } from 'react-native'
+import { AccessibilityInfo, KeyboardAvoidingView, Platform, Pressable, ScrollView, View, type ScrollViewInstance } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   ArrowLink,
@@ -103,8 +103,10 @@ function Viva() {
   const [typing, setTyping] = useState(false)
   const [unavailable, setUnavailable] = useState(false)
   const [memoryOpen, setMemoryOpen] = useState(false)
-  const [memoryOn, setMemoryOn] = useState<Record<TermKey, boolean>>({ H: true, P: true, R: true, F: true, D: true, B: false })
-  const [memory, setMemory] = useState(VIVA_MEMORY)
+  // What VIVA may remember, and what the member has forgotten, is kept on the phone: a forget
+  // or a space switched off holds when VIVA is closed and opened again.
+  const [memoryOn, setMemoryOn] = useLocal<Record<TermKey, boolean>>('vivaMemoryOn', MEMORY_ON_DEFAULT)
+  const [memory, setMemory] = useLocal('vivaMemory', VIVA_MEMORY)
   const [notice, setNotice] = useState('')
   const [msgs, setMsgs] = useState<Msg[]>([
     {
@@ -121,6 +123,14 @@ function Viva() {
     return () => clearTimeout(t)
   }, [msgs, typing])
   useEffect(() => () => timers.current.forEach(clearTimeout), [])
+  // Screen readers hear only the newest reply or system line, not the whole conversation again.
+  const announced = useRef('hello')
+  useEffect(() => {
+    const last = msgs[msgs.length - 1]
+    if (!last || last.id === announced.current) return
+    announced.current = last.id
+    if (last.from !== 'me') AccessibilityInfo.announceForAccessibility(last.text)
+  }, [msgs])
 
   /** text is shown as the member's words; routeText (English) picks the scripted reply when a tool or guardrail was tapped. */
   const respond = (text: string, routeText = text) => {
@@ -248,7 +258,7 @@ function Viva() {
           </View>
 
           {/* Conversation */}
-          <View style={{ gap: space.s2 }} accessibilityLiveRegion="polite" accessibilityLabel={t('convo')}>
+          <View style={{ gap: space.s2 }}>
             {msgs.map((m) => (
               <Bubble key={m.id} m={m.id === 'hello' ? { ...m, text: t('hello') } : m} onWriteDown={writeDown} />
             ))}
@@ -475,6 +485,24 @@ function Extra({ kind, onWriteDown }: { kind: NonNullable<Msg['extra']>; onWrite
 }
 
 // ─── Scripted router (no live model in this front end) ──────────────────────
+const MEMORY_ON_DEFAULT: Record<TermKey, boolean> = { H: true, P: true, R: true, F: true, D: true, B: false }
+
+// The guardrails must hold in the member's own language, not only for English words or the
+// tapped chips (which pass English route text). Matched as substrings of the lowercased text.
+const DX_WORDS_INDIC = [
+  // Tamil
+  'நோயறிதல்', 'தூக்கமின்மை', 'நோய்', 'கோளாறு', 'மனச்சோர்வு', 'மருந்து', 'மாத்திரை', 'மெலடோனின்', 'டோஸ்', 'மருத்துவச் சீட்டு', 'மூச்சுத்திணறல்',
+  // Hindi
+  'निदान', 'अनिद्रा', 'बीमारी', 'विकार', 'अवसाद', 'डिप्रेशन', 'दवा', 'दवाई', 'गोली', 'खुराक', 'डोज़', 'मेलाटोनिन', 'प्रिस्क्रिप्शन', 'एपनिया',
+]
+const MONEY_WORDS_INDIC = [
+  // Tamil
+  'சேமிப்பு', 'முதலீடு', 'மியூச்சுவல் ஃபண்ட்', 'பங்குகள்', 'பங்குச் சந்தை', 'பங்குச்சந்தை', 'கடன்', 'பணம்', 'போர்ட்ஃபோலியோ', 'எஸ்ஐபி',
+  // Hindi
+  'बचत', 'निवेश', 'म्यूचुअल फंड', 'शेयर बाज़ार', 'शेयर बाजार', 'स्टॉक', 'लोन', 'कर्ज़', 'कर्ज', 'क़र्ज़', 'पैसा', 'पैसे', 'पोर्टफोलियो', 'एसआईपी',
+]
+const hasAny = (t: string, words: string[]) => words.some((w) => t.includes(w))
+
 function route(text: string, memoryOn: Record<TermKey, boolean>, retakes: { date: string; score: number }[] = [], lang: Lang = 'en'): Msg {
   const t = text.toLowerCase()
   const latest = INDEX_HISTORY[0]
@@ -487,6 +515,8 @@ function route(text: string, memoryOn: Record<TermKey, boolean>, retakes: { date
       kind: 'suffering',
       text: phq4Passage(retakes, lang),
     }
+  if (hasAny(t, DX_WORDS_INDIC)) return viva('guardrail · no diagnosis', tr(lang, 'rDx'), 'route-meera', 'refusal')
+  if (hasAny(t, MONEY_WORDS_INDIC)) return viva('guardrail · no financial advice', tr(lang, 'rMoney'), 'route-adviser', 'refusal')
   if (/\b(diagnos|insomnia|disorder|depress|melatonin|medicine|medication|dose|tablet|prescri|apnoea|apnea)/.test(t))
     return viva('guardrail · no diagnosis', tr(lang, 'rDx'), 'route-meera', 'refusal')
   if (/\b(savings|invest|equity|mutual fund|stocks?|shares|loan|money|portfolio|sip)\b/.test(t))

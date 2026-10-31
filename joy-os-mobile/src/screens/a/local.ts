@@ -93,7 +93,16 @@ export function usePlanned() {
 }
 
 /** A ’cation request or registration of interest, kept on the phone per ’cation slug. */
-export type CationRequest = { ref: string; win: string; venue: string; guests: number; outcome: string; interestOnly: boolean }
+export type CationRequest = {
+  ref: string
+  win: string
+  venue: string
+  guests: number
+  outcome: string
+  /** The optional dietary note the venue receives. Requests saved before it was kept have none. */
+  dietary?: string
+  interestOnly: boolean
+}
 
 /** ’Cation requests made on this phone, read by the ’Cation hub and each ’cation's page. */
 export function useCationRequests() {

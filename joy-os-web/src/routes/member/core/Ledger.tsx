@@ -12,7 +12,7 @@ import { interceptsCrisis, useApp } from '@/lib/store'
 import { useT } from '@/lib/i18n'
 import { LEDGER_CALENDAR, LEDGER_SCHEDULE, LEDGER_STORY } from './_data'
 import { Provenance, Switch, TICK } from './_parts'
-import { SPECIMEN_TODAY, addDays, isSeed, liveLedger, useLedgerRemoved, useLocal, weekCounts, type ScheduleRow } from './_store'
+import { SPECIMEN_TODAY, addDays, isSeed, liveLedger, useLedgerRemoved, useLocal, weekCounts, weekEntryCount, type ScheduleRow } from './_store'
 import { SCHEDULE_LABEL, STORY_TEXT, fmtLocal, rich, useCore } from './_i18n'
 import type { Lang } from '@/lib/store'
 
@@ -132,6 +132,8 @@ function PromptCard({ prompt, time, next, live }: { prompt: 1 | 2 | 3; time?: st
   const { ledger, addLedger, setCrisisOpen } = useApp()
   const [photos, setPhotos] = useLocal<Record<string, string>>('ledger-photos', {})
   const wordId = useId()
+  const labelId = useId()
+  const askId = useId()
   const fileRef = useRef<HTMLInputElement>(null)
   const pendingPhoto = useRef<string | null>(null)
   const [tags, setTags] = useState<string[]>([])
@@ -190,15 +192,16 @@ function PromptCard({ prompt, time, next, live }: { prompt: 1 | 2 | 3; time?: st
   }
 
   return (
-    <Card tone="soft" className="flex flex-col" aria-labelledby="ledger-prompt">
+    <Card tone="soft" className="flex flex-col" aria-labelledby={state === 'ask' ? `${labelId} ${askId}` : labelId}>
       <div className="flex items-start justify-between gap-3">
-        <Eyebrow tone="daybreak">{name('D')} · {c('lgPromptOf', { p: prompt, n: 3 })}</Eyebrow>
+        {/* Always rendered, so the card keeps its name in every state. */}
+        <div id={labelId} className="min-w-0"><Eyebrow tone="daybreak">{name('D')} · {c('lgPromptOf', { p: prompt, n: 3 })}</Eyebrow></div>
         {time && <span className="num text-[13px] text-ink-3">{time}</span>}
       </div>
       <AnimatePresence mode="wait">
         {state === 'ask' ? (
           <motion.div key="ask" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-1 flex-col">
-            <h2 id="ledger-prompt" className="mt-4 text-[2rem] font-light leading-tight text-ink md:text-[2.4rem]">{t('ledgerPrompt')}</h2>
+            <h2 id={askId} className="mt-4 text-[2rem] font-light leading-tight text-ink md:text-[2.4rem]">{t('ledgerPrompt')}</h2>
             <fieldset className="mt-6">
               <legend className="sr-only">{c('lgLegend')}</legend>
               <div className="flex flex-wrap gap-2">
@@ -363,7 +366,9 @@ function ScheduleCard({ rows, setRows }: { rows: ScheduleRow[]; setRows: (next: 
 function WeekCard({ ledger, removed }: { ledger: LedgerEntry[]; removed: string[] }) {
   const [hidden, setHidden] = useLocal<boolean>('ledger-story-hidden', false)
   const week = useMemo(() => weekCounts(ledger, removed), [ledger, removed])
-  const total = week.reduce((a, r) => a + r.count, 0)
+  // The headline counts moments (entries); one entry can carry several tags, so the
+  // per-tag sum is for the bars only.
+  const total = useMemo(() => weekEntryCount(ledger, removed), [ledger, removed])
   const [first, second] = week
   const { t: c, lang, pick, tag } = useCore()
   const tagWord = (s: string) => (lang === 'en' ? s.toLowerCase() : tag(s))
@@ -468,9 +473,10 @@ function CalendarCard({ live }: { live: LedgerEntry[] }) {
 
 // ─── The entries ────────────────────────────────────────────────────────────
 function EntriesCard({ live, onRemove, onRestore }: { live: LedgerEntry[]; onRemove: (id: string) => void; onRestore: (id: string) => void }) {
-  const [photos] = useLocal<Record<string, string>>('ledger-photos', {})
+  const [photos, setPhotos] = useLocal<Record<string, string>>('ledger-photos', {})
   const [filter, setFilter] = useState<string | null>(null)
-  const [undo, setUndo] = useState<{ id: string; label: string } | null>(null)
+  // A removed entry's on-device photo leaves storage at once; Undo puts it back.
+  const [undo, setUndo] = useState<{ id: string; label: string; photo?: string } | null>(null)
   const timer = useRef<number | undefined>(undefined)
   useEffect(() => () => window.clearTimeout(timer.current), [])
   const rows = filter ? live.filter((e) => e.tags.includes(filter)) : live
@@ -487,7 +493,15 @@ function EntriesCard({ live, onRemove, onRestore }: { live: LedgerEntry[]; onRem
   const tr = useT()
   const remove = (e: LedgerEntry) => {
     onRemove(e.id)
-    setUndo({ id: e.id, label: `${fmtDay(asDate(dayKey(e.at)), lang)}, ${fmtTime(e.at)}` })
+    const photo = photos[e.id]
+    if (photo) {
+      setPhotos((p) => {
+        const next = { ...p }
+        delete next[e.id]
+        return next
+      })
+    }
+    setUndo({ id: e.id, label: `${fmtDay(asDate(dayKey(e.at)), lang)}, ${fmtTime(e.at)}`, photo })
     window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => setUndo(null), 8000)
   }
@@ -508,6 +522,9 @@ function EntriesCard({ live, onRemove, onRestore }: { live: LedgerEntry[]; onRem
             <button
               onClick={() => {
                 onRestore(undo.id)
+                const { id, photo } = undo
+                if (photo) setPhotos((p) => ({ ...p, [id]: photo }))
+                window.clearTimeout(timer.current)
                 setUndo(null)
               }}
               className="font-medium text-ink underline underline-offset-4 focus-ring"

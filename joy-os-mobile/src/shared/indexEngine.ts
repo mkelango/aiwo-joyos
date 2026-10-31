@@ -3,7 +3,7 @@ import type { Band, MethodVersion, TermKey, TermScore } from './types'
 // Index method registry. Weights and λ are configuration, not code (Memo p.10).
 export const METHODS: Record<MethodVersion, { lambda: number; label: string; published: string; status: string }> = {
   'v1.0': { lambda: 0.25, label: 'Method v1.0', published: '2026-10-22', status: 'In use' },
-  'v1.1': { lambda: 0.22, label: 'Method v1.1 (calibration)', published: '2027-06-30', status: 'Planned · J3' },
+  'v1.1': { lambda: 0.22, label: 'Method v1.1 (calibration)', published: '2028-03-31', status: 'Planned · J3' },
   'v2.0': { lambda: 0.2, label: 'Index v2 (adaptive, <₹100)', published: 'FY29', status: 'Planned · J4' },
 }
 

@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
-import { Pressable, ScrollView, TextInput, View, type TextInputInstance } from 'react-native'
+import { Platform, Pressable, ScrollView, TextInput, View, type TextInputInstance } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AiwoMark, Avatar, Body, Button, Card, DaybreakButton, Eyebrow, Icon, Meta, Mono, Segmented, Serif, Title } from '@/components'
 import { useApp } from '@/lib/store'
@@ -42,6 +42,8 @@ export default function SignIn() {
   const [busy, setBusy] = useState(false)
   const [who, setWho] = useState('Arjun')
   const codeRef = useRef<TextInputInstance>(null)
+  // The specimen passkey check runs on a timer; it is held here so backing out cancels it.
+  const passkeyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const t = useDict(SIGNIN)
   const tc = useCommon()
 
@@ -51,7 +53,22 @@ export default function SignIn() {
     return () => clearTimeout(t)
   }, [phase, resendIn])
 
-  const finish = (m: 'passkey' | 'otp' | 'email' | 'demo', name = 'Arjun') => {
+  const cancelPasskey = () => {
+    if (passkeyTimer.current) {
+      clearTimeout(passkeyTimer.current)
+      passkeyTimer.current = null
+    }
+    setBusy(false)
+  }
+  useEffect(() => () => {
+    if (passkeyTimer.current) clearTimeout(passkeyTimer.current)
+  }, [])
+
+  // The greeting follows the AIWO ID that was entered; an ID outside the specimen accounts
+  // greets as Arjun, the specimen member whose data the app shows.
+  const nameFor = (id: string) => DEMO_ACCOUNTS.find((a) => a.aiwoId === id)?.name.split(' ')[0] ?? 'Arjun'
+
+  const finish = (m: 'passkey' | 'otp' | 'email' | 'demo', name = nameFor(aiwoId)) => {
     setWho(name)
     setSession((s) => ({ ...s, signedIn: true, method: m, at: new Date().toISOString() }))
     setPhase('done')
@@ -70,11 +87,17 @@ export default function SignIn() {
     setPhase('method')
   }
   const usePasskey = () => {
+    if (passkeyTimer.current) return
     setBusy(true)
-    setTimeout(() => {
+    passkeyTimer.current = setTimeout(() => {
+      passkeyTimer.current = null
       setBusy(false)
       finish('passkey')
     }, 900)
+  }
+  const changeMethod = (m: Method) => {
+    cancelPasskey()
+    setMethod(m)
   }
   const sendCode = () => {
     const digits = phone.replace(/\D/g, '')
@@ -101,6 +124,7 @@ export default function SignIn() {
     setPhase('email-sent')
   }
   const goBack = () => {
+    cancelPasskey()
     if (phase === 'method') return setPhase('id')
     if (phase === 'otp-code' || phase === 'email-sent') return setPhase('method')
     router.canGoBack() ? router.back() : router.replace('/welcome')
@@ -119,7 +143,7 @@ export default function SignIn() {
         <AiwoMark size={18} />
         <View style={{ width: 44 }} />
       </View>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'} keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}>
         <View style={{ paddingHorizontal: space.gutter, paddingTop: space.s2, paddingBottom: insets.bottom + space.s4, gap: space.s3, width: '100%', maxWidth: 640, alignSelf: 'center', flexGrow: 1 }}>
           {phase === 'id' ? (
             <>
@@ -188,7 +212,7 @@ export default function SignIn() {
               <StepHead eyebrow={t('step2')} title={t('howTitle')} lead={`AIWO ID ${aiwoId}`} />
               <Segmented<Method>
                 value={method}
-                onChange={setMethod}
+                onChange={changeMethod}
                 items={[
                   { value: 'passkey', label: t('passkey') },
                   { value: 'otp', label: t('phone') },

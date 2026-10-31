@@ -1,10 +1,10 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, BookOpen, Check, Clock, MapPin, ShieldCheck, Sparkles } from 'lucide-react'
-import { useId, useState, type ReactNode } from 'react'
+import { useId, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { BandLabel, Delta, Eyebrow, MethodLine, SpecimenTag, TermDot, fmtDate } from '@/components/joy/primitives'
+import { BandLabel, Delta, Eyebrow, MethodLine, SpecimenTag, TermDot } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill } from '@/components/ui'
 import { INDEX_HISTORY } from '@/data/member'
 import { interceptsCrisis, useApp } from '@/lib/store'
@@ -13,6 +13,7 @@ import { termByKey, termColor } from '@/data/terms'
 import type { TermKey } from '@/domain/types'
 import { ROOM_VERDICT, VIVA_DRAFT, actionsFor, termHistory } from './_data'
 import { useSpaceText } from './_i18n'
+import { useSpaceState } from './_state'
 
 // Shared shell for the six spaces (Memo p.19): the term, its score with method,
 // its 90-day history, what moves it, three actions, the VIVA tool, the lead
@@ -67,6 +68,34 @@ export function Toggle({ checked, onChange, label, description }: { checked: boo
   )
 }
 
+const RADIO_STEP: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }
+
+/**
+ * Props for each option of a custom role="radiogroup" (the WAI-ARIA radio pattern):
+ * one Tab stop for the group (the checked option, else the first enabled one), and
+ * arrow keys, Home and End move the choice and the focus. Use on <button>s inside a
+ * role="radiogroup" element, in the same order as `options`.
+ */
+export function rovingRadio<V>(options: readonly V[], value: V, onChange: (v: V) => void, isDisabled?: (v: V) => boolean) {
+  const enabled = options.filter((o) => !isDisabled?.(o))
+  const stop = enabled.includes(value) ? value : enabled[0]
+  return (o: V) => ({
+    role: 'radio' as const,
+    'aria-checked': value === o,
+    tabIndex: o === stop ? 0 : -1,
+    onClick: () => onChange(o),
+    onKeyDown: (e: KeyboardEvent<HTMLElement>) => {
+      const i = enabled.indexOf(o)
+      const next = e.key in RADIO_STEP ? enabled[(i + RADIO_STEP[e.key] + enabled.length) % enabled.length] : e.key === 'Home' ? enabled[0] : e.key === 'End' ? enabled[enabled.length - 1] : undefined
+      if (next === undefined || i < 0) return
+      e.preventDefault()
+      onChange(next)
+      const radios = e.currentTarget.closest('[role="radiogroup"]')?.querySelectorAll<HTMLElement>('[role="radio"]')
+      radios?.[options.indexOf(next)]?.focus()
+    },
+  })
+}
+
 /** Fade-in wrapper; ≤240ms, respects reduced motion. */
 export function Reveal({ children, className, delay = 0 }: { children: ReactNode; className?: string; delay?: number }) {
   const reduce = useReducedMotion()
@@ -95,7 +124,7 @@ export function ToolCard({ eyebrow, title, sub, aside, children, className, tone
 }
 
 /** Recharts tooltip in tokens. */
-export function ChartTip({ active, payload, label, unit = '', names, fmt }: { active?: boolean; payload?: { value: number; name?: string; dataKey?: string; color?: string }[]; label?: string; unit?: string; names?: Record<string, string>; fmt?: (label: string) => string }) {
+export function ChartTip({ active, payload, label, unit = '', prefix = '', names, fmt }: { active?: boolean; payload?: { value: number; name?: string; dataKey?: string; color?: string }[]; label?: string; unit?: string; prefix?: string; names?: Record<string, string>; fmt?: (label: string) => string }) {
   if (!active || !payload?.length) return null
   return (
     <div className="rounded-lg border border-line bg-paper-raised px-3 py-2 text-[13px] shadow-card">
@@ -103,7 +132,7 @@ export function ChartTip({ active, payload, label, unit = '', names, fmt }: { ac
       {payload.map((p) => (
         <p key={String(p.dataKey)} className="mt-0.5 flex items-center gap-2 text-ink">
           {payload.length > 1 && <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />}
-          {names?.[String(p.dataKey)] ?? ''} <span className="num">{p.value}{unit}</span>
+          {names?.[String(p.dataKey)] ?? ''} <span className="num">{prefix}{p.value}{unit}</span>
         </p>
       ))}
     </div>
@@ -119,10 +148,12 @@ export function TermRule({ term, className }: { term: TermKey; className?: strin
 
 function ScoreHero({ term }: { term: TermKey }) {
   const t = termByKey(term)
-  const { t: tx, tt, d } = useSpaceText()
+  const { t: tx, tt, d, dm, my } = useSpaceText()
   const name = tt.name(term)
   const s = termScore(term)
   const isB = term === 'B'
+  // Burden is always signed with a minus (U+2212), on the axis and tooltip as on the tiles.
+  const sign = isB ? '−' : ''
   const history = termHistory(term)
   const fulls = INDEX_HISTORY.slice().reverse().map((ix) => ({ on: ix.takenOn, v: ix.terms.find((x) => x.key === term)!.value, grade: ix.grade }))
   const diff = s.delta ?? 0
@@ -139,7 +170,7 @@ function ScoreHero({ term }: { term: TermKey }) {
           <Eyebrow>{tx('sh.yourScore', { name })}{isB ? tx('sh.lowerSuffix') : ''}</Eyebrow>
           <div className="mt-3 flex items-end gap-4">
             <span className="num text-[5.25rem] font-light leading-[0.85] tracking-tight text-ink md:text-[6.5rem]" aria-label={tx(isB ? 'sh.ariaB' : 'sh.aria', { name, v: s.value ?? '' })}>
-              {isB ? '−' : ''}{s.value}
+              {sign}{s.value}
             </span>
             <span className="mb-1.5 flex flex-col gap-1">
               <Delta value={s.delta} inverse={isB} className="text-[15px]" />
@@ -177,21 +208,21 @@ function ScoreHero({ term }: { term: TermKey }) {
                     <stop offset="100%" stopColor={termColor[term]} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={{ stroke: 'var(--line)' }} interval={3} />
-                <YAxis tick={axisTick} tickLine={false} axisLine={false} domain={['dataMin - 6', 'dataMax + 6']} allowDecimals={false} />
-                <Tooltip content={<ChartTip unit="" />} cursor={{ stroke: 'var(--line-strong)' }} />
+                <XAxis dataKey="on" tick={axisTick} tickLine={false} axisLine={{ stroke: 'var(--line)' }} interval={3} tickFormatter={dm} />
+                <YAxis tick={axisTick} tickLine={false} axisLine={false} domain={['dataMin - 6', 'dataMax + 6']} allowDecimals={false} tickFormatter={(v: number) => `${sign}${v}`} />
+                <Tooltip content={<ChartTip unit="" prefix={sign} fmt={dm} />} cursor={{ stroke: 'var(--line-strong)' }} />
                 <Area isAnimationActive={false} type="monotone" dataKey="value" stroke={termColor[term]} strokeWidth={2} fill={`url(#${gradId})`} strokeDasharray={isB ? '5 3' : undefined} dot={false} activeDot={{ r: 4, fill: termColor[term] }} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
           <p className="sr-only">
-            {tx('sh.pulseSr', { name, list: history.map((h) => `${h.label} ${h.value}`).join(', ') })}
+            {tx('sh.pulseSr', { name, list: history.map((h) => `${dm(h.on)} ${sign}${h.value}`).join(', ') })}
           </p>
           <ol className="mt-4 grid grid-cols-3 gap-2" aria-label={tx('sh.fullMeasures')}>
             {fulls.map((f) => (
               <li key={f.on} className="rounded-xl bg-paper-sunk px-3 py-2.5">
-                <span className="eyebrow block text-ink-3">{fmtDate(f.on).slice(3)}</span>
-                <span className="num text-[1.4rem] font-light text-ink">{isB ? '−' : ''}{f.v}</span>
+                <span className="eyebrow block text-ink-3">{my(f.on)}</span>
+                <span className="num text-[1.4rem] font-light text-ink">{sign}{f.v}</span>
                 <span className="block text-[12px] text-ink-3">{f.grade === 'clinical' ? tx('sh.clinical') : tx('sh.index')}</span>
               </li>
             ))}
@@ -229,7 +260,7 @@ function WhatMoves({ term }: { term: TermKey }) {
 function ThreeActions({ term }: { term: TermKey }) {
   const actions = actionsFor(term)
   const { t: tx, tt, d } = useSpaceText()
-  const [added, setAdded] = useState<Record<string, boolean>>({})
+  const [added, setAdded] = useSpaceState<Record<string, boolean>>(`actions.${term}.added.v1`, {})
   const [open, setOpen] = useState<string | null>(null)
   return (
     <ToolCard eyebrow={tx('sh.threeActions', { name: tt.name(term) })} sub={tx('sh.threeSub')}>

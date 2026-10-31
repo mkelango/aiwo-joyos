@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { ArrowRight, CalendarClock, Check, FileSignature, Hourglass, MessageCircle, ShieldCheck } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
 import { BandLabel, DaybreakButton, Delta, Eyebrow, MethodLine, SpecimenTag, TermDot, useFmtDate } from '@/components/joy/primitives'
@@ -11,7 +11,7 @@ import { METHODS, bandFor, joyspanIndex, lowestTerm } from '@/domain/indexEngine
 import type { Grade, TermKey } from '@/domain/types'
 import { DAY90_DATES, DAY90_TERMS, DAY90_WHY, NEXT_90 } from './_data'
 import { INK_GROUND } from './_parts'
-import { IN_REMEASURE_WINDOW, addDays } from './_store'
+import { IN_REMEASURE_WINDOW, REMEASURE_OPENS, addDays } from './_store'
 import { DAY90_SPECIMEN_TEXT, DAY90_WHY_TEXT, NEXT90_TEXT, rich, useCore } from './_i18n'
 import { useT } from '@/lib/i18n'
 
@@ -37,6 +37,7 @@ export default function Day90() {
   const slot = DAY90_DATES.call
   const [requested, setRequested] = useState<string | null>(null)
   const [picking, setPicking] = useState(false)
+  const pointerPick = useRef(false)
   const day = weekdayOf(slot)
   const b0 = day0.terms.find((t) => t.key === 'B')!.value!
   const b90 = DAY90_TERMS.find((t) => t.key === 'B')!.value!
@@ -58,7 +59,7 @@ export default function Day90() {
 
       {!IN_REMEASURE_WINDOW && (
         <p className="mb-6 max-w-2xl rounded-card border border-dashed border-line-strong px-4 py-3 text-[14px] text-ink-2">
-          {rich(c('d9HowShown'), { d: <span className="num">{MEMBER.dayOfLoop}</span>, n: <span className="num">76</span>, date: fmtDate(addDays(MEMBER.loopStarted, 76)) })}
+          {rich(c('d9HowShown'), { d: <span className="num">{MEMBER.dayOfLoop}</span>, n: <span className="num">76</span>, date: fmtDate(REMEASURE_OPENS) })}
         </p>
       )}
       <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -131,13 +132,19 @@ export default function Day90() {
           <p className="mt-4 text-[1.35rem] font-light leading-snug text-ink">{pick(DAY90_SPECIMEN_TEXT.person, DAY90_SPECIMEN.person)}</p>
           <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px] text-ink-2"><CalendarClock size={15} aria-hidden /> <span className="num">{when(slot)}</span> <span>{c('d9CallMeta')}</span></p>
           {picking && (
-            <fieldset className="mt-4 space-y-2">
+            <fieldset className="mt-4 space-y-2" onKeyDown={() => { pointerPick.current = false }}>
               <legend className="eyebrow mb-2 text-ink-3">{c('d9Choose')}</legend>
               {SLOTS.map((s) => {
                 const on = (requested ?? slot) === s
                 return (
-                  <label key={s} className={clsx('flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-[15px] focus-within:ring-2 focus-within:ring-daybreak', on ? 'border-ink text-ink' : 'border-line text-ink-2')}>
-                    <input type="radio" name="slot" className="sr-only" checked={on} onChange={() => { setRequested(s === slot ? null : s); setPicking(false) }} />
+                  <label key={s} onPointerDown={() => { pointerPick.current = true }} className={clsx('flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-[15px] focus-within:ring-2 focus-within:ring-daybreak', on ? 'border-ink text-ink' : 'border-line text-ink-2')}>
+                    <input type="radio" name="slot" className="sr-only" checked={on} onChange={() => {
+                      setRequested(s === slot ? null : s)
+                      // A tap picks and closes; arrow keys only move the choice, so keyboard
+                      // users can browse the slots and close with the toggle below.
+                      if (pointerPick.current) setPicking(false)
+                      pointerPick.current = false
+                    }} />
                     <span className={clsx('flex h-4 w-4 items-center justify-center rounded-full border', on ? 'border-ink' : 'border-line-strong')}>{on && <span className="h-2 w-2 rounded-full bg-ink" />}</span>
                     <span className="num min-w-0">{when(s)}</span>
                     {s === slot && <span className="ml-auto shrink-0 text-[13px] text-ink-3">{c('d9Booked')}</span>}

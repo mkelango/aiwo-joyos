@@ -24,19 +24,23 @@ function Notifications() {
   const [rd, setRd] = useStore(notifReadStore)
   const [draft, setDraft] = useState<NotifPrefs>(prefs)
   const [saved, setSaved] = useState(false)
+  const [dirty, setDirty] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const t = useDict(NOTIF)
   const tc = useCommon()
   const tx = useTx()
   const prefsErr = usePrefsError()
 
-  // Pick up the stored preferences once they have been read from the phone.
-  useEffect(() => setDraft(prefs), [prefs])
+  // Pick up the stored preferences once they have been read from the phone (unless mid-edit).
+  useEffect(() => {
+    if (!dirty) setDraft(prefs)
+  }, [prefs, dirty])
 
   const shown = NOTICES.filter((n) => !rd.cleared.includes(n.id))
   const unread = shown.filter((n) => !rd.read.includes(n.id)).length
   const edit = (fn: (d: NotifPrefs) => NotifPrefs) => {
     setDraft(fn)
+    setDirty(true)
     setSaved(false)
     setError(null)
   }
@@ -48,6 +52,7 @@ function Notifications() {
     const err = prefsErr(validatePrefs(draft))
     if (err) return setError(err)
     setPrefs({ ...draft, savedAt: new Date().toISOString() })
+    setDirty(false)
     setSaved(true)
   }
 

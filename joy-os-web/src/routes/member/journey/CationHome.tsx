@@ -44,6 +44,8 @@ export default function CationHome() {
   const journey = useJourney()
   const suggestedReq = journey.cationRequests.find((r) => r.slug === suggested.slug)
   const lowestCations = CATIONS.filter((c) => c.primary === latest.lowestTerm)
+  /** A request already sent for a ’cation of the lowest term: the empty state points to it, not to “Start with”. */
+  const lowestReq = journey.cationRequests.find((x) => lowestCations.some((c) => c.slug === x.slug))
   const shown = CATIONS.filter((c) => filter === 'all' || c.primary === filter)
   const groups: (TermKey | 'ALL')[] = ['ALL', 'H', 'P', 'R', 'F', 'D', 'B']
 
@@ -261,7 +263,7 @@ export default function CationHome() {
             <EmptyState
               title={r('emptyLowestTitle', { name: lowestName })}
               body={t('emptyLowestBody', { list: lowestCations.map((c) => c.name).join(t('andJoin')) })}
-              action={<Link to={`/app/cation/${suggested.slug}`} className="inline-flex h-11 items-center gap-2 rounded-full border border-line-strong bg-paper-raised px-4 text-[15px] text-ink hover:bg-paper-sunk focus-ring">{t('startWith', { name: suggested.name })} <ArrowRight size={15} /></Link>}
+              action={<Link to={lowestReq ? `/app/cation/${lowestReq.slug}#request` : `/app/cation/${suggested.slug}`} className="inline-flex h-11 items-center gap-2 rounded-full border border-line-strong bg-paper-raised px-4 text-[15px] text-ink hover:bg-paper-sunk focus-ring">{lowestReq ? t('seeYourRequest') : t('startWith', { name: suggested.name })} <ArrowRight size={15} /></Link>}
             />
           </div>
         )}

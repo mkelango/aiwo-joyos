@@ -27,9 +27,10 @@ import { CIRCLE, PRACTICE_WEEKS } from '@/shared/platform'
 import { termByKey } from '@/shared/terms'
 import { useTheme } from '@/theme/ThemeProvider'
 import { PRACTICE_CONTENT, PRACTICE_PULSE } from '@/screens/b/journeyData'
-import { practiceStore, todayIso, useStore, weekdayIndex } from '@/screens/b/bStore'
+import { practiceStore, useStore } from '@/screens/b/bStore'
 import { AudioPlayer, PrimaryChip } from '@/screens/b/parts'
 import { Rich, useA } from '@/screens/a/i18n'
+import { SPACE_TODAY, SPACE_TODAY_INDEX } from '@/screens/a/spacesData'
 
 // THE JOYSPIRATION PRACTICE (Memo p.21): eight weeks; five-minute audio in the Mentor's
 // voice, a science note from the faculty, one practice daily / weekly / yearly, the weekly
@@ -45,8 +46,10 @@ export default function Practice() {
   const content = PRACTICE_CONTENT.find((p) => p.week === CURRENT)!
   const before = INDEX_HISTORY[0]
   const [prac, setPrac] = useStore(practiceStore)
-  const today = todayIso()
-  const todayIdx = weekdayIndex()
+  // The specimen is pinned to Thursday 28 Jan 2027, the same day Today and the spaces call today,
+  // so the week strip and "Practised today" never follow the device clock.
+  const today = SPACE_TODAY
+  const todayIdx = SPACE_TODAY_INDEX
   const doneToday = prac.days.includes(today)
   const setDoneToday = (v: boolean) => setPrac((p) => ({ ...p, days: v ? Array.from(new Set([...p.days, today])) : p.days.filter((d) => d !== today) }))
   // Earlier days this week come from the specimen; today is yours; later days are still to come.

@@ -29,18 +29,28 @@ export const ROOM_VERDICT: Record<TermKey, string> = {
 
 // ─── 90-day history ────────────────────────────────────────────────────────
 
-/** Weekly short-form pulse across the last ninety days, ending at the latest full measure. */
+const DAY_MS = 86400000
+
+/** 'YYYY-MM-DD' for a whole number of days after a calendar date (UTC, so no time-zone drift). */
+function addDays(iso: string, n: number) {
+  return new Date(Date.parse(`${iso}T00:00:00Z`) + n * DAY_MS).toISOString().slice(0, 10)
+}
+
+/**
+ * Weekly short-form pulse across the last ninety days: fourteen weekly points
+ * from 91 days before SPACE_TODAY up to today. The last point holds the current
+ * value (the latest full measure). `on` is an ISO date; screens format it in the
+ * member's language at render.
+ */
 export function termHistory(key: TermKey) {
   const cur = INDEX_HISTORY[0].terms.find((t) => t.key === key)!.value ?? 0
   const prev = INDEX_HISTORY[1].terms.find((t) => t.key === key)!.value ?? cur
   const seed = key.charCodeAt(0)
-  const start = new Date('2026-10-30')
   return Array.from({ length: 14 }, (_, i) => {
     const p = i / 13
     const wobble = i === 13 ? 0 : Math.round(Math.sin(seed * 1.7 + i * 1.3) * 1.6)
-    const d = new Date(start.getTime() + i * 7 * 86400000)
     return {
-      label: d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
+      on: addDays(SPACE_TODAY, (i - 13) * 7),
       value: Math.round(prev + (cur - prev) * p + wobble),
     }
   })
@@ -49,14 +59,14 @@ export function termHistory(key: TermKey) {
 // ─── Three actions per term (ACTION_LIBRARY first, then our own) ───────────
 
 const OWN_ACTIONS: Action[] = [
-  { id: 'a_h_021', term: 'H', title: 'Walk after dinner for twenty minutes.', detail: 'With Kavya if she is free.', minutes: 30, timeOfDay: 'evening', shared: true, evidence: 'Post-meal walking lowers glucose excursions (LE8 · blood glucose).', why: 'HbA1c is at the edge of its range.' },
-  { id: 'a_h_027', term: 'H', title: 'Fifteen minutes of morning sun.', detail: 'Arms and face, before 10 am.', minutes: 10, timeOfDay: 'morning', shared: false, evidence: 'Sun exposure supports vitamin D status; your physician advises on supplements.', why: 'Vitamin D was below range in January.' },
+  { id: 'a_h_021', term: 'H', title: 'Walk after dinner for half an hour.', detail: 'With Kavya if she is free.', minutes: 30, timeOfDay: 'evening', shared: true, evidence: 'Post-meal walking lowers glucose excursions (LE8 · blood glucose).', why: 'HbA1c is at the edge of its range.' },
+  { id: 'a_h_027', term: 'H', title: 'Ten minutes of morning sun.', detail: 'Arms and face, before 10 am.', minutes: 10, timeOfDay: 'morning', shared: false, evidence: 'Sun exposure supports vitamin D status; your physician advises on supplements.', why: 'Vitamin D was below range in January.' },
   { id: 'a_p_009', term: 'P', title: 'Write one line in the contribution log.', detail: 'Who did your work help today?', minutes: 2, timeOfDay: 'evening', shared: false, evidence: 'Prosocial contribution and meaning in life (MLQ-P).', why: 'Contribution is the quietest part of your Ikigai map.' },
   { id: 'a_p_012', term: 'P', title: 'Spend ten minutes learning something new.', detail: 'Stay Curious, Practice week 7.', minutes: 10, timeOfDay: 'any', shared: false, evidence: 'Curiosity predicts meaning presence (Kashdan & Steger).', why: 'Keeps the daily anchors alive.' },
   { id: 'a_r_011', term: 'R', title: 'Plan State of Us for Sunday.', detail: 'Twenty minutes, phones away.', minutes: 2, timeOfDay: 'any', shared: true, evidence: 'Weekly couple rituals (Gottman, “State of the Union”).', why: 'Your last State of Us was eleven days ago.' },
   { id: 'a_r_014', term: 'R', title: 'Send one voice note to someone in your 5.', detail: 'Not a forward. Your own voice.', minutes: 2, timeOfDay: 'any', shared: false, evidence: 'Close-tie contact and perceived support (LSNS-6).', why: 'Your 5 hold the most weight in your score.' },
   { id: 'a_f_007', term: 'F', title: 'Block one hour on Thursday that is yours.', detail: 'Name it. Defend it like a board meeting.', minutes: 2, timeOfDay: 'morning', shared: false, evidence: 'Time affluence and autonomy (Whillans; BPNSFS).', why: 'Nearly half of last fortnight was asked of you.' },
-  { id: 'a_f_010', term: 'F', title: 'Schedule the succession conversation.', detail: 'Thirty minutes, with Kavya and your adviser.', minutes: 10, timeOfDay: 'any', shared: true, evidence: 'Choice and peace of mind (Freedom Triad · Choice).', why: 'It is the open item on your peace-of-mind list.' },
+  { id: 'a_f_010', term: 'F', title: 'Schedule the succession conversation.', detail: 'Thirty minutes, with Kavya and your adviser.', minutes: 10, timeOfDay: 'any', shared: true, evidence: 'Choice and peace of mind (Freedom Triad · Choice).', why: 'It is the bigger of the two open items on your peace-of-mind list.' },
   { id: 'a_d_019', term: 'D', title: 'Savour one meal without a screen.', detail: 'Name the three best flavours.', minutes: 30, timeOfDay: 'any', shared: true, evidence: 'Sensory sharpening raises savouring (Bryant).', why: 'Food is your second-largest source of joy this week.' },
   { id: 'a_b_009', term: 'B', title: 'Write the second arrow down.', detail: 'The problem, and the extra you are adding.', minutes: 10, timeOfDay: 'evening', shared: false, evidence: 'Cognitive defusion (ACT; Hayes).', why: 'Stress is your second-largest Burden part.' },
   { id: 'a_b_012', term: 'B', title: 'Move one “keep meaning to” item to done.', detail: 'The smallest one.', minutes: 10, timeOfDay: 'any', shared: false, evidence: 'Behavioural activation reduces avoidance.', why: 'Avoidance is small, but it is there.' },
@@ -87,15 +97,16 @@ export const DEVICES = [
 ]
 
 export type Le8Status = 'ideal' | 'good' | 'watch'
+/** Scored on AHA Life's Essential 8 (2022): MEPA 12–14 → 80; ≥150 min → 100; 120–129 / <80 → 75. */
 export const LE8 = [
-  { key: 'diet', name: 'Diet', score: 70, status: 'good' as Le8Status, reading: 'MEPA 11 of 16', source: 'Self-report' },
-  { key: 'activity', name: 'Physical activity', score: 90, status: 'ideal' as Le8Status, reading: '165 min / week', source: 'Apple Health' },
+  { key: 'diet', name: 'Diet', score: 80, status: 'good' as Le8Status, reading: 'MEPA 12 of 16', source: 'Self-report' },
+  { key: 'activity', name: 'Physical activity', score: 100, status: 'ideal' as Le8Status, reading: '165 min / week', source: 'Apple Health' },
   { key: 'nicotine', name: 'Nicotine exposure', score: 100, status: 'ideal' as Le8Status, reading: 'Never', source: 'Self-report' },
   { key: 'sleep', name: 'Sleep health', score: 70, status: 'good' as Le8Status, reading: '6 h 40 m average', source: 'Oura' },
   { key: 'bmi', name: 'Body mass index', score: 70, status: 'good' as Le8Status, reading: '26.1 kg/m²', source: 'Clinic' },
   { key: 'lipids', name: 'Blood lipids', score: 60, status: 'watch' as Le8Status, reading: 'Non-HDL 146 mg/dL', source: 'Panel · Jan' },
   { key: 'glucose', name: 'Blood glucose', score: 60, status: 'watch' as Le8Status, reading: 'HbA1c 5.8%', source: 'Panel · Jan' },
-  { key: 'bp', name: 'Blood pressure', score: 75, status: 'good' as Le8Status, reading: '128 / 82 mmHg', source: 'Home cuff' },
+  { key: 'bp', name: 'Blood pressure', score: 75, status: 'good' as Le8Status, reading: '128 / 78 mmHg', source: 'Home cuff' },
 ]
 
 export type MarkerStatus = 'in range' | 'worth watching' | 'outside range'
@@ -140,14 +151,19 @@ export const CAPACITY = [
   { key: 'gait', name: 'Gait speed', unit: 'm/s', last: 1.12, prev: 1.08, better: 'higher', how: 'Walk 4 metres at your usual pace. We divide 4 by your time.', norm: 'Above 1.0 m/s is the usual line' },
 ] as const
 
-/** 28 days of signal features (not vendor scores). */
+/**
+ * 28 days of signal features (not vendor scores), 1–28 Jan 2027. 1 Jan 2027 is a
+ * Friday, so i % 7 === 1 falls on the Saturdays (2, 9, 16, 23 Jan): the late
+ * dinners behind the HRV dips and the late nights behind the regularity dips.
+ * `on` is an ISO date; screens format it in the member's language at render.
+ */
 export const SIGNALS = Array.from({ length: 28 }, (_, i) => {
-  const d = new Date(new Date('2027-01-01').getTime() + i * 86400000)
+  const sat = i % 7 === 1
   return {
-    label: d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
-    hrv: Math.round(38 + i * 0.18 + Math.sin(i * 0.9) * 4 + (i % 7 === 5 ? -6 : 0)),
-    rhr: Math.round((60 - i * 0.06 + Math.cos(i * 0.8) * 1.6 + (i % 7 === 5 ? 3 : 0)) * 10) / 10,
-    regularity: Math.round(78 + Math.sin(i * 0.6) * 6 - (i > 20 ? 7 : 0) + (i % 7 === 6 ? -5 : 0)),
+    on: addDays('2027-01-01', i),
+    hrv: Math.round(38 + i * 0.18 + Math.sin(i * 0.9) * 4 + (sat ? -6 : 0)),
+    rhr: Math.round((60 - i * 0.06 + Math.cos(i * 0.8) * 1.6 + (sat ? 3 : 0)) * 10) / 10,
+    regularity: Math.round(78 + Math.sin(i * 0.6) * 6 - (i > 20 ? 7 : 0) + (sat ? -5 : 0)),
   }
 })
 
@@ -341,7 +357,8 @@ export const PHQ4_ITEMS = [
 export const PHQ4_OPTIONS = ['Not at all', 'Several days', 'More than half the days', 'Nearly every day']
 
 /** Each screen's take-form: the stem, items, options and scoring. Pain is a single 0–10 rating. */
-export const SCREEN_FORMS: Record<Screen, { stem: string; items: string[]; options: string[]; reverse?: number[]; source: string; minutes: number }> = {
+/** Each item scores 0 to options.length − 1; itemOptions[qi], when present, relabels item qi's options (same scoring). */
+export const SCREEN_FORMS: Record<Screen, { stem: string; items: string[]; options: string[]; itemOptions?: Record<number, string[]>; reverse?: number[]; source: string; minutes: number }> = {
   'PHQ-4': { stem: 'Over the last two weeks, how often have you been bothered by…', items: PHQ4_ITEMS, options: PHQ4_OPTIONS, source: 'PHQ-4 · Kroenke et al., 2009 · public domain', minutes: 1 },
   ISI: {
     stem: 'Over the last two weeks, please rate…',
@@ -349,12 +366,19 @@ export const SCREEN_FORMS: Record<Screen, { stem: string; items: string[]; optio
       'Difficulty falling asleep',
       'Difficulty staying asleep',
       'Problems waking up too early',
-      'How satisfied or dissatisfied you are with your current sleep pattern (0 very satisfied, 4 very dissatisfied)',
+      'How satisfied or dissatisfied you are with your current sleep pattern',
       'How noticeable your sleep problem is to others, in terms of your quality of life',
       'How worried or distressed you are about your current sleep problem',
       'How much your sleep problem interferes with your daily functioning',
     ],
     options: ['None', 'Mild', 'Moderate', 'Severe', 'Very severe'],
+    // Items 4–7 have their own anchors in the ISI; all still score 0–4.
+    itemOptions: {
+      3: ['Very satisfied', 'Satisfied', 'Moderately satisfied', 'Dissatisfied', 'Very dissatisfied'],
+      4: ['Not at all noticeable', 'A little', 'Somewhat', 'Much', 'Very much noticeable'],
+      5: ['Not at all worried', 'A little', 'Somewhat', 'Much', 'Very much worried'],
+      6: ['Not at all interfering', 'A little', 'Somewhat', 'Much', 'Very much interfering'],
+    },
     source: 'Insomnia Severity Index · Morin et al., 2001 · licensed for Joy OS',
     minutes: 2,
   },
@@ -374,9 +398,10 @@ export const SCREEN_FORMS: Record<Screen, { stem: string; items: string[]; optio
   Pain: { stem: 'On average over the last week, how much pain have you had?', items: ['Average pain, last week'], options: [], source: 'Numeric rating scale, 0–10', minutes: 1 },
 }
 
+/** Weighted, these add to the Burden shown on the hero: 0.30·22 + 0.25·34 + 0.20·29 + 0.15·14 + 0.10·12 = 24.2 → 24. */
 export const BURDEN_PARTS = [
   { key: 'Mood', weight: 0.3, value: 22 },
-  { key: 'Sleep', weight: 0.25, value: 38 },
+  { key: 'Sleep', weight: 0.25, value: 34 },
   { key: 'Stress', weight: 0.2, value: 29 },
   { key: 'Pain', weight: 0.15, value: 14 },
   { key: 'Avoidance', weight: 0.1, value: 12 },

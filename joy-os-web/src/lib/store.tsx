@@ -1,10 +1,17 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react'
 import type { LedgerEntry, Role } from '@/domain/types'
 import { LEDGER } from '@/data/member'
 
 // Front-end-only app state. Persists per-viewer conveniences in localStorage
 // (theme, text size, language, demo role). Swap for TanStack Query + the BFF later.
 
+
+/** Local wall-clock time to the minute ('YYYY-MM-DDTHH:mm'), the same shape as the specimen
+ *  ledger entries, so slicing and sorting `at` never meets seconds, a 'Z' or the UTC hour. */
+function localMinute(d: Date) {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+}
 export type Theme = 'light' | 'dark'
 export type TextSize = 'default' | 'large' | 'xlarge'
 export type Lang = 'en' | 'ta' | 'hi'
@@ -59,6 +66,34 @@ export function activeLang(): Lang {
   return ACTIVE_LANG
 }
 
+function applyPrefs(theme: Theme, textSize: TextSize, lang: Lang) {
+  const el = document.documentElement
+  el.dataset.theme = theme
+  el.dataset.text = textSize === 'default' ? '' : textSize
+  el.lang = lang === 'en' ? 'en' : `${lang}-IN`
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#1c1314' : '#fdfbf8')
+}
+
+// A member who chose dark Ink or larger text must not see a flash of light Paper at default size
+// on load: apply the stored choices synchronously when this module is first imported, which is
+// before main.tsx calls createRoot.
+function readStored<T>(key: string, allowed: readonly T[], fallback: T): T {
+  try {
+    const raw = localStorage.getItem(`joyos:${key}`)
+    const v = raw ? (JSON.parse(raw) as T) : fallback
+    return allowed.includes(v) ? v : fallback
+  } catch {
+    return fallback
+  }
+}
+if (typeof document !== 'undefined') {
+  applyPrefs(
+    readStored<Theme>('theme', ['light', 'dark'], 'light'),
+    readStored<TextSize>('text', ['default', 'large', 'xlarge'], 'default'),
+    readStored<Lang>('lang', ['en', 'ta', 'hi'], 'en'),
+  )
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = usePersisted<Theme>('theme', 'light')
   const [textSize, setTextSize] = usePersisted<TextSize>('text', 'default')
@@ -71,20 +106,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [crisisOpen, setCrisisReason] = useState<CrisisReason>(false)
   const setCrisisOpen = useCallback((v: boolean | CrisisReason) => setCrisisReason(v === true ? 'intercept' : v), [])
 
-  useEffect(() => {
-    const el = document.documentElement
-    el.dataset.theme = theme
-    el.dataset.text = textSize === 'default' ? '' : textSize
-    el.lang = lang === 'en' ? 'en' : `${lang}-IN`
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#1c1314' : '#fdfbf8')
-  }, [theme, textSize, lang])
+  // Layout effect, so a change applies before the browser paints (the first paint is covered by
+  // applyStoredPrefs() at module load, below).
+  useLayoutEffect(() => applyPrefs(theme, textSize, lang), [theme, textSize, lang])
 
   const value = useMemo<AppState>(
     () => ({
       theme, setTheme, textSize, setTextSize, lang, setLang, role, setRole,
       actionDone, setActionDone,
       ledger,
-      addLedger: (e) => setLedger((l) => [{ ...e, id: `l${Date.now()}`, at: new Date().toISOString() }, ...l]),
+      addLedger: (e) => setLedger((l) => [{ ...e, id: `l${Date.now()}`, at: localMinute(new Date()) }, ...l]),
       offline, setOffline, crisisOpen, setCrisisOpen,
     }),
     [theme, setTheme, textSize, setTextSize, lang, setLang, role, setRole, actionDone, setActionDone, ledger, setLedger, offline, crisisOpen, setCrisisOpen],
@@ -99,7 +130,8 @@ export function useApp() {
 }
 
 /** Emergency intercept — runs before anything else touches free text (Memo p.24). */
-const CRISIS = /\b(kill myself|suicide|end my life|self[- ]?harm|want to die|hurt myself|khudkushi|aatmahatya|atmahatya|marna chah(ta|ti)|jaan de d(u|oo)n|tharkolai|thatkolai|saaganum|saaga venum)\b/i
+// English: \b only on the outer edges, so 'suicidal', 'killing myself', "don't want to live" all match.
+const CRISIS = /\b(suicid(e|al|ally)|kill(ing)? my ?self|(end|ending|take|taking) (my (own )?life|it all)|self[- ]?harm(ing)?|(want(ing)?|wanna) (to )?die|hurt(ing)? my ?self|(do ?n[o'’]?t|dont) want to (live|be alive|be here)|better off dead|no reason to (live|go on)|khudkushi|aatmahatya|atmahatya|marna chah(ta|ti)|jaan de d(u|oo)n|tharkolai|thatkolai|saaganum|saaga venum)\b/i
 // Tamil and Hindi phrases. \b does not work for Indic scripts, so these match as plain
 // substrings after normalising (NFD, nukta dropped so ख़/ख and नुक़सान/नुकसान both match).
 // Starter list pending clinical review of the translated intercept.

@@ -6,7 +6,7 @@ import { INDEX_HISTORY, MEMBER } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
 import { PASSPORT, SESSIONS_OPEN } from '@/screens/b/journeyData'
 import { accountStore, useStore } from '@/screens/b/bStore'
-import { KeyValue, PrimaryChip, SpecimenQR, memberOnly } from '@/screens/b/parts'
+import { KeyValue, PrimaryChip, SpecimenQR, fmtWhen, memberOnly } from '@/screens/b/parts'
 import { useDict, useT } from '@/lib/i18n'
 import { PASSPORT_T, STAMP_KIND, ENTITLEMENT_TEXT } from '@/screens/b/i18n/journey'
 import { useCommon, useTx } from '@/screens/b/i18n/common'
@@ -109,7 +109,7 @@ function Passport() {
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{t('stamps')}</SectionTitle>
         <Body tone="ink2">{t('stampsBody')}</Body>
-        {[...PASSPORT.stamps, ...acct.bookings.map((b) => { const ses = SESSIONS_OPEN.find((x) => x.id === b.id); return { id: b.ref, place: ses ? t('passAt', { where: ses.where, ref: b.ref }) : t('pass', { ref: b.ref }), what: ses ? t('sessionCity', { city: ses.city }) : t('session'), when: ses ? ses.when : fmtDate(b.at), kind: 'Session', term: 'ALL' as const, done: false } })].map((s) => (
+        {[...PASSPORT.stamps.map((s) => ({ ...s, when: fmtWhen(s) })), ...acct.bookings.map((b) => { const ses = SESSIONS_OPEN.find((x) => x.id === b.id); return { id: b.ref, place: ses ? t('passAt', { where: ses.where, ref: b.ref }) : t('pass', { ref: b.ref }), what: ses ? t('sessionCity', { city: ses.city }) : t('session'), when: ses ? fmtWhen(ses) : fmtDate(b.at), date: ses ? ses.date : b.at.slice(0, 10), to: undefined, kind: 'Session', term: 'ALL' as const, done: false } })].map((s) => (
           <Pressable
             key={s.id}
             onPress={() => setStamp(s as Stamp)}

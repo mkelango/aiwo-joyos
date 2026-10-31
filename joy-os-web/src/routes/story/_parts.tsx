@@ -103,6 +103,8 @@ export function stationForDay(day: number): LoopStation['id'] {
   return 'act'
 }
 
+const LOOP_FOCUS_CSS = '.loop-node:focus{outline:none}.loop-node:focus-visible .loop-focus{stroke:var(--daybreak)}'
+
 export function LoopDiagram({
   size = 460,
   selected,
@@ -156,10 +158,11 @@ export function LoopDiagram({
         aria-label={interactive ? `${s.when}: ${s.label}. ${s.does}` : undefined}
         onClick={interactive ? () => onSelect!(s.id) : undefined}
         onKeyDown={interactive ? (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onSelect!(s.id)) : undefined}
-        style={{ cursor: interactive ? 'pointer' : undefined, outline: 'none' }}
+        style={{ cursor: interactive ? 'pointer' : undefined }}
         className="loop-node"
       >
         <circle cx={x} cy={y} r={22} fill="transparent" />
+        {interactive && <circle className="loop-focus" cx={x} cy={y} r={16} fill="none" stroke="transparent" strokeWidth={3} />}
         <circle cx={x} cy={y} r={on ? 11 : 7.5} fill={on ? 'var(--ink)' : 'var(--paper-raised)'} stroke="var(--ink)" strokeWidth={1.5} style={{ transition: 'r 200ms var(--ease-brand)' }} />
         <text x={lx} y={ly - 2} textAnchor={anchor} fontFamily="var(--font-sans)" fontSize={labelSize + 3} fontWeight={on ? 500 : 400} fill="var(--ink)">
           {s.label}
@@ -173,6 +176,8 @@ export function LoopDiagram({
 
   return (
     <svg viewBox={`0 0 ${box} ${box}`} width="100%" style={{ maxWidth: box }} role={interactive ? 'group' : 'img'} aria-label="The ninety-day loop: consent at Day −14, measure at Day 0, plan at checkout, act daily, review at Day 15 and 45, talk at Day 60, re-measure at Day 76 and 90, publish after Day 90, then again.">
+      {/* the node draws its own focus ring: a browser outline on an SVG <g> renders inconsistently */}
+      {interactive && <style>{LOOP_FOCUS_CSS}</style>}
       <defs>
         <marker id="loop-arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M 0 1 L 8 5 L 0 9 z" fill="var(--ink-3)" />

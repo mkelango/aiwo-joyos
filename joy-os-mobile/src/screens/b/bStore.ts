@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useCallback, useSyncExternalStore } from 'react'
 import { MEMBER } from '@/shared/member'
 import type { TermKey } from '@/shared/types'
-import type { Msg, Thread } from './accountData'
+import { GRANTS, type DeviceState, type Grant, type Msg, type Thread } from './accountData'
 
 // Lane B persisted state: small module-level stores kept on the device with AsyncStorage
 // (offline-first, like the app store). Each store hydrates once, notifies subscribers and
@@ -21,11 +21,14 @@ export interface Store<T> {
 export function createStore<T>(key: string, initial: T): Store<T> {
   let value = initial
   let loaded = false
+  // A set() before hydration finishes has already been written through; the older stored
+  // value must not replace it in memory when it arrives.
+  let touched = false
   const listeners = new Set<Listener>()
   const emit = () => listeners.forEach((l) => l())
   AsyncStorage.getItem(PREFIX + key)
     .then((raw) => {
-      if (raw != null) {
+      if (raw != null && !touched) {
         try {
           const parsed = JSON.parse(raw)
           value = parsed && typeof parsed === 'object' && !Array.isArray(parsed) && initial && typeof initial === 'object' && !Array.isArray(initial) ? { ...initial, ...parsed } : parsed
@@ -43,6 +46,7 @@ export function createStore<T>(key: string, initial: T): Store<T> {
     get: () => value,
     hydrated: () => loaded,
     set: (next) => {
+      touched = true
       value = typeof next === 'function' ? (next as (p: T) => T)(value) : next
       AsyncStorage.setItem(PREFIX + key, JSON.stringify(value)).catch(() => {})
       emit()
@@ -155,6 +159,8 @@ export const notifReadStore = createStore<{ read: string[]; cleared: string[] }>
 
 export interface AccountState {
   plan: 'Free' | 'Plus' | 'Patron'
+  /** ISO date the current plan took effect (set on an upgrade; a yearly plan renews a year on). */
+  planSince?: string
   planChange?: { to: 'Free' | 'Plus' | 'Patron'; effective: string; ref: string }
   profile: { name: string; phone: string; email: string; language: string }
   emergency: { name: string; relation: string; phone: string }
@@ -164,6 +170,8 @@ export interface AccountState {
   circle: { remind: boolean; mode: 'video' | 'audio'; calendar: boolean }
   invites: { id: string; name: string; relation: string; age: string; expires: string }[]
   elder: { largeType: boolean; voice: boolean; helper: boolean }
+  /** Household share grants (proposed, agreed and revoked), on top of the specimen's. */
+  grants: Grant[]
 }
 export const accountStore = createStore<AccountState>('account', {
   plan: 'Plus',
@@ -175,7 +183,29 @@ export const accountStore = createStore<AccountState>('account', {
   circle: { remind: true, mode: 'video', calendar: false },
   invites: [],
   elder: { largeType: true, voice: true, helper: true },
+  grants: GRANTS,
 })
+
+// ─── Trust centre: consents, research use and a scheduled erasure ───────────
+
+export interface TrustState {
+  /** Consent id → on/off, over each consent's specimen default. */
+  consents: Record<string, boolean>
+  research: boolean
+  eraseScheduled: boolean
+}
+export const trustStore = createStore<TrustState>('trust', { consents: {}, research: true, eraseScheduled: false })
+
+// ─── Devices: connections, HealthKit reads and the mindful-minutes write-back ───
+
+export interface DevicesState {
+  /** Device id → connection state (and last sync) over the specimen DEVICES. */
+  states: Record<string, { state: DeviceState; lastSync?: string; freshness?: 'fresh' | 'stale' }>
+  /** HealthKit type id → read on/off over the specimen HEALTHKIT_TYPES. */
+  hk: Record<string, boolean>
+  writeBack: boolean
+}
+export const devicesStore = createStore<DevicesState>('devices', { states: {}, hk: {}, writeBack: true })
 
 export const refCode = (prefix: string) => `${prefix}-${Date.now().toString(36).toUpperCase().slice(-6)}`
 export const maskPhone = (p: string) => (p.length >= 10 ? `+91 ${p.slice(0, 2)}••• ••${p.slice(-3)}` : p)

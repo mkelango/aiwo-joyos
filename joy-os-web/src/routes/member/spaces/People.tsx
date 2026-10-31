@@ -7,8 +7,9 @@ import { DaybreakButton, Eyebrow } from '@/components/joy/primitives'
 import { Button, Pill } from '@/components/ui'
 import { CIRCLE } from '@/data/platform'
 import { fmtDate } from '@/components/joy/primitives'
+import { useSpaceState } from './_state'
 import { COUPLES_CHECK, COUPLES_ITEMS, COUPLES_OPTIONS, CONNECTIONS, CIRCLE_START, SPACE_TODAY, STATE_OF_US, STATE_OF_US_PAST, TWO_AM_START, type CirclePerson } from './_data'
-import { SpaceShell, ToolCard, useCrisisGuard, Toggle } from './_SpaceShell'
+import { SpaceShell, ToolCard, rovingRadio, useCrisisGuard, Toggle } from './_SpaceShell'
 import { useSpaceText, type SpKey } from './_i18n'
 import { INSTRUMENT_NOTE } from '@/lib/i18n'
 
@@ -34,14 +35,27 @@ export default function People() {
   )
 }
 
+/** Orbit labels stay short enough to fit the drawing; the full name is in the aria-label and the detail card. */
+const NAME_MAX = 20
+const LABEL_MAX = 12
+function orbitLabel(name: string) {
+  const chars = Array.from(name)
+  if (chars.length <= LABEL_MAX) return name
+  return `${chars.slice(0, LABEL_MAX - 1).join('').replace(/\p{M}+$/u, '').trimEnd()}…`
+}
+
 const inputCls = 'h-11 w-full rounded-xl border border-line-strong bg-paper px-4 text-[16px] text-ink placeholder:text-ink-3 focus-ring'
 
 // ─── Circles orbit ────────────────────────────────────────────────────────
 
+const RINGS = [5, 15] as const
+
 function CirclesOrbit() {
   const guard = useCrisisGuard()
-  const [people, setPeople] = useState<CirclePerson[]>(CIRCLE_START)
+  const [people, setPeople] = useSpaceState<CirclePerson[]>('people.circles.v1', CIRCLE_START)
   const [sel, setSel] = useState<string | null>('k')
+  // Focus is drawn by hand: :focus-visible on an SVG <g> is unreliable across browsers.
+  const [focusedId, setFocusedId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [ring, setRing] = useState<5 | 15>(15)
   const [err, setErr] = useState<{ k: SpKey; v?: Record<string, string> } | null>(null)
@@ -85,6 +99,8 @@ function CirclesOrbit() {
     setSel(removed.person.id); setRemoved(null)
   }
 
+  const ringRadio = rovingRadio(RINGS, ring, (r) => { setRing(r); setErr(null) }, (r) => full[r])
+
   const C = 210
   const place = (list: CirclePerson[], r: number, offset: number) =>
     list.map((p, i) => {
@@ -103,7 +119,7 @@ function CirclesOrbit() {
     >
       <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <div className="min-w-0">
-          <svg viewBox="0 -8 420 428" className="mx-auto w-full max-w-[460px]" role="img" aria-label={t('ppl.c.aria', { a: inner.map((p) => p.name).join(', '), b: outer.map((p) => p.name).join(', '), c: unseen.map((p) => p.name).join(', ') || t('ppl.c.noOne') })}>
+          <svg viewBox="0 -8 420 428" className="mx-auto w-full max-w-[460px]" role="group" aria-label={t('ppl.c.aria', { a: inner.map((p) => p.name).join(', '), b: outer.map((p) => p.name).join(', '), c: unseen.map((p) => p.name).join(', ') || t('ppl.c.noOne') })}>
             <circle cx={C} cy={C} r={170} fill="none" stroke="var(--line)" />
             <circle cx={C} cy={C} r={88} fill="var(--term-r-soft)" fillOpacity={0.5} stroke="var(--line)" />
             <text x={C} y={C - 170 - 14} textAnchor="middle" fontSize={10} fontFamily="var(--font-mono)" letterSpacing={lang === 'en' ? '0.14em' : '0'} fill="var(--ink-3)">{t('ppl.c.YOUR15')}</text>
@@ -113,8 +129,13 @@ function CirclesOrbit() {
             {dots.map(({ p, x, y, a }) => {
               const dim = onlyUnseen && p.seen
               const isSel = sel === p.id
-              const lx = x
+              const ring = isSel || focusedId === p.id
+              // Names on the left and right of a ring run inward-out from the dot, so they never cross the edge.
+              const side = Math.cos(a) > 0.35 ? 1 : Math.cos(a) < -0.35 ? -1 : 0
               const below = Math.sin(a) > -0.2
+              const r0 = p.ring === 5 ? 9 : 7
+              const lx = side === 0 ? x : x + side * (r0 + 5)
+              const ly = side === 0 ? (below ? y + 24 : y - (p.ring === 5 ? 21 : 16)) : y + 4.5
               return (
                 <g
                   key={p.id}
@@ -124,13 +145,16 @@ function CirclesOrbit() {
                   aria-label={`${t('ppl.c.dot', { name: p.name, ring: p.ring })}${p.seen ? '' : t('ppl.c.dotUnseen')}`}
                   onClick={() => setSel(p.id)}
                   onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setSel(p.id))}
+                  onFocus={() => setFocusedId(p.id)}
+                  onBlur={() => setFocusedId((f) => (f === p.id ? null : f))}
+                  aria-pressed={isSel}
                   className="cursor-pointer focus:outline-none"
                   style={{ transition: 'opacity 200ms' }}
                 >
-                  {isSel && <circle cx={x} cy={y} r={p.ring === 5 ? 14 : 12} fill="none" stroke="var(--ink)" strokeWidth={1.5} />}
-                  <circle cx={x} cy={y} r={p.ring === 5 ? 9 : 7} fill={p.seen ? 'var(--term-r)' : 'var(--paper-raised)'} stroke="var(--term-r)" strokeWidth={1.5} strokeDasharray={p.seen ? undefined : '2.5 2'} />
-                  <text x={lx} y={below ? y + 24 : y - (p.ring === 5 ? 21 : 16)} textAnchor="middle" fontSize={13} fontFamily="var(--font-sans)" fill={p.seen ? 'var(--ink)' : 'var(--ink-2)'}>
-                    {p.name}
+                  {ring && <circle cx={x} cy={y} r={p.ring === 5 ? 14 : 12} fill="none" stroke="var(--ink)" strokeWidth={focusedId === p.id ? 2.5 : 1.5} />}
+                  <circle cx={x} cy={y} r={r0} fill={p.seen ? 'var(--term-r)' : 'var(--paper-raised)'} stroke="var(--term-r)" strokeWidth={1.5} strokeDasharray={p.seen ? undefined : '2.5 2'} />
+                  <text x={lx} y={ly} textAnchor={side === 1 ? 'start' : side === -1 ? 'end' : 'middle'} fontSize={13} fontFamily="var(--font-sans)" fill={p.seen ? 'var(--ink)' : 'var(--ink-2)'} aria-hidden>
+                    {orbitLabel(p.name)}
                   </text>
                 </g>
               )
@@ -179,19 +203,17 @@ function CirclesOrbit() {
             <Eyebrow>{t('ppl.c.addSomeone')}</Eyebrow>
             <label className="mt-3 block">
               <span className="sr-only">{t('ppl.c.firstName')}</span>
-              <input value={name} onChange={(e) => { setName(e.target.value); setErr(null) }} placeholder={t('ppl.c.firstName')} aria-invalid={!!err} aria-describedby={err ? 'circ-err' : undefined} className={inputCls} />
+              <input value={name} maxLength={NAME_MAX} onChange={(e) => { setName(e.target.value); setErr(null) }} placeholder={t('ppl.c.firstName')} aria-invalid={!!err} aria-describedby={err ? 'circ-err' : undefined} className={inputCls} />
             </label>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <div role="radiogroup" aria-label={t('ppl.c.which')} className="inline-flex w-full rounded-full bg-paper-raised p-1 sm:w-auto sm:flex-1">
-                {([5, 15] as const).map((r) => (
+                {RINGS.map((r) => (
                   <button
                     key={r}
                     type="button"
-                    role="radio"
-                    aria-checked={ring === r}
+                    {...ringRadio(r)}
                     disabled={full[r]}
                     aria-describedby={full[r] ? `circ-full-${r}` : undefined}
-                    onClick={() => { setRing(r); setErr(null) }}
                     className={clsx('flex-1 whitespace-nowrap rounded-full px-3 py-1.5 text-[14px] focus-ring disabled:cursor-not-allowed disabled:opacity-50', ring === r && !full[r] ? 'bg-ink text-paper' : 'text-ink-2')}
                   >
                     {t('ppl.c.your', { ring: r })} <span className="num text-[12px] opacity-70">{r === 5 ? inner.length : outer.length}/{caps[r]}</span>
@@ -217,8 +239,8 @@ function StateOfUs() {
   const [step, setStep] = useState(-1)
   const [secs, setSecs] = useState(STATE_OF_US[0].minutes * 60)
   const [running, setRunning] = useState(false)
-  const [past, setPast] = useState(STATE_OF_US_PAST)
-  const { t, d, r } = useSpaceText()
+  const [past, setPast] = useSpaceState('people.stateOfUs.v1', STATE_OF_US_PAST)
+  const { t, d, r, dm } = useSpaceText()
   useEffect(() => {
     if (!running) return
     const id = window.setInterval(() => setSecs((s) => Math.max(0, s - 1)), 1000)
@@ -233,9 +255,15 @@ function StateOfUs() {
   }
   const done = step >= STATE_OF_US.length
   const cur = STATE_OF_US[step]
+  // A part that has run out restarts on Resume (the countdown cannot resume from 0:00).
+  const toggleRun = () => {
+    if (running) return setRunning(false)
+    if (secs === 0 && cur) setSecs(cur.minutes * 60)
+    setRunning(true)
+  }
   const mm = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`
   return (
-    <ToolCard className="w-full" eyebrow={t('ppl.s.eyebrow')} title={t('ppl.s.title')} sub={t('ppl.s.sub')} aside={<Pill tone="neutral">{r('ppl.s.last', { d: <span className="num">{fmtDate(past[0]).slice(0, 6)}</span> })}</Pill>}>
+    <ToolCard className="w-full" eyebrow={t('ppl.s.eyebrow')} title={t('ppl.s.title')} sub={t('ppl.s.sub')} aside={<Pill tone="neutral">{r('ppl.s.last', { d: <span className="num">{dm(past[0])}</span> })}</Pill>}>
       <ol className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label={t('ppl.s.parts')}>
         {STATE_OF_US.map((s, i) => (
           <li key={s.title} className={clsx('rounded-xl px-3 py-2.5 text-[13px] transition-colors', i === step ? 'bg-ink text-paper' : i < step || done ? 'bg-[color:var(--term-r-soft)] text-[color:var(--term-r-ink)]' : 'bg-paper-sunk text-ink-2')}>
@@ -254,7 +282,7 @@ function StateOfUs() {
                 <Eyebrow>{t('ppl.s.lastEvenings')}</Eyebrow>
                 <ul className="mt-2 flex flex-wrap gap-2" aria-label={t('ppl.s.recent')}>
                   {past.slice(0, 4).map((d) => (
-                    <li key={d} className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-[13px] text-ink-2"><Check size={12} aria-hidden /> <span className="num">{fmtDate(d).slice(0, 6)}</span></li>
+                    <li key={d} className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-[13px] text-ink-2"><Check size={12} aria-hidden /> <span className="num">{dm(d)}</span></li>
                   ))}
                 </ul>
                 <p className="mt-2 text-[13px] text-ink-3">{t('ppl.s.dates')}</p>
@@ -271,7 +299,7 @@ function StateOfUs() {
               <p className="mt-3 text-[1.3rem] font-light leading-snug text-ink">{d(cur.prompt)}</p>
               <div className="mt-auto flex flex-wrap gap-2 pt-6">
                 <Button variant="ghost" onClick={() => go(step - 1)} aria-label={t('ppl.s.prev')}><ChevronLeft size={16} /></Button>
-                <Button onClick={() => setRunning((r) => !r)}>{running ? <><Pause size={14} /> {t('c.pause')}</> : <><Play size={14} /> {t('c.resume')}</>}</Button>
+                <Button onClick={toggleRun}>{running ? <><Pause size={14} /> {t('c.pause')}</> : <><Play size={14} /> {t('c.resume')}</>}</Button>
                 <Button variant="ink" onClick={() => go(step + 1)}>{step === STATE_OF_US.length - 1 ? t('ppl.s.finish') : t('ppl.s.nextPart')} <ChevronRight size={15} /></Button>
               </div>
             </>
@@ -302,13 +330,14 @@ function StateOfUs() {
 type CheckRow = { area: string; agree: boolean }
 
 function CouplesCheck() {
-  const [phase, setPhase] = useState<'result' | 'taking' | 'waiting'>('result')
+  const [result, setResult] = useSpaceState<{ on: string; rows: CheckRow[] }>('people.couplesCheck.v1', { on: '2026-10-11', rows: COUPLES_CHECK })
+  // Your sent answers are kept (privately) while you wait for Kavya, so a reload does not lose them.
+  const [mine, setMine] = useSpaceState<number[] | null>('people.couplesCheck.mine.v1', null)
+  const [phase, setPhase] = useState<'result' | 'taking' | 'waiting'>(() => (mine ? 'waiting' : 'result'))
   const [onlyDiffer, setOnlyDiffer] = useState(false)
-  const [result, setResult] = useState<{ on: string; rows: CheckRow[] }>({ on: '2026-10-11', rows: COUPLES_CHECK })
   const [answers, setAnswers] = useState<(number | null)[]>(() => COUPLES_ITEMS.map(() => null))
-  const [mine, setMine] = useState<number[] | null>(null)
   const [err, setErr] = useState<number | null>(null)
-  const { t, d, r, lang } = useSpaceText()
+  const { t, d, r, lang, dm } = useSpaceText()
   const agree = result.rows.filter((c) => c.agree).length
   const rows = useMemo(() => result.rows.filter((c) => !onlyDiffer || !c.agree), [onlyDiffer, result])
   const answered = answers.filter((a) => a !== null).length
@@ -320,7 +349,7 @@ function CouplesCheck() {
   }
   // Specimen: Kavya's private answers arrive. Only agree/differ is computed; neither set is ever shown.
   const kavyaAnswers = () => {
-    if (!mine) return
+    if (!mine || mine.length !== COUPLES_ITEMS.length) { setMine(null); setPhase('result'); return }
     const hers = [3, 2, 1, 1, 3, 3, 2, 1]
     setResult({ on: SPACE_TODAY, rows: COUPLES_ITEMS.map((it, i) => ({ area: it.area, agree: Math.abs(mine[i] - hers[i]) <= 1 })) })
     setAnswers(COUPLES_ITEMS.map(() => null)); setMine(null); setOnlyDiffer(false); setPhase('result')
@@ -361,7 +390,7 @@ function CouplesCheck() {
     return (
       <ToolCard className="w-full" eyebrow={t('ppl.cc.quarter')} title={t('ppl.cc.inTitle')} sub={t('ppl.cc.inSub')}>
         <div role="status" className="rounded-2xl bg-paper-sunk p-4">
-          <p className="flex items-center gap-2 text-[15px] text-ink"><Check size={15} className="shrink-0" aria-hidden /> <span>{r('ppl.cc.you', { d: <span className="num">{fmtDate(SPACE_TODAY).slice(0, 6)}</span> })}</span></p>
+          <p className="flex items-center gap-2 text-[15px] text-ink"><Check size={15} className="shrink-0" aria-hidden /> <span>{r('ppl.cc.you', { d: <span className="num">{dm(SPACE_TODAY)}</span> })}</span></p>
           <p className="mt-2 flex items-center gap-2 text-[15px] text-ink-2"><Lock size={14} className="shrink-0" aria-hidden /> {t('ppl.cc.waiting')}</p>
         </div>
         <p className="mt-4 text-[14px] text-ink-2">{t('ppl.cc.noPreview')}</p>
@@ -374,7 +403,7 @@ function CouplesCheck() {
   }
 
   return (
-    <ToolCard className="w-full" eyebrow={<>{r('ppl.cc.eyebrow', { d: <span className="num">{result.on === SPACE_TODAY ? fmtDate(result.on).slice(0, 6) : fmtDate(result.on)}</span> })}</>} title={<>{r('ppl.cc.agreeOn', { a: <span className="num">{agree}</span>, b: <span className="num">{result.rows.length}</span> })}</>} sub={t('ppl.cc.sub')}>
+    <ToolCard className="w-full" eyebrow={<>{r('ppl.cc.eyebrow', { d: <span className="num">{result.on === SPACE_TODAY ? dm(result.on) : fmtDate(result.on)}</span> })}</>} title={<>{r('ppl.cc.agreeOn', { a: <span className="num">{agree}</span>, b: <span className="num">{result.rows.length}</span> })}</>} sub={t('ppl.cc.sub')}>
       <Toggle checked={onlyDiffer} onChange={setOnlyDiffer} label={t('ppl.cc.onlyDiffer')} />
       <ul className="mt-4 divide-y divide-line">
         {rows.map((c) => (
@@ -386,6 +415,7 @@ function CouplesCheck() {
           </li>
         ))}
       </ul>
+      {rows.length === 0 && <p className="py-2.5 text-[15px] text-ink-2" role="status">{t('ppl.cc.noDiffer')}</p>}
       {result.rows.length - agree > 0 && <p className="mt-3 text-[14px] text-ink-2">{t('ppl.cc.differNote')}</p>}
       <div className="mt-auto pt-5">
         {result.on === SPACE_TODAY
@@ -401,7 +431,7 @@ function CouplesCheck() {
 
 function TwoAmList() {
   const guard = useCrisisGuard()
-  const [names, setNames] = useState(TWO_AM_START)
+  const [names, setNames] = useSpaceState('people.twoAm.v1', TWO_AM_START)
   const [v, setV] = useState('')
   const [err, setErr] = useState<{ k: SpKey; v?: Record<string, string> } | null>(null)
   const { t, r } = useSpaceText()
@@ -465,7 +495,7 @@ function CircleOfEight() {
 // ─── Connections ──────────────────────────────────────────────────────────
 
 function Connections() {
-  const [rsvp, setRsvp] = useState<Record<string, 'yes' | 'no'>>({})
+  const [rsvp, setRsvp] = useSpaceState<Record<string, 'yes' | 'no'>>('people.connections.v1', {})
   const { t, d } = useSpaceText()
   return (
     <ToolCard className="w-full" eyebrow={t('ppl.cx.eyebrow')} title={t('ppl.cx.title')} sub={t('ppl.cx.sub')}>

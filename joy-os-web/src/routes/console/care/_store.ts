@@ -59,6 +59,9 @@ export function useCoachState() {
   return useSyncExternalStore(subscribe, () => state, () => state)
 }
 
+/** A non-hook read of the coach tasks, for other console stores that act on them. */
+export const getCoachTasks = () => state.tasks
+
 export const coach = {
   setStatus(id: string, status: DriftTask['status'], extra?: Partial<CoachTask>) {
     emit({ ...state, tasks: state.tasks.map((t) => (t.id === id ? { ...t, status, ...extra } : t)) })
@@ -76,7 +79,7 @@ export const coach = {
 }
 
 export const isClinicalTask = (t: DriftTask) => t.owner.startsWith('Dr ')
-export const isMyTask = (t: DriftTask, me: string) => t.owner === me || t.owner.startsWith('Circle lead')
+export const isMyTask = (t: DriftTask, me: string) => t.owner === me || t.owner.startsWith(`${me} ·`)
 
 export const SIGNAL_LABEL: Record<DriftSignal, string> = {
   'index-fall': 'Index or a term fell at re-measure',

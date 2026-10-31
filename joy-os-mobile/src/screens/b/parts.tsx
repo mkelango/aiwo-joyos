@@ -1,7 +1,7 @@
 import { Redirect } from 'expo-router'
 import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import { Platform, Pressable, ScrollView, Share, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native'
-import { Body, Eyebrow, Icon, Meta, Mono, TermChip, TermDot, Title, Toggle, type IconName } from '@/components'
+import { Body, Eyebrow, Icon, Meta, Mono, TermChip, TermDot, Title, Toggle, fmtDate, type IconName } from '@/components'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
@@ -14,6 +14,9 @@ import { PARTS } from './i18n/parts'
 // Built only from theme tokens and the shared kit; no raw colours.
 
 export const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
+
+/** A dated item ("20 Feb 2027 · 10:00", or a range) through the member's language. */
+export const fmtWhen = (w: { date: string; to?: string; time?: string }) => `${fmtDate(w.date)}${w.to ? ` – ${fmtDate(w.to)}` : ''}${w.time ? ` · ${w.time}` : ''}`
 
 /** Primary-term chip that also handles the master ’cation (all six terms, each named in VoiceOver). */
 export function PrimaryChip({ primary, style }: { primary: TermKey | 'ALL'; style?: StyleProp<ViewStyle> }) {

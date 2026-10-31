@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { JoyOsLockup } from '@/components/joy/Brand'
+import { fmtDate } from '@/components/joy/primitives'
 import { LoopRing } from '@/components/ui'
 import { MEMBER } from '@/data/member'
 import { useApp } from '@/lib/store'
@@ -54,7 +55,7 @@ export default function MemberLayout() {
             <LoopRing day={MEMBER.dayOfLoop} size={44} />
             <div className="min-w-0 break-words leading-tight">
               <p className="text-[14px] text-ink">{t('dayOf', { n: MEMBER.dayOfLoop })}</p>
-              <p className="eyebrow mt-1 text-ink-3">{s('nextMeasureOn', { date: '02.04.27' })}</p>
+              <p className="eyebrow mt-1 text-ink-3">{s('nextMeasureOn', { date: fmtDate(MEMBER.nextMeasure, lang) })}</p>
             </div>
           </div>
           <nav aria-label={s('navMember')} className="flex-1 overflow-y-auto px-3 pb-6">

@@ -116,6 +116,7 @@ export const dark: Palette = {
   daybreakInk: '#f08a72',
   daybreakSoft: '#3a2420',
   daybreakLabel: '#1c1314',
+  error: '#f08a8a', // light's #9f1d1d is ~2.3:1 on Ink; this clears AA on paper, raised and sunk
   termHSoft: '#17352b',
   termPSoft: '#2c2234',
   termRSoft: '#34202a',

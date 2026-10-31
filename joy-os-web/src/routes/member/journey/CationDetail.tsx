@@ -9,7 +9,7 @@ import { CATIONS, CATION_PHASES } from '@/data/platform'
 import { INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
 import { CATION_DETAIL, buildItinerary } from './_data'
 import { PrimaryChip, fade, kindIcon } from './_parts'
-import { addCationRequest, useJourney, withdrawCationRequest } from './_store'
+import { addCationRequest, useJourney, withdrawCationRequest, type CationRequest } from './_store'
 import { useJ, type JourneyKey } from './_i18n'
 
 // ’CATION DETAIL (Memo p.20): one template per ’cation — promise, primary and
@@ -192,7 +192,7 @@ export default function CationDetail() {
         </div>
 
         {/* Booking */}
-        <aside id="request" className="scroll-mt-24 lg:sticky lg:top-24 lg:self-start" aria-label={t('requestThis')}>
+        <aside id="request" className="scroll-mt-24 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:overscroll-contain" aria-label={t('requestThis')}>
           <BookingPanel key={c.slug} slug={c.slug} name={c.name} priceFrom={c.priceFrom} venues={c.venues} windows={d.windows} placeholder={d.outcomePlaceholder} interestOnly={c.status === 'FY28'} forTwo={c.slug === 'lovecation'} concierge={TEAM.find((p) => p.role === 'Concierge')!.name} coach={coach.name} />
         </aside>
       </div>
@@ -214,6 +214,16 @@ function BookingPanel({ slug, name, priceFrom, venues, windows, placeholder, int
   const sent = editing ? null : existing ?? null
   const conciergeFirst = concierge.split(' ')[0]
   const { t, r, tx } = useJ()
+
+  /** Put the form back to a request as it was saved (or to a fresh form), with no errors left over. */
+  const resetFrom = (req: CationRequest | undefined) => {
+    setWin(req?.dates ?? '')
+    setVenue(req?.venue ?? venues[0])
+    setGuests(req?.guests ?? (forTwo ? 2 : 1))
+    setOutcome(req?.outcome ?? '')
+    setDietary(req?.dietary ?? '')
+    setErrors({})
+  }
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -256,8 +266,8 @@ function BookingPanel({ slug, name, priceFrom, venues, windows, placeholder, int
             <Link to="/app/passport" className="inline-flex h-11 items-center justify-center gap-2 rounded-full px-4 text-[15px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring"><CreditCard size={16} /> {t('seeOnPassport')} <ArrowRight size={15} /></Link>
           </div>
           <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t border-line pt-3">
-            <Button variant="link" className="text-[14px]" onClick={() => setEditing(true)}>{t('changeRequest')}</Button>
-            <Button variant="link" className="text-[14px]" onClick={() => { withdrawCationRequest(slug); setWin(''); setOutcome(''); setDietary('') }}>{t('withdrawIt')}</Button>
+            <Button variant="link" className="text-[14px]" onClick={() => { resetFrom(existing); setEditing(true) }}>{t('changeRequest')}</Button>
+            <Button variant="link" className="text-[14px]" onClick={() => { withdrawCationRequest(slug); resetFrom(undefined) }}>{t('withdrawIt')}</Button>
           </div>
         </Card>
       </motion.div>
@@ -317,7 +327,7 @@ function BookingPanel({ slug, name, priceFrom, venues, windows, placeholder, int
         </div>
 
         <DaybreakButton type="submit" className="mt-6 w-full">{t(existing ? 'updateRequest' : interestOnly ? 'registerInterest' : 'requestThis')}</DaybreakButton>
-        {existing && <Button variant="ghost" className="mt-2 w-full" onClick={() => setEditing(false)}>{t('keepAsWas')}</Button>}
+        {existing && <Button variant="ghost" className="mt-2 w-full" onClick={() => { resetFrom(existing); setEditing(false) }}>{t('keepAsWas')}</Button>}
 
         <div className="mt-4 space-y-2 text-[12px] leading-relaxed text-ink-3">
           <p className="flex gap-2"><ShieldCheck size={14} className="mt-0.5 shrink-0" /><span>{r('noPayment', { pct: { n: '18%' } })}</span></p>
