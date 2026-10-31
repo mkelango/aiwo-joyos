@@ -8,7 +8,7 @@ import { termByKey } from '@/shared/terms'
 import { useTheme } from '@/theme/ThemeProvider'
 import { PASSES, SESSIONS_OPEN, SESSION_SCHEDULE, ZONES } from '@/screens/b/journeyData'
 import { accountStore, refCode, useStore } from '@/screens/b/bStore'
-import { Done, KeyValue, SpecimenQR, TimelineStep } from '@/screens/b/parts'
+import { Done, KeyValue, SpecimenQR, TimelineStep, memberOnly } from '@/screens/b/parts'
 
 // EVENTS AND PASSES (Memo p.22): your passes with a QR, the day's schedule, Experience Zones
 // by term, the Index issued on site, your Day-90 date, and Sessions open to book.
@@ -16,7 +16,9 @@ import { Done, KeyValue, SpecimenQR, TimelineStep } from '@/screens/b/parts'
 
 type Open = (typeof SESSIONS_OPEN)[number]
 
-export default function Events() {
+export default memberOnly(Events)
+
+function Events() {
   const { c, space } = useTheme()
   const [acct, setAcct] = useStore(accountStore)
   const [walletFor, setWalletFor] = useState<string | null>(null)

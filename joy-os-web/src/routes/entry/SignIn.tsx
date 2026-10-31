@@ -373,7 +373,7 @@ function DemoAccounts({ onEnter }: { onEnter: (a: DemoAccount) => void }) {
         </p>
         <ul className="mt-6 divide-y divide-line overflow-hidden rounded-card border border-line bg-paper-raised">
           {ACCOUNTS.map((a) => {
-            const current = role === a.role && a.key === a.role
+            const current = role === a.role
             return (
               <li key={a.key} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">

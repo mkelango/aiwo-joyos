@@ -388,7 +388,7 @@ function Result({ answers, savedAt, onRestart, onSaved }: { answers: Record<stri
   const easeThin = result.rows.find((r) => r.key === 'B')?.band === 'thin'
   const count = (b: Band) => result.rows.filter((r) => r.band === b).length
   const today = (savedAt ?? new Date().toISOString()).slice(0, 10)
-  const description = result.rows.map((r) => `${termByKey(r.key).space}, ${termByKey(r.key).name}: ${r.band}`).join('. ')
+  const description = result.rows.map((r) => { const t = termByKey(r.key); return `${t.name === t.space ? t.space : `${t.space}, ${t.name}`}: ${r.band}` }).join('. ')
 
   return (
     <div className="mx-auto w-full max-w-page px-4 pb-32 pt-10 md:px-10 md:pb-16 md:pt-14">

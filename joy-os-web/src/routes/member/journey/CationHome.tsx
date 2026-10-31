@@ -229,7 +229,7 @@ export default function CationHome() {
           <div className="flex flex-col gap-3 md:items-end">
             <p className="text-[14px] text-ink-2 md:text-right">Day-90 measure: {suggested.day90Measure}</p>
             {suggestedReq && <Pill tone="daybreak">Requested · <span className="num">{suggestedReq.ref}</span></Pill>}
-            <Link to={`/app/cation/${suggested.slug}`} className="btn-daybreak w-full md:w-auto">
+            <Link to={`/app/cation/${suggested.slug}${suggestedReq ? '#request' : ''}`} className="btn-daybreak w-full md:w-auto">
               {suggestedReq ? 'See your request' : `See ${suggested.name}`} <ArrowRight size={16} />
             </Link>
           </div>
@@ -243,8 +243,10 @@ export default function CationHome() {
             <h2 id="cat-title" className="eyebrow text-ink-3">The ten ’cations · by term</h2>
             <p className="mt-2 max-w-xl text-[16px] text-ink-2">One engine, ten templates. Each has a primary term, a named clinician present, and a Day-90 measure kept in Joy OS.</p>
           </div>
-          <div className="-mx-1 max-w-full overflow-x-auto px-1 pb-1">
+          <div className="max-w-full">
+            {/* Wraps rather than scrolls on a phone, so Pleasure and Ease are never hidden off the edge. */}
             <Tabs<Filter>
+              className="flex-wrap !rounded-[1.4rem]"
               value={filter}
               onChange={setFilter}
               items={[{ value: 'all', label: 'All' }, { value: 'ALL', label: 'Master' }, ...TERMS.map((t) => ({ value: t.key as Filter, label: t.space }))]}

@@ -218,7 +218,12 @@ function Category() {
 // ─── 04 · The equation and the Index ─────────────────────────────────────────
 function Equation() {
   const st = useStatic()
-  const [hl, setHl] = useState<TermKey | null>(null)
+  // hover or focus previews a term on the Wheel; a click pins it (click again to clear)
+  const [hover, setHover] = useState<TermKey | null>(null)
+  const [pin, setPin] = useState<TermKey | null>(null)
+  const hl = hover ?? pin
+  const togglePin = (k: TermKey) => setPin((p) => (p === k ? null : k))
+  const hlTerm = hl ? latest.terms.find((t) => t.key === hl) : undefined
   const ji = joyspanIndex(latest.terms)!
   const five = latest.terms.filter((t) => t.key !== 'B')
   const b = latest.terms.find((t) => t.key === 'B')!.value!
@@ -246,17 +251,29 @@ function Equation() {
               <ul className="mt-3 space-y-[6px]">
                 {latest.terms.map((t) => (
                   <li key={t.key}>
-                    <button
-                      data-no-advance
-                      onMouseEnter={() => !st && setHl(t.key)}
-                      onMouseLeave={() => setHl(null)}
-                      onFocus={() => setHl(t.key)}
-                      onBlur={() => setHl(null)}
-                      className={clsx('flex w-full items-center justify-between rounded-md px-2 py-[3px] text-left transition-colors', hl === t.key && 'bg-paper-sunk')}
-                    >
-                      <DTerm k={t.key} size={17} />
-                      <span className="num text-[18px] text-ink">{t.key === 'B' ? `−${t.value}` : t.value}</span>
-                    </button>
+                    {st ? (
+                      // thumbnails and print: no nested buttons, no interaction
+                      <div className="flex w-full items-center justify-between rounded-md px-2 py-[3px]">
+                        <DTerm k={t.key} size={17} />
+                        <span className="num text-[18px] text-ink">{t.key === 'B' ? `−${t.value}` : t.value}</span>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        data-no-advance
+                        onMouseEnter={() => setHover(t.key)}
+                        onMouseLeave={() => setHover(null)}
+                        onFocus={() => setHover(t.key)}
+                        onBlur={() => setHover(null)}
+                        onClick={() => togglePin(t.key)}
+                        aria-pressed={pin === t.key}
+                        aria-label={`${termByKey(t.key).name} ${t.key === 'B' ? `minus ${t.value}` : t.value}, ${t.band}. ${pin === t.key ? 'Clear the highlight on the Wheel.' : 'Highlight it on the Wheel.'}`}
+                        className={clsx('flex w-full items-center justify-between rounded-md px-2 py-[3px] text-left transition-colors focus-ring hover:bg-paper-sunk', hl === t.key && 'bg-paper-sunk', pin === t.key && 'ring-1 ring-line-strong')}
+                      >
+                        <DTerm k={t.key} size={17} />
+                        <span className="num text-[18px] text-ink">{t.key === 'B' ? `−${t.value}` : t.value}</span>
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -276,8 +293,15 @@ function Equation() {
           </div>
         </div>
         <div className="flex flex-col items-center justify-center">
-          <JoyspanWheel terms={latest.terms} size={360} value={latest.value} showLabels highlight={hl} animate={!st} />
-          <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} className="mt-3 !text-[12px]" />
+          <JoyspanWheel terms={latest.terms} size={360} value={latest.value} showLabels highlight={hl} animate={!st} onSelect={st ? undefined : togglePin} />
+          <p className="mt-2 h-[22px] text-[15px] text-ink-2" aria-live="polite">
+            {hlTerm ? (
+              <><DTerm k={hlTerm.key} size={15} /> <span className="num text-ink">{hlTerm.key === 'B' ? `−${hlTerm.value}` : hlTerm.value}</span> · <BandLabel band={hlTerm.band} className="!text-[12px]" />{pin === hlTerm.key && !hover && <span className="text-ink-3"> · click again to clear</span>}</>
+            ) : st ? null : (
+              <span className="text-ink-3">Choose a term to see it on the Wheel</span>
+            )}
+          </p>
+          <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} className="mt-2 !text-[12px]" />
           <p className="eyebrow mt-2 !text-[11px] text-ink-3">Specimen · not a real member</p>
         </div>
       </div>
@@ -1115,7 +1139,7 @@ export const SLIDES: SlideDef[] = [
   { id: 'cover', title: 'Joy OS — the operating system for a joyful life', section: 'Cover', ground: 'ink', accent: true, bare: true, Body: Cover, notes: 'Joy OS is the operating system for a joyful life: it measures a person’s Joyspan on six terms, names the one term to raise next, delivers the ’cation, practice or habit that raises it, and holds the gain ninety days at a time, on the phone, the web and WhatsApp.', outline: OUTLINES['cover'] },
   { id: 'problem', title: 'The problem', section: 'The problem', ground: 'paper', accent: true, Body: Problem, notes: 'Wearables count sleep and strain. Meditation apps calm the mind. Lab subscriptions read the blood. Each sells one term of the equation as if it were the whole. Across fifteen competitors and 59 screenshots, none covers more than two of the five whole-life rows, and the market has converged on wearable + blood test + an “age” number + an AI companion, all body-only.', outline: OUTLINES['problem'] },
   { id: 'category', title: 'The category', section: 'The category', ground: 'sunk', accent: true, Body: Category, notes: 'Joy OS takes four markets and gives them one number and one loop. That is a new category, Joyspan management, and the first company to define its unit owns it.', outline: OUTLINES['category'] },
-  { id: 'equation', title: 'The equation and the Index', section: 'The equation and the Index', ground: 'paper', accent: true, Body: Equation, notes: 'JI = GM(H, P, R, F, D) − 0.25·B, method v1.0, pinned on every score. Hover or focus a term to see its petal. The geometric mean rewards balance; the burden term subtracts. Movements are shown both ways.', outline: OUTLINES['equation'] },
+  { id: 'equation', title: 'The equation and the Index', section: 'The equation and the Index', ground: 'paper', accent: true, Body: Equation, notes: 'JI = GM(H, P, R, F, D) − 0.25·B, method v1.0, pinned on every score. Hover, focus or click a term (or a petal) to light it on the Wheel; click again to clear. The geometric mean rewards balance; the burden term subtracts. Movements are shown both ways.', outline: OUTLINES['equation'] },
   { id: 'grades', title: 'Three grades, one method', section: 'Three grades', ground: 'paper', accent: true, Body: Grades, notes: 'The Check is free and shows bands only, never a number. The Index is about sixty items in two sittings, re-measured every ninety days. The Clinical grade is physician-signed, using the shared clinical core. One engine scores all three.', outline: OUTLINES['grades'] },
   { id: 'loop', title: 'The 90-day loop', section: 'The ninety-day loop', ground: 'paper', accent: false, Body: Loop, notes: 'Measure, raise, hold, re-measure. Day 0 names the lowest term; the coach owns the reviews at Day 15 and 45; Day 60 is the next-step talk; Day 76–90 is the like-for-like re-measure with a signed delta; then cohort deltas are published up and down.', outline: OUTLINES['loop'] },
   { id: 'product', title: 'The product: five tabs and six spaces', section: 'The product', ground: 'paper', accent: true, Body: Product, notes: 'The equation is the information architecture: six term services become six spaces, plus Today. A member’s day takes about two minutes: one action, three ten-second Ledger prompts, a weekly circle and a quarterly re-measure.', outline: OUTLINES['product'] },

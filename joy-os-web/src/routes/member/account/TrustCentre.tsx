@@ -24,9 +24,11 @@ export default function TrustCentre() {
   const [toast, showToast] = useToast()
   // WhatsApp consent is the same stored value the WhatsApp page and Profile use.
   const [wa, setWa] = usePersisted('wa', { consented: CONSENTS.find((c) => c.id === 'c_wa')!.granted })
-  const [consents, setConsents] = useState<Record<string, { on: boolean; pending?: boolean }>>(() => Object.fromEntries(CONSENTS.map((c) => [c.id, { on: c.id === 'c_wa' ? wa.consented : c.granted }])))
+  // Consents are kept per viewer so a withdrawal survives a reload; WhatsApp always follows the shared value.
+  const [stored, setStored] = usePersisted<Record<string, { on: boolean; pending?: boolean }>>('consents', Object.fromEntries(CONSENTS.map((c) => [c.id, { on: c.granted }])))
+  const consents = { ...stored, c_wa: { ...stored.c_wa, on: wa.consented } }
   const setConsent = (id: string, on: boolean) => {
-    setConsents((s) => ({ ...s, [id]: { on, pending: true } }))
+    setStored((s) => ({ ...s, [id]: { on, pending: true } }))
     if (id === 'c_wa') { setWa({ consented: on }); syncWhatsAppChannel(on) }
   }
   const { hash } = useLocation()
@@ -419,7 +421,9 @@ function NomineeCard({ onSaved }: { onSaved: (m: string) => void }) {
 }
 
 function ResearchCard({ onChange }: { onChange: (m: string) => void }) {
-  const [on, setOn] = useState(true)
+  const [research, setResearch] = usePersisted('research', { on: true })
+  const on = research.on
+  const setOn = (v: boolean) => setResearch({ on: v })
   return (
     <Card>
       <p className="eyebrow text-ink-3">Research</p>

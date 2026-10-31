@@ -186,6 +186,7 @@ function MarkerRow({ m, first, open, onToggle }: { m: Marker; first: boolean; op
       onPress={onToggle}
       accessibilityRole="button"
       accessibilityState={{ expanded: open }}
+      aria-expanded={open}
       accessibilityLabel={`${m.name}, ${m.value} ${m.unit}, range ${m.range}, ${m.status}${m.prev !== null ? `, previously ${m.prev}` : ''}`}
       style={({ pressed }) => ({ borderTopWidth: first ? 0 : 1, borderTopColor: c.line, paddingVertical: 12, gap: 6, opacity: pressed ? 0.7 : 1 })}
     >

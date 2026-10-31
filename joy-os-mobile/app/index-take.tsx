@@ -24,6 +24,7 @@ import { H2, useLocal } from '@/screens/a/local'
 import { OptionRow } from '@/screens/a/parts'
 import { termByKey } from '@/shared/terms'
 import { useTheme } from '@/theme/ThemeProvider'
+import { memberOnly } from '@/screens/b/parts'
 
 // TAKE THE INDEX (Memo p.10–11; Plan §4B): two sittings of about ten minutes, organised by
 // instrument (a short intro before each one), one item per screen, progress always visible,
@@ -54,7 +55,9 @@ interface Saved {
 const EMPTY: Saved = { answers: {}, seen: [], at: null }
 const PHQ_IDS = ['phq-26', 'phq-27']
 
-export default function TakeIndex() {
+export default memberOnly(TakeIndex)
+
+function TakeIndex() {
   const { c, space } = useTheme()
   const { offline, setCrisisOpen } = useApp()
   const items = useMemo<Flat[]>(

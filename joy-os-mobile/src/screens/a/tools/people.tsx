@@ -128,6 +128,7 @@ function TwoAm() {
   return (
     <ToolCard title="The 2 a.m. list" lead="Who would you call at two in the morning? Private to you; it is not shared with anyone on it.">
       <View>
+        {names.length === 0 ? <Meta tone="ink3">No one on it yet. One name is enough to start.</Meta> : null}
         {names.map((n, i) => (
           <View key={`${n}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 }}>
             <Mono size={13} tone="ink3" style={{ width: 20 }}>
@@ -284,6 +285,7 @@ function StateOfUs() {
                     onPress={() => setDraft((d) => d.map((y, j) => (j === i ? o.v : y)))}
                     accessibilityRole="radio"
                     accessibilityState={{ checked: on }}
+                    aria-checked={on}
                     accessibilityLabel={`${x.area}: ${o.label}`}
                     style={({ pressed }) => ({ flex: 1, minHeight: 44, borderRadius: 999, borderWidth: on ? 2 : 1, borderColor: on ? c.ink : c.lineStrong, backgroundColor: on ? c.paperRaised : pressed ? c.paperSunk : undefined, alignItems: 'center', justifyContent: 'center' })}
                   >

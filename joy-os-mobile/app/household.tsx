@@ -1,6 +1,6 @@
 import { router } from 'expo-router'
 import { useState } from 'react'
-import { Share, View } from 'react-native'
+import { View } from 'react-native'
 import {
   ArrowLink,
   Avatar,
@@ -36,7 +36,7 @@ import type { Band, TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { COUPLES_CHECK, GRANTS, HOUSEHOLD_MINOR, KAVYA_SHARED, type Grant, type GrantScope } from '@/screens/b/accountData'
 import { accountStore, refCode, useStore } from '@/screens/b/bStore'
-import { ChoiceCard, Done, Field, KeyValue, useSheetCrisisGuard } from '@/screens/b/parts'
+import { ChoiceCard, Done, Field, KeyValue, shareOrCopy, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
 
 // HOUSEHOLD (Memo p.19, "made for two, welcoming to one"): partners scored separately,
 // elder mode with a helper by the elder's consent, minors never scored, share grants both
@@ -46,7 +46,9 @@ import { ChoiceCard, Done, Field, KeyValue, useSheetCrisisGuard } from '@/screen
 const bandFor = (v: number): Band => (v >= 70 ? 'steady' : v >= 50 ? 'uneven' : 'thin')
 const scopeLabel = (s: GrantScope[]) => s.map((x) => (x === 'index' ? 'Index only' : termByKey(x).name)).join(' · ')
 
-export default function Household() {
+export default memberOnly(Household)
+
+function Household() {
   const { c, space } = useTheme()
   const [grants, setGrants] = useState<Grant[]>(GRANTS)
   const [shareOpen, setShareOpen] = useState(false)
@@ -448,6 +450,7 @@ function InviteSheet({ open, onClose, onInvite }: { open: boolean; onClose: () =
   const [consent, setConsent] = useState(false)
   const [errors, setErrors] = useState<{ name?: string; consent?: string }>({})
   const [done, setDone] = useState<Invite | null>(null)
+  const [shareState, setShareState] = useState<'shared' | 'copied' | 'failed' | null>(null)
 
   const reset = () => {
     setName('')
@@ -456,6 +459,7 @@ function InviteSheet({ open, onClose, onInvite }: { open: boolean; onClose: () =
     setConsent(false)
     setErrors({})
     setDone(null)
+    setShareState(null)
   }
   const close = () => {
     reset()
@@ -483,7 +487,12 @@ function InviteSheet({ open, onClose, onInvite }: { open: boolean; onClose: () =
       footer={
         done ? (
           <View style={{ gap: 8 }}>
-            <Button variant="ink" block icon="share" onPress={() => Share.share({ message: `Join the Rao household on Joy OS: ${link}`, title: 'Joy OS invitation' }).catch(() => {})}>
+            {shareState ? (
+              <Meta tone="ink" align="center" accessibilityLiveRegion="polite">
+                {shareState === 'copied' ? 'Link copied. Paste it into a message to them.' : shareState === 'shared' ? 'Link shared.' : `Could not share from here. The link is above to copy by hand.`}
+              </Meta>
+            ) : null}
+            <Button variant="ink" block icon="share" onPress={() => shareOrCopy(`Join the Rao household on Joy OS: ${link}`, 'Joy OS invitation').then(setShareState)}>
               Share the link
             </Button>
             <Button variant="secondary" block onPress={close}>

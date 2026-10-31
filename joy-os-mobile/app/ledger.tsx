@@ -27,6 +27,8 @@ import { H2, isSpecimenToday, ledgerStamp, madeHere, ledgerWhen, shiftTime, useL
 import { BarRow, Chip, IconButton, Provenance, TextField } from '@/screens/a/parts'
 import { LEDGER_TAGS, LEDGER_WEEK } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
+import { notifPrefsStore, useStore } from '@/screens/b/bStore'
+import { memberOnly } from '@/screens/b/parts'
 
 // JOY LEDGER (Memo p.17 · Daily Pleasure): three light prompts a day, a tag or two and
 // an optional word — ten seconds. Then, weekly, where joy came from. No streaks, no counts
@@ -36,7 +38,9 @@ const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 /** Three full weeks and Monday to Wednesday of this one; today (Thursday 28 Jan) follows. */
 const CAL = LEDGER_CALENDAR.slice(-24)
 
-export default function Ledger() {
+export default memberOnly(Ledger)
+
+function Ledger() {
   const t = useT()
   const { c, space, term } = useTheme()
   const { ledger, addLedger, setCrisisOpen, lang } = useApp()
@@ -50,6 +54,11 @@ export default function Ledger() {
   const [draftTimes, setDraftTimes] = useState<string[]>(times)
   const [timesSaved, setTimesSaved] = useState(false)
   const col = term('D')
+  // The same quiet hours and channels that Settings, Notifications and onboarding keep.
+  const [prefs] = useStore(notifPrefsStore)
+  const toMin = (x: string) => Number(x.slice(0, 2)) * 60 + Number(x.slice(3))
+  // The last prompt stays at least fifteen minutes before quiet hours begin (evening start), else by 21:30.
+  const latestPrompt = toMin(prefs.quiet.from) >= 18 * 60 ? toMin(prefs.quiet.from) - 15 : 21 * 60 + 30
   const schedule = LEDGER_SCHEDULE.map((s, i) => ({ ...s, time: times[i] ?? s.time }))
   const prompt = schedule[1]
   const nextPrompt = schedule[2]
@@ -273,7 +282,7 @@ export default function Ledger() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
           <Icon name="moon" size={14} color={c.ink3} />
           <Meta size={14} tone="ink3" style={{ flex: 1 }}>
-            Quiet hours 21:45 – 07:30. WhatsApp prompts are off until you allow them.
+            {`Quiet hours ${prefs.quiet.from} – ${prefs.quiet.to}. ${prefs.channels.whatsapp ? 'Prompts also come by WhatsApp, never clinical content.' : 'WhatsApp prompts are off until you allow them.'}`}
           </Meta>
         </View>
         {timesSaved ? (
@@ -324,7 +333,7 @@ export default function Ledger() {
           const nxt = draftTimes[i + 1]
           const mins = (x: string) => Number(x.slice(0, 2)) * 60 + Number(x.slice(3))
           const canEarlier = mins(t) - 15 >= (prev ? mins(prev) + 60 : 6 * 60)
-          const canLater = mins(t) + 15 <= (nxt ? mins(nxt) - 60 : 21 * 60 + 30)
+          const canLater = mins(t) + 15 <= (nxt ? mins(nxt) - 60 : latestPrompt)
           return (
             <View key={s.prompt} style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1, minHeight: 56, borderTopWidth: i ? 1 : 0, borderTopColor: c.line }}>
               <View style={{ flex: 1, gap: 2 }}>
@@ -340,7 +349,7 @@ export default function Ledger() {
           )
         })}
         <Meta size={14} tone="ink3">
-          The last prompt stays before quiet hours begin at 21:45.
+          {`The last prompt stays before quiet hours begin at ${prefs.quiet.from}.`}
         </Meta>
       </Sheet>
     </Screen>

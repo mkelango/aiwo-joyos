@@ -10,7 +10,7 @@ import { INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
 import { termByKey } from '@/data/terms'
 import { PRACTICE_CONTENT } from './_data'
 import { AudioPlayer, PrimaryChip, Quote, fade } from './_parts'
-import { addDays, practisedToday, togglePractisedToday, useJourney } from './_store'
+import { addDays, practisedToday, saveReflection, setWeekPractised, togglePractisedToday, useJourney, weekPractised } from './_store'
 
 // PRACTICE WEEK (Memo p.21): one week of the Joyspiration Practice in full —
 // audio, the practice, the science note, a private reflection and "mark practised".
@@ -27,10 +27,10 @@ function WeekView({ n }: { n: string }) {
   const week = PRACTICE_WEEKS.find((w) => w.week === num)
   const content = PRACTICE_CONTENT.find((p) => p.week === num)
   const id = useId()
-  const [reflection, setReflection] = useState('')
-  const [savedAt, setSavedAt] = useState<string | null>(null)
-  const [pastDone, setPastDone] = useState(true)
   const journey = useJourney()
+  const saved = journey.reflections[num]
+  const [reflection, setReflection] = useState(saved?.text ?? '')
+  const [savedAt, setSavedAt] = useState<string | null>(saved?.savedAt ?? null)
   const coachFirst = TEAM.find((p) => p.role === 'Coach')!.name.split(' ')[0]
   const [error, setError] = useState('')
 
@@ -49,15 +49,17 @@ function WeekView({ n }: { n: string }) {
   const term = week.term === 'ALL' ? null : termByKey(week.term)
   // Week n runs Monday to Sunday; the circle talks it over the Monday after.
   const opens = new Date(2027, 0, 4 + (num - 1) * 7, 12)
-  const practised = status === 'now' ? practisedToday(journey) : status === 'done' ? pastDone : false
-  const setPractised = (v: boolean) => (status === 'now' ? togglePractisedToday(v) : setPastDone(v))
+  const practised = status === 'now' ? practisedToday(journey) : status === 'done' ? weekPractised(journey, num) : false
+  const setPractised = (v: boolean) => (status === 'now' ? togglePractisedToday(v) : setWeekPractised(num, v))
   const before = INDEX_HISTORY[0]
   const remeasureOpens = addDays(MEMBER.loopStarted, 76)
 
   const save = () => {
     if (reflection.trim().length < 3) { setError('Write a few words first. It stays private to you.'); return }
     setError('')
-    setSavedAt(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }))
+    const at = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+    saveReflection(num, reflection.trim(), at)
+    setSavedAt(at)
   }
 
   return (
@@ -71,7 +73,7 @@ function WeekView({ n }: { n: string }) {
         actions={
           <div className="flex items-center gap-2">
             <PrimaryChip primary={week.term} size="md" />
-            {status === 'done' && <Pill tone="ink"><Check size={12} /> Practised</Pill>}
+            {status === 'done' && (practised ? <Pill tone="ink"><Check size={12} /> Practised</Pill> : <Pill>Earlier week</Pill>)}
             {status === 'now' && <Pill tone="daybreak">This week</Pill>}
             {status === 'next' && <Pill>Opens {fmtDate(opens.toISOString())}</Pill>}
           </div>
@@ -104,7 +106,7 @@ function WeekView({ n }: { n: string }) {
                 rows={5}
                 maxLength={MAX}
                 value={reflection}
-                onChange={(e) => { setReflection(e.target.value); setSavedAt(null) }}
+                onChange={(e) => { setReflection(e.target.value); setSavedAt(null); setError('') }}
                 placeholder="A few honest words are enough."
                 aria-describedby={`${id}-hint`}
                 className="mt-4 w-full resize-y rounded-card border border-line-strong bg-paper-raised px-4 py-3 text-[17px] leading-relaxed text-ink placeholder:text-ink-3 focus-ring"

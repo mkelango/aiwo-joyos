@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Pressable, ScrollView, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native'
+import { Redirect } from 'expo-router'
+import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react'
+import { Platform, Pressable, ScrollView, Share, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native'
 import { Body, Eyebrow, Icon, Meta, Mono, TermChip, TermDot, Title, Toggle, type IconName } from '@/components'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { palettes } from '@/theme/tokens'
+import { sessionStore, useStore } from './bStore'
 
 // Lane B helpers: ’Cation, Practice, Care, account and entry screens.
 // Built only from theme tokens and the shared kit; no raw colours.
@@ -96,6 +98,7 @@ export function ChoiceCard({
       accessibilityRole={kind}
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ checked: selected }}
+      aria-checked={selected}
       style={({ pressed }) => ({
         borderRadius: radius.card,
         borderWidth: selected ? 2 : 1,
@@ -208,6 +211,7 @@ export function FilterChips<T extends string>({ value, onChange, items, label }:
             accessibilityRole="tab"
             accessibilityLabel={it.label}
             accessibilityState={{ selected: on }}
+            aria-selected={on}
             style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, borderRadius: radius.pill, borderWidth: 1, borderColor: on ? c.ink : c.line, backgroundColor: on ? c.ink : c.paperRaised }}
           >
             {it.term ? <TermDot term={it.term} /> : null}
@@ -530,5 +534,50 @@ export function useSheetCrisisGuard() {
     closeSheet()
     setTimeout(() => setCrisisOpen(true), 300)
     return false
+  }
+}
+
+/**
+ * The signed-out gate for member-only screens outside the tabs (the tab layout has its own).
+ * After Sign out, a deep link to Profile, Messages, the Ledger and so on lands on Welcome
+ * instead of showing the specimen member's data. Waits for the stored session first.
+ */
+export function memberOnly<P extends object>(Screen: ComponentType<P>) {
+  function MemberOnly(props: P) {
+    const [session] = useStore(sessionStore)
+    if (sessionStore.hydrated() && !session.signedIn) return <Redirect href="/welcome" />
+    return <Screen {...props} />
+  }
+  MemberOnly.displayName = `MemberOnly(${Screen.displayName ?? Screen.name ?? 'Screen'})`
+  return MemberOnly
+}
+
+/**
+ * Share text from the phone's share sheet. On the web build, where a browser may have no share
+ * sheet, the text is copied to the clipboard instead, so the button always does something visible.
+ */
+export async function shareOrCopy(message: string, title: string): Promise<'shared' | 'copied' | 'failed'> {
+  if (Platform.OS === 'web' && typeof navigator !== 'undefined') {
+    const nav = navigator as Navigator & { share?: (d: { title?: string; text?: string }) => Promise<void> }
+    if (typeof nav.share === 'function') {
+      try {
+        await nav.share({ title, text: message })
+        return 'shared'
+      } catch {
+        /* dismissed or unsupported: fall through to the clipboard */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(message)
+      return 'copied'
+    } catch {
+      return 'failed'
+    }
+  }
+  try {
+    await Share.share({ message, title })
+    return 'shared'
+  } catch {
+    return 'failed'
   }
 }

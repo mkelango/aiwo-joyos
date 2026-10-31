@@ -23,6 +23,10 @@ const TABS = ['safety', 'screens', 'signoff', 'member', 'ai', 'config'] as const
 const PRIORITY_RANK = { P0: 0, P1: 1 } as const
 const STATUS_RANK = { open: 0, acknowledged: 1, closed: 2 } as const
 
+/** The Medical Director's active, signed threshold set. Lifted so every tab reads the same version. */
+type MdActive = { version: string; signedOn: string; signers: string[]; hash: string; values: Record<string, number> }
+const MD_INITIAL = (): MdActive => ({ version: MD_CONFIG.active.version, signedOn: MD_CONFIG.active.signedOn, signers: MD_CONFIG.active.signers, hash: MD_CONFIG.active.hash, values: Object.fromEntries(MD_CONFIG.thresholds.map((t) => [t.key, t.value])) as Record<string, number> })
+
 /** Reached-in time and whether it was inside the SLA, from the alert's own clock. */
 function reachOf(a: SafetyAlert) {
   if (!a.ackAt) return null
@@ -63,6 +67,7 @@ export default function Clinical() {
   const [signoffs, setSignoffs] = useState<SignItem[]>(SIGNOFF_QUEUE.map((s) => ({ ...s, signed: null, returned: null })))
   const [drafts, setDrafts] = useState(HITL_QUEUE.map((h) => ({ ...h, state: 'pending' as 'pending' | 'approved' | 'rejected', edited: false })))
   const [screens, setScreens] = useState<Screen[]>(SCREEN_QUEUE.map((q) => ({ ...q })))
+  const [md, setMd] = useState<MdActive>(MD_INITIAL)
 
   const openP0 = alerts.filter((a) => a.priority === 'P0' && a.status === 'open').sort((a, b) => +new Date(a.openedAt) - +new Date(b.openedAt))[0]
   const activeP0 = alerts.filter((a) => a.priority === 'P0' && a.status !== 'closed').length
@@ -154,13 +159,13 @@ export default function Clinical() {
       </div>
 
       <div className="mt-6">
-        {tab === 'safety' && <SafetyBoard alerts={alerts} setAlerts={setAlerts} now={now} onAck={ack} onOpen={openMember} canAct={canAct} />}
-        {tab === 'screens' && <ScreenQueue screens={screens} setScreens={setScreens} setAlerts={setAlerts} alerts={alerts} now={now} onOpen={openMember} canAct={canAct} />}
+        {tab === 'safety' && <SafetyBoard alerts={alerts} setAlerts={setAlerts} now={now} onAck={ack} onOpen={openMember} canAct={canAct} p0Minutes={md.values.p0} />}
+        {tab === 'screens' && <ScreenQueue screens={screens} setScreens={setScreens} setAlerts={setAlerts} alerts={alerts} now={now} onOpen={openMember} canAct={canAct} md={md} />}
         {tab === 'signoff' && <SignOff items={signoffs} setItems={setSignoffs} now={now} onOpen={openMember} canAct={canAct} />}
         {tab === 'member' && <MemberRecord key={memberId} memberId={memberId} setMember={setMember} now={now} canAct={canAct} alerts={alerts} />}
         {tab === 'ai' && <AiReview drafts={drafts} setDrafts={setDrafts} onOpen={openMember} canAct={canAct} />}
         {/* Kept mounted so a pending proposal or a new version survives a tab switch. */}
-        <div hidden={tab !== 'config'}><MedicalDirector canAct={canAct} /></div>
+        <div hidden={tab !== 'config'}><MedicalDirector canAct={canAct} active={md} setActive={setMd} /></div>
       </div>
     </div>
   )
@@ -168,7 +173,7 @@ export default function Clinical() {
 
 // ─── Safety board ──────────────────────────────────────────────────────────
 
-function SafetyBoard({ alerts, setAlerts, now, onAck, onOpen, canAct }: { alerts: SafetyAlert[]; setAlerts: (f: (a: SafetyAlert[]) => SafetyAlert[]) => void; now: number; onAck: (id: string) => void; onOpen: (id: string) => void; canAct: boolean }) {
+function SafetyBoard({ alerts, setAlerts, now, onAck, onOpen, canAct, p0Minutes }: { alerts: SafetyAlert[]; setAlerts: (f: (a: SafetyAlert[]) => SafetyAlert[]) => void; now: number; onAck: (id: string) => void; onOpen: (id: string) => void; canAct: boolean; p0Minutes: number }) {
   const [closing, setClosing] = useState<SafetyAlert | null>(null)
   const [outcome, setOutcome] = useState('')
   const [note, setNote] = useState('')
@@ -237,7 +242,7 @@ function SafetyBoard({ alerts, setAlerts, now, onAck, onOpen, canAct }: { alerts
           <ol className="mt-3 space-y-3 text-[15px] text-ink-2">
             <li><span className="num mr-2 text-ink-3">1</span>Keyword and classifier intercept fires <span className="text-ink">before any model runs</span>.</li>
             <li><span className="num mr-2 text-ink-3">2</span>The member sees Tele-MANAS <span className="num text-ink">14416</span>, the on-call clinician and their emergency contact.</li>
-            <li><span className="num mr-2 text-ink-3">3</span>The on-call clinician is paged; a person reaches the member within <span className="num text-ink">15</span> minutes.</li>
+            <li><span className="num mr-2 text-ink-3">3</span>The on-call clinician is paged; a person reaches the member within <span className="num text-ink">{p0Minutes}</span> minutes.</li>
             <li><span className="num mr-2 text-ink-3">4</span>Closed only by a clinician, with an outcome. Never by AI.</li>
           </ol>
         </Card>
@@ -285,7 +290,7 @@ function SafetyBoard({ alerts, setAlerts, now, onAck, onOpen, canAct }: { alerts
 
 type Screen = (typeof SCREEN_QUEUE)[number] & { routedAt?: string; alertId?: string }
 
-function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canAct }: {
+function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canAct, md }: {
   screens: Screen[]
   setScreens: (f: (s: Screen[]) => Screen[]) => void
   alerts: SafetyAlert[]
@@ -293,6 +298,7 @@ function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canA
   now: number
   onOpen: (id: string) => void
   canAct: boolean
+  md: MdActive
 }) {
   const [choice, setChoice] = useState<Record<string, string>>({})
   const [notice, setNotice] = useState<string | null>(null)
@@ -324,8 +330,8 @@ function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canA
   return (
     <Card>
       <CardHead
-        eyebrow="Screen-threshold queue · config v3"
-        title="PHQ-4 at 6 or above, ISI at 15 or above"
+        eyebrow={<>Screen-threshold queue · config <span className="num">{md.version}</span></>}
+        title={<>PHQ-4 at <span className="num">{md.values.phq4}</span> or above, ISI at <span className="num">{md.values.isi}</span> or above</>}
         aside={<Pill>Pre-approved passages only</Pill>}
       />
       {notice && <p role="status" className="mb-3 flex items-start justify-between gap-3 rounded-lg bg-paper-sunk px-4 py-2.5 text-[14px] text-ink"><span className="flex items-start gap-2"><Check size={15} className="mt-0.5 shrink-0" aria-hidden />{notice}</span><button onClick={() => setNotice(null)} className="shrink-0 text-[13px] text-ink-3 hover:underline focus-ring">Dismiss</button></p>}
@@ -418,7 +424,7 @@ function SignOff({ items, setItems, now, onOpen, canAct }: { items: SignItem[]; 
   }
   const undoReturn = () => setItems((xs) => xs.map((x) => (x.id === item.id ? { ...x, returned: null, notes: x.notes.slice(0, -1) } : x)))
   const annotate = () => {
-    if (!note.trim()) return
+    if (!note.trim() || !canAct) return
     setItems((xs) => xs.map((x) => (x.id === item.id ? { ...x, notes: [...x.notes, `${MEERA.name}: ${note.trim()}`] } : x)))
     setNote('')
   }
@@ -514,7 +520,7 @@ function SignOff({ items, setItems, now, onOpen, canAct }: { items: SignItem[]; 
           {!item.signed && !item.returned && (
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
               <label htmlFor="annot" className="sr-only">Add annotation</label>
-              <input id="annot" value={note} onChange={(e) => setNote(e.target.value)} className={fieldCls} placeholder="Annotate for the member’s record or the care team" />
+              <input id="annot" value={note} disabled={!canAct} onChange={(e) => setNote(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); annotate() } }} className={fieldCls} placeholder="Annotate for the member’s record or the care team" />
               <Button variant="secondary" onClick={annotate} disabled={!note.trim() || !canAct}>Annotate</Button>
             </div>
           )}
@@ -823,13 +829,13 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts }: { memberId: 
               </div>
               <div>
                 <label htmlFor="rx-freq" className={labelCls}>Frequency</label>
-                <select id="rx-freq" className={fieldCls} value={freq} onChange={(e) => setFreq(e.target.value)}>
+                <select id="rx-freq" className={fieldCls} value={freq} disabled={!canAct} onChange={(e) => setFreq(e.target.value)}>
                   {['Once daily', 'Twice daily', 'At night', 'Once weekly', 'As needed, max 3 a day'].map((o) => <option key={o}>{o}</option>)}
                 </select>
               </div>
               <div>
                 <label htmlFor="rx-days" className={labelCls}>Duration (days)</label>
-                <input id="rx-days" inputMode="numeric" className={clsx(fieldCls, 'num')} value={days} onChange={(e) => setDays(e.target.value)} />
+                <input id="rx-days" inputMode="numeric" className={clsx(fieldCls, 'num')} value={days} disabled={!canAct} onChange={(e) => setDays(e.target.value)} />
               </div>
             </div>
             <Button variant="secondary" disabled={!canAct} onClick={() => { if (drug) { setChecked(true); setErrs('') } else setErrs('Choose a drug to check.') }}>Run interaction check</Button>
@@ -910,7 +916,7 @@ function AiReview({ drafts, setDrafts, onOpen, canAct }: { drafts: Draft[]; setD
                     <label htmlFor={`edit-${d.id}`} className="sr-only">Edit draft</label>
                     <textarea id={`edit-${d.id}`} rows={5} lang={d.lang === 'HI' ? 'hi' : 'en'} className={areaCls} value={text} onChange={(e) => setText(e.target.value)} />
                     <div className="mt-2 flex gap-2">
-                      <Button size="sm" variant="ink" onClick={() => { update(d.id, { text, edited: true }); setEditing(null) }}>Save edit</Button>
+                      <Button size="sm" variant="ink" disabled={text.trim().length < 20} onClick={() => { update(d.id, { text: text.trim(), edited: true }); setEditing(null) }}>Save edit</Button>
                       <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
                     </div>
                   </div>
@@ -958,9 +964,8 @@ function AiReview({ drafts, setDrafts, onOpen, canAct }: { drafts: Draft[]; setD
 
 // ─── Medical Director config ───────────────────────────────────────────────
 
-function MedicalDirector({ canAct }: { canAct: boolean }) {
+function MedicalDirector({ canAct, active, setActive }: { canAct: boolean; active: MdActive; setActive: (a: MdActive) => void }) {
   const base = MD_CONFIG.thresholds
-  const [active, setActive] = useState({ version: MD_CONFIG.active.version, signedOn: MD_CONFIG.active.signedOn, signers: MD_CONFIG.active.signers, hash: MD_CONFIG.active.hash, values: Object.fromEntries(base.map((t) => [t.key, t.value])) as Record<string, number> })
   const [vals, setVals] = useState<Record<string, number>>(active.values)
   const [why, setWhy] = useState('')
   const [proposal, setProposal] = useState<null | { version: string; changes: string[]; why: string }>(null)
@@ -1002,7 +1007,7 @@ function MedicalDirector({ canAct }: { canAct: boolean }) {
         />
         <p className="text-[15px] text-ink-2">Signed {active.signedOn} by {active.signers.join(' and ')}. <span className="num">{active.hash}</span></p>
         <div className="relative mt-5 overflow-x-auto">
-          <table className="w-full min-w-[560px] border-collapse text-left text-[14px]">
+          <table className="w-full min-w-[500px] border-collapse text-left text-[14px]">
             <caption className="sr-only">Clinical thresholds</caption>
             <thead><tr className="border-b border-line">{['Rule', <>Active · <span className="num">{active.version}</span></>, proposal ? <>Proposed · <span className="num">{proposal.version}</span></> : 'Proposed', 'Range'].map((h, i) => <th key={i} scope="col" className="eyebrow py-3 pr-4 font-normal text-ink-3">{h}</th>)}</tr></thead>
             <tbody>

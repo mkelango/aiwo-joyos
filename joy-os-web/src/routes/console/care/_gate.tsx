@@ -14,6 +14,8 @@ export const ROLE_OPTIONS: { value: Role; label: string; person: string }[] = [
   { value: 'tenant', label: 'Tenant admin', person: 'Northwind Capital People team' },
   { value: 'science', label: 'Science Office', person: 'Head of Joyspan Science' },
   { value: 'exec', label: 'Leadership', person: 'Head of Joy OS' },
+  // Engineering & ops: the control plane is JIT only, so this role holds no standing console.
+  { value: 'ops', label: 'Control plane', person: 'SRE on call · DPO' },
 ]
 
 /** Which demo roles may act in each console. The control plane is never standing access. */
@@ -53,7 +55,7 @@ export function PreviewBanner({ path }: { path: string }) {
         </span>
       </p>
       <div className="flex shrink-0 flex-wrap gap-2">
-        <Link to="/console" className="inline-flex h-9 items-center rounded-full px-3 text-[14px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring">Request access</Link>
+        <Link to={`/console?request=${encodeURIComponent(path)}`} className="inline-flex h-9 items-center rounded-full px-3 text-[14px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring">Request access</Link>
         {nativeLabel && <Button size="sm" variant="secondary" onClick={switchTo}>Sign in as {nativeLabel.toLowerCase()} (specimen)</Button>}
       </div>
     </div>

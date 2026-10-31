@@ -188,6 +188,7 @@ function Question({ i, answers, onAnswer, onBack, onNext }: { i: number; answers
               accessibilityRole="radio"
               accessibilityLabel={`${o.v}, ${o.label}`}
               accessibilityState={{ checked: on }}
+              aria-checked={on}
               style={({ pressed }) => ({
                 flexDirection: 'row',
                 alignItems: 'center',

@@ -38,7 +38,7 @@ export default function SpacesHub() {
         <Card className="grid gap-8 md:grid-cols-[auto_minmax(0,1fr)] md:items-center md:gap-10">
           <div className="flex flex-col items-center">
             <JoyspanWheel terms={latest.terms} size={260} value={latest.value} showLabels highlight={selected} onSelect={setSelected} />
-            <p className="mt-2 max-w-[30ch] text-center text-[13px] text-ink-3">Tap a petal to open its room. Ease is hatched and counted as a minus.</p>
+            <p className="mt-2 max-w-[30ch] text-center text-[13px] text-ink-3">Tap a petal to see its room here. Ease is hatched and counted as a minus.</p>
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -127,20 +127,21 @@ export default function SpacesHub() {
       </section>
 
       {/* How rooms work */}
-      <section className="mt-12 grid gap-5 md:grid-cols-3" aria-label="How the spaces work">
+      <section className="mt-12 grid gap-5 md:grid-cols-3" aria-labelledby="how-spaces">
+        <h2 id="how-spaces" className="sr-only">How the spaces work</h2>
         <Card tone="sunk">
           <Watch size={18} className="text-ink-2" aria-hidden />
-          <p className="mt-3 text-[17px] text-ink">Every room works without a device.</p>
+          <h3 className="mt-3 text-[17px] font-normal text-ink">Every room works without a device.</h3>
           <p className="mt-1.5 text-[15px] text-ink-2">A full Index comes from instruments. Your Oura and Apple Health enrich Body, Pleasure and Ease; they never gate them.</p>
         </Card>
         <Card tone="sunk">
           <Lock size={18} className="text-ink-2" aria-hidden />
-          <p className="mt-3 text-[17px] text-ink">Sensitive by default.</p>
+          <h3 className="mt-3 text-[17px] font-normal text-ink">Sensitive by default.</h3>
           <p className="mt-1.5 text-[15px] text-ink-2">Purpose, People and Freedom answers are kept as carefully as biomarkers: encrypted, audited, never sold. Calendars are summarised, then dropped.</p>
         </Card>
         <Card tone="sunk">
           <span className="flex items-center gap-1.5" aria-hidden><TermDot term="B" size={14} /><span className="num text-ink-2">−</span></span>
-          <p className="mt-3 text-[17px] text-ink">Ease counts as a minus.</p>
+          <h3 className="mt-3 text-[17px] font-normal text-ink">Ease counts as a minus.</h3>
           <p className="mt-1.5 text-[15px] text-ink-2">Preventable Suffering is subtracted from the other five: JI = GM(H, P, R, F, D) − 0.25·B. In Ease, lower is better.</p>
         </Card>
       </section>

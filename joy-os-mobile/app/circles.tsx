@@ -6,13 +6,15 @@ import { brand, palettes } from '@/theme/tokens'
 import { useTheme } from '@/theme/ThemeProvider'
 import { CIRCLE_NEXT, CIRCLE_SESSIONS, OTHER_CIRCLES, PRACTICE_CONTENT, SALONS } from '@/screens/b/journeyData'
 import { accountStore, useStore } from '@/screens/b/bStore'
-import { CheckLine, Done, TimelineStep } from '@/screens/b/parts'
+import { CheckLine, Done, TimelineStep, memberOnly } from '@/screens/b/parts'
 
 // CIRCLES (Memo p.21): the circle of eight — the same eight people and a lead, Monday at
 // 7 pm, thirty minutes, for the ninety days. First names only, cameras optional, nothing
 // ranked. Other circles and salons by invitation. One Daybreak: join Monday's call.
 
-export default function Circles() {
+export default memberOnly(Circles)
+
+function Circles() {
   const { c, space } = useTheme()
   const [joinOpen, setJoinOpen] = useState(false)
   const [acct, setAcct] = useStore(accountStore)

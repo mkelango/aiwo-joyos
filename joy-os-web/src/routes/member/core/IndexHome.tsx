@@ -416,7 +416,7 @@ function HistoryCard() {
 
       <div className="mt-6 h-[280px] w-full" aria-hidden>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 16, right: 16, bottom: 4, left: -16 }}>
+          <LineChart accessibilityLayer={false} data={data} margin={{ top: 16, right: 16, bottom: 4, left: -16 }}>
             <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="2 6" />
             <XAxis dataKey="t" type="number" scale="time" domain={[first - pad, v11 + pad]} ticks={[...data.map((d) => d.t), v11]} tickFormatter={(t: number) => shortDate(new Date(t).toISOString())} tick={TICK} axisLine={{ stroke: 'var(--line)' }} tickLine={false} />
             <YAxis domain={view === 'index' ? [40, 80] : [0, 100]} tick={TICK} axisLine={false} tickLine={false} width={44} />

@@ -97,6 +97,7 @@ function IkigaiMap() {
               onPress={() => setKept((k) => k.map((v, j) => (j === i ? !v : v)))}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: kept[i] }}
+              aria-checked={kept[i]}
               accessibilityLabel={a}
               style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44, opacity: pressed ? 0.7 : 1 })}
             >

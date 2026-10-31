@@ -174,6 +174,7 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
               accessibilityRole="button"
               accessibilityLabel={`${term.space}, ${term.name} ${v === null ? 'not yet measured' : `${k === 'B' ? 'minus ' : ''}${v}, ${tv?.band}`}`}
               accessibilityState={{ selected: highlight === k }}
+              aria-selected={highlight === k}
               style={{ position: 'absolute', left: cx + Math.cos(a) * rr - hit / 2, top: cx + Math.sin(a) * rr - hit / 2, width: hit, height: hit, borderRadius: hit / 2 }}
             />
           )

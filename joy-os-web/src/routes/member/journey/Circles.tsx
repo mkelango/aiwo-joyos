@@ -2,7 +2,7 @@ import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, CalendarPlus, Captions, Check, CircleDot, Hand, Lock, MapPin, MessageCircle, Mic, MicOff, PhoneOff, ShieldCheck, Video, VideoOff } from 'lucide-react'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { DaybreakButton, Eyebrow, TermDot, fmtDate } from '@/components/joy/primitives'
 import { Avatar, Button, Card, PageHeader, Pill, SectionTitle } from '@/components/ui'
 import { CIRCLE, PRACTICE_WEEKS } from '@/data/platform'
@@ -10,16 +10,15 @@ import { MEMBER, TEAM } from '@/data/member'
 import { termByKey } from '@/data/terms'
 import { CAPTIONS, CIRCLE_NEXT, CIRCLE_SESSIONS, OTHER_CIRCLES, PRACTICE_CONTENT, SALONS } from './_data'
 import { fade, useFocusTrap } from './_parts'
-import { TODAY, holderName, setCalendar, setSalon, useJourney } from './_store'
+import { TODAY, holderName, setCalendar, setCircleRequest, setSalon, useJourney } from './_store'
 
 // JOY CIRCLES (Memo p.21): eight members and a coach, a 30-minute call every
 // Monday for ninety days; video in the app, recordings off by default,
 // coach-moderated, first names only. Couples, family, founders' and alumni
 // circles; Connections salons booked from the circle. One Daybreak: join.
 
-const TONES = ['var(--term-r)', 'var(--term-p)', 'var(--term-f)', 'var(--term-h)', 'var(--term-d)', 'var(--term-b)', 'var(--term-r)', 'var(--term-p)']
-/** Initials on a term-coloured disc: Ink on Marigold, Stone on the rest (fixed, so both themes read). */
-const onTone = (tone: string) => (tone.includes('term-d') ? 'var(--aiwo-ink)' : 'var(--aiwo-stone)')
+/** Initials disc: a neutral Paper ground with Ink-2. The Spectrum is reserved for the six terms, so people are never painted in it. */
+const DISC = { background: 'var(--paper-sunk)', color: 'var(--ink-2)' } as const
 
 const callDate = new Date(`${CIRCLE_NEXT.date}T${CIRCLE_NEXT.time}:00`)
 const weekday = callDate.toLocaleDateString('en-GB', { weekday: 'long' })
@@ -40,10 +39,17 @@ export default function Circles() {
   const [room, setRoom] = useState<RoomMode | null>(null)
   const [left, setLeft] = useState<RoomMode | null>(null)
   const [showFull, setShowFull] = useState(false)
-  const [requested, setRequested] = useState<Record<string, boolean>>({})
   const sessions = [...CIRCLE_SESSIONS].reverse()
+  const { hash } = useLocation()
   const calAdded = !!journey.calendar['circle-next']
   const alumniCal = !!journey.calendar['alumni-feb']
+
+  // Arriving from Events (“Book for two, from your circle”) lands on the salons.
+  useEffect(() => {
+    if (!hash) return
+    const t = window.setTimeout(() => document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' }), 60)
+    return () => window.clearTimeout(t)
+  }, [hash])
 
   // Give focus back to the join button (Safari does not focus buttons on click).
   const leave = (mode: RoomMode) => { setRoom(null); setLeft(mode); window.setTimeout(() => document.querySelector<HTMLButtonElement>('#join-call button')?.focus(), 0) }
@@ -76,9 +82,9 @@ export default function Circles() {
           </div>
 
           <ul className="mt-5 flex flex-wrap gap-2" aria-label="Members of your circle, first names only">
-            {CIRCLE.members.map((m, i) => (
+            {CIRCLE.members.map((m) => (
               <li key={m} className="flex items-center gap-2 rounded-full border border-line py-1 pl-1 pr-3 text-[14px] text-ink">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full font-mono text-[11px]" style={{ background: TONES[i], color: onTone(TONES[i]) }} aria-hidden>{m[0]}</span>
+                <span className="flex h-6 w-6 items-center justify-center rounded-full font-mono text-[11px]" style={DISC} aria-hidden>{m[0]}</span>
                 {m}{m === MEMBER.firstName && <span className="text-ink-3"> (you)</span>}
               </li>
             ))}
@@ -161,7 +167,7 @@ export default function Circles() {
         <SectionTitle><span id="other">Other circles</span></SectionTitle>
         <ul className="grid gap-4 sm:grid-cols-2">
           {OTHER_CIRCLES.map((c) => {
-            const req = requested[c.id]
+            const req = !!journey.circleRequests[c.id]
             return (
               <li key={c.id} className="flex flex-col rounded-card border border-line bg-paper-raised p-5">
                 <div className="flex items-start justify-between gap-3">
@@ -180,10 +186,10 @@ export default function Circles() {
                   ) : req ? (
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1" role="status">
                       <span className="flex items-center gap-1.5 text-[14px] text-ink"><Check size={15} /> {c.status === 'Invited' ? 'Accepted. Kavya will see you said yes.' : 'Requested. The lead will write within two days.'}</span>
-                      <Button variant="link" className="text-[14px]" onClick={() => setRequested((r) => ({ ...r, [c.id]: false }))}>{c.status === 'Invited' ? 'Undo' : 'Withdraw'}</Button>
+                      <Button variant="link" className="text-[14px]" onClick={() => setCircleRequest(c.id, false)}>{c.status === 'Invited' ? 'Undo' : 'Withdraw'}</Button>
                     </div>
                   ) : (
-                    <Button variant="secondary" size="sm" onClick={() => setRequested((r) => ({ ...r, [c.id]: true }))}>{c.status === 'Invited' ? 'Accept invitation' : 'Ask to join'}</Button>
+                    <Button variant="secondary" size="sm" onClick={() => setCircleRequest(c.id, true)}>{c.status === 'Invited' ? 'Accept invitation' : 'Ask to join'}</Button>
                   )}
                 </div>
               </li>
@@ -267,9 +273,9 @@ function CallRoom({ mode, onMode, onLeave }: { mode: RoomMode; onMode: (m: RoomM
   const prompt = PRACTICE_CONTENT.find((p) => p.week === CIRCLE.week)!.circlePrompt
   const others = CIRCLE.members.filter((m) => m !== MEMBER.firstName)
   const present = others.filter((m) => m !== 'Thomas')
-  const you = { name: `${MEMBER.firstName} (you)`, coach: false, tone: TONES[0], you: true }
+  const you = { name: `${MEMBER.firstName} (you)`, coach: false, you: true }
   const tiles = live
-    ? [{ name: coach.name.split(' ')[0], coach: true, tone: coach.tone, you: false }, ...present.map((m) => ({ name: m, coach: false, tone: TONES[CIRCLE.members.indexOf(m)], you: false })), you]
+    ? [{ name: coach.name.split(' ')[0], coach: true, you: false }, ...present.map((m) => ({ name: m, coach: false, you: false })), you]
     : [you]
 
   useFocusTrap(rootRef, leaveRef)
@@ -327,9 +333,9 @@ function CallRoom({ mode, onMode, onLeave }: { mode: RoomMode; onMode: (m: RoomM
           const talking = live && i === speaker && !t.you
           const off = t.you ? !cam : t.name === 'Deepa'
           return (
-            <div key={t.name} className={clsx('relative flex items-center justify-center overflow-hidden rounded-card transition-shadow', live ? 'min-h-[110px]' : 'aspect-video w-full max-w-2xl', talking && 'ring-2 ring-[color:var(--daybreak)]')} style={{ background: `color-mix(in srgb, ${t.tone} 28%, var(--room-bg))` }}>
-              {!off && <div aria-hidden className="absolute inset-0 opacity-40" style={{ background: `radial-gradient(circle at 50% 35%, ${t.tone}, transparent 70%)` }} />}
-              <span className={clsx('relative flex items-center justify-center rounded-full font-mono', live ? 'h-14 w-14 text-[18px] md:h-16 md:w-16' : 'h-24 w-24 text-[28px]')} style={{ background: t.tone, color: onTone(t.tone) }} aria-hidden>{t.name[0]}</span>
+            <div key={t.name} className={clsx('relative flex items-center justify-center overflow-hidden rounded-card transition-shadow', live ? 'min-h-[110px]' : 'aspect-video w-full max-w-2xl', talking && 'ring-2 ring-[color:var(--daybreak)]')} style={{ background: 'color-mix(in srgb, var(--room-fg) 12%, var(--room-bg))' }}>
+              {!off && <div aria-hidden className="absolute inset-0 opacity-40" style={{ background: 'radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--room-fg) 30%, transparent), transparent 70%)' }} />}
+              <span className={clsx('relative flex items-center justify-center rounded-full font-mono', live ? 'h-14 w-14 text-[18px] md:h-16 md:w-16' : 'h-24 w-24 text-[28px]')} style={DISC} aria-hidden>{t.name[0]}</span>
               <span className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-full bg-[color:color-mix(in_srgb,var(--room-bg)_70%,transparent)] px-2 py-0.5 text-[12px]">
                 {t.you && !mic ? <MicOff size={11} /> : <Mic size={11} />} {t.name}{t.coach && ' · coach'}
               </span>

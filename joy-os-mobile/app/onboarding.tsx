@@ -491,7 +491,11 @@ export default function Onboarding() {
         <Title size={24}>
           Your plan is <Serif>saved</Serif>.
         </Title>
-        <KeyValue k="Tomorrow">{`One reminder at ${quiet.to}, after your quiet hours, to take the baseline Index.`}</KeyValue>
+        <KeyValue k="Tomorrow">
+          {perDay > 0 && (channels.app || channels.whatsapp || channels.email)
+            ? `One reminder at ${quiet.to}, after your quiet hours, to take the baseline Index.`
+            : 'No reminder, as you chose. The baseline Index waits on Today whenever you open Joy OS.'}
+        </KeyValue>
         <KeyValue k="Focus until then">{intents.length ? intents.map((k) => termByKey(k).space).join(' and ') : 'All six terms'}</KeyValue>
         <KeyValue k="Reminders" last>
           <Mono tone="ink" size={17}>{`${perDay} a day · quiet ${quiet.from} – ${quiet.to}`}</Mono>

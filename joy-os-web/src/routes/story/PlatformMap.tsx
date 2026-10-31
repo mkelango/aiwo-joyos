@@ -8,7 +8,7 @@ import { Card, PageHeader, Pill, Tabs } from '@/components/ui'
 import { TERMS, termColor } from '@/data/terms'
 import type { TermKey } from '@/domain/types'
 import { ARCH_LAYERS, MODULES, OUTCOMES, SURFACES, TWO_APPS, type Module, type OutcomeKey } from './_data'
-import { LinkButton, StorySection, TermLabel } from './_parts'
+import { LinkButton, StorySection, TermLabel, useEnterAs } from './_parts'
 
 // PLATFORM MAP (Plan §4D; Memo p.8, p.16, p.28, p.6): fourteen modules, each answerable
 // to a term; the surfaces that carry them; the outcomes they move; the architecture
@@ -70,6 +70,7 @@ function ConnectionMap({ sel, onSelect }: { sel: string; onSelect: (n: string) =
   const [box, setBox] = useState({ w: 0, h: 0 })
   const [hovered, setHovered] = useState<TermKey | null>(null)
   const [pinned, setPinned] = useState<TermKey | null>(null)
+  const enterAs = useEnterAs()
   const hoverTerm = hovered ?? pinned
   const mod = MODULES.find((m) => m.n === sel)!
 
@@ -163,6 +164,7 @@ function ConnectionMap({ sel, onSelect }: { sel: string; onSelect: (n: string) =
                 <li key={s.key} ref={reg(`s-${s.key}`)}>
                   <Link
                     to={s.to}
+                    onClick={() => enterAs(s.to)}
                     title={`Open ${s.name}`}
                     className={clsx('group block rounded-lg border px-3 py-2 transition-all duration-200 hover:border-ink hover:opacity-100 focus-ring', on ? 'border-ink bg-paper-raised' : 'border-line opacity-55')}
                   >
@@ -288,6 +290,7 @@ function MobileModulePicker({ sel, onSelect }: { sel: string; onSelect: (n: stri
 
 // ─── The module's detail card ────────────────────────────────────────────────
 function ModuleDetail({ mod }: { mod: Module }) {
+  const enterAs = useEnterAs()
   const allSix = mod.terms.length === 6
   return (
     <div id="module-detail" className="scroll-mt-24" aria-live="polite">
@@ -324,7 +327,7 @@ function ModuleDetail({ mod }: { mod: Module }) {
                 <dd className="mt-2 flex flex-wrap gap-1.5">
                   {mod.surfaces.map((s) => {
                     const sf = SURFACES.find((x) => x.key === s)!
-                    return <Link key={s} to={sf.to} className="rounded-full bg-paper-sunk px-2.5 py-1 text-[13px] text-ink hover:bg-line focus-ring">{sf.name}</Link>
+                    return <Link key={s} to={sf.to} onClick={() => enterAs(sf.to)} className="rounded-full bg-paper-sunk px-2.5 py-1 text-[13px] text-ink hover:bg-line focus-ring">{sf.name}</Link>
                   })}
                 </dd>
               </div>
@@ -387,7 +390,7 @@ function ModuleDetail({ mod }: { mod: Module }) {
               </div>
               <div className="flex flex-wrap gap-x-5 gap-y-2">
                 {mod.routes.map((r) => (
-                  <Link key={r.to} to={r.to} className="inline-flex items-center gap-1.5 text-[15px] text-ink underline-offset-4 hover:underline focus-ring">
+                  <Link key={r.to} to={r.to} onClick={() => enterAs(r.to)} className="inline-flex items-center gap-1.5 text-[15px] text-ink underline-offset-4 hover:underline focus-ring">
                     See {r.label} <ArrowUpRight size={15} />
                   </Link>
                 ))}

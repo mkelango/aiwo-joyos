@@ -28,6 +28,7 @@ import { termByKey } from '@/shared/terms'
 import { useTheme } from '@/theme/ThemeProvider'
 import { CATION_DETAIL, buildItinerary, type ItemKind } from '@/screens/b/journeyData'
 import { CheckLine, ChoiceCard, Field, IconButton, KeyValue, PrimaryChip, useCrisisGuard } from '@/screens/b/parts'
+import { useCationRequests } from '@/screens/a/local'
 
 // ’CATION DETAIL (Memo p.20): the template as configuration — primary term, Day-90 measure,
 // itinerary day by day, before and after, a named clinician present, and the request.
@@ -60,7 +61,9 @@ export default function CationDetail() {
   const [outcome, setOutcome] = useState('')
   const [dietary, setDietary] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [sent, setSent] = useState<string | null>(null)
+  // A request made here is kept on the phone, so it is still shown after leaving and coming back.
+  const { requests, setRequest } = useCationRequests()
+  const request = requests[slug]
 
   if (!cation || !d) {
     return (
@@ -88,7 +91,8 @@ export default function CationDetail() {
     if (!guard(`${outcome} ${dietary}`)) return
     if (outcome.trim().length < 12) errs.outcome = 'In a sentence, what would you like to be different? It is how we measure the ’cation.'
     setErrors(errs)
-    if (Object.keys(errs).length === 0) setSent(`REQ-${slug.slice(0, 3).toUpperCase()}-${MEMBER.id.slice(-4)}-${String(Date.now()).slice(-4)}`)
+    if (Object.keys(errs).length === 0)
+      setRequest(slug, { ref: `REQ-${slug.slice(0, 3).toUpperCase()}-${MEMBER.id.slice(-4)}-${String(Date.now()).slice(-4)}`, win, venue, guests, outcome: outcome.trim(), interestOnly })
   }
 
   return (
@@ -173,6 +177,7 @@ export default function CationDetail() {
                 accessibilityRole="tab"
                 accessibilityLabel={`Day ${x.day}, ${x.title}`}
                 accessibilityState={{ selected: on }}
+                aria-selected={on}
                 style={{ minHeight: 44, minWidth: 64, paddingHorizontal: 14, borderRadius: radius.pill, borderWidth: 1, borderColor: on ? col.ink : col.line, backgroundColor: on ? col.ink : col.paperRaised, alignItems: 'center', justifyContent: 'center' }}
               >
                 <Mono color={on ? col.paper : col.ink}>{`Day ${x.day}`}</Mono>
@@ -253,7 +258,7 @@ export default function CationDetail() {
       </Card>
 
       {/* Request */}
-      {sent ? (
+      {request ? (
         <Card tone="soft" style={{ gap: space.s2 }}>
           <View accessibilityLiveRegion="polite" style={{ gap: space.s1 }}>
             <Title size={26}>
@@ -275,12 +280,12 @@ export default function CationDetail() {
           </View>
           <View>
             <KeyValue k="Reference">
-              <Mono tone="ink">{sent}</Mono>
+              <Mono tone="ink">{request.ref}</Mono>
             </KeyValue>
-            {!interestOnly ? <KeyValue k="Dates">{win}</KeyValue> : null}
-            <KeyValue k="Venue">{venue}</KeyValue>
+            {!interestOnly ? <KeyValue k="Dates">{request.win}</KeyValue> : null}
+            <KeyValue k="Venue">{request.venue}</KeyValue>
             <KeyValue k="Guests" last>
-              <Mono tone="ink">{String(guests)}</Mono>
+              <Mono tone="ink">{String(request.guests)}</Mono>
             </KeyValue>
           </View>
           <Eyebrow>What happens next</Eyebrow>
@@ -300,14 +305,24 @@ export default function CationDetail() {
               Your Joy Passport
             </ArrowLink>
           </View>
-          <Button variant="link" onPress={() => setSent(null)}>
+          <Button
+            variant="link"
+            onPress={() => {
+              // Back to the form with what was sent, so only the change needs typing.
+              setWin(request.win)
+              setVenue(request.venue)
+              setGuests(request.guests)
+              setOutcome(request.outcome)
+              setRequest(slug, null)
+            }}
+          >
             Change the request
           </Button>
         </Card>
       ) : (
         <Card tone="raised" style={{ gap: space.s3 }}>
           <View style={{ gap: 4 }}>
-            <Title size={24} accessibilityRole="header">
+            <Title size={24} accessibilityRole="header" aria-level={2}>
               {interestOnly ? 'Register interest' : 'Request this ’cation'}
             </Title>
             <Meta>

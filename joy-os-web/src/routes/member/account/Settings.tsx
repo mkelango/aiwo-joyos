@@ -1,8 +1,8 @@
 import clsx from 'clsx'
-import { ArrowRight, Bell, BellOff, BookOpen, Compass, Fingerprint, HeartHandshake, Home, LogOut, Mail, MessageCircle, Moon, Plane, Smartphone, Sun, UserRound, WifiOff } from 'lucide-react'
+import { ArrowRight, Bell, BellOff, BookOpen, Compass, Fingerprint, HeartHandshake, Home, KeyRound, LogOut, Mail, MessageCircle, Moon, Plane, Smartphone, Sun, Trash2, UserRound, WifiOff } from 'lucide-react'
 import { MotionConfig } from 'framer-motion'
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { DaybreakButton } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill, Sheet } from '@/components/ui'
 import { MEMBER } from '@/data/member'
@@ -46,7 +46,16 @@ export default function Settings() {
   useEffect(() => { applyReducedMotion(prefs.reduceMotion) }, [prefs.reduceMotion])
   const [signOut, setSignOut] = useState(false)
   const [passkey, setPasskey] = useState(false)
-  const [passkeys, setPasskeys] = useState(['iPhone 15', 'MacBook Air'])
+  const [pk, setPk] = usePersisted<{ names: string[] }>('passkeys', { names: ['iPhone 15', 'MacBook Air'] })
+  const passkeys = pk.names
+  const [removeKey, setRemoveKey] = useState<string | null>(null)
+  const { hash } = useLocation()
+  // Arriving from the notification centre with #notifications (or any section): scroll once rendered.
+  useEffect(() => {
+    if (!hash) return
+    const t = window.setTimeout(() => document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
+    return () => window.clearTimeout(t)
+  }, [hash])
   const LOCK_LABEL: Record<string, string> = { '0': 'Immediately', '1': '1 minute away', '5': '5 minutes away', '15': '15 minutes away' }
 
   return (
@@ -195,12 +204,23 @@ export default function Settings() {
               <p className="rounded-card bg-paper-sunk px-4 py-3 text-[14px] text-ink-2" aria-live="polite">
                 {prefs.biometric ? <>Face ID or fingerprint · locks {prefs.lockAfter === '0' ? 'immediately' : <>after <span className="num">{prefs.lockAfter}</span> {prefs.lockAfter === '1' ? 'minute' : 'minutes'} away</>}</> : 'No biometric lock · passkey at sign-in only'} · sessions last <span className="num">15</span> minutes, with rotation.
               </p>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5">
-                <div>
-                  <p className="text-[16px] text-ink">Passkeys</p>
-                  <p className="text-[14px] text-ink-2">{passkeys.join(' · ')} — no passwords to remember or leak.</p>
+              <div className="border-t border-line pt-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[16px] text-ink">Passkeys</p>
+                    <p className="text-[14px] text-ink-2">No passwords to remember or leak. Keep at least one.</p>
+                  </div>
+                  <Button size="sm" variant="secondary" onClick={() => setPasskey(true)}>Add a passkey</Button>
                 </div>
-                <Button size="sm" variant="secondary" onClick={() => setPasskey(true)}>Add a passkey</Button>
+                <ul className="mt-3 divide-y divide-line rounded-card border border-line">
+                  {passkeys.map((k) => (
+                    <li key={k} className="flex items-center gap-3 px-4 py-3">
+                      <KeyRound size={16} className="shrink-0 text-ink-3" />
+                      <span className="min-w-0 flex-1 truncate text-[15px] text-ink">{k}</span>
+                      <Button size="sm" variant="ghost" disabled={passkeys.length < 2} title={passkeys.length < 2 ? 'Your last passkey can’t be removed' : undefined} onClick={() => setRemoveKey(k)} aria-label={`Remove passkey ${k}`}><Trash2 size={15} /> <span className="hidden sm:inline">Remove</span></Button>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </Card>
           </Section>
@@ -246,7 +266,7 @@ export default function Settings() {
 
       {/* Save bar — the one Daybreak */}
       <div className={clsx('fixed inset-x-0 bottom-[68px] z-20 border-t border-line bg-paper px-4 py-3 backdrop-blur transition-transform duration-200 lg:bottom-0 lg:left-[264px]', dirty ? 'translate-y-0' : 'pointer-events-none translate-y-[200%]')} aria-hidden={!dirty}>
-        <div className="mx-auto flex max-w-[1120px] items-center justify-between gap-4 md:px-4 lg:pr-28">
+        <div className="mx-auto flex max-w-[1120px] flex-col items-start gap-2 pr-24 sm:flex-row sm:items-center sm:justify-between sm:gap-4 md:px-4 lg:pr-28">
           <p className="text-[14px] text-ink-2">{overBudget ? 'Over three a day — adjust before saving.' : n.quietFrom === n.quietTo ? 'Quiet hours need two different times.' : 'Notification changes not saved yet.'}</p>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={() => setN(saved)} tabIndex={dirty ? 0 : -1}>Discard</Button>
@@ -259,8 +279,16 @@ export default function Settings() {
         <PasskeyForm
           existing={passkeys}
           onCancel={() => setPasskey(false)}
-          onAdded={(name) => { setPasskeys((p) => [...p, name]); setPasskey(false); showToast(`Passkey added for ${name}.`) }}
+          onAdded={(name) => { setPk((p) => ({ names: [...p.names, name] })); setPasskey(false); showToast(`Passkey added for ${name}.`) }}
         />
+      </Sheet>
+
+      <Sheet open={!!removeKey} onClose={() => setRemoveKey(null)} title={`Remove the passkey on ${removeKey ?? ''}?`} side="center">
+        <p className="text-[17px] text-ink-2">That device will no longer sign you in. Your other passkeys keep working, and you can add this one again at any time.</p>
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setRemoveKey(null)}>Keep it</Button>
+          <Button variant="ink" onClick={() => { const k = removeKey!; setPk((p) => ({ names: p.names.filter((x) => x !== k) })); setRemoveKey(null); showToast(`Passkey on ${k} removed.`) }}><Trash2 size={15} /> Remove</Button>
+        </div>
       </Sheet>
 
       <Sheet open={signOut} onClose={() => setSignOut(false)} title="Sign out of Joy OS?" side="center">

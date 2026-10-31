@@ -12,7 +12,7 @@ import type { TermKey } from '@/domain/types'
 import { bandFor } from '@/domain/indexEngine'
 import { COUPLES_CHECK, GRANTS, HOUSEHOLD_MINOR, KAVYA_SHARED, type Grant, type GrantScope } from './_data'
 import { Checkbox, Field, Section, Segmented, Toggle } from './_parts'
-import { inputCls, useToast } from './_util'
+import { inputCls, usePersisted, useToast } from './_util'
 
 // HOUSEHOLD (Memo p.19 "made for two, welcoming to one"): partners, elder mode
 // with a family helper by the elder's consent, minors never scored, a share-grant
@@ -20,14 +20,19 @@ import { inputCls, useToast } from './_util'
 // both share. Couples Check shows agree / differ, never who said what.
 export default function Household() {
   const [toast, showToast] = useToast()
-  const [grants, setGrants] = useState<Grant[]>(GRANTS)
+  // Shares, invitations and elder-mode choices are kept per viewer, so they survive leaving the page.
+  const [hh, setHh] = usePersisted<{ grants: Grant[]; invites: Invite[]; elder: { large: boolean; voice: boolean } }>('household', { grants: GRANTS, invites: [], elder: { large: true, voice: true } })
+  const grants = hh.grants
+  const invites = hh.invites
+  const elder = hh.elder
+  const setGrants = (fn: (g: Grant[]) => Grant[]) => setHh((h) => ({ ...h, grants: fn(h.grants) }))
+  const setInvites = (fn: (i: Invite[]) => Invite[]) => setHh((h) => ({ ...h, invites: fn(h.invites) }))
+  const setElder = (fn: (e: { large: boolean; voice: boolean }) => { large: boolean; voice: boolean }) => setHh((h) => ({ ...h, elder: fn(h.elder) }))
   const [shareOpen, setShareOpen] = useState(false)
   const [revoke, setRevoke] = useState<Grant | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
-  const [invites, setInvites] = useState<Invite[]>([])
   const [cancelInvite, setCancelInvite] = useState<Invite | null>(null)
   const [elderOpen, setElderOpen] = useState(false)
-  const [elder, setElder] = useState({ large: true, voice: true })
   const me = INDEX_HISTORY[0]
   const kavyaIndex = CASELOAD.find((c) => c.name === 'Kavya Rao')!.index
   const [arjun, kavya, lakshmi] = HOUSEHOLD

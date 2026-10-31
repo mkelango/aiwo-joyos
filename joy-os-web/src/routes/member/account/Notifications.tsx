@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { DaybreakButton, SpecimenTag } from '@/components/joy/primitives'
 import { Avatar, Button, Card, EmptyState, PageHeader, Pill, Tabs } from '@/components/ui'
-import { MEMBER, TEAM } from '@/data/member'
+import { TEAM } from '@/data/member'
 import { DEFAULT_NOTIF_PREFS, LEDGER_TIMES, NOTIFICATIONS, NOTIF_TYPES, pushesPerDay, type Notif, type NotifKind, type NotifPrefs } from './_data'
 import { Field, LinkButton, Section, Select, Toggle } from './_parts'
 import { usePersisted, useToast } from './_util'
@@ -78,7 +78,7 @@ export default function Notifications() {
       <PageHeader
         eyebrow="Notifications"
         title={<>Few, kind, and never at <em className="font-serif">night</em></>}
-        lead={<>At most three a day, never in quiet hours (<span className="num">{MEMBER.quietHours}</span>). A fall in your Index is never pushed.</>}
+        lead={<>At most three a day, never in quiet hours (<span className="num">{prefs.quietFrom} – {prefs.quietTo}</span>). A fall in your Index is never pushed.</>}
         actions={unread.length > 0
           ? <DaybreakButton onClick={markAll}><CheckCheck size={18} /> Mark all read</DaybreakButton>
           : <Button variant="ghost" disabled><Check size={16} /> All read</Button>}

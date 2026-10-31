@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { LedgerEntry, Role } from '@/domain/types'
 import { LEDGER } from '@/data/member'
 
@@ -8,6 +8,7 @@ import { LEDGER } from '@/data/member'
 export type Theme = 'light' | 'dark'
 export type TextSize = 'default' | 'large' | 'xlarge'
 export type Lang = 'en' | 'ta' | 'hi'
+export type CrisisReason = false | 'intercept' | 'manual'
 
 interface AppState {
   theme: Theme
@@ -24,8 +25,10 @@ interface AppState {
   addLedger: (e: Omit<LedgerEntry, 'id' | 'at'>) => void
   offline: boolean
   setOffline: (v: boolean) => void
-  crisisOpen: boolean
-  setCrisisOpen: (v: boolean) => void
+  /** Why the crisis sheet is open: an intercept caught free text, or the member asked for a person. */
+  crisisOpen: CrisisReason
+  /** true means an intercept; pass 'manual' from a plain "Talk to someone" button. */
+  setCrisisOpen: (v: boolean | CrisisReason) => void
 }
 
 const Ctx = createContext<AppState | null>(null)
@@ -57,7 +60,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [actionDone, setActionDone] = usePersisted('actionDone', false)
   const [ledger, setLedger] = usePersisted<LedgerEntry[]>('ledger', LEDGER)
   const [offline, setOffline] = useState(false)
-  const [crisisOpen, setCrisisOpen] = useState(false)
+  const [crisisOpen, setCrisisReason] = useState<CrisisReason>(false)
+  const setCrisisOpen = useCallback((v: boolean | CrisisReason) => setCrisisReason(v === true ? 'intercept' : v), [])
 
   useEffect(() => {
     const el = document.documentElement
@@ -75,7 +79,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addLedger: (e) => setLedger((l) => [{ ...e, id: `l${Date.now()}`, at: new Date().toISOString() }, ...l]),
       offline, setOffline, crisisOpen, setCrisisOpen,
     }),
-    [theme, setTheme, textSize, setTextSize, lang, setLang, role, setRole, actionDone, setActionDone, ledger, setLedger, offline, crisisOpen],
+    [theme, setTheme, textSize, setTextSize, lang, setLang, role, setRole, actionDone, setActionDone, ledger, setLedger, offline, crisisOpen, setCrisisOpen],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

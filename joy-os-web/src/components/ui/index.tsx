@@ -67,11 +67,12 @@ export function Pill({ children, className, tone = 'neutral' }: { children: Reac
   return <span className={clsx('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium', t[tone], className)}>{children}</span>
 }
 
+/** Initials on a neutral Paper ground: the Spectrum is reserved for the six terms, so a person's tone is not painted. */
 export function Avatar({ person, size = 40 }: { person: Pick<Person, 'initials' | 'tone' | 'name'>; size?: number }) {
   return (
     <span
-      className="inline-flex shrink-0 items-center justify-center rounded-full font-mono text-[12px] font-medium text-paper"
-      style={{ width: size, height: size, background: person.tone }}
+      className="inline-flex shrink-0 items-center justify-center rounded-full border border-line bg-paper-sunk font-mono text-[12px] font-medium text-ink-2"
+      style={{ width: size, height: size }}
       aria-hidden
       title={person.name}
     >
@@ -123,13 +124,15 @@ export function Toggle({ checked, onChange, label, description }: { checked: boo
   return (
     <div className="flex items-start justify-between gap-4">
       <div>
-        <label htmlFor={id} className="text-[16px] text-ink">{label}</label>
+        <label id={`${id}-l`} htmlFor={id} className="text-[16px] text-ink">{label}</label>
         {description && <p className="mt-0.5 text-[14px] text-ink-2">{description}</p>}
       </div>
       <button
         id={id}
+        type="button"
         role="switch"
         aria-checked={checked}
+        aria-labelledby={`${id}-l`}
         onClick={() => onChange(!checked)}
         className={clsx('relative mt-0.5 h-7 w-12 shrink-0 rounded-full transition-colors focus-ring', checked ? 'bg-ink' : 'bg-line-strong')}
       >
@@ -141,11 +144,26 @@ export function Toggle({ checked, onChange, label, description }: { checked: boo
 
 export function Tabs<T extends string>({ value, onChange, items, className }: { value: T; onChange: (v: T) => void; items: { value: T; label: ReactNode }[]; className?: string }) {
   return (
-    <div role="tablist" className={clsx('inline-flex gap-1 rounded-full bg-paper-sunk p-1', className)}>
+    <div
+      role="tablist"
+      // Arrow keys move between tabs, as ARIA tabs should; Home and End jump to the ends.
+      onKeyDown={(e) => {
+        const n = items.length
+        const i = items.findIndex((it) => it.value === value)
+        const to = e.key === 'ArrowRight' ? (i + 1) % n : e.key === 'ArrowLeft' ? (i - 1 + n) % n : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -1
+        if (to < 0 || n === 0) return
+        e.preventDefault()
+        onChange(items[to].value)
+        ;(e.currentTarget.children[to] as HTMLElement | undefined)?.focus()
+      }}
+      className={clsx('inline-flex gap-1 rounded-full bg-paper-sunk p-1', className)}
+    >
       {items.map((it) => (
         <button
           key={it.value}
+          type="button"
           role="tab"
+          tabIndex={value === it.value ? 0 : -1}
           aria-selected={value === it.value}
           onClick={() => onChange(it.value)}
           className={clsx('rounded-full px-4 py-1.5 text-[14px] transition-colors focus-ring', value === it.value ? 'bg-paper-raised text-ink shadow-card' : 'text-ink-2 hover:text-ink')}

@@ -30,6 +30,7 @@ import { CIRCLE, PRACTICE_WEEKS } from '@/shared/platform'
 import { termByKey } from '@/shared/terms'
 import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
+import { memberOnly } from '@/screens/b/parts'
 
 // VIVA COMPANION (Memo p.27; Plan §4B). Typed tools, scripted replies (no live model in
 // this front end), provenance on every draft. Guardrails in order of precedence:
@@ -76,7 +77,9 @@ const SPACE_ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 let seq = 0
 const mid = () => `m${Date.now()}-${seq++}`
 
-export default function Viva() {
+export default memberOnly(Viva)
+
+function Viva() {
   const { c, space } = useTheme()
   const insets = useSafeAreaInsets()
   const { setCrisisOpen } = useApp()

@@ -11,7 +11,7 @@ import { HOUSEHOLD, INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
 import { termByKey } from '@/data/terms'
 import { FLAGSHIP_NEXT, FLAGSHIP_RECAP, PASSES, SALONS, SESSIONS_ALLOWANCE, SESSIONS_OPEN, SESSION_SCHEDULE, ZONES } from './_data'
 import { QRCode, SheetFocus, fade } from './_parts'
-import { addPass, cancelPass, holderName, passCode, setFlagshipRequest, setSalon, useJourney } from './_store'
+import { addPass, cancelPass, holderName, passCode, setFlagshipRequest, setSalon, setSchedule, useJourney } from './_store'
 
 // EVENTS (Memo p.21): the Joyspan Event Platform — AIWO Joyspan at New Year,
 // Joyspan Sessions, Connections salons, passes, personal schedules and
@@ -29,7 +29,7 @@ export default function Events() {
   const [passTab, setPassTab] = useState<'upcoming' | 'past'>('upcoming')
   const [openPass, setOpenPass] = useState<string | null>(null)
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null)
-  const [mine, setMine] = useState<Record<number, boolean>>(() => Object.fromEntries(SESSION_SCHEDULE.map((s, i) => [i, s.mine])))
+  const mine: Record<number, boolean> = journey.schedule ?? Object.fromEntries(SESSION_SCHEDULE.map((s, i) => [i, s.mine]))
   const [swapNote, setSwapNote] = useState('')
   const [view, setView] = useState<'mine' | 'all'>('mine')
   const flagship = EVENTS.find((e) => e.kind === 'Flagship')!
@@ -57,10 +57,10 @@ export default function Events() {
 
   const toggleSession = (i: number) => {
     const s = SESSION_SCHEDULE[i]
-    if (mine[i]) { setMine((m) => ({ ...m, [i]: false })); setSwapNote(''); return }
+    if (mine[i]) { setSchedule({ ...mine, [i]: false }); setSwapNote(`${s.title} is off your schedule.`); return }
     const clash = SESSION_SCHEDULE.findIndex((o, j) => j !== i && o.time === s.time && mine[j])
-    setMine((m) => ({ ...m, [i]: true, ...(clash >= 0 ? { [clash]: false } : {}) }))
-    setSwapNote(clash >= 0 ? `${s.title} replaces ${SESSION_SCHEDULE[clash].title} at ${s.time}; they run at the same time.` : '')
+    setSchedule({ ...mine, [i]: true, ...(clash >= 0 ? { [clash]: false } : {}) })
+    setSwapNote(clash >= 0 ? `${s.title} replaces ${SESSION_SCHEDULE[clash].title} at ${s.time}; they run at the same time.` : `${s.title} is on your schedule.`)
   }
 
   return (
@@ -337,7 +337,7 @@ function UpcomingAtAiwo() {
               )
             })}
           </ul>
-          <Link to="/app/circles" className="mt-auto inline-flex items-center gap-1.5 pt-4 text-[14px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring">Book for two, from your circle <ArrowRight size={14} /></Link>
+          <Link to="/app/circles#salons" className="mt-auto inline-flex items-center gap-1.5 pt-4 text-[14px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring">Book for two, from your circle <ArrowRight size={14} /></Link>
         </Card>
       </div>
     </section>

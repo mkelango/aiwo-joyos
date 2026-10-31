@@ -7,17 +7,18 @@ import { Bar, BarChart, LabelList, ResponsiveContainer, XAxis, YAxis } from 'rec
 import { DaybreakButton, Eyebrow, MethodLine, SpecimenTag, TermDot } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill, SectionTitle } from '@/components/ui'
 import { CIRCLE, PRACTICE_WEEKS } from '@/data/platform'
-import { INDEX_HISTORY } from '@/data/member'
+import { INDEX_HISTORY, TEAM } from '@/data/member'
 import { termByKey } from '@/data/terms'
 import { PRACTICE_CONTENT, PRACTICE_PULSE } from './_data'
 import { AudioPlayer, PrimaryChip, Quote, fade } from './_parts'
-import { practisedToday, togglePractisedToday, useJourney } from './_store'
+import { practisedToday, togglePractisedToday, useJourney, weekPractised } from './_store'
 
 // THE JOYSPIRATION PRACTICE (Memo p.21): eight weeks; five-minute audio in the
 // Mentor's voice, a science note from the faculty, one practice daily, weekly
 // and yearly, the weekly circle, and the Index before and after. One Daybreak.
 
 const CURRENT = CIRCLE.week
+const COACH_FIRST = TEAM.find((p) => p.role === 'Coach')!.name.split(' ')[0]
 
 export default function Practice() {
   const week = PRACTICE_WEEKS.find((w) => w.week === CURRENT)!
@@ -48,6 +49,7 @@ export default function Practice() {
         <ol className="flex min-w-max gap-2 xl:grid xl:min-w-0 xl:grid-cols-8">
           {PRACTICE_WEEKS.map((w) => {
             const st = w.week < CURRENT ? 'done' : w.week === CURRENT ? 'now' : 'next'
+            const kept = st === 'done' && weekPractised(journey, w.week)
             return (
               <li key={w.week}>
                 <Link
@@ -59,7 +61,7 @@ export default function Practice() {
                 >
                   <span className="flex items-center justify-between">
                     <span className="eyebrow text-ink-3">W<span className="num">{w.week}</span></span>
-                    {st === 'done' ? <Check size={14} className="text-ink-2" aria-label="Practised" /> : w.term === 'ALL' ? <span className="eyebrow text-ink-3">All</span> : <TermDot term={w.term} />}
+                    {kept ? <Check size={14} className="text-ink-2" aria-label="Practised" /> : w.term === 'ALL' ? <span className="eyebrow text-ink-3">All</span> : <TermDot term={w.term} />}
                   </span>
                   <span className={clsx('mt-2 line-clamp-2 text-[14px] leading-snug', st === 'next' ? 'text-ink-2' : 'text-ink')}>{w.title}</span>
                 </Link>
@@ -145,7 +147,7 @@ export default function Practice() {
               <Eyebrow>Weekly circle · {CIRCLE.when}</Eyebrow>
               <Users size={16} className="text-ink-3" aria-hidden />
             </div>
-            <p className="mt-3 text-[15px] text-ink-2">This week’s prompt, from Priya</p>
+            <p className="mt-3 text-[15px] text-ink-2">This week’s prompt, from {COACH_FIRST}</p>
             <p className="mt-1 text-[1.15rem] leading-snug text-ink">“{content.circlePrompt}”</p>
             <Link to="/app/circles" className="mt-4 inline-flex items-center gap-1.5 text-[15px] text-ink underline-offset-4 hover:underline focus-ring"><Calendar size={15} /> Your circle of eight <ArrowRight size={15} /></Link>
           </Card>

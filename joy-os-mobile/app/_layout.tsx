@@ -73,6 +73,7 @@ function RootNavigator() {
         <Stack.Screen name="check" options={{ presentation: 'fullScreenModal' }} />
         <Stack.Screen name="onboarding" options={{ presentation: 'fullScreenModal' }} />
         <Stack.Screen name="welcome" options={{ presentation: 'fullScreenModal' }} />
+        <Stack.Screen name="+not-found" />
       </Stack>
       <CrisisSheet />
     </NavThemeProvider>

@@ -10,6 +10,7 @@ import { DAY90_SPECIMEN, INDEX_HISTORY, TEAM } from '@/shared/member'
 import { termByKey } from '@/shared/terms'
 import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
+import { memberOnly } from '@/screens/b/parts'
 
 // DAY 90 (Memo p.18 screen 04; Playbook p39): the re-measure where the number went down.
 // Warm Ink ground in both schemes. A fall is a sentence and a named person, never red,
@@ -23,7 +24,9 @@ const SLOTS = [
 ] as const
 type Slot = (typeof SLOTS)[number]['value']
 
-export default function Day90() {
+export default memberOnly(Day90)
+
+function Day90() {
   const { space, radius } = useTheme()
   const meera = TEAM.find((p) => p.id === 'p_meera')!
   const { setCrisisOpen } = useApp()
@@ -167,6 +170,7 @@ export default function Day90() {
                 onPress={() => setOpen(isOpen ? null : k)}
                 accessibilityRole="button"
                 accessibilityState={{ expanded: isOpen }}
+                aria-expanded={isOpen}
                 accessibilityLabel={`${t.space}, ${t.name}: ${k === 'B' ? 'minus ' : ''}${then.value} to ${k === 'B' ? 'minus ' : ''}${now.value}, ${word}${d ? ` ${Math.abs(d)}` : ''}.`}
                 style={({ pressed }) => ({ borderBottomWidth: 1, borderBottomColor: INK.line, paddingVertical: 14, gap: 6, opacity: pressed ? 0.75 : 1 })}
               >

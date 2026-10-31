@@ -219,7 +219,7 @@ function PromptCard({ prompt, time, next, live }: { prompt: 1 | 2 | 3; time?: st
             </fieldset>
 
             {!showExtra ? (
-              <button onClick={() => setShowExtra(true)} className="mt-5 inline-flex items-center gap-1.5 self-start text-[15px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring">
+              <button onClick={() => setShowExtra(true)} className="mt-5 inline-flex min-h-[24px] items-center gap-1.5 self-start py-1 text-[15px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring">
                 <Plus size={15} /> Add a word or a photo (optional)
               </button>
             ) : (
@@ -347,7 +347,7 @@ function ScheduleCard({ rows, setRows }: { rows: ScheduleRow[]; setRows: (next: 
       <div className="mt-4 flex min-h-[1.5rem] flex-wrap items-center justify-between gap-2">
         <p role="status" className="text-[13px] text-ink-2">{status}</p>
         {changed && (
-          <Button variant="link" className="text-[13px]" onClick={() => { setRows(DEFAULT_SCHEDULE); setStatus('Saved · back to the usual three prompts') }}>
+          <Button variant="link" className="min-h-[24px] text-[13px]" onClick={() => { setRows(DEFAULT_SCHEDULE); setStatus('Saved · back to the usual three prompts') }}>
             Restore the usual times
           </Button>
         )}
@@ -376,7 +376,7 @@ function WeekCard({ ledger, removed }: { ledger: LedgerEntry[]; removed: string[
       {week.length > 0 ? (
         <div className="mt-4" style={{ height: Math.max(120, week.length * 32) }} aria-hidden>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={week} layout="vertical" margin={{ top: 0, right: 32, bottom: 0, left: 0 }} barCategoryGap={6}>
+            <BarChart accessibilityLayer={false} data={week} layout="vertical" margin={{ top: 0, right: 32, bottom: 0, left: 0 }} barCategoryGap={6}>
               <XAxis type="number" hide domain={[0, 'dataMax']} />
               <YAxis type="category" dataKey="tag" tick={{ ...TICK, fontSize: 12, fill: 'var(--ink-2)' }} axisLine={false} tickLine={false} width={72} />
               <Bar dataKey="count" fill="var(--term-d)" radius={[0, 6, 6, 0]} isAnimationActive={false}>
@@ -395,7 +395,7 @@ function WeekCard({ ledger, removed }: { ledger: LedgerEntry[]; removed: string[
       <div className="mt-5 border-t border-line pt-5">
         {hidden ? (
           <p className="flex items-center justify-between gap-3 text-[14px] text-ink-3">
-            The weekly story is hidden. <Button variant="link" className="text-[14px]" onClick={() => setHidden(false)}>Show it</Button>
+            The weekly story is hidden. <Button variant="link" className="min-h-[24px] text-[14px]" onClick={() => setHidden(false)}>Show it</Button>
           </p>
         ) : (
           <>

@@ -9,7 +9,7 @@ import { MEMBER } from '@/data/member'
 import { MEMBERSHIPS } from '@/data/platform'
 import { ENTITLEMENTS, GSTIN_AIWO, GST_RATE, INVOICES } from './_data'
 import { Section, Segmented, Toggle } from './_parts'
-import { inr, useToast } from './_util'
+import { inr, usePersisted, useToast } from './_util'
 
 // MEMBERSHIP (module 12 Commerce): Joy OS Plus + Circle, entitlements, the
 // ladder of plans, GST invoices, Razorpay / UPI methods (mock, no entry here),
@@ -40,11 +40,16 @@ export default function Membership() {
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [plan, setPlan] = useState<string | null>(null)
   const [addMethod, setAddMethod] = useState(false)
-  const [pending, setPending] = useState<Pending | null>(null)
-  const [paused, setPaused] = useState<{ from: string; until: string } | null>(null)
+  // Plan changes, a pause and new invoices are kept per viewer, so they survive leaving the page.
+  const [mem, setMem] = usePersisted<{ pending: Pending | null; paused: { from: string; until: string } | null; extra: Invoice[] }>('membership', { pending: null, paused: null, extra: [] })
+  const pending = mem.pending
+  const paused = mem.paused
+  const extraInvoices = mem.extra
+  const setPending = (v: Pending | null) => setMem((m) => ({ ...m, pending: v }))
+  const setPaused = (v: { from: string; until: string } | null) => setMem((m) => ({ ...m, paused: v }))
+  const setExtraInvoices = (fn: (x: Invoice[]) => Invoice[]) => setMem((m) => ({ ...m, extra: fn(m.extra) }))
   const [pauseOpen, setPauseOpen] = useState(false)
   const [pauseMonths, setPauseMonths] = useState<'1' | '2' | '3'>('2')
-  const [extraInvoices, setExtraInvoices] = useState<Invoice[]>([])
   const current = [MEMBER.plan, MEMBER.membership]
   const rank = (name: string) => MEMBERSHIPS.findIndex((x) => x.name === name)
   const quote = (name: string): Pending => {
@@ -218,6 +223,20 @@ export default function Membership() {
       <div className="mt-16 grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Section id="invoices" eyebrow="Invoices" title="Every invoice, with GST" lead={<>Issued by AIWO · GSTIN <span className="num">{GSTIN_AIWO}</span> · GST at <span className="num">{GST_RATE * 100}%</span>, included in the price.</>}>
           <Card>
+            {/* Phones: one row per invoice, so View is never scrolled out of sight */}
+            <ul className="divide-y divide-line sm:hidden" aria-label="Invoices">
+              {(grace ? [{ id: 'INV-2027-000531', date: '2027-02-01', item: 'Joy OS Plus · February', total: 499, method: 'UPI', status: 'Retrying' }, ...INVOICES] : [...extraInvoices, ...INVOICES]).map((r) => (
+                <li key={r.id} className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                  <span className="min-w-0">
+                    <span className="block text-[15px] text-ink">{r.item}</span>
+                    <span className="num block text-[12px] text-ink-3">{fmtDate(r.date)} · {r.id}</span>
+                    <span className="mt-1 flex items-center gap-2"><span className="num text-[15px] text-ink">{inr(r.total)}</span><Pill tone={r.status === 'Paid' ? 'positive' : 'caution'}>{r.status}</Pill></span>
+                  </span>
+                  <button onClick={() => setInvoice(r)} className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[13px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring" aria-label={`Open invoice ${r.id}`}><FileText size={14} /> View</button>
+                </li>
+              ))}
+            </ul>
+            <div className="hidden sm:block">
             <DataTable
               caption="Invoices"
               rows={grace ? [{ id: 'INV-2027-000531', date: '2027-02-01', item: 'Joy OS Plus · February', total: 499, method: 'UPI', status: 'Retrying' }, ...INVOICES] : [...extraInvoices, ...INVOICES]}
@@ -230,6 +249,7 @@ export default function Membership() {
                 { key: 'open', header: '', align: 'right', render: (r) => <button onClick={() => setInvoice(r)} className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-[13px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring" aria-label={`Open invoice ${r.id}`}><FileText size={14} /> View</button> },
               ]}
             />
+            </div>
           </Card>
         </Section>
 
@@ -357,7 +377,7 @@ function InvoiceView({ inv, onSaved }: { inv: Invoice; onSaved: (m: string) => v
   const gst = gstOf(inv.total)
   const taxable = Math.round((inv.total - gst) * 100) / 100
   const half = Math.round((gst / 2) * 100) / 100
-  const save = () => {
+  const buildHtml = () => {
     const esc = (x: string) => x.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] as string)
     const row = (k: string, v: string, strong = false) => `<tr><td style="padding:6px 0">${strong ? `<strong>${esc(k)}</strong>` : esc(k)}</td><td style="padding:6px 0;text-align:right;font-family:monospace">${esc(v)}</td></tr>`
     const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${inv.id}</title></head><body style="font-family:system-ui,sans-serif;max-width:640px;margin:40px auto;padding:0 16px">`
@@ -367,6 +387,10 @@ function InvoiceView({ inv, onSaved }: { inv: Invoice; onSaved: (m: string) => v
       + `<p>Date ${fmtDate(inv.date)} · SAC 999723 · Paid by ${inv.method} via Razorpay · ${inv.status}</p>`
       + `<table style="width:100%;border-collapse:collapse;margin-top:24px">${row(inv.item, inr(taxable, 2))}${row('CGST 9%', inr(half, 2))}${row('SGST 9%', inr(gst - half, 2))}${row('Total', inr(inv.total, 2), true)}</table>`
       + `</body></html>`
+    return html
+  }
+  const save = () => {
+    const html = buildHtml()
     try {
       const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }))
       const a = document.createElement('a')
@@ -381,6 +405,15 @@ function InvoiceView({ inv, onSaved }: { inv: Invoice; onSaved: (m: string) => v
       onSaved('Your browser blocked the download. We can email it instead.')
     }
   }
+  // Print only the invoice, not the page behind the sheet.
+  const print = () => {
+    const w = window.open('', '_blank', 'width=720,height=900')
+    if (!w) { onSaved('Your browser blocked the print window. Save the invoice and print it from there.'); return }
+    w.document.write(buildHtml())
+    w.document.close()
+    w.focus()
+    window.setTimeout(() => { try { w.print() } catch { /* window closed */ } }, 250)
+  }
   return (
     <div>
       <div className="flex items-start justify-between gap-4">
@@ -394,7 +427,7 @@ function InvoiceView({ inv, onSaved }: { inv: Invoice; onSaved: (m: string) => v
         <div><dt className="eyebrow text-ink-3">Billed to</dt><dd className="mt-1 text-ink">{MEMBER.firstName} {MEMBER.lastName}<span className="block text-ink-2">{MEMBER.city}, Tamil Nadu</span></dd></div>
         <div><dt className="eyebrow text-ink-3">Date</dt><dd className="num mt-1 text-ink">{fmtDate(inv.date)}</dd></div>
         <div><dt className="eyebrow text-ink-3">SAC</dt><dd className="num mt-1 text-ink">999723</dd></div>
-        <div><dt className="eyebrow text-ink-3">Paid by</dt><dd className="mt-1 text-ink">{inv.method} · Razorpay</dd></div>
+        <div><dt className="eyebrow text-ink-3">{inv.status === 'Paid' ? 'Paid by' : 'Charging'}</dt><dd className="mt-1 text-ink">{inv.method} · Razorpay</dd></div>
       </dl>
       <table className="mt-6 w-full text-[15px]">
         <caption className="sr-only">Invoice lines</caption>
@@ -407,7 +440,7 @@ function InvoiceView({ inv, onSaved }: { inv: Invoice; onSaved: (m: string) => v
       </table>
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
         <Button variant="secondary" onClick={save}><Download size={15} /> Save invoice</Button>
-        <Button variant="ghost" onClick={() => window.print()}><FileText size={15} /> Print</Button>
+        <Button variant="ghost" onClick={print}><FileText size={15} /> Print</Button>
       </div>
       <p className="mt-3 text-[13px] text-ink-3">Saved as a self-contained page you can open or print to PDF. Specimen — not a real member.</p>
     </div>

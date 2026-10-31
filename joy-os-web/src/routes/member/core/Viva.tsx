@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } fr
 import { Link, useSearchParams } from 'react-router-dom'
 import { DaybreakButton, Eyebrow, TermDot } from '@/components/joy/primitives'
 import { Avatar, Button, Card, PageHeader, Pill, SectionTitle } from '@/components/ui'
-import { INDEX_HISTORY, TEAM, TODAY_ACTION } from '@/data/member'
+import { INDEX_HISTORY, MEMBER, TEAM, TODAY_ACTION } from '@/data/member'
 import { CIRCLE, PRACTICE_WEEKS } from '@/data/platform'
 import { termByKey } from '@/data/terms'
 import { joyspanIndex } from '@/domain/indexEngine'
@@ -53,6 +53,7 @@ const GUARDRAIL_EXAMPLES = [
 const SPACE_ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 const MEMORY_ON: Record<TermKey, boolean> = { H: true, P: true, R: true, F: true, D: true, B: false }
 let seq = 0
+const greeting = (h = new Date().getHours()) => (h < 5 ? 'Hello' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening')
 const mid = () => `m${Date.now()}-${seq++}`
 
 export default function Viva() {
@@ -77,7 +78,7 @@ export default function Viva() {
       from: 'viva',
       kind: 'reply',
       tool: 'index_explainer',
-      text: 'Good evening, Arjun. I can explain your Index, say why today’s action was chosen, or help with the Practice. I draft; a person signs anything clinical.',
+      text: `${greeting()}, ${MEMBER.firstName}. I can explain your Index, say why today’s action was chosen, or help with the Practice. I draft; a person signs anything clinical.`,
     },
   ])
   const scroller = useRef<HTMLDivElement>(null)
@@ -313,7 +314,7 @@ export default function Viva() {
                       <button
                         onClick={() => setExpanded((e) => (e === k ? null : k))}
                         aria-expanded={expanded === k}
-                        className="mt-2 text-[13px] text-ink-2 underline decoration-line-strong underline-offset-4 hover:text-ink focus-ring"
+                        className="mt-1 min-h-[24px] py-1 text-[13px] text-ink-2 underline decoration-line-strong underline-offset-4 hover:text-ink focus-ring"
                       >
                         {expanded === k ? 'Hide' : `See what VIVA remembers`}
                       </button>
@@ -332,7 +333,7 @@ export default function Viva() {
                                 <Button variant="ghost" size="sm" className="!h-8 !px-2.5 !text-[13px]" onClick={() => setConfirmAll(null)}>Cancel</Button>
                               </div>
                             ) : (
-                              <Button variant="link" className="text-[13px]" onClick={() => setConfirmAll(k)}>Forget everything in {term.space}</Button>
+                              <Button variant="link" className="min-h-[24px] text-[13px]" onClick={() => setConfirmAll(k)}>Forget everything in {term.space}</Button>
                             )}
                           </li>
                         )}

@@ -49,7 +49,7 @@ export default function Exec() {
             <div className="flex items-end gap-3 lg:justify-end">
               <span className="num text-[5rem] font-light leading-[0.85] tracking-tight md:text-[6.5rem]">{perLakh.toFixed(1)}</span>
               <span className="mb-1.5 flex flex-col text-left">
-                <Delta value={Math.round((perLakh - NORTH_STAR.prior) * 10) / 10} className="!text-paper opacity-80" />
+                <Delta value={Math.round((perLakh - NORTH_STAR.prior) * 10) / 10} className="!text-current opacity-80" />
                 <span className="eyebrow mt-1 opacity-70">per ₹1 lakh</span>
               </span>
             </div>
@@ -310,7 +310,14 @@ function Revenue() {
             <Bar dataKey="plus" stackId="r" fill="var(--ink)" isAnimationActive={false} />
             <Bar dataKey="licensed" stackId="r" fill="var(--ink-3)" isAnimationActive={false} />
             <Bar dataKey="fees" stackId="r" fill="var(--line-strong)" radius={[4, 4, 0, 0]} isAnimationActive={false}>
-              <LabelList dataKey="total" position="top" offset={8} formatter={(v: unknown) => `₹${Number(v).toLocaleString('en-IN')} Cr`} style={{ fill: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 12 }} />
+              {/* Drawn by hand so the total never wraps inside a narrow bar at phone width. */}
+              <LabelList
+                dataKey="total"
+                content={(p) => {
+                  const { x, y, width, value } = p as { x?: number | string; y?: number | string; width?: number | string; value?: number | string }
+                  return <text x={Number(x) + Number(width) / 2} y={Number(y) - 8} textAnchor="middle" style={{ fill: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>₹{Number(value).toLocaleString('en-IN')} Cr</text>
+                }}
+              />
             </Bar>
           </BarChart>
         </ResponsiveContainer>

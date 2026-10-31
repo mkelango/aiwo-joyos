@@ -8,7 +8,7 @@ import { Button, Card, PageHeader, Pill } from '@/components/ui'
 import { JOURNEYS } from '@/data/platform'
 import { MEMBER } from '@/data/member'
 import { DAY_IN_JOY_OS, JOURNEY_DETAIL, LOOP_STATIONS } from './_data'
-import { LinkButton, LoopDiagram, StorySection, TermLabel, stationForDay } from './_parts'
+import { LinkButton, LoopDiagram, StorySection, TermLabel, stationForDay, useEnterAs } from './_parts'
 
 // JOURNEYS (Plan §4D; Memo p.13, p.17, p.22): five ways in, one loop. Each journey is a
 // horizontal timeline; each step says what Joy OS does, who is involved, which term, and
@@ -41,6 +41,7 @@ function JourneyExplorer() {
   const [step, setStep] = useState(0)
   const stepRefs = useRef<(HTMLButtonElement | null)[]>([])
   const uid = useId()
+  const enterAs = useEnterAs()
   const j = JOURNEYS.find((x) => x.id === jid)!
   const d = JOURNEY_DETAIL[jid]
   const s = d.steps[step]
@@ -66,7 +67,7 @@ function JourneyExplorer() {
     <section aria-labelledby="journeys-h" className="pb-16">
       <h2 id="journeys-h" className="sr-only">The five journeys</h2>
       {/* Journey chooser */}
-      <div role="tablist" aria-label="Journeys" className="-mx-5 flex snap-x gap-3 overflow-x-auto px-5 pb-2 md:mx-0 md:grid md:grid-cols-5 md:overflow-visible md:px-0 md:pb-0">
+      <div role="tablist" aria-label="Journeys" className="-mx-5 flex snap-x scroll-px-5 gap-3 overflow-x-auto px-5 pb-2 md:mx-0 md:grid md:grid-cols-5 md:overflow-visible md:px-0 md:pb-0">
         {JOURNEYS.map((x, i) => {
           const on = x.id === jid
           return (
@@ -158,7 +159,7 @@ function JourneyExplorer() {
               <p className="eyebrow text-ink-3">Step {step + 1} of {d.steps.length} · {s.when} · what Joy OS does</p>
               <p className="mt-3 text-[1.35rem] font-light leading-snug text-ink md:text-[1.5rem]">{s.does}</p>
               <div className="mt-6 flex flex-wrap items-center gap-3">
-                <Link to={s.route.to} className="inline-flex h-11 items-center gap-2 rounded-full bg-ink px-5 text-[15px] font-medium text-paper hover:opacity-90 focus-ring">
+                <Link to={s.route.to} onClick={() => enterAs(s.route.to)} className="inline-flex h-11 items-center gap-2 rounded-full bg-ink px-5 text-[15px] font-medium text-paper hover:opacity-90 focus-ring">
                   See this screen · {s.route.label} <ArrowUpRight size={16} />
                 </Link>
                 <span className="num text-[13px] text-ink-3">{s.route.to}</span>
@@ -206,6 +207,7 @@ function LoopExplorer() {
   const st = LOOP_STATIONS.find((s) => s.id === sel)!
   const idx = LOOP_STATIONS.findIndex((s) => s.id === sel)
   const sliderId = useId()
+  const enterAs = useEnterAs()
   // on phones the ring renders at about half scale: larger label units keep station names legible
   const [phone, setPhone] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches)
   useEffect(() => {
@@ -269,7 +271,7 @@ function LoopExplorer() {
                     <dd className="mt-1 text-ink">{st.sees}</dd>
                   </div>
                 </dl>
-                <Link to={st.route.to} className="mt-5 inline-flex items-center gap-1.5 text-[15px] text-ink underline-offset-4 hover:underline focus-ring">
+                <Link to={st.route.to} onClick={() => enterAs(st.route.to)} className="mt-5 inline-flex items-center gap-1.5 text-[15px] text-ink underline-offset-4 hover:underline focus-ring">
                   See this screen · {st.route.label} <ArrowUpRight size={15} />
                 </Link>
               </motion.div>
@@ -323,6 +325,7 @@ function LoopExplorer() {
 
 // ─── A day in Joy OS (Memo p.17) ─────────────────────────────────────────────
 function DaySection() {
+  const enterAs = useEnterAs()
   return (
     <StorySection
       id="day"
@@ -331,10 +334,10 @@ function DaySection() {
       lead="One action, three ten-second Ledger prompts, a weekly circle and a quarterly re-measure. Nothing asks for attention it has not earned; a fall in the Index is never pushed, it is told by a person."
       aside={<Pill><Clock size={13} /> Daily ≈ 2 min · weekly circle 30 min · quarterly Index ≈ 20 min</Pill>}
     >
-      <ol className="-mx-5 flex snap-x gap-3 overflow-x-auto px-5 pb-3 lg:mx-0 lg:grid lg:grid-cols-7 lg:overflow-visible lg:px-0">
+      <ol className="-mx-5 flex snap-x scroll-px-5 gap-3 overflow-x-auto px-5 pb-3 lg:mx-0 lg:grid lg:grid-cols-7 lg:overflow-visible lg:px-0">
         {DAY_IN_JOY_OS.map((m) => (
           <li key={m.at} className="w-[220px] shrink-0 snap-start lg:w-auto">
-            <Link to={m.to} className="group flex h-full flex-col rounded-card border border-line bg-paper-raised p-4 transition-colors hover:border-line-strong focus-ring">
+            <Link to={m.to} onClick={() => enterAs(m.to)} className="group flex h-full flex-col rounded-card border border-line bg-paper-raised p-4 transition-colors hover:border-line-strong focus-ring">
               <span className="num text-[13px] text-ink-3">{m.at}</span>
               <span className="mt-2 text-[17px] text-ink">{m.name}</span>
               <span className="mt-1.5 flex-1 text-[14px] leading-snug text-ink-2">{m.what}</span>

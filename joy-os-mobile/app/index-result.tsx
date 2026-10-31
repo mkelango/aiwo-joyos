@@ -1,6 +1,6 @@
 import { router } from 'expo-router'
 import { useState } from 'react'
-import { Pressable, View } from 'react-native'
+import { Platform, Pressable, View } from 'react-native'
 import {
   ArrowLink,
   BandLabel,
@@ -34,11 +34,14 @@ import { INDEX_HISTORY, MEMBER } from '@/shared/member'
 import { termByKey } from '@/shared/terms'
 import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
+import { memberOnly } from '@/screens/b/parts'
 
 // INDEX DETAIL (Memo p.10–11, p.18; Plan §4B): the number, how it is made, each petal on
 // tap (survey vs signals, what moved), three measures of history, and how a gap is shown.
 
-export default function IndexResult() {
+export default memberOnly(IndexResult)
+
+function IndexResult() {
   const th = useTheme()
   const { c, space } = th
   const latest = INDEX_HISTORY[0]
@@ -83,7 +86,7 @@ export default function IndexResult() {
           </View>
         </View>
         <Body tone="ink2">
-          Up from {previous.value} in October. Daily Pleasure is the lowest term, so it holds the Index back most.
+          {`${latest.value > previous.value ? 'Up from' : latest.value < previous.value ? 'Down from' : 'The same as'} ${previous.value} in ${new Date(previous.takenOn).toLocaleDateString('en-GB', { month: 'long' })}. ${termByKey(latest.lowestTerm).name} is the lowest term, so it holds the Index back most.`}
         </Body>
         <Divider />
         <View style={{ gap: 8 }} accessible accessibilityLabel={`How it is made: geometric mean of the five positive terms, ${calc.gm}, minus a quarter of Burden, ${calc.burden}, gives ${latest.value}.`}>
@@ -118,6 +121,7 @@ export default function IndexResult() {
                 onPress={() => setSel(x.key)}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: on }}
+                aria-selected={on}
                 accessibilityLabel={`${t.space}, ${t.name} ${x.key === 'B' ? 'minus ' : ''}${x.value}`}
                 style={({ pressed }) => ({ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderRadius: 999, borderWidth: on ? 2 : 1, borderColor: on ? c.ink : c.line, backgroundColor: pressed ? c.paperSunk : undefined })}
               >
@@ -222,6 +226,7 @@ export default function IndexResult() {
                   onPress={() => setOpenMeasure(isOpen ? null : h.id)}
                   accessibilityRole="button"
                   accessibilityState={{ expanded: isOpen }}
+                  aria-expanded={isOpen}
                   accessibilityLabel={`${fmtDate(h.takenOn)}, Index ${h.value}. ${isOpen ? 'Hide' : 'Show'} the six terms.`}
                   style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, minHeight: 56, opacity: pressed ? 0.7 : 1 })}
                 >
@@ -303,7 +308,7 @@ export default function IndexResult() {
           cardSaved ? (
             <View accessibilityLiveRegion="polite" style={{ gap: 4, alignItems: 'center' }}>
               <Body weight="medium" align="center">
-                {cardSaved === 'photos' ? 'Saved to Photos.' : 'Sent to the printer.'}
+                {cardSaved === 'photos' ? 'Saved to Photos (specimen).' : Platform.OS === 'web' ? 'Print dialog opened.' : 'Sent to the printer.'}
               </Body>
               <Meta align="center">The card carries the method, so whoever sees it can read it properly.</Meta>
               <Button variant="link" onPress={() => setCardSaved(null)}>
@@ -315,7 +320,11 @@ export default function IndexResult() {
               <Button variant="ink" icon="download" onPress={() => setCardSaved('photos')} style={{ flex: 1 }}>
                 Save to Photos
               </Button>
-              <Button variant="secondary" icon="printer" onPress={() => setCardSaved('print')} style={{ flex: 1 }}>
+              <Button variant="secondary" icon="printer" onPress={() => {
+                  setCardSaved('print')
+                  // The web build opens the browser's print dialog; a phone hands it to the system print sheet.
+                  if (Platform.OS === 'web' && typeof window !== 'undefined') setTimeout(() => window.print(), 50)
+                }} style={{ flex: 1 }}>
                 Print
               </Button>
             </View>

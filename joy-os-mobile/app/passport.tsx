@@ -6,7 +6,7 @@ import { INDEX_HISTORY, MEMBER } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
 import { PASSPORT, SESSIONS_OPEN } from '@/screens/b/journeyData'
 import { accountStore, useStore } from '@/screens/b/bStore'
-import { KeyValue, PrimaryChip, SpecimenQR } from '@/screens/b/parts'
+import { KeyValue, PrimaryChip, SpecimenQR, memberOnly } from '@/screens/b/parts'
 
 // JOY PASSPORT (Memo p.22): one card for every ’cation, edition and House. The same Index and
 // the same ninety days wherever you are; stamps for where you have been. Venues see a name
@@ -14,7 +14,9 @@ import { KeyValue, PrimaryChip, SpecimenQR } from '@/screens/b/parts'
 
 type Stamp = (typeof PASSPORT.stamps)[number]
 
-export default function Passport() {
+export default memberOnly(Passport)
+
+function Passport() {
   const { c, space, radius } = useTheme()
   const [acct] = useStore(accountStore)
   const [qrOpen, setQrOpen] = useState(false)

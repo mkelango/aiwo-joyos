@@ -93,7 +93,7 @@ export default function MemberLayout() {
             <button className="underline underline-offset-2" onClick={() => setOffline(false)}>Dismiss</button>
           </div>
         )}
-        <main id="main" className={clsx('mx-auto w-full max-w-[1120px] px-4 pt-6 md:px-8 md:pt-10', immersive ? 'pb-10' : 'pb-28 lg:pb-16')}>
+        <main id="main" className={clsx('mx-auto w-full max-w-[1120px] px-4 pt-6 md:px-8 md:pt-10', immersive ? 'pb-10' : 'pb-44 lg:pb-24')}>
           <Outlet />
         </main>
       </div>

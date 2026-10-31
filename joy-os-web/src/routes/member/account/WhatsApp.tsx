@@ -155,8 +155,20 @@ export default function WhatsApp() {
       }
       return
     }
-    if (/^(start|resume)$/i.test(t) && !consented) {
+    if (/^start$/i.test(t) && !consented) {
       botSay(['Consent is only ever given in the app, never by a reply. Tap “Turn on prompts” beside this phone when you’re ready.'])
+      return
+    }
+    if (/^resume$/i.test(t)) {
+      const n = SCRIPTS.ledger.nodes.l0
+      if (scenario === 'ledger') botSay(['Prompts are back on for today.', ...n.bot], n.replies)
+      else botSay(['Prompts are back on for today. The next Ledger prompt comes around 16:15.'])
+      return
+    }
+    if (/^check$/i.test(t)) {
+      const n = SCRIPTS.check.nodes.c0
+      if (scenario === 'check') botSay(n.bot, n.replies)
+      else botSay(['The Check lives under its own tab beside this phone — tap “The Check” to try it.'])
       return
     }
     if (scenario === 'ledger' && !t.includes('?') && t.length <= 80) {

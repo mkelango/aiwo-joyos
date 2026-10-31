@@ -1,4 +1,5 @@
 import type { TermKey } from '@/shared/types'
+import { brand } from '@/theme/tokens'
 
 // SPECIMEN DATA for the Care, Trust and Account lane — not a real member.
 // Shapes mirror the Technical Architecture (Care bridge, Signals, Commerce, Trust centre).
@@ -117,7 +118,7 @@ export const THREADS: Thread[] = [
 
 // ─── Household ────────────────────────────────────────────────────────────
 
-export const HOUSEHOLD_MINOR = { id: 'h_ananya', name: 'Ananya Rao', role: 'Daughter · 15', initials: 'AR', tone: 'var(--ink-2)' }
+export const HOUSEHOLD_MINOR = { id: 'h_ananya', name: 'Ananya Rao', role: 'Daughter · 15', initials: 'AR', tone: brand.slate } // a fixed ground: Paper initials stay legible in both schemes
 
 export type GrantScope = 'index' | TermKey
 export interface Grant { id: string; scope: GrantScope[]; from: string; to: string; state: 'active' | 'waiting' | 'revoked'; since: string }

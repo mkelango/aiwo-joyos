@@ -594,7 +594,7 @@ function ResultsSection() {
       <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
         <Card className="min-w-0" role="tabpanel" aria-label={c.cohort}>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Eyebrow>{c.cohort} · designed to raise {primary.name}</Eyebrow>
+            <Eyebrow>{c.cohort} · designed to {primary.key === 'B' ? 'ease' : 'raise'} {primary.name}</Eyebrow>
             <SpecimenTag />
           </div>
           <p className="mt-3 text-[15px] text-ink-2">

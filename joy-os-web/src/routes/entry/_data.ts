@@ -163,7 +163,7 @@ export const COHORT_GROWTH = [
 // ─── Sign-in · specimen accounts per role ──────────────────────────────────
 
 export interface DemoAccount {
-  /** unique row key; equals the role for every account except Engineering & ops */
+  /** unique row key; equals the role */
   key: string
   /** the demo role the store is set to on entry */
   role: Role
@@ -186,10 +186,10 @@ export const DEMO_ACCOUNTS: DemoAccount[] = [
   { key: 'exec', role: 'exec', email: 'leadership@specimen.aiwo', title: 'Leadership', to: '/console/exec', who: 'CEO · Head of Joy OS', short: 'leadership' },
 ]
 
-// Engineering & ops has no Role of its own yet (SHARED-FIX: add 'ops' to Role and
-// DEMO_ROLES). Kept apart from DEMO_ACCOUNTS (which other lanes key by role) and
-// entered with the Leadership role; it lands on the Control plane console.
-export const OPS_ACCOUNT: DemoAccount = { key: 'ops', role: 'exec', email: 'sre.oncall@specimen.aiwo', title: 'Engineering & ops', to: '/console/ops', who: 'SRE on call · DPO', short: 'ops' }
+// Engineering & ops: its own 'ops' role (the Control plane in the Demo switcher).
+// Kept apart from DEMO_ACCOUNTS, which other lanes key by role; it lands on the
+// Control plane console.
+export const OPS_ACCOUNT: DemoAccount = { key: 'ops', role: 'ops', email: 'sre.oncall@specimen.aiwo', title: 'Engineering & ops', to: '/console/ops', who: 'SRE on call · DPO', short: 'ops' }
 
 // ─── Phone numbers (sign-in and account creation) ───────────────────────────
 

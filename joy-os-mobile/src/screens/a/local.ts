@@ -90,6 +90,21 @@ export function usePlanned() {
   return { planned, plan, ready }
 }
 
+/** A ’cation request or registration of interest, kept on the phone per ’cation slug. */
+export type CationRequest = { ref: string; win: string; venue: string; guests: number; outcome: string; interestOnly: boolean }
+
+/** ’Cation requests made on this phone, read by the ’Cation hub and each ’cation's page. */
+export function useCationRequests() {
+  const [requests, setRequests, ready] = useLocal<Record<string, CationRequest>>('cationRequests', {})
+  const setRequest = useCallback((slug: string, r: CationRequest | null) => setRequests((all) => {
+    const next = { ...all }
+    if (r) next[slug] = r
+    else delete next[slug]
+    return next
+  }), [setRequests])
+  return { requests, setRequest, ready }
+}
+
 /** Heading props for a section kicker: level 2 (web: <h2>), so ScreenHeader stays the only h1. */
 export const H2 = { accessibilityRole: 'header', 'aria-level': 2 } as const
 /** Heading props for a tool card inside a section: level 3. */

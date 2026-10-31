@@ -181,7 +181,7 @@ function Methods({ focusKey, d }: { focusKey: number; d: Draft }) {
                 </div>
                 <p className="mt-2 text-[15px] text-ink-2">{m.label}</p>
                 <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-3 text-[14px]">
-                  <div><dt className="eyebrow text-ink-3">λ</dt><dd className="num mt-0.5 text-ink">{isDraft ? lambda.toFixed(2) : m.lambda.toFixed(2)}</dd></div>
+                  <div><dt className="eyebrow normal-case text-ink-3">λ</dt><dd className="num mt-0.5 text-ink">{isDraft ? lambda.toFixed(2) : m.lambda.toFixed(2)}</dd></div>
                   <div><dt className="eyebrow text-ink-3">{v === 'v1.0' ? 'Published' : 'Planned'}</dt><dd className="num mt-0.5 text-ink">{v === 'v1.0' ? '22 Oct 2026' : isDraft ? (published ? '28 Jan 2027' : '30 Jun 2027') : m.published}</dd></div>
                 </dl>
                 {v === 'v1.0' && (

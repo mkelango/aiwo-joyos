@@ -8,7 +8,7 @@ import { MEMBER } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
 import { PLANS } from '@/screens/b/_data'
 import { accountStore, notifPrefsStore, onboardingStore, sessionStore, useStore, validatePrefs } from '@/screens/b/bStore'
-import { ChoiceCard, TimeStepper } from '@/screens/b/parts'
+import { ChoiceCard, TimeStepper, memberOnly } from '@/screens/b/parts'
 
 // SETTINGS: language (English · தமிழ் · हिन्दी), theme (follows the system by default),
 // text size on top of Dynamic Type, notifications with quiet hours (never more than three a
@@ -20,7 +20,9 @@ const SAMPLE = {
   hi: 'पिछले कुछ घंटों में कुछ अच्छा हुआ?',
 } as const
 
-export default function Settings() {
+export default memberOnly(Settings)
+
+function Settings() {
   const { space, scheme } = useTheme()
   const t = useT()
   const { lang, setLang, themePref, setThemePref, textSize, setTextSize, offline, setOffline } = useApp()

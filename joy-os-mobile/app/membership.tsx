@@ -7,7 +7,7 @@ import { useTheme } from '@/theme/ThemeProvider'
 import { ENTITLEMENTS, GSTIN_AIWO, GST_RATE, INVOICES } from '@/screens/b/accountData'
 import { PLANS, inr } from '@/screens/b/_data'
 import { accountStore, refCode, useStore } from '@/screens/b/bStore'
-import { CheckLine, ChoiceCard, Done, KeyValue } from '@/screens/b/parts'
+import { CheckLine, ChoiceCard, Done, KeyValue, memberOnly } from '@/screens/b/parts'
 
 // MEMBERSHIP: the plan you are on, what it includes, the ladder (Free · Plus · Patron) with a
 // confirm step, GST invoices and the payment method on file (never editable here: Razorpay
@@ -17,7 +17,9 @@ type PlanKey = (typeof PLANS)[number]['key']
 const RENEWS = '2027-02-01'
 const CIRCLE_RENEWS = '2027-12-15'
 
-export default function Membership() {
+export default memberOnly(Membership)
+
+function Membership() {
   const { c, space } = useTheme()
   const [acct, setAcct] = useStore(accountStore)
   const [changeOpen, setChangeOpen] = useState(false)
@@ -79,6 +81,11 @@ export default function Membership() {
           <Mono tone="ink2">{fmtDate(CIRCLE_RENEWS)}</Mono>
         </Meta>
         {pending ? <Done>{`${pending.to === acct.plan ? 'Changed to' : 'Moving to'} ${PLANS.find((p) => p.key === pending.to)!.name} · effective ${fmtDate(pending.effective)} · ${pending.ref}`}</Done> : null}
+        {pending && pending.to !== acct.plan ? (
+          <Button variant="link" onPress={() => setAcct((a) => ({ ...a, planChange: undefined }))} accessibilityHint="Cancels the move at renewal; nothing changes">
+            {`Keep ${current.name} instead`}
+          </Button>
+        ) : null}
       </Card>
       <SpecimenTag />
 

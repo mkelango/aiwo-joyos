@@ -46,6 +46,14 @@ export interface JourneyState {
   flagshipRequest: null | { ref: string; guests: number; note: string }
   /** Calendar holds the member accepted, by id. */
   calendar: Record<string, boolean>
+  /** Other circles: invitation accepted or request to join sent, by circle id. */
+  circleRequests: Record<string, boolean>
+  /** Personal schedule at the next Session, by programme row; null = the specimen default. */
+  schedule: Record<number, boolean> | null
+  /** Private Practice reflections, by week. */
+  reflections: Record<number, { text: string; savedAt: string }>
+  /** Earlier Practice weeks the member has un-marked (all earlier weeks start as practised). */
+  weeksUnmarked: number[]
 }
 
 const KEY = 'joyos:journey'
@@ -74,6 +82,10 @@ const initial: JourneyState = {
   wallet: null,
   flagshipRequest: null,
   calendar: {},
+  circleRequests: {},
+  schedule: null,
+  reflections: {},
+  weeksUnmarked: [],
 }
 
 function load(): JourneyState {
@@ -155,6 +167,25 @@ export function setFlagshipRequest(r: JourneyState['flagshipRequest']) {
 
 export function setCalendar(id: string, on: boolean) {
   setJourney((s) => ({ ...s, calendar: { ...s.calendar, [id]: on } }))
+}
+
+export function setCircleRequest(id: string, on: boolean) {
+  setJourney((s) => ({ ...s, circleRequests: { ...s.circleRequests, [id]: on } }))
+}
+
+export function setSchedule(schedule: Record<number, boolean>) {
+  setJourney((s) => ({ ...s, schedule }))
+}
+
+export function saveReflection(week: number, text: string, savedAt: string) {
+  setJourney((s) => ({ ...s, reflections: { ...s.reflections, [week]: { text, savedAt } } }))
+}
+
+/** Earlier weeks are practised unless the member un-marked them. */
+export const weekPractised = (s: JourneyState, week: number) => !s.weeksUnmarked.includes(week)
+
+export function setWeekPractised(week: number, on: boolean) {
+  setJourney((s) => ({ ...s, weeksUnmarked: on ? s.weeksUnmarked.filter((w) => w !== week) : Array.from(new Set([...s.weeksUnmarked, week])) }))
 }
 
 export const holderName = `${MEMBER.firstName} ${MEMBER.lastName}`

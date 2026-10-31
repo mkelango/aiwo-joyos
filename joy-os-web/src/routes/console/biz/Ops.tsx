@@ -34,6 +34,8 @@ type RunState = 'idle' | 'running' | 'done'
 
 const SLA = { export: 72, erase: 24, withdraw: 24 } as const
 const KIND_LABEL = { export: 'Export', erase: 'Erase', withdraw: 'Withdraw consent' } as const
+/** 'Email to the DPO' → 'email to the DPO': lower-case the sentence start, keep acronyms. */
+const lcFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1)
 
 function belowFloor(t: (typeof AI_TOOLS)[number]) {
   return (Object.entries(t.langs) as [string, number][]).filter(([, v]) => v > 0 && v < EVAL_BAR).map(([l]) => l)
@@ -712,7 +714,8 @@ function JitSheet({ open, onClose, onSubmit, nextId }: { open: boolean; onClose:
   const [ticket, setTicket] = useState('')
   const [reason, setReason] = useState('')
   const [errs, setErrs] = useState<{ ticket?: string; reason?: string }>({})
-  const [done, setDone] = useState(false)
+  // The id this request was sent under; nextId moves on as soon as the request joins the list.
+  const [done, setDone] = useState<string | null>(null)
 
   const submit = () => {
     const e: typeof errs = {}
@@ -720,10 +723,10 @@ function JitSheet({ open, onClose, onSubmit, nextId }: { open: boolean; onClose:
     if (reason.trim().length < 20) e.reason = 'Describe what you will look at and why, in at least 20 characters.'
     setErrs(e)
     if (Object.keys(e).length) return
-    onSubmit({ id: nextId, who: ME_NAME, role: 'DPO', scope, duration, reason: `${ticket.toUpperCase()} · ${reason.trim()}`, status: 'pending', approver: '—', expires: '—' })
-    setDone(true)
+    onSubmit({ id: nextId, who: ME_NAME, role: 'DPO', scope, duration, reason: `${ticket.trim().toUpperCase()} · ${reason.trim()}`, status: 'pending', approver: '—', expires: '—' })
+    setDone(nextId)
   }
-  const close = () => { onClose(); window.setTimeout(() => { setDone(false); setTicket(''); setReason(''); setErrs({}) }, 250) }
+  const close = () => { onClose(); window.setTimeout(() => { setDone(null); setTicket(''); setReason(''); setErrs({}) }, 250) }
 
   return (
     <Sheet open={open} onClose={close} title="Request just-in-time access">
@@ -731,7 +734,7 @@ function JitSheet({ open, onClose, onSubmit, nextId }: { open: boolean; onClose:
         <div role="status">
           <Timer size={22} className="text-ink-3" aria-hidden />
           <p className="mt-3 text-[1.35rem] font-light leading-snug text-ink">Requested. A second person must approve it.</p>
-          <p className="mt-2 text-[15px] text-ink-2">{nextId} · {scope} · {duration}. The SRE on call is paged to review it. Access expires on its own, and you can withdraw the request or revoke the grant early from Audit &amp; JIT.</p>
+          <p className="mt-2 text-[15px] text-ink-2"><span className="num">{done}</span> · {scope} · {duration}. The SRE on call is paged to review it. Access expires on its own, and you can withdraw the request or revoke the grant early from Audit &amp; JIT.</p>
           <Button variant="secondary" className="mt-6" onClick={close}>Close</Button>
         </div>
       ) : (
@@ -751,10 +754,10 @@ function JitSheet({ open, onClose, onSubmit, nextId }: { open: boolean; onClose:
             </select>
           </Field>
           <Field label="Incident or change" htmlFor="jit-ticket" error={errs.ticket}>
-            <input id="jit-ticket" className={clsx(fieldCls, 'font-mono')} value={ticket} onChange={(e) => setTicket(e.target.value)} placeholder="INC-0415" aria-invalid={!!errs.ticket} />
+            <input id="jit-ticket" className={clsx(fieldCls, 'font-mono')} value={ticket} onChange={(e) => { setTicket(e.target.value); setErrs((x) => ({ ...x, ticket: undefined })) }} placeholder="INC-0415" aria-invalid={!!errs.ticket} aria-describedby={errs.ticket ? 'jit-ticket-err' : undefined} />
           </Field>
           <Field label="Reason" htmlFor="jit-reason" error={errs.reason}>
-            <textarea id="jit-reason" rows={3} className={areaCls} value={reason} onChange={(e) => setReason(e.target.value)} aria-invalid={!!errs.reason} />
+            <textarea id="jit-reason" rows={3} className={areaCls} value={reason} onChange={(e) => { setReason(e.target.value); setErrs((x) => ({ ...x, reason: undefined })) }} placeholder="e.g. Root-cause the Ledger retry storm in the write-path traces" aria-invalid={!!errs.reason} aria-describedby={errs.reason ? 'jit-reason-err' : undefined} />
           </Field>
           <div className="flex flex-wrap gap-2">
             <Button variant="ink" onClick={submit}>Send for approval</Button>
@@ -852,8 +855,8 @@ function Rights({ jobs, setJobs, log, stamp }: { jobs: Job[]; setJobs: React.Dis
   const add = (kind: Job['kind'], member: string, channel: string) => {
     const id = `RQ-${2292 + jobs.length - RIGHTS_JOBS.length}`
     const at = `28 Jan ${stamp()}`
-    setJobs((js) => [{ id, kind, opened: at, elapsedH: 0, stores: RIGHTS_STORES[kind].length, done: 0, status: 'running', note: `Logged for ${member} · received by ${channel.toLowerCase()}.`, escalated: false, retrying: false, notices: [{ at, text: `Request received. We will finish within ${SLA[kind]} hours and tell you when it is done.` }] }, ...js])
-    log(`${id} opened · ${KIND_LABEL[kind]} · ${member}`, `Received by ${channel.toLowerCase()}`)
+    setJobs((js) => [{ id, kind, opened: at, elapsedH: 0, stores: RIGHTS_STORES[kind].length, done: 0, status: 'running', note: `Logged for ${member} · received by ${lcFirst(channel)}.`, escalated: false, retrying: false, notices: [{ at, text: `Request received. We will finish within ${SLA[kind]} hours and tell you when it is done.` }] }, ...js])
+    log(`${id} opened · ${KIND_LABEL[kind]} · ${member}`, `Received by ${lcFirst(channel)}`)
     // Workers clear one store at a time; the member is told when every store is done.
     const total = RIGHTS_STORES[kind].length
     for (let n = 1; n <= total; n++) {

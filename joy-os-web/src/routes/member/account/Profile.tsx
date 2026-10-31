@@ -40,7 +40,9 @@ export default function Profile() {
 
   const me = { ...HOUSEHOLD[0], name: `${details.firstName} ${details.lastName}`, initials: `${details.firstName[0] ?? ''}${details.lastName[0] ?? ''}`.toUpperCase() }
   const langLabel = LANGS.find((l) => l.value === lang)!
-  const connectedDevices = DEVICES.filter((d) => d.state === 'connected')
+  // Same per-viewer device state the Devices page keeps.
+  const [devState] = usePersisted<{ states: Record<string, { state: string }> }>('devices', { states: {} })
+  const connectedDevices = DEVICES.filter((d) => (devState.states[d.id]?.state ?? d.state) === 'connected')
   const plan = MEMBERSHIPS.find((m) => m.name === MEMBER.plan)!
   const circle = MEMBERSHIPS.find((m) => m.name === MEMBER.membership)!
 
@@ -176,7 +178,7 @@ export default function Profile() {
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-paper-sunk text-ink-2"><Watch size={18} /></span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-[15px] text-ink">Devices</span>
-                      <span className="text-[13px] text-ink-2"><span className="num">{connectedDevices.length}</span> connected · {connectedDevices.map((d) => d.name).join(', ')}</span>
+                      <span className="text-[13px] text-ink-2">{connectedDevices.length ? <><span className="num">{connectedDevices.length}</span> connected · {connectedDevices.map((d) => d.name).join(', ')}</> : 'Nothing connected · your answers are used'}</span>
                     </span>
                     <ArrowRight size={15} className="text-ink-3" />
                   </Link>

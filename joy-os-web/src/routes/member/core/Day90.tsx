@@ -260,14 +260,14 @@ function SignedDelta({ grade, before, after, day }: { grade: GradeState; before:
       </div>
 
       <div className="mt-5 overflow-x-auto">
-        <table className="w-full min-w-[22rem] border-collapse text-left text-[14px]">
+        <table className="w-full border-collapse text-left text-[14px]">
           <caption className="sr-only">Day 0 and Day 90 term scores</caption>
           <thead>
             <tr className="border-b border-line">
               <th scope="col" className="eyebrow py-2 pr-3 font-normal text-ink-3">Term</th>
-              <th scope="col" className="eyebrow py-2 pr-3 text-right font-normal text-ink-3">Day 0</th>
-              <th scope="col" className="eyebrow py-2 pr-3 text-right font-normal text-ink-3">Day 90</th>
-              <th scope="col" className="eyebrow py-2 text-right font-normal text-ink-3">Change</th>
+              <th scope="col" className="eyebrow whitespace-nowrap py-2 pr-3 text-right font-normal text-ink-3">Day 0</th>
+              <th scope="col" className="eyebrow whitespace-nowrap py-2 pr-3 text-right font-normal text-ink-3">Day 90</th>
+              <th scope="col" className="eyebrow whitespace-nowrap py-2 text-right font-normal text-ink-3">Change</th>
             </tr>
           </thead>
           <tbody>
@@ -281,9 +281,9 @@ function SignedDelta({ grade, before, after, day }: { grade: GradeState; before:
                     <span className="flex items-center gap-2 text-[15px] text-ink"><TermDot term={k} /> {termByKey(k).name}</span>
                     <span className="mt-1 block text-[13px] text-ink-3">{DAY90_WHY[k]}</span>
                   </th>
-                  <td className="num py-3 pr-3 text-right text-ink-2">{sign}{a}</td>
-                  <td className="num py-3 pr-3 text-right text-ink">{sign}{b}</td>
-                  <td className="py-3 text-right"><Delta value={b - a} inverse={k === 'B'} /></td>
+                  <td className="num whitespace-nowrap py-3 pr-3 text-right text-ink-2">{sign}{a}</td>
+                  <td className="num whitespace-nowrap py-3 pr-3 text-right text-ink">{sign}{b}</td>
+                  <td className="whitespace-nowrap py-3 text-right"><Delta value={b - a} inverse={k === 'B'} /></td>
                 </tr>
               )
             })}

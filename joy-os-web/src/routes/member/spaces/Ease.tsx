@@ -4,9 +4,8 @@ import { ArrowRight, Check, Moon, Phone, Plus, MessageCircle, ShieldCheck, Spark
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 import { Link } from 'react-router-dom'
 import { DaybreakButton, Eyebrow, fmtDate } from '@/components/joy/primitives'
-import { Button, Pill, Tabs } from '@/components/ui'
+import { Button, Pill, Sheet, Tabs } from '@/components/ui'
 import { TEAM } from '@/data/member'
-import { useApp } from '@/lib/store'
 import { BURDEN_PARTS, JOURNAL_START, KEEP_MEANING_START, SCREEN_FORMS, SCREEN_HISTORY, SCREEN_META, SPACE_TODAY, WIND_DOWN, type Screen } from './_data'
 import { SpaceShell, ToolCard, useCrisisGuard } from './_SpaceShell'
 
@@ -17,7 +16,9 @@ import { SpaceShell, ToolCard, useCrisisGuard } from './_SpaceShell'
 // Burden is hatched and signed with a minus; lower is better.
 // The one Daybreak button: save to the Second Arrow journal.
 export default function Ease() {
-  const { setCrisisOpen } = useApp()
+  // A tap on Tele-MANAS is a choice, not an intercept: it opens a neutral sheet
+  // (the shared crisis sheet speaks to words that were written and flagged).
+  const [talkOpen, setTalkOpen] = useState(false)
   // Screen history lives here so the sleep plan and clinician routing read the same results.
   const [history, setHistory] = useState(SCREEN_HISTORY)
   const isi = history.ISI[history.ISI.length - 1].score
@@ -29,7 +30,7 @@ export default function Ease() {
     <SpaceShell
       term="B"
       title={<>Put down what you are <em>adding</em></>}
-      headerActions={<Button onClick={() => setCrisisOpen(true)}><Phone size={16} /> Tele-MANAS · <span className="num">14416</span></Button>}
+      headerActions={<Button onClick={() => setTalkOpen(true)}><Phone size={16} /> Tele-MANAS · <span className="num">14416</span></Button>}
     >
       <LowerIsBetter />
       <div className="grid gap-6 lg:grid-cols-12">
@@ -39,9 +40,41 @@ export default function Ease() {
       <Screens history={history} setHistory={setHistory} />
       <div className="grid gap-6 lg:grid-cols-12">
         <div className="flex lg:col-span-7"><SleepPlan isi={isi} /></div>
-        <div className="flex lg:col-span-5"><ClinicianRouting tasks={tasks} /></div>
+        <div className="flex lg:col-span-5"><ClinicianRouting tasks={tasks} onTalk={() => setTalkOpen(true)} /></div>
       </div>
+      <TalkNowSheet open={talkOpen} onClose={() => setTalkOpen(false)} />
     </SpaceShell>
+  )
+}
+
+/** Opened by the member on purpose: the same people and numbers, without assuming anything was written. */
+function TalkNowSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const sanjay = TEAM.find((p) => p.role === 'Psychologist')!
+  return (
+    <Sheet open={open} onClose={onClose} title="Talk to someone now" side="center">
+      <p className="text-[17px] text-ink-2">A real person, whenever you want one. Nothing here is written by AI, and nothing is shared unless you call.</p>
+      <div className="mt-6 space-y-3">
+        <a href="tel:14416" className="flex items-center justify-between rounded-card bg-ink px-5 py-4 text-paper focus-ring">
+          <span>
+            <span className="block text-[17px] font-medium">Tele-MANAS · <span className="num">14416</span></span>
+            <span className="block text-[14px] opacity-90">Free, 24 hours, in 20 languages</span>
+          </span>
+          <Phone size={20} aria-hidden />
+        </a>
+        <Link to="/app/care/messages" onClick={onClose} className="flex items-center justify-between rounded-card border border-line px-5 py-4 text-ink focus-ring">
+          <span>
+            <span className="block text-[16px]">Message {sanjay.name}</span>
+            <span className="block text-[14px] text-ink-2">{sanjay.role} · replies within a working day</span>
+          </span>
+          <MessageCircle size={18} aria-hidden />
+        </Link>
+        <a href="tel:112" className="flex items-center justify-between rounded-card border border-line px-5 py-4 text-ink focus-ring">
+          <span className="text-[16px]">Emergency services · <span className="num">112</span></span>
+          <Phone size={18} aria-hidden />
+        </a>
+      </div>
+      <p className="eyebrow mt-6 text-ink-3">Opened by you · no entry is logged unless you call</p>
+    </Sheet>
   )
 }
 
@@ -115,9 +148,9 @@ function SecondArrow() {
       </form>
 
       <div className="mt-7 border-t border-line pt-5">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <Eyebrow>Latest · {fmtDate(latest.date)}</Eyebrow>
-          {!reflect && <Button size="sm" variant="ghost" onClick={() => setReflect(latest.id)}><Sparkles size={14} /> Reflect it back</Button>}
+          {!reflect && <Button size="sm" variant="ghost" onClick={() => setReflect(latest.id)} className="whitespace-nowrap"><Sparkles size={14} /> Reflect it back</Button>}
         </div>
         <dl className="mt-3 grid gap-3 sm:grid-cols-2">
           <div className="rounded-xl bg-paper-sunk p-3.5"><dt className="eyebrow text-ink-3">First arrow</dt><dd className="mt-1 text-[15px] text-ink">{latest.problem}</dd></div>
@@ -404,8 +437,7 @@ const ROUTED_BEFORE = [
   { on: '2026-07-06', what: 'ISI 15', who: 'Dr Meera Iyer', outcome: 'Reviewed in 31 h · sleep plan, no study · closed' },
 ]
 
-function ClinicianRouting({ tasks }: { tasks: { screen: Screen; score: number }[] }) {
-  const { setCrisisOpen } = useApp()
+function ClinicianRouting({ tasks, onTalk }: { tasks: { screen: Screen; score: number }[]; onTalk: () => void }) {
   const sanjay = TEAM.find((p) => p.role === 'Psychologist')!
   const meera = TEAM.find((p) => p.role === 'Physician')!
   const rules = [
@@ -455,7 +487,7 @@ function ClinicianRouting({ tasks }: { tasks: { screen: Screen; score: number }[
         </ul>
       </div>
       <div className="mt-auto pt-6">
-        <button onClick={() => setCrisisOpen(true)} className="flex w-full items-center justify-between rounded-2xl bg-ink px-5 py-4 text-left text-paper focus-ring">
+        <button onClick={onTalk} className="flex w-full items-center justify-between rounded-2xl bg-ink px-5 py-4 text-left text-paper focus-ring">
           <span>
             <span className="block text-[17px] font-medium">Talk to someone now</span>
             <span className="block text-[14px] opacity-90">Tele-MANAS · <span className="num">14416</span> · free, 24 hours, 20 languages</span>

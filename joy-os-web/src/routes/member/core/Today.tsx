@@ -96,7 +96,7 @@ export default function Today() {
               <p className="mt-4 text-[1.6rem] font-light leading-snug text-ink">
                 {action.title.replace('.', '')}. <em>Notice</em> three things.
               </p>
-              <button onClick={() => setWhyOpen(true)} className="mt-3 flex items-center gap-1.5 self-start text-[14px] text-ink-2 underline-offset-4 hover:underline focus-ring">
+              <button onClick={() => setWhyOpen(true)} className="mt-3 flex min-h-[24px] items-center gap-1.5 self-start py-1 text-[14px] text-ink-2 underline-offset-4 hover:underline focus-ring">
                 <Info size={15} /> Why this, today?
               </button>
               <div className="mt-auto flex flex-col gap-2 pt-6">
@@ -124,8 +124,9 @@ export default function Today() {
           <Eyebrow>Your circle · {CIRCLE.when}</Eyebrow>
           <p className="mt-3 text-[17px] text-ink">Coach {coach} and {WORDS[others] ?? others} others</p>
           <div className="mt-4 flex -space-x-2" aria-hidden>
+            {/* People are never coloured with the Spectrum: those six colours belong to the terms. */}
             {CIRCLE.members.map((m, i) => (
-              <span key={m} className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-paper-raised font-mono text-[11px] text-paper" style={{ background: ['var(--term-r)', 'var(--term-p)', 'var(--term-f)', 'var(--term-h)', 'var(--term-b)', 'var(--ink-2)', 'var(--term-r)', 'var(--term-p)'][i] }}>
+              <span key={m} className={`flex h-8 w-8 items-center justify-center rounded-full border-2 border-paper-raised font-mono text-[11px] ${i === 0 ? 'bg-ink text-paper' : 'bg-paper-sunk text-ink-2'}`}>
                 {m[0]}
               </span>
             ))}

@@ -103,6 +103,8 @@ export default function Tenant() {
           const id = `${k}:${t}`
           if (!seen.current.has(id)) return null
           const active = view === k && tab === t
+          // Outcomes holds charts and no work in progress: unmount it when hidden, so no chart measures a zero-size box.
+          if (!active && t === 'outcomes') return null
           return (
             <motion.div key={id} hidden={!active} role="tabpanel" aria-label={`${k} ${t}`} initial={{ opacity: 0, y: 6 }} animate={active ? { opacity: 1, y: 0 } : { opacity: 0, y: 6 }} transition={{ duration: 0.2 }}>
               {panel(k, t)}
@@ -638,7 +640,8 @@ function Access({ kind, stepUp, setStepUp }: { kind: View; stepUp: boolean; setS
   const edit = <T,>(set: (v: T) => void) => (v: T) => { set(v); setEdited(true); setSaved(false); setTest('idle') }
 
   const copy = (k: string, v: string) => {
-    try { void navigator.clipboard?.writeText(v) } catch { /* clipboard unavailable */ }
+    // writeText rejects (not throws) when the page lacks focus or permission; the value stays visible to copy by hand.
+    try { navigator.clipboard?.writeText(v).catch(() => undefined) } catch { /* clipboard unavailable */ }
     setCopied(k)
     window.setTimeout(() => setCopied(null), 1400)
   }
@@ -842,8 +845,9 @@ function ReadOnly({ label, value, copied, onCopy }: { label: string; value: stri
       <span className="eyebrow mb-1.5 block text-ink-3">{label}</span>
       <div className="flex h-11 items-center gap-2 rounded-lg border border-line bg-paper-sunk pl-3 pr-1">
         <span className="num min-w-0 flex-1 truncate text-[13px] text-ink-2">{value}</span>
-        <Button variant="ghost" size="sm" onClick={onCopy} aria-label={`Copy ${label}`}>{copied ? <Check size={15} /> : <Copy size={15} />}</Button>
+        <Button variant="ghost" size="sm" onClick={onCopy} aria-label={`Copy ${label}`}>{copied ? <Check size={15} aria-hidden /> : <Copy size={15} aria-hidden />}</Button>
       </div>
+      <span className="sr-only" aria-live="polite">{copied ? `${label} copied` : ''}</span>
     </div>
   )
 }

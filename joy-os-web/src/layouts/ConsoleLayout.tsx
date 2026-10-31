@@ -2,6 +2,8 @@ import clsx from 'clsx'
 import { Activity, Building2, FlaskConical, Gauge, HeartPulse, Hotel, LayoutGrid, Stethoscope, Users } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { JoyOsLockup } from '@/components/joy/Brand'
+import { useApp } from '@/lib/store'
+import { DEMO_ROLES } from './DemoBar'
 import { ThemeToggle } from './shared'
 
 // Consoles that sit around the member app (Memo p.16; Architecture p21, p25).
@@ -16,7 +18,15 @@ export const CONSOLES = [
   { to: '/console/exec', label: 'Leadership scoreboard', icon: Gauge, who: 'CEO, CTO, Head of Joy OS', rule: 'Records re-measured per rupee — not downloads, not minutes' },
 ]
 
+/** The demo role whose console a path opens (same rule as useEnterAs in story/_parts). */
+function roleFor(to: string) {
+  return DEMO_ROLES.find((d) => d.role !== 'member' && (to === d.to || to.startsWith(`${d.to}/`)))?.role
+}
+
 export default function ConsoleLayout() {
+  const { setRole } = useApp()
+  // Following a console link keeps the Demo switcher in step with the console on screen.
+  const enter = (to: string) => () => { const r = roleFor(to); if (r) setRole(r) }
   return (
     <div className="min-h-screen bg-paper">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col border-r border-line bg-paper-sunk/40 xl:flex">
@@ -24,9 +34,9 @@ export default function ConsoleLayout() {
         <nav aria-label="Consoles" className="flex-1 px-3 py-2">
           <NavLink to="/console" end className={({ isActive }) => linkCls(isActive)}><LayoutGrid size={17} strokeWidth={1.6} /> All consoles</NavLink>
           <p className="eyebrow mb-2 mt-6 px-3 text-ink-3">Care</p>
-          {CONSOLES.slice(0, 3).map((c) => <NavLink key={c.to} to={c.to} className={({ isActive }) => linkCls(isActive)}><c.icon size={17} strokeWidth={1.6} />{c.label}</NavLink>)}
+          {CONSOLES.slice(0, 3).map((c) => <NavLink key={c.to} to={c.to} onClick={enter(c.to)} className={({ isActive }) => linkCls(isActive)}><c.icon size={17} strokeWidth={1.6} />{c.label}</NavLink>)}
           <p className="eyebrow mb-2 mt-6 px-3 text-ink-3">Platform</p>
-          {CONSOLES.slice(3).map((c) => <NavLink key={c.to} to={c.to} className={({ isActive }) => linkCls(isActive)}><c.icon size={17} strokeWidth={1.6} />{c.label}</NavLink>)}
+          {CONSOLES.slice(3).map((c) => <NavLink key={c.to} to={c.to} onClick={enter(c.to)} className={({ isActive }) => linkCls(isActive)}><c.icon size={17} strokeWidth={1.6} />{c.label}</NavLink>)}
         </nav>
         <div className="border-t border-line px-5 py-4 text-[12px] text-ink-3">
           <p className="eyebrow">Region · India (Mumbai)</p>
@@ -51,10 +61,10 @@ export default function ConsoleLayout() {
         </header>
         <nav aria-label="Consoles" className="flex gap-1 overflow-x-auto border-b border-line px-4 py-2 xl:hidden">
           {CONSOLES.map((c) => (
-            <NavLink key={c.to} to={c.to} className={({ isActive }) => clsx('whitespace-nowrap rounded-full px-3 py-1.5 text-[13px]', isActive ? 'bg-ink text-paper' : 'text-ink-2')}>{c.label}</NavLink>
+            <NavLink key={c.to} to={c.to} onClick={enter(c.to)} className={({ isActive }) => clsx('whitespace-nowrap rounded-full px-3 py-1.5 text-[13px]', isActive ? 'bg-ink text-paper' : 'text-ink-2')}>{c.label}</NavLink>
           ))}
         </nav>
-        <main id="main" className="mx-auto w-full max-w-[1400px] px-5 py-8 md:px-8">
+        <main id="main" className="mx-auto w-full max-w-[1400px] px-5 pb-24 pt-8 md:px-8">
           <Outlet />
         </main>
       </div>

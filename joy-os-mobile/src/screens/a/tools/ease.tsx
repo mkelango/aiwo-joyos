@@ -213,7 +213,7 @@ function CareRouted({ today = false }: { today?: boolean }) {
         <Icon name="user-check" size={16} color={c.ink} />
         <Body style={{ flex: 1 }}>{today ? 'Dr Sanjay Menon will call you today. You do not need to do anything.' : 'Dr Sanjay Menon will read this within 48 hours. You do not need to do anything.'}</Body>
       </View>
-      <ArrowLink icon="message-square" onPress={() => router.push('/care')}>
+      <ArrowLink icon="message-square" onPress={() => router.push('/messages?compose=1&to=p_sanjay')}>
         Message him in Care
       </ArrowLink>
     </Card>
@@ -320,6 +320,7 @@ function KeepMeaning() {
               onPress={() => setItems((all) => all.map((y) => (y.id === x.id ? { ...y, done: !y.done } : y)))}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: x.done }}
+              aria-checked={x.done}
               accessibilityLabel={x.text}
               style={({ pressed }) => ({ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, opacity: pressed ? 0.7 : 1 })}
             >
@@ -360,7 +361,7 @@ function TeleManas() {
       <Meta size={14} tone="ink3">
         In an emergency, call 112. Dr Sanjay Menon, your psychologist, is one message away in Care.
       </Meta>
-      <ArrowLink icon="message-square" onPress={() => router.push('/care')}>
+      <ArrowLink icon="message-square" onPress={() => router.push('/messages?compose=1&to=p_sanjay')}>
         Message Dr Sanjay in Care
       </ArrowLink>
     </ToolCard>

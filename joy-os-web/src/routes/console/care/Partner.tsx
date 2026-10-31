@@ -530,7 +530,11 @@ function Commerce() {
               </li>
             ))}
           </ul>
-          <p className="mt-3 flex items-center gap-2 text-[14px] text-ink"><Check size={15} aria-hidden /> Rule met: receivables over thirty days are zero.</p>
+          {over30.amount === 0 ? (
+            <p className="mt-3 flex items-center gap-2 text-[14px] text-ink"><Check size={15} aria-hidden /> Rule met: receivables over thirty days are zero.</p>
+          ) : (
+            <p className="mt-3 text-[14px] text-ink"><span className="num">{inr(over30.amount)}</span> over thirty days. The AIWO partner desk is chasing it; new packages still settle T+2.</p>
+          )}
           <p className="mt-1 text-[12px] text-ink-3">Prepaid packages; GST invoices issued by AIWO. Razorpay settlement T+2.</p>
         </Card>
       </div>

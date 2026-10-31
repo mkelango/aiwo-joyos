@@ -2,20 +2,27 @@ import { router } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Platform, Share, View } from 'react-native'
 import { Avatar, Body, Button, Card, DaybreakButton, Divider, Eyebrow, ListRow, Meta, Mono, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, Title } from '@/components'
+import { useApp, type Lang } from '@/lib/store'
 import { HOUSEHOLD, MEMBER } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
 import { PLANS } from '@/screens/b/_data'
 import { accountStore, maskPhone, sessionStore, useStore, type AccountState } from '@/screens/b/bStore'
-import { Done, Field, useSheetCrisisGuard } from '@/screens/b/parts'
+import { Done, Field, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
 
 // PROFILE: who you are in Joy OS — AIWO ID (copy), personal details (validated edit), the
 // household, an emergency contact, the account links, and a deliberate sign-out with a
 // confirm step. One Daybreak: Save changes.
 
 const LANGS = ['English', 'தமிழ் Tamil', 'हिन्दी Hindi'] as const
+// Profile language is the app language (the same one Settings and onboarding set).
+const LANG_CODE: Record<string, Lang> = { English: 'en', 'தமிழ் Tamil': 'ta', 'हिन्दी Hindi': 'hi' }
+const LANG_NAME: Record<Lang, string> = { en: 'English', ta: 'தமிழ் Tamil', hi: 'हिन्दी Hindi' }
 
-export default function Profile() {
+export default memberOnly(Profile)
+
+function Profile() {
   const { space } = useTheme()
+  const { lang, setLang } = useApp()
   const guard = useSheetCrisisGuard()
   const [acct, setAcct] = useStore(accountStore)
   const planName = `${PLANS.find((p) => p.key === acct.plan)?.name ?? MEMBER.plan} + ${MEMBER.membership}`
@@ -24,19 +31,27 @@ export default function Profile() {
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [emOpen, setEmOpen] = useState(false)
   const [outOpen, setOutOpen] = useState(false)
-  const [draft, setDraft] = useState<AccountState['profile']>(acct.profile)
+  const [draft, setDraft] = useState<AccountState['profile']>({ ...acct.profile, language: LANG_NAME[lang] })
   const [em, setEm] = useState<AccountState['emergency']>(acct.emergency)
   const [errs, setErrs] = useState<Record<string, string>>({})
   const [dirty, setDirty] = useState(false)
   const [saved, setSaved] = useState<string | null>(null)
+  // What the member accepted with Done in a sheet but has not saved yet; a sheet dismissed
+  // without Done goes back to this (or to the saved record), so the page never shows edits it will not keep.
+  const [kept, setKept] = useState<{ profile: AccountState['profile']; emergency: AccountState['emergency'] } | null>(null)
   const me = HOUSEHOLD[0]
 
   useEffect(() => {
     if (!dirty) {
-      setDraft(acct.profile)
+      setDraft({ ...acct.profile, language: LANG_NAME[lang] })
       setEm(acct.emergency)
     }
-  }, [acct, dirty])
+  }, [acct, dirty, lang])
+  const discard = () => {
+    setDraft(kept?.profile ?? { ...acct.profile, language: LANG_NAME[lang] })
+    setEm(kept?.emergency ?? acct.emergency)
+    setErrs({})
+  }
 
   const copy = () => {
     // No clipboard module in this build: the web uses the browser clipboard, a phone the share sheet.
@@ -47,7 +62,7 @@ export default function Profile() {
   }
   const checkDetails = () => {
     const e: Record<string, string> = {}
-    if (!guard(draft.name, () => setDetailsOpen(false))) return false
+    if (!guard(draft.name, () => { discard(); setDetailsOpen(false) })) return false
     if (draft.name.trim().length < 2) e.name = 'Enter your name as you would like to be called.'
     if (!/^[6-9]\d{9}$/.test(draft.phone)) e.phone = 'Enter a 10-digit Indian mobile number.'
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(draft.email.trim())) e.email = 'Enter a valid email address.'
@@ -56,7 +71,7 @@ export default function Profile() {
   }
   const checkEm = () => {
     const e: Record<string, string> = {}
-    if (!guard(`${em.name} ${em.relation}`, () => setEmOpen(false))) return false
+    if (!guard(`${em.name} ${em.relation}`, () => { discard(); setEmOpen(false) })) return false
     if (em.name.trim().length < 2) e.emName = 'Enter their name.'
     if (em.relation.trim().length < 2) e.emRel = 'How are they related to you?'
     if (!/^[6-9]\d{9}$/.test(em.phone)) e.emPhone = 'Enter a 10-digit Indian mobile number.'
@@ -66,6 +81,8 @@ export default function Profile() {
   const save = () => {
     if (!dirty) return setSaved('Nothing has changed since your last save.')
     setAcct((a) => ({ ...a, profile: { ...draft, name: draft.name.trim(), email: draft.email.trim() }, emergency: { ...em, name: em.name.trim(), relation: em.relation.trim() } }))
+    if (LANG_CODE[draft.language] && LANG_CODE[draft.language] !== lang) setLang(LANG_CODE[draft.language])
+    setKept(null)
     setDirty(false)
     setSaved('Saved on this phone. It syncs to your AIWO ID when online.')
   }
@@ -157,7 +174,10 @@ export default function Profile() {
 
       <Sheet
         open={detailsOpen}
-        onClose={() => setDetailsOpen(false)}
+        onClose={() => {
+          discard()
+          setDetailsOpen(false)
+        }}
         title="Personal details"
         footer={
           <Button
@@ -165,6 +185,7 @@ export default function Profile() {
             block
             onPress={() => {
               if (!checkDetails()) return
+              setKept({ profile: draft, emergency: em })
               setDirty(true)
               setSaved(null)
               setDetailsOpen(false)
@@ -184,7 +205,10 @@ export default function Profile() {
 
       <Sheet
         open={emOpen}
-        onClose={() => setEmOpen(false)}
+        onClose={() => {
+          discard()
+          setEmOpen(false)
+        }}
         title="Emergency contact"
         footer={
           <Button
@@ -192,6 +216,7 @@ export default function Profile() {
             block
             onPress={() => {
               if (!checkEm()) return
+              setKept({ profile: draft, emergency: em })
               setDirty(true)
               setSaved(null)
               setEmOpen(false)

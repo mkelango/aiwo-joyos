@@ -38,6 +38,7 @@ export function DaybreakButton({ children, onPress, disabled, icon, block = true
       accessibilityLabel={children}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: !!disabled }}
+      aria-disabled={!!disabled}
       style={({ pressed }) => [
         {
           minHeight: 56,
@@ -104,6 +105,7 @@ export function Button({ children, onPress, variant = 'secondary', size = 'md', 
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: !!disabled }}
+      aria-disabled={!!disabled}
       hitSlop={variant === 'link' ? 6 : undefined}
       style={({ pressed }) => [
         {

@@ -163,6 +163,7 @@ function PeaceOfMind() {
               onPress={() => setItems((all) => all.map((y) => (y.id === x.id ? { ...y, done: !y.done } : y)))}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: x.done }}
+              aria-checked={x.done}
               accessibilityLabel={`${x.title}. ${x.detail}`}
               style={({ pressed }) => ({ flexDirection: 'row', gap: 12, paddingVertical: 12, opacity: pressed ? 0.7 : 1 })}
             >

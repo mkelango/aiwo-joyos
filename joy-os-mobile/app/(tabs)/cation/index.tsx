@@ -35,6 +35,7 @@ import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { MY_CATION, SIGNAL_READINGS } from '@/screens/b/journeyData'
 import { FilterChips, HereMarker, PrimaryChip, TimelineStep } from '@/screens/b/parts'
+import { useCationRequests } from '@/screens/a/local'
 
 // ’CATION (Memo p.20): the member's current journey — before, during, after; the hand-off,
 // readings from Signal Points, the named outcome and the ninety days; then the ’cation for
@@ -53,6 +54,11 @@ const phaseState = (key: string): 'done' | 'now' | 'next' => {
 export default function CationHome() {
   const { c, space } = useTheme()
   const [filter, setFilter] = useState<Filter>('all')
+  const { requests } = useCationRequests()
+  const requestLine = (slug: string) => {
+    const r = requests[slug]
+    return r ? `${r.interestOnly ? 'Interest registered' : 'Requested'} · ${r.ref}` : null
+  }
   const latest = INDEX_HISTORY[0]
   const lowest = termByKey(latest.lowestTerm)
   const lowestScore = latest.terms.find((t) => t.key === latest.lowestTerm)?.value
@@ -138,7 +144,7 @@ export default function CationHome() {
           <Pressable
             key={p.id}
             onPress={() => router.push(`/messages?t=${thread}`)}
-            accessibilityRole="button"
+            accessibilityRole="link"
             accessibilityLabel={`Message ${p.name}. ${what}`}
             style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.paperSunk, borderRadius: 12, padding: 12, minHeight: 64, opacity: pressed ? 0.75 : 1 })}
           >
@@ -271,7 +277,7 @@ export default function CationHome() {
               key={x.slug}
               tone="raised"
               onPress={() => router.push(`/cation/${x.slug}`)}
-              accessibilityLabel={`${x.name}. ${x.promise} ${x.nights}, from ${x.priceFrom}. ${x.status === 'FY28' ? 'Opens FY28' : x.status === 'NEW' ? 'New' : 'Live'}.`}
+              accessibilityLabel={`${x.name}. ${x.promise} ${x.nights}, from ${x.priceFrom}. ${x.status === 'FY28' ? 'Opens FY28' : x.status === 'NEW' ? 'New' : 'Live'}.${requestLine(x.slug) ? ` ${requestLine(x.slug)}.` : ''}`}
               style={{ gap: space.s1 }}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s1, flexWrap: 'wrap' }}>
@@ -285,6 +291,14 @@ export default function CationHome() {
               <Meta>{x.promise}</Meta>
               {x.slug === MY_CATION.slug ? <Meta size={14} tone="daybreak">{`You took this · ${MY_CATION.venue}`}</Meta> : null}
               {x.primary === latest.lowestTerm ? <Meta size={14} tone="daybreak">For your lowest term</Meta> : null}
+              {requestLine(x.slug) ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Icon name="check" size={14} color={c.ink} />
+                  <Meta size={14} tone="ink">
+                    {requestLine(x.slug)}
+                  </Meta>
+                </View>
+              ) : null}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space.s1, marginTop: 4 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1 }}>
                   <Icon name="map-pin" size={13} color={c.ink3} />

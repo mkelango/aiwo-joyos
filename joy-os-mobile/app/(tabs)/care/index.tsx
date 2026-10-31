@@ -118,7 +118,7 @@ export default function Care() {
             <Pressable
               key={t.id}
               onPress={() => router.push(`/messages?t=${t.id}`)}
-              accessibilityRole="button"
+              accessibilityRole="link"
               accessibilityLabel={`${p.name}, ${t.subject}${isUnread(t.id, t.unread) ? ', new reply' : ''}. ${last.body}`}
               style={({ pressed }) => ({ flexDirection: 'row', gap: 12, opacity: pressed ? 0.7 : 1 })}
             >
@@ -298,6 +298,7 @@ export default function Care() {
                 onPress={() => setOpenResult(open ? null : r.id)}
                 accessibilityRole="button"
                 accessibilityState={{ expanded: open }}
+                aria-expanded={open}
                 accessibilityLabel={`${r.name}. ${r.status === 'signed' ? `Signed by ${r.signedBy}` : 'Awaiting sign-off'}. ${open ? 'Hide' : 'Show'} markers.`}
                 style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, minHeight: 44 }}
               >

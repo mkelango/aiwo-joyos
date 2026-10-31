@@ -230,9 +230,9 @@ function Digest({ d }: { d: CoachDigest }) {
         {/* Term scores */}
         <Card className="min-w-0">
           <CardHead eyebrow="Term scores and bands" aside={<span className="flex items-baseline gap-2"><span className="num text-[2.2rem] font-light leading-none text-ink">{d.index}</span><BandLabel band={d.band} /></span>} />
-          <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
+          <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start lg:flex-col lg:items-center 2xl:flex-row 2xl:items-start">
             <div className="shrink-0"><JoyspanWheel terms={d.terms} size={140} /></div>
-            <ul className="w-full space-y-2">
+            <ul className="w-full min-w-0 flex-1 space-y-2">
               {d.terms.map((s) => {
                 const term = termByKey(s.key)
                 return (
@@ -240,7 +240,7 @@ function Digest({ d }: { d: CoachDigest }) {
                     <span className="flex min-w-0 items-start gap-2">
                       <span className="mt-1.5"><TermDot term={s.key} /></span>
                       <span className="min-w-0">
-                        <span className="block whitespace-nowrap text-[14px] text-ink-2">{term.name}</span>
+                        <span className="block text-[14px] leading-snug text-ink-2">{term.name}</span>
                         <span className="eyebrow block !text-[10px] text-ink-3">{s.band}</span>
                       </span>
                     </span>

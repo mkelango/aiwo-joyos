@@ -8,7 +8,7 @@ import { Avatar, Button, Card, EmptyState, PageHeader, Pill, Sheet } from '@/com
 import { MEMBER, TEAM } from '@/data/member'
 import { CARE_LADDER, CLINICIANS, CONSULTS, ERX, PAST_CONSULTS, PEOPLE_DETAIL, RESULTS, THREADS } from './_data'
 import { Checkbox, Field, LinkButton, Section, Segmented, Select, TeleManasStrip } from './_parts'
-import { inputCls, useToast } from './_util'
+import { inputCls, usePersisted, useToast } from './_util'
 
 // CARE (Memo p.17, module 09 Care bridge): my people, the stepped-care ladder,
 // consults under the Telemedicine Practice Guidelines 2020, signed results, e-Rx
@@ -26,7 +26,10 @@ export default function Care() {
   const [bookFor, setBookFor] = useState<(typeof CLINICIANS)[number] | null>(null)
   const [lifeOsOpen, setLifeOsOpen] = useState(false)
   const person = (id: string) => TEAM.find((p) => p.id === id)!
-  const [consults, setConsults] = useState<Consult[]>(() => CONSULTS.map((c) => { const p = person(c.with); return { ...c, who: { name: p.name, initials: p.initials, tone: p.tone, reg: REG[p.name] } } }))
+  // Bookings, new times and cancellations are kept per viewer, so they survive leaving Care.
+  const [saved, setSaved] = usePersisted<{ list: Consult[] }>('consults', { list: CONSULTS.map((c) => { const p = person(c.with); return { ...c, who: { name: p.name, initials: p.initials, tone: p.tone, reg: REG[p.name] } } }) })
+  const consults = saved.list
+  const setConsults = (fn: (cs: Consult[]) => Consult[]) => setSaved((s) => ({ list: fn(s.list) }))
   const [resched, setResched] = useState<Consult | null>(null)
   const [room, setRoom] = useState<Consult | null>(null)
   const [role, setRole] = useState<'Psychologist' | 'Physician'>('Psychologist')
@@ -631,7 +634,7 @@ function WaitingRoom({ consult, onClose, onEnded }: { consult: Consult | null; o
             <Avatar person={consult.who} size={48} />
             <div>
               <p className="text-[17px] text-ink">{consult.who.name}</p>
-              <p className="text-[14px] text-ink-2">{consult.who.reg?.startsWith('RCI') ? 'Licensed clinical psychologist' : 'Registered medical practitioner'} · Reg.<span className="num">{consult.who.reg ?? 'on file'}</span></p>
+              <p className="text-[14px] text-ink-2">{consult.who.reg?.startsWith('RCI') ? 'Licensed clinical psychologist' : 'Registered medical practitioner'} · Reg. <span className="num">{consult.who.reg ?? 'on file'}</span></p>
               <p className="num text-[13px] text-ink-3">{consult.when} · {consult.time} · {consult.minutes} min · video</p>
             </div>
           </div>

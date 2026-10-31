@@ -5,7 +5,7 @@ import { Body, Button, Card, DaybreakButton, Divider, Eyebrow, Icon, Meta, Mono,
 import { useTheme } from '@/theme/ThemeProvider'
 import { NOTICES, type Notice } from '@/screens/b/_data'
 import { notifPrefsStore, notifReadStore, useStore, validatePrefs, type NotifPrefs } from '@/screens/b/bStore'
-import { Done, TimeStepper } from '@/screens/b/parts'
+import { Done, TimeStepper, memberOnly } from '@/screens/b/parts'
 
 // NOTIFICATIONS: the few things we sent you, grouped Today / Earlier, each opening where it
 // belongs; then the rules we keep — quiet hours, at most three a day, and the channels. The
@@ -13,7 +13,9 @@ import { Done, TimeStepper } from '@/screens/b/parts'
 
 const ICON: Record<Notice['kind'], IconName> = { action: 'sun', ledger: 'feather', circle: 'users', message: 'message-circle', letter: 'mail', care: 'heart' }
 
-export default function Notifications() {
+export default memberOnly(Notifications)
+
+function Notifications() {
   const { c, space } = useTheme()
   const [prefs, setPrefs] = useStore(notifPrefsStore)
   const [rd, setRd] = useStore(notifReadStore)

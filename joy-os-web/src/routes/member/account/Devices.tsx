@@ -1,13 +1,13 @@
 import clsx from 'clsx'
 import { motion } from 'framer-motion'
 import { AlertCircle, Apple, Check, CircleDot, Clock, Link2, RefreshCw, ShieldOff, Smartphone, Watch } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Bar, BarChart, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { DaybreakButton, SpecimenTag, TermChip } from '@/components/joy/primitives'
 import { Button, Card, EmptyState, PageHeader, Pill, Sheet } from '@/components/ui'
-import { DEVICES, HEALTHKIT_TYPES, WEAR_NIGHTS } from './_data'
+import { DEVICES, HEALTHKIT_TYPES, WEAR_NIGHTS, type DeviceState } from './_data'
 import { Checkbox, Section, Toggle } from './_parts'
-import { useToast } from './_util'
+import { usePersisted, useToast } from './_util'
 
 // DEVICES (Signals, Memo p.15–16): Oura by default via Terra, Apple Health with
 // per-type HealthKit reads and mindful-minutes write-back, Health Connect, WHOOP,
@@ -15,17 +15,31 @@ import { useToast } from './_util'
 // Joy OS never imports a vendor's readiness, strain or age score into the Index.
 // One Daybreak: "Sync now".
 type Device = (typeof DEVICES)[number]
+type DeviceOverride = { state: DeviceState; lastSync?: string; freshness?: 'fresh' | 'stale' }
+function applyDeviceStates(states: Record<string, DeviceOverride>): Device[] {
+  // Android-only sources keep their own state; a disconnected default ring becomes "available" again.
+  return DEVICES.map((d) => (states[d.id] ? { ...d, ...states[d.id], state: states[d.id].state === 'available' && d.state === 'android' ? 'android' : states[d.id].state } : d))
+}
 /** Specimen samples per sync, per source. */
 const SAMPLES: Record<string, number> = { oura: 288, apple: 124 }
 
 export default function Devices() {
   const [toast, showToast] = useToast()
-  const [devices, setDevices] = useState(DEVICES)
+  // Connection state is kept per viewer so Profile and a reload show the same devices.
+  const [saved, setSaved] = usePersisted<{ states: Record<string, DeviceOverride> }>('devices', { states: {} })
+  const devices = useMemo(() => applyDeviceStates(saved.states), [saved])
+  const setDevices = (fn: (ds: Device[]) => Device[]) => setSaved((cur) => {
+    const next = fn(applyDeviceStates(cur.states))
+    return { states: Object.fromEntries(next.map((d) => [d.id, { state: d.state, lastSync: d.lastSync, freshness: d.freshness }])) }
+  })
   const [syncing, setSyncing] = useState(false)
   const [connect, setConnect] = useState<Device | null>(null)
   const [disconnect, setDisconnect] = useState<Device | null>(null)
-  const [hk, setHk] = useState(HEALTHKIT_TYPES)
-  const [writeBack, setWriteBack] = useState(true)
+  const [hkSaved, setHkSaved] = usePersisted<{ on: Record<string, boolean>; writeBack: boolean }>('healthkit', { on: Object.fromEntries(HEALTHKIT_TYPES.map((x) => [x.id, x.on])), writeBack: true })
+  const hk = HEALTHKIT_TYPES.map((x) => ({ ...x, on: hkSaved.on[x.id] ?? x.on }))
+  const setHk = (fn: (h: typeof hk) => typeof hk) => setHkSaved((cur) => ({ ...cur, on: Object.fromEntries(fn(HEALTHKIT_TYPES.map((x) => ({ ...x, on: cur.on[x.id] ?? x.on }))).map((x) => [x.id, x.on])) }))
+  const writeBack = hkSaved.writeBack
+  const setWriteBack = (v: boolean) => setHkSaved((cur) => ({ ...cur, writeBack: v }))
   const connected = devices.filter((d) => d.state === 'connected')
   const others = devices.filter((d) => d.state !== 'connected')
 

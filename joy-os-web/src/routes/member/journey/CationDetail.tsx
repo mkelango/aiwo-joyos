@@ -1,8 +1,8 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowDown, ArrowLeft, ArrowRight, Check, CreditCard, Info, MapPin, MessageCircle, Minus, Moon, Plus, ShieldCheck, Stethoscope } from 'lucide-react'
-import { useId, useMemo, useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useEffect, useId, useMemo, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { DaybreakButton, Eyebrow, TermChip, TermDot } from '@/components/joy/primitives'
 import { Button, Card, EmptyState, PageHeader, Pill, SectionTitle } from '@/components/ui'
 import { CATIONS, CATION_PHASES } from '@/data/platform'
@@ -24,6 +24,24 @@ export default function CationDetail() {
   const d = CATION_DETAIL[slug]
   const itinerary = useMemo(() => buildItinerary(slug), [slug])
   const [day, setDay] = useState(1)
+  const tabId = useId()
+  const { hash } = useLocation()
+
+  // Arriving from the Passport (“See the request”) lands on the request panel.
+  useEffect(() => {
+    if (!hash) return
+    const t = window.setTimeout(() => document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' }), 60)
+    return () => window.clearTimeout(t)
+  }, [hash, slug])
+  // Arrow keys move between days, as a tablist should.
+  const onDaysKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    const n = itinerary.length
+    const to = e.key === 'ArrowRight' ? (day % n) + 1 : e.key === 'ArrowLeft' ? ((day + n - 2) % n) + 1 : e.key === 'Home' ? 1 : e.key === 'End' ? n : 0
+    if (!to) return
+    e.preventDefault()
+    setDay(to)
+    document.getElementById(`${tabId}-t${to}`)?.focus()
+  }
 
   if (!c || !d) {
     return (
@@ -92,17 +110,18 @@ export default function CationDetail() {
           {/* Itinerary */}
           <section aria-labelledby="itin">
             <SectionTitle aside={<span className="text-[13px] text-ink-3">Room and treatment schedule</span>}><span id="itin">The itinerary, day by day</span></SectionTitle>
-            <div className="-mx-1 mb-4 overflow-x-auto px-1 pb-1">
-              <div role="tablist" aria-label="Itinerary days" className="inline-flex gap-1 rounded-full bg-paper-sunk p-1">
+            <div className="mb-4">
+              {/* Wraps rather than scrolls, so the last day is never hidden off the edge. */}
+              <div role="tablist" aria-label="Itinerary days" className="inline-flex flex-wrap gap-1 rounded-[1.4rem] bg-paper-sunk p-1" onKeyDown={onDaysKey}>
                 {itinerary.map((x) => (
-                  <button key={x.day} role="tab" aria-selected={day === x.day} onClick={() => setDay(x.day)} className={clsx('whitespace-nowrap rounded-full px-4 py-1.5 text-[14px] transition-colors focus-ring', day === x.day ? 'bg-paper-raised text-ink shadow-card' : 'text-ink-2 hover:text-ink')}>
+                  <button key={x.day} id={`${tabId}-t${x.day}`} type="button" role="tab" aria-selected={day === x.day} aria-controls={`${tabId}-panel`} tabIndex={day === x.day ? 0 : -1} onClick={() => setDay(x.day)} className={clsx('whitespace-nowrap rounded-full px-4 py-1.5 text-[14px] transition-colors focus-ring', day === x.day ? 'bg-paper-raised text-ink shadow-card' : 'text-ink-2 hover:text-ink')}>
                     Day <span className="num">{x.day}</span>
                   </button>
                 ))}
               </div>
             </div>
             <AnimatePresence mode="wait">
-              <motion.div key={current.day} {...fade} exit={{ opacity: 0 }}>
+              <motion.div key={current.day} id={`${tabId}-panel`} role="tabpanel" aria-labelledby={`${tabId}-t${current.day}`} {...fade} exit={{ opacity: 0 }}>
                 <Card tone="outline">
                   <p className="eyebrow text-ink-3">Day <span className="num">{current.day}</span> of <span className="num">{itinerary.length}</span></p>
                   <p className="mt-1 text-[1.3rem] font-light text-ink">{current.title}</p>

@@ -26,7 +26,8 @@ export function DemoBar() {
   const { pathname } = useLocation()
   if (pathname.startsWith('/creds') || pathname.startsWith('/app/index/take')) return null
   return (
-    <div className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-3 z-40 lg:bottom-5 lg:right-4">
+    // Above the member tab bar inside /app; near the corner everywhere else.
+    <div className={clsx('fixed right-3 z-40 lg:bottom-5 lg:right-4', pathname === '/app' || pathname.startsWith('/app/') ? 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))]' : 'bottom-[calc(1.25rem+env(safe-area-inset-bottom))]')}>
       <AnimatePresence>
         {open && (
           <motion.div

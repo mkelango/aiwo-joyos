@@ -13,6 +13,9 @@ export function Toggle({ checked, onChange, label, description, disabled }: { ch
       accessibilityRole="switch"
       accessibilityLabel={label}
       accessibilityState={{ checked, disabled: !!disabled }}
+      // react-native-web drops accessibilityState, so say it in ARIA too.
+      aria-checked={checked}
+      aria-disabled={!!disabled}
       style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, minHeight: 44, opacity: disabled ? 0.5 : pressed ? 0.8 : 1 })}
     >
       <View style={{ flex: 1, gap: 2 }}>

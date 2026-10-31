@@ -38,7 +38,8 @@ export function termHistory(key: TermKey) {
   const start = new Date('2026-10-30')
   return Array.from({ length: 14 }, (_, i) => {
     const p = i / 13
-    const wobble = i === 13 ? 0 : Math.round(Math.sin(seed * 1.7 + i * 1.3) * 1.6)
+    // The ends are the two measured scores (so the line agrees with the delta); weeks between wobble.
+    const wobble = i === 0 || i === 13 ? 0 : Math.round(Math.sin(seed * 1.7 + i * 1.3) * 1.6)
     const d = new Date(start.getTime() + i * 7 * 86400000)
     return {
       label: d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),

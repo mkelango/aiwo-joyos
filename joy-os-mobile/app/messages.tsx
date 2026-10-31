@@ -6,7 +6,7 @@ import { TEAM } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
 import { PEOPLE_DETAIL, THREADS, type Msg, type Thread } from '@/screens/b/accountData'
 import { messagesStore, useStore } from '@/screens/b/bStore'
-import { ChoiceCard, Done, Field, useCrisisGuard } from '@/screens/b/parts'
+import { ChoiceCard, Done, Field, useCrisisGuard, memberOnly } from '@/screens/b/parts'
 
 // MESSAGES (Care bridge): every thread with a named person. VIVA may draft; a person signs.
 // Three views on one route: the inbox, a thread (?t=<id>) and a new message (?compose=1&to=<person>).
@@ -32,7 +32,9 @@ function useThreads() {
   return { all, state, set, isUnread }
 }
 
-export default function Messages() {
+export default memberOnly(Messages)
+
+function Messages() {
   const { t = '', compose = '', to = '' } = useLocalSearchParams<{ t?: string; compose?: string; to?: string }>()
   if (compose) return <Compose key={`c-${to}`} initialTo={to} />
   if (t) return <ThreadView key={t} id={t} />

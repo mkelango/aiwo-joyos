@@ -2,20 +2,22 @@ import type { ReactNode } from 'react'
 import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 import type { Person } from '../shared/types'
 import { useTheme } from '../theme/ThemeProvider'
-import { light } from '../theme/tokens'
 import { Icon, type IconName } from './Icon'
 import { Body, Meta } from './Text'
 
-/** Initials avatar on the person's tone (a 'var(--term-x)' string from the shared data). */
+/**
+ * Initials avatar on a neutral Paper ground. The Spectrum is reserved for the six terms, so a
+ * person's `tone` from the shared data is never painted here.
+ */
 export function Avatar({ person, size = 40 }: { person: Pick<Person, 'initials' | 'tone' | 'name'>; size?: number }) {
-  const { resolve, fonts } = useTheme()
+  const { c, fonts } = useTheme()
   return (
     <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: resolve(person.tone), alignItems: 'center', justifyContent: 'center' }}
+      style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: c.paperSunk, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center' }}
     >
-      <Text maxFontSizeMultiplier={1.2} style={{ fontFamily: fonts.monoMedium, fontSize: Math.round(size * 0.3), color: light.onInk }}>
+      <Text maxFontSizeMultiplier={1.2} style={{ fontFamily: fonts.monoMedium, fontSize: Math.round(size * 0.3), color: c.ink2 }}>
         {person.initials}
       </Text>
     </View>
@@ -71,7 +73,9 @@ export function Segmented<T extends string>({ value, onChange, items, style }: {
             key={it.value}
             onPress={() => onChange(it.value)}
             accessibilityRole="tab"
+            accessibilityLabel={it.label}
             accessibilityState={{ selected: on }}
+            aria-selected={on}
             style={{ minHeight: 40, paddingHorizontal: 16, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: on ? c.paperRaised : undefined }}
           >
             <Text maxFontSizeMultiplier={1.6} style={{ fontFamily: on ? fonts.sansSemi : fonts.sans, fontSize: 15 * textScale, color: on ? c.ink : c.ink2 }}>

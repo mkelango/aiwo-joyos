@@ -5,6 +5,8 @@ import { Link } from 'react-router-dom'
 import { TermDot } from '@/components/joy/primitives'
 import { termByKey } from '@/data/terms'
 import type { TermKey } from '@/domain/types'
+import { DEMO_ROLES } from '@/layouts/DemoBar'
+import { useApp } from '@/lib/store'
 import { FLYWHEEL, LOOP_STATIONS, type LoopStation } from './_data'
 
 /** A router link styled as a secondary/ghost/ink button (the kit's Button is a <button>). */
@@ -20,6 +22,19 @@ export function LinkButton({ to, children, variant = 'secondary', size = 'md', c
       {children}
     </Link>
   )
+}
+
+/**
+ * The demo role that owns a screen: '/app…' is the member, '/console/<x>…' the console's role.
+ * Story pages call this when a link jumps into a surface, so the Demo switcher matches the screen.
+ */
+export function useEnterAs() {
+  const { setRole } = useApp()
+  return (to: string) => {
+    if (to === '/app' || to.startsWith('/app/')) return setRole('member')
+    const r = DEMO_ROLES.find((d) => d.role !== 'member' && (to === d.to || to.startsWith(`${d.to}/`)))
+    if (r) setRole(r.role)
+  }
 }
 
 /** A term with its name, or "All six" — a colour never appears without its word. */
@@ -82,8 +97,9 @@ export function stationForDay(day: number): LoopStation['id'] {
   if (day === 1) return 'plan'
   if (day === 15 || day === 45) return 'review'
   if (day === 60) return 'talk'
-  if (day >= 76 && day < 90) return 'remeasure'
-  if (day >= 90) return 'publish'
+  // Day 90 is the signed re-measure itself; publishing follows it
+  if (day >= 76 && day <= 90) return 'remeasure'
+  if (day > 90) return 'publish'
   return 'act'
 }
 

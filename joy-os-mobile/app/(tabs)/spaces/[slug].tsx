@@ -173,6 +173,7 @@ export default function SpaceDetail() {
                     onPress={() => setChosen(i)}
                     accessibilityRole="radio"
                     accessibilityState={{ checked: on }}
+                    aria-checked={on}
                     accessibilityLabel={`${a.title} ${a.detail} ${a.minutes} minutes${a.shared ? ', shared' : ''}.`}
                     style={({ pressed }) => ({
                       borderRadius: 12,

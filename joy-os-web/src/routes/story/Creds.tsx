@@ -179,10 +179,19 @@ export default function Creds() {
               </span>
               <IconBtn label="Overview (G)" onClick={() => setOverview(true)} btnRef={overviewBtn}><LayoutGrid size={18} /></IconBtn>
               <IconBtn label="Speaker notes (N)" onClick={() => setNotes((v) => !v)} pressed={notes} className="hidden md:inline-flex"><NotebookText size={18} /></IconBtn>
-              <IconBtn label="Print or save as PDF (P)" onClick={() => window.print()} className="hidden sm:inline-flex"><Printer size={18} /></IconBtn>
+              <IconBtn label="Print or save as PDF (P)" onClick={() => window.print()}><Printer size={18} /></IconBtn>
               <IconBtn label="Full screen (F)" onClick={toggleFullscreen} className="hidden md:inline-flex"><Expand size={18} /></IconBtn>
               <ThemeToggle />
-              <Link to="/platform-map" className="ml-1 inline-flex h-9 items-center rounded-full p-2 text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring" aria-label="Close the deck">
+              <Link
+                to="/platform-map"
+                onClick={(e) => {
+                  // close back to wherever the deck was opened from (sign-in, the map, journeys); a cold open lands on the map
+                  if ((window.history.state as { idx?: number } | null)?.idx) { e.preventDefault(); nav(-1) }
+                }}
+                className="ml-1 inline-flex h-9 items-center rounded-full p-2 text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring"
+                aria-label="Close the deck"
+                title="Close the deck"
+              >
                 <X size={18} />
               </Link>
             </div>
@@ -367,7 +376,7 @@ function Overview({ current, onPick, onClose }: { current: number; onPick: (k: n
     setRole(r.role)
     nav(r.to)
   }
-  // the seven roles, plus Engineering & ops (entered with the Leadership role, lands on /console/ops)
+  // the seven roles, plus Engineering & ops (its own ops role, lands on /console/ops)
   const accounts = [
     ...DEMO_ACCOUNTS.flatMap((a) => {
       const r = DEMO_ROLES.find((d) => d.role === a.role)
@@ -441,7 +450,7 @@ function Overview({ current, onPick, onClose }: { current: number; onPick: (k: n
             </div>
             <ul className="grid gap-2 sm:grid-cols-2">
               {accounts.map((a) => {
-                const current = role === a.role && a.key !== 'ops'
+                const current = role === a.role
                 return (
                   <li key={a.key}>
                     <button

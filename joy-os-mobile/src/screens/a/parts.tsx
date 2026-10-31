@@ -75,6 +75,7 @@ export function Chip({ label, selected, onPress, icon, accessibilityHint }: { la
       onPress={onPress}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: selected }}
+      aria-checked={selected}
       accessibilityLabel={label}
       accessibilityHint={accessibilityHint}
       style={({ pressed }) => ({
@@ -216,6 +217,7 @@ export function OptionRow({ label, selected, onPress, index }: { label: string; 
       onPress={onPress}
       accessibilityRole="radio"
       accessibilityState={{ checked: selected }}
+      aria-checked={selected}
       accessibilityLabel={label}
       style={({ pressed }) => ({
         minHeight: 56,
@@ -249,6 +251,7 @@ export function IconButton({ icon, label, onPress, tone = 'plain', disabled }: {
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled }}
+      aria-disabled={!!disabled}
       hitSlop={4}
       style={({ pressed }) => ({
         width: 44,

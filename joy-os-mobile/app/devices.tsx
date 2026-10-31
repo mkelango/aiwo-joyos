@@ -4,7 +4,7 @@ import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg'
 import { Body, Button, Card, DaybreakButton, Divider, Eyebrow, Icon, type IconName, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Serif, Sheet, SpecimenTag, TermChip, TermDot, Toggle } from '@/components'
 import { useTheme } from '@/theme/ThemeProvider'
 import { DEVICES, HEALTHKIT_TYPES, WEAR_NIGHTS } from '@/screens/b/accountData'
-import { CheckLine } from '@/screens/b/parts'
+import { CheckLine, memberOnly } from '@/screens/b/parts'
 
 // DEVICES (Signals, Memo p.15–16): Oura by default via Terra, Apple Health with per-type
 // HealthKit reads and mindful-minutes write-back, Health Connect on Android, WHOOP, Garmin.
@@ -15,7 +15,9 @@ type Device = (typeof DEVICES)[number]
 
 const iconFor = (id: string): IconName => (id === 'apple' || id === 'hc' ? 'smartphone' : id === 'oura' || id === 'ultrahuman' ? 'circle' : 'watch')
 
-export default function Devices() {
+export default memberOnly(Devices)
+
+function Devices() {
   const { c, space, fonts } = useTheme()
   const [devices, setDevices] = useState<Device[]>(DEVICES)
   const [syncing, setSyncing] = useState(false)

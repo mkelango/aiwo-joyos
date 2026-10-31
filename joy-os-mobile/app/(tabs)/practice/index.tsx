@@ -69,12 +69,14 @@ export default function Practice() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityLabel="The eight weeks" contentContainerStyle={{ gap: space.s1 + 2, paddingRight: space.s2 }} style={{ marginHorizontal: -space.gutter, paddingLeft: space.gutter, flexGrow: 0 }}>
         {PRACTICE_WEEKS.map((w) => {
           const st = w.week < CURRENT ? 'done' : w.week === CURRENT ? 'now' : 'next'
+          // Earlier weeks count as practised unless the member un-marked them in the week screen.
+          const kept = prac.weeks.includes(w.week) || (st === 'done' && !prac.unmarked.includes(w.week))
           return (
             <Pressable
               key={w.week}
               onPress={() => router.push(`/practice/${w.week}`)}
               accessibilityRole="link"
-              accessibilityLabel={`Week ${w.week}, ${w.title}. ${st === 'done' ? 'Practised' : st === 'now' ? 'This week' : 'Upcoming'}`}
+              accessibilityLabel={`Week ${w.week}, ${w.title}. ${st === 'now' ? `This week${kept ? ', practised' : ''}` : st === 'next' ? (kept ? 'Upcoming, practised ahead' : 'Upcoming') : kept ? 'Practised' : 'Earlier week, not marked'}`}
               style={({ pressed }) => ({
                 width: 148,
                 minHeight: 112,
@@ -90,7 +92,7 @@ export default function Practice() {
             >
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Mono tone="ink">{`W${w.week}`}</Mono>
-                {st === 'done' ? <Icon name="check" size={14} color={c.ink2} /> : w.term === 'ALL' ? <Eyebrow size={11}>All</Eyebrow> : <TermDot term={w.term} />}
+                {kept ? <Icon name="check" size={14} color={c.ink2} /> : w.term === 'ALL' ? <Eyebrow size={11}>All</Eyebrow> : <TermDot term={w.term} />}
               </View>
               <Meta tone={st === 'next' ? 'ink2' : 'ink'} size={14}>
                 {w.title}

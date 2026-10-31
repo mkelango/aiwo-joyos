@@ -1,8 +1,8 @@
 import clsx from 'clsx'
 import { motion, useReducedMotion } from 'framer-motion'
 import { ArrowRight, Check, Eye, FileLock2, KeyRound, Lock, Minus, ScrollText, ShieldCheck } from 'lucide-react'
-import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { DaybreakButton, Eyebrow, SpecimenTag } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill } from '@/components/ui'
 import { CONSOLES } from '@/layouts/ConsoleLayout'
@@ -56,6 +56,18 @@ export default function ConsoleHome() {
   const home = CONSOLES.find((c) => GATE[c.to]?.includes(activeRole)) ?? CONSOLES[0]
   const [requesting, setRequesting] = useState<(typeof CONSOLES)[number] | null>(null)
   const [requested, setRequested] = useState<Record<string, string>>({})
+  const [params, setParams] = useSearchParams()
+
+  // Arriving from a console's preview banner (?request=/console/…) opens that request directly.
+  const requestParam = params.get('request')
+  useEffect(() => {
+    if (!requestParam) return
+    const target = CONSOLES.find((c) => c.to === requestParam)
+    if (target && !GATE[target.to]?.includes(activeRole) && !requested[target.to]) setRequesting(target)
+    const next = new URLSearchParams(params)
+    next.delete('request')
+    setParams(next, { replace: true })
+  }, [requestParam]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div>
@@ -159,7 +171,7 @@ export default function ConsoleHome() {
       </section>
 
       {/* How gating works */}
-      <section className="mt-12 grid gap-6 lg:grid-cols-[1fr_1.6fr]" aria-labelledby="gating-h">
+      <section className="mt-12 grid gap-6 2xl:grid-cols-[1fr_1.6fr]" aria-labelledby="gating-h">
         <div className="min-w-0">
           <h2 id="gating-h" className="text-[1.6rem] font-light leading-snug text-ink">Role, then relationship, then <em>purpose</em></h2>
           <p className="mt-3 text-[17px] leading-relaxed text-ink-2">

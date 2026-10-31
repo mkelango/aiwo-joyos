@@ -43,6 +43,7 @@ export default function Messages() {
   const [picker, setPicker] = useState(false)
   const [keepId, setKeepId] = useState<string | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
+  const logRef = useRef<HTMLDivElement>(null)
   const timers = useRef<number[]>([])
   useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), [])
 
@@ -58,7 +59,8 @@ export default function Messages() {
     if (activeId || wide) setThreads((ts) => (ts.some((t) => t.id === desktopActive && t.unread) ? ts.map((t) => (t.id === desktopActive ? { ...t, unread: 0 } : t)) : ts))
   }, [desktopActive]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { endRef.current?.scrollIntoView({ block: 'nearest' }) }, [active.messages.length, desktopActive])
+  // Scroll the conversation itself to the newest message — never the page, so the header stays put.
+  useEffect(() => { const el = logRef.current; if (el) el.scrollTop = el.scrollHeight }, [active.messages.length, desktopActive, held])
 
   const open = (id: string) => {
     if (filter === 'unread') setKeepId(id)
@@ -161,7 +163,7 @@ export default function Messages() {
         </div>
 
         {/* Conversation */}
-        <div className={clsx('min-h-[640px] min-w-0 flex-col lg:flex lg:min-h-0', activeId ? 'flex' : 'hidden')}>
+        <div className={clsx('h-[calc(100dvh-210px)] min-h-[520px] min-w-0 flex-col lg:flex lg:h-auto lg:min-h-0', activeId ? 'flex' : 'hidden')}>
           <div className="flex items-center gap-3 border-b border-line px-4 py-3 md:px-6">
             <button onClick={() => { setActiveId(null); setParams({}, { replace: true }) }} className="rounded-full p-2 text-ink-2 hover:bg-paper-sunk focus-ring lg:hidden" aria-label="Back to conversations">
               <ArrowLeft size={18} />
@@ -180,7 +182,7 @@ export default function Messages() {
             </p>
           )}
 
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-6 md:px-6" role="log" aria-label={`Conversation with ${p.name}`}>
+          <div ref={logRef} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-6 md:px-6" role="log" aria-label={`Conversation with ${p.name}`}>
             {active.messages.length === 0 && (
               <p className="mx-auto max-w-sm py-16 text-center text-[15px] text-ink-2">
                 Write to {p.name}. A person reads every message; replies are signed by name.

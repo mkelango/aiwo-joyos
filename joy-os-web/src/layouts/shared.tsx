@@ -20,10 +20,14 @@ export function ThemeToggle() {
 export function CrisisSheet() {
   const { crisisOpen, setCrisisOpen } = useApp()
   const sanjay = TEAM.find((p) => p.role === 'Psychologist')!
+  // A voluntary tap is a choice, not an intercept: no "what you wrote", no one "has been told".
+  const manual = crisisOpen === 'manual'
   return (
-    <Sheet open={crisisOpen} onClose={() => setCrisisOpen(false)} title="You don’t have to hold this alone" side="center">
+    <Sheet open={!!crisisOpen} onClose={() => setCrisisOpen(false)} title="You don’t have to hold this alone" side="center">
       <p className="text-[17px] text-ink-2">
-        What you wrote sounded heavy. A real person can talk with you right now. Nothing here is written by AI.
+        {manual
+          ? 'A real person, whenever you want one. Nothing here is written by AI.'
+          : 'What you wrote sounded heavy. A real person can talk with you right now. Nothing here is written by AI.'}
       </p>
       <div className="mt-6 space-y-3">
         <a href="tel:14416" className="flex items-center justify-between rounded-card bg-ink px-5 py-4 text-paper">
@@ -33,18 +37,20 @@ export function CrisisSheet() {
           </span>
           <Phone size={20} />
         </a>
-        <div className="flex items-center justify-between rounded-card border border-line px-5 py-4">
-          <span>
-            <span className="block text-[16px] text-ink">{sanjay.name} has been told</span>
-            <span className="block text-[14px] text-ink-2">On call tonight · will reach you within 15 minutes</span>
-          </span>
-        </div>
+        {!manual && (
+          <div className="flex items-center justify-between rounded-card border border-line px-5 py-4">
+            <span>
+              <span className="block text-[16px] text-ink">{sanjay.name} has been told</span>
+              <span className="block text-[14px] text-ink-2">On call tonight · will reach you within 15 minutes</span>
+            </span>
+          </div>
+        )}
         <a href="tel:112" className="flex items-center justify-between rounded-card border border-line px-5 py-4 text-ink">
           <span className="text-[16px]">Emergency services · 112</span>
           <Phone size={18} />
         </a>
       </div>
-      <p className="eyebrow mt-6 text-ink-3">P0 · logged with an SLA, an owner and an audit trail</p>
+      {!manual && <p className="eyebrow mt-6 text-ink-3">P0 · logged with an SLA, an owner and an audit trail</p>}
     </Sheet>
   )
 }

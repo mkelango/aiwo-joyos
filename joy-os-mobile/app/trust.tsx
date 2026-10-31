@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Share, View } from 'react-native'
+import { Platform, Share, View } from 'react-native'
 import {
   Body,
   Button,
@@ -29,7 +29,7 @@ import { TENANT } from '@/shared/platform'
 import type { AccessEvent, Consent } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { CLAIMS_LOG, EXPORTS_PAST, EXTRA_ACCESS } from '@/screens/b/accountData'
-import { ChoiceCard, Done, Field, FilterChips, TimelineStep, useSheetCrisisGuard } from '@/screens/b/parts'
+import { ChoiceCard, Done, Field, FilterChips, TimelineStep, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
 
 // TRUST CENTRE (Memo module 14, p.27): who has seen my data, consents by purpose, export
 // (FHIR / JSON, ≤72 h), delete (step-up, honoured ≤24 h), research, aggregates-only for
@@ -39,7 +39,9 @@ const SCOPE_LABEL: Record<Consent['scope'], string> = { core: 'Core', device: 'D
 type ExportStatus = 'idle' | 'requested' | 'preparing' | 'ready'
 type DeleteStep = 'closed' | 'explain' | 'confirm' | 'auth'
 
-export default function Trust() {
+export default memberOnly(Trust)
+
+function Trust() {
   const { c, space } = useTheme()
   const [toast, setToast] = useState<string | null>(null)
 
@@ -87,7 +89,21 @@ export default function Trust() {
       consents: Object.entries(consent).map(([id, v]) => ({ id, granted: v.on })),
       exportedAt: new Date().toISOString(),
     }
-    Share.share({ title: 'Joy OS export (specimen)', message: JSON.stringify(bundle, null, 2) })
+    const text = JSON.stringify(bundle, null, 2)
+    // On the web build there is no share sheet to rely on, so the copy downloads as a file.
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const url = URL.createObjectURL(new Blob([text], { type: format === 'fhir' ? 'application/fhir+json' : 'application/json' }))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `joy-os-export-specimen-${format}.json`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      setShared(true)
+      return
+    }
+    Share.share({ title: 'Joy OS export (specimen)', message: text })
       .then(() => setShared(true))
       .catch(() => setShared(true))
   }
@@ -258,7 +274,7 @@ export default function Trust() {
                 </TimelineStep>
               ))}
             </View>
-            {shared ? <Done>Copy handed to your share sheet. Keep it somewhere private.</Done> : null}
+            {shared ? <Done>{Platform.OS === 'web' ? 'Copy saved to your downloads. Keep it somewhere private.' : 'Copy handed to your share sheet. Keep it somewhere private.'}</Done> : null}
             <Meta>
               {exp === 'ready'
                 ? `Your ${format === 'fhir' ? 'FHIR R4 bundle' : 'JSON file'} is ready · 2.6 MB · the link expires in 7 days.`
@@ -266,8 +282,8 @@ export default function Trust() {
             </Meta>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s1 }}>
               {exp === 'ready' ? (
-                <Button variant="ink" size="sm" icon="share" onPress={shareCopy}>
-                  Share copy (specimen)
+                <Button variant="ink" size="sm" icon={Platform.OS === 'web' ? 'download' : 'share'} onPress={shareCopy}>
+                  {Platform.OS === 'web' ? 'Download copy (specimen)' : 'Share copy (specimen)'}
                 </Button>
               ) : null}
               <Button variant="ghost" size="sm" onPress={() => { setExp('idle'); setShared(false) }}>

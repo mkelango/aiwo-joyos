@@ -82,7 +82,7 @@ function WeekView({ n }: { n: string }) {
       <ScreenHeader back="The Practice" eyebrow={`Week ${num} of 8 · ${term ? term.name : 'All six terms'}`} title={week.title} lead={content.mentorLine} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s1, alignItems: 'center' }}>
         <PrimaryChip primary={week.term} />
-        {status === 'done' ? <Pill tone="ink">Practised</Pill> : status === 'now' ? <Pill tone="daybreak">This week</Pill> : <Pill>{`Opens ${fmtDate(opens)}`}</Pill>}
+        {status === 'now' ? <Pill tone="daybreak">This week</Pill> : status === 'next' ? <Pill>{`Opens ${fmtDate(opens)}`}</Pill> : practised ? <Pill tone="ink">Practised</Pill> : <Pill>Earlier week · not marked</Pill>}
       </View>
       {status === 'next' ? (
         <View style={{ flexDirection: 'row', gap: 8 }}>

@@ -3,7 +3,8 @@ import type { ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
 import { DaybreakButton } from '@/components/joy/primitives'
-import type { TermKey, TermScore } from '@/domain/types'
+import type { Role, TermKey, TermScore } from '@/domain/types'
+import { useApp } from '@/lib/store'
 import { FlowTopBar } from './_parts'
 
 // NOT FOUND: three faces. Inside the member app it is page content only (MemberLayout
@@ -12,7 +13,7 @@ import { FlowTopBar } from './_parts'
 
 const GHOST: TermScore[] = (['H', 'P', 'R', 'F', 'D', 'B'] as TermKey[]).map((k) => ({ key: k, value: null, band: 'not-yet-measured' }))
 
-type Dest = { to: string; label: string; line: string; icon: ReactNode }
+type Dest = { to: string; label: string; line: string; icon: ReactNode; role?: Role }
 
 const MEMBER_LINKS: Dest[] = [
   { to: '/app/index', label: 'My Index', line: 'Your number, your Wheel and what moved.', icon: <Sparkles size={18} aria-hidden /> },
@@ -22,19 +23,19 @@ const MEMBER_LINKS: Dest[] = [
 
 const PUBLIC_LINKS: Dest[] = [
   { to: '/check', label: 'Take the free Check', line: 'Eighteen statements, five minutes, no login.', icon: <Compass size={18} aria-hidden /> },
-  { to: '/creds', label: 'Credentials deck', line: 'Joy OS in sixteen slides.', icon: <Presentation size={18} aria-hidden /> },
+  { to: '/creds', label: 'Credentials deck', line: 'Joy OS in twenty slides, with a sign-in for every role.', icon: <Presentation size={18} aria-hidden /> },
   { to: '/journeys', label: 'Journeys', line: 'Every role, walked end to end.', icon: <RouteIcon size={18} aria-hidden /> },
   { to: '/platform-map', label: 'Platform map', line: 'Every surface and how they connect.', icon: <Map size={18} aria-hidden /> },
 ]
 
 const CONSOLE_LINKS: Dest[] = [
-  { to: '/console/coach', label: 'Coach & concierge', line: 'Caseload, reviews and messages.', icon: <Users size={18} aria-hidden /> },
-  { to: '/console/clinical', label: 'Clinical portal', line: 'Sign-off queue and safety flags.', icon: <Stethoscope size={18} aria-hidden /> },
-  { to: '/console/partner', label: 'Partner & venue', line: 'Schedules and passes; never health data.', icon: <Hotel size={18} aria-hidden /> },
-  { to: '/console/tenant', label: 'Tenant admin', line: 'Aggregates only, groups of fifty or more.', icon: <Building2 size={18} aria-hidden /> },
-  { to: '/console/science', label: 'Science Office', line: 'Cohorts, methods and published results.', icon: <FlaskConical size={18} aria-hidden /> },
-  { to: '/console/ops', label: 'Control plane', line: 'Engineering, SRE and data protection.', icon: <Activity size={18} aria-hidden /> },
-  { to: '/console/exec', label: 'Leadership scoreboard', line: 'Records re-measured per rupee.', icon: <Gauge size={18} aria-hidden /> },
+  { to: '/console/coach', role: 'coach', label: 'Coach & concierge', line: 'Caseload, reviews and messages.', icon: <Users size={18} aria-hidden /> },
+  { to: '/console/clinical', role: 'clinician', label: 'Clinical portal', line: 'Sign-off queue and safety flags.', icon: <Stethoscope size={18} aria-hidden /> },
+  { to: '/console/partner', role: 'partner', label: 'Partner & venue', line: 'Schedules and passes; never health data.', icon: <Hotel size={18} aria-hidden /> },
+  { to: '/console/tenant', role: 'tenant', label: 'Tenant admin', line: 'Aggregates only, groups of fifty or more.', icon: <Building2 size={18} aria-hidden /> },
+  { to: '/console/science', role: 'science', label: 'Science Office', line: 'Cohorts, methods and published results.', icon: <FlaskConical size={18} aria-hidden /> },
+  { to: '/console/ops', role: 'ops', label: 'Control plane', line: 'Engineering, SRE and data protection.', icon: <Activity size={18} aria-hidden /> },
+  { to: '/console/exec', role: 'exec', label: 'Leadership scoreboard', line: 'Records re-measured per rupee.', icon: <Gauge size={18} aria-hidden /> },
 ]
 
 export default function NotFound() {
@@ -85,6 +86,7 @@ export default function NotFound() {
 }
 
 function Body({ path, lead, primary, secondary, links, linksTitle }: { path: string; lead: string; primary: ReactNode; secondary?: ReactNode; links: Dest[]; linksTitle: string }) {
+  const { setRole } = useApp()
   return (
     <div className="grid gap-10 lg:grid-cols-[1.2fr_1fr] lg:items-start lg:gap-16">
       <div className="min-w-0">
@@ -112,7 +114,7 @@ function Body({ path, lead, primary, secondary, links, linksTitle }: { path: str
         <ul className="divide-y divide-line overflow-hidden rounded-card border border-line bg-paper-raised">
           {links.map((l) => (
             <li key={l.to}>
-              <Link to={l.to} className="group flex items-center gap-4 px-4 py-3.5 hover:bg-paper-sunk focus-ring">
+              <Link to={l.to} onClick={l.role ? () => setRole(l.role!) : undefined} className="group flex items-center gap-4 px-4 py-3.5 hover:bg-paper-sunk focus-ring">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-paper-sunk text-ink-2 group-hover:bg-paper">{l.icon}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[16px] text-ink">{l.label}</span>

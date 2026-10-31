@@ -103,7 +103,7 @@ export default function Passport() {
                   <p className="eyebrow text-ink-3">Scan at any House or venue</p>
                   <p className="mt-2 text-[15px] text-ink">Shows your name and booking.</p>
                   <p className="mt-1 text-[14px] text-ink-2">Never your Index, readings or anything clinical.</p>
-                  <p className="num mt-3 text-[12px] text-ink-3">Refreshes every 60 s</p>
+                  <p className="num mt-3 whitespace-nowrap text-[12px] text-ink-3">Refreshes every 60 s</p>
                 </div>
               </div>
             </motion.div>
@@ -205,7 +205,7 @@ export default function Passport() {
                 </div>
                 <p className="mt-4 text-[1.15rem] font-light text-ink">{r.name}</p>
                 <p className="num mt-1 text-[14px] text-ink-2">{r.dates ?? 'Dates when it opens'}</p>
-                <p className="mt-auto pt-5 text-[13px] text-ink-3">’Cation · <span className="num">{r.ref}</span> · <Link to={`/app/cation/${r.slug}`} className="underline-offset-4 hover:underline focus-ring">See the request</Link></p>
+                <p className="mt-auto pt-5 text-[13px] text-ink-3">’Cation · <span className="num">{r.ref}</span> · <Link to={`/app/cation/${r.slug}#request`} className="underline-offset-4 hover:underline focus-ring">See the request</Link></p>
               </div>
             </motion.li>
           ))}
