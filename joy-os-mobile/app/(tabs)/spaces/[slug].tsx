@@ -23,6 +23,7 @@ import {
   TermChip,
   Title,
 } from '@/components'
+import { Rich, useA } from '@/screens/a/i18n'
 import { H2, usePlanned } from '@/screens/a/local'
 import { HumanWritten, Provenance, Sparkline } from '@/screens/a/parts'
 import { ROOM_VERDICT, VIVA_DRAFT, actionsFor, termHistory } from '@/screens/a/spacesData'
@@ -40,6 +41,7 @@ export default function SpaceDetail() {
   const { slug } = useLocalSearchParams<{ slug: string }>()
   const th = useTheme()
   const { c, space } = th
+  const { t, tx, name, space: spaceName, date, lang } = useA()
   const term = TERMS.find((t) => t.slug === slug)
   const [chosen, setChosen] = useState(0)
   const { planned: plannedBySpace, plan } = usePlanned()
@@ -47,8 +49,8 @@ export default function SpaceDetail() {
   if (!term) {
     return (
       <Screen inTabs>
-        <ScreenHeader back="Spaces" eyebrow="Spaces" title="This room does not exist." lead="There are six spaces: Body, Purpose, People, Freedom, Pleasure and Ease." />
-        <Button onPress={() => router.replace('/spaces')}>See all six</Button>
+        <ScreenHeader back={tx('Spaces')} eyebrow={tx('Spaces')} title={t('This room does not exist.')} lead={t('There are six spaces: Body, Purpose, People, Freedom, Pleasure and Ease.')} />
+        <Button onPress={() => router.replace('/spaces')}>{t('See all six')}</Button>
       </Screen>
     )
   }
@@ -69,15 +71,9 @@ export default function SpaceDetail() {
   return (
     <Screen inTabs>
       <ScreenHeader
-        back="Spaces"
-        eyebrow={term.name === term.space ? `${term.space} space` : `${term.space} · ${term.name}`}
-        title={
-          <>
-            {SPACE_TITLE[k][0]}
-            <Serif>{SPACE_TITLE[k][1]}</Serif>
-            {SPACE_TITLE[k][2]}
-          </>
-        }
+        back={tx('Spaces')}
+        eyebrow={term.name === term.space ? t('{space} space', { space: spaceName(k) }) : `${spaceName(k)} · ${name(k)}`}
+        title={<Rich text={tx(SPACE_TITLE[k])} wrap={(w) => <Serif>{w}</Serif>} />}
       />
 
       {/* Score */}
@@ -87,7 +83,7 @@ export default function SpaceDetail() {
           <SpecimenTag />
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.s2 }}>
-          <Numeral size={72} accessibilityLabel={`${term.name} ${inverse ? 'minus ' : ''}${score.value} of 100`}>
+          <Numeral size={72} accessibilityLabel={t('{name} {minus}{value} of 100', { name: name(k), minus: inverse ? t('minus ') : '', value: String(score.value) })}>
             {shown}
           </Numeral>
           <View style={{ paddingBottom: 10, gap: 4 }}>
@@ -95,17 +91,17 @@ export default function SpaceDetail() {
             <BandLabel band={score.band} />
           </View>
         </View>
-        <Body tone="ink2">{ROOM_VERDICT[k]}</Body>
-        {inverse ? <Meta>Burden is the one term where lower is better. It is subtracted from the Index at a quarter of its weight.</Meta> : null}
+        <Body tone="ink2">{tx(ROOM_VERDICT[k])}</Body>
+        {inverse ? <Meta>{t('Burden is the one term where lower is better. It is subtracted from the Index at a quarter of its weight.')}</Meta> : null}
         <View style={{ gap: space.s1, marginTop: space.half }}>
           <Meta>
-            Your weekly pulse over the last ninety days, from <Mono tone="ink">{String(first.value)}</Mono> to <Mono tone="ink">{String(last.value)}</Mono>.
+            <Rich text={t('Your weekly pulse over the last ninety days, from *{a}* to *{b}*.', { a: String(first.value), b: String(last.value) })} wrap={(w) => <Mono tone="ink">{w}</Mono>} />
           </Meta>
           <Sparkline
             values={history.map((h) => h.value)}
-            labels={[first.label, last.label]}
+            labels={[date(first.label), date(last.label)]}
             color={col.main}
-            label={`${term.name} weekly pulse, fourteen weeks from ${first.label} to ${last.label}: ${first.value} to ${last.value}.`}
+            label={t('{name} weekly pulse, fourteen weeks from {from} to {to}: {a} to {b}.', { name: name(k), from: date(first.label), to: date(last.label), a: first.value, b: last.value })}
           />
         </View>
         <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />
@@ -113,53 +109,53 @@ export default function SpaceDetail() {
 
       {/* What this room measures */}
       <Card tone="sunk" style={{ gap: space.s2 }}>
-        <Eyebrow {...H2}>What this room measures</Eyebrow>
-        <Body>{term.framework}</Body>
+        <Eyebrow {...H2}>{t('What this room measures')}</Eyebrow>
+        <Body>{tx(term.framework)}</Body>
         <View style={{ gap: 6 }}>
-          <Eyebrow>Formula · method v1.0</Eyebrow>
+          <Eyebrow>{t('Formula · method v1.0')}</Eyebrow>
           <Mono tone="ink" size={15}>
             {term.formula}
           </Mono>
         </View>
         <View style={{ gap: 8 }}>
-          <Eyebrow>Instruments</Eyebrow>
+          <Eyebrow>{t('Instruments')}</Eyebrow>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {term.instruments.map((i) => (
-              <Pill key={i}>{i}</Pill>
+              <Pill key={i}>{tx(i)}</Pill>
             ))}
           </View>
         </View>
         <Meta>
           <Meta tone="ink" weight="semibold">
-            What moves it.
+            {t('What moves it.')}
           </Meta>{' '}
-          {term.whatMoves}.
+          {tx(term.whatMoves)}{lang === 'hi' ? '।' : '.'}
         </Meta>
         <Meta>
           <Meta tone="ink" weight="semibold">
-            Lead ’cations.
+            {t('Lead ’cations.')}
           </Meta>{' '}
-          {term.leadCations.join(' · ')} · Practice week {term.practiceWeek}
+          {term.leadCations.join(' · ')} · {t('Practice week {w}', { w: tx(term.practiceWeek) })}
         </Meta>
       </Card>
 
       {/* Three actions */}
       <View style={{ gap: space.s2 }}>
-        <Eyebrow {...H2}>Three small things · pick one</Eyebrow>
+        <Eyebrow {...H2}>{t('Three small things · pick one')}</Eyebrow>
         {plannedAction ? (
           <Card tone="soft" style={{ gap: space.s1 }}>
             <View accessibilityLiveRegion="polite" style={{ gap: space.s1 }}>
-              <Eyebrow tone="daybreak">Planned for today</Eyebrow>
+              <Eyebrow tone="daybreak">{t('Planned for today')}</Eyebrow>
               <Title size={24}>
-                {plannedAction.title} <Serif>Kept.</Serif>
+                <Rich text={t('{title} *Kept.*', { title: tx(plannedAction.title) })} wrap={(w) => <Serif>{w}</Serif>} />
               </Title>
-              <Meta>It sits on Today beside your one action, kept on this phone. Missing it is fine; nothing is counted against you.</Meta>
+              <Meta>{t('It sits on Today beside your one action, kept on this phone. Missing it is fine; nothing is counted against you.')}</Meta>
               <ArrowLink icon="sun" onPress={() => router.push('/')}>
-                See it on Today
+                {t('See it on Today')}
               </ArrowLink>
             </View>
             <Button variant="link" onPress={() => plan(k, null)}>
-              Undo
+              {t('Undo')}
             </Button>
           </Card>
         ) : (
@@ -174,7 +170,7 @@ export default function SpaceDetail() {
                     accessibilityRole="radio"
                     accessibilityState={{ checked: on }}
                     aria-checked={on}
-                    accessibilityLabel={`${a.title} ${a.detail} ${a.minutes} minutes${a.shared ? ', shared' : ''}.`}
+                    accessibilityLabel={t('{title} {detail} {n} minutes{shared}.', { title: tx(a.title), detail: tx(a.detail), n: a.minutes, shared: a.shared ? t(', shared') : '' })}
                     style={({ pressed }) => ({
                       borderRadius: 12,
                       borderWidth: on ? 2 : 1,
@@ -189,34 +185,34 @@ export default function SpaceDetail() {
                         {on ? <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: c.ink }} /> : null}
                       </View>
                       <View style={{ flex: 1, gap: 4 }}>
-                        <Body weight="medium">{a.title}</Body>
-                        <Meta>{a.detail}</Meta>
+                        <Body weight="medium">{tx(a.title)}</Body>
+                        <Meta>{tx(a.detail)}</Meta>
                       </View>
                     </View>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, paddingLeft: 34 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                         <Icon name="clock" size={13} color={c.ink3} />
-                        <Mono size={13} tone="ink3">{`${a.minutes} min`}</Mono>
+                        <Mono size={13} tone="ink3">{t('{n} min', { n: a.minutes })}</Mono>
                       </View>
                       <Meta size={13} tone="ink3">
-                        {a.timeOfDay === 'any' ? 'any time' : a.timeOfDay}
-                        {a.shared ? ' · with Kavya' : ''}
+                        {a.timeOfDay === 'any' ? t('any time') : tx(a.timeOfDay)}
+                        {a.shared ? t(' · with Kavya') : ''}
                       </Meta>
                     </View>
                     {on ? (
                       <Meta size={14} style={{ paddingLeft: 34 }}>
                         <Meta size={14} tone="ink" weight="semibold">
-                          Why.
+                          {t('Why.')}
                         </Meta>{' '}
-                        {a.why} <Meta size={14} tone="ink3">{a.evidence}</Meta>
+                        {tx(a.why)} <Meta size={14} tone="ink3">{tx(a.evidence)}</Meta>
                       </Meta>
                     ) : null}
                   </Pressable>
                 )
               })}
             </View>
-            <DaybreakButton onPress={() => plan(k, actions[chosen].id)} accessibilityHint="Adds this to Today. You can undo it.">
-              Plan it for today
+            <DaybreakButton onPress={() => plan(k, actions[chosen].id)} accessibilityHint={t('Adds this to Today. You can undo it.')}>
+              {t('Plan it for today')}
             </DaybreakButton>
           </>
         )}
@@ -230,24 +226,24 @@ export default function SpaceDetail() {
         <Card tone="raised" style={{ gap: space.s2 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Icon name="message-circle" size={16} color={c.ink2} />
-            <Eyebrow {...H2}>VIVA · AI drafts, a person signs</Eyebrow>
+            <Eyebrow {...H2} style={{ flexShrink: 1 }}>{t('VIVA · AI drafts, a person signs')}</Eyebrow>
           </View>
           <Meta>
-            You asked: <Meta tone="ink">“{draft.ask}”</Meta>
+            <Rich text={t('You asked: *“{ask}”*', { ask: tx(draft.ask) })} wrap={(w) => <Meta tone="ink">{w}</Meta>} />
           </Meta>
-          <Body>{draft.draft}</Body>
+          <Body>{tx(draft.draft)}</Body>
           <Provenance tool={draft.tool} />
           <Meta size={14} tone="ink3">
-            {draft.reviewer}
+            {tx(draft.reviewer)}
           </Meta>
           <ArrowLink icon="message-circle" onPress={() => router.push('/viva')}>
-            {`Ask VIVA about ${term.space}`}
+            {t('Ask VIVA about {space}', { space: spaceName(k) })}
           </ArrowLink>
         </Card>
       ) : (
         <Card tone="outline" style={{ gap: space.s1 }}>
-          <Eyebrow {...H2}>Why VIVA is quiet here</Eyebrow>
-          <Body tone="ink2">No AI writes about a Suffering result. In Ease, the words you read are written and signed by a clinician.</Body>
+          <Eyebrow {...H2}>{t('Why VIVA is quiet here')}</Eyebrow>
+          <Body tone="ink2">{t('No AI writes about a Suffering result. In Ease, the words you read are written and signed by a clinician.')}</Body>
           <HumanWritten by="Dr Sanjay Menon" />
         </Card>
       )}

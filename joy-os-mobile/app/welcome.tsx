@@ -6,6 +6,9 @@ import { TERMS } from '@/shared/terms'
 import type { TermScore } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { ORDER } from '@/screens/b/parts'
+import { useDict, useTermText } from '@/lib/i18n'
+import { WELCOME } from '@/screens/b/i18n/entry'
+import { useCommon } from '@/screens/b/i18n/common'
 
 // WELCOME (first run; Playbook p62): the Wheel blooming, the promise in one line, and two
 // doors — Begin (onboarding) or Sign in. The free Check for anyone not ready to join.
@@ -17,6 +20,9 @@ const BLOOM: TermScore[] = ORDER.map((k, i) => ({ key: k, value: k === 'B' ? 30 
 export default function Welcome() {
   const { space } = useTheme()
   const { setCrisisOpen } = useApp()
+  const t = useDict(WELCOME)
+  const tc = useCommon()
+  const tt = useTermText()
   return (
     <Screen contentStyle={{ paddingTop: space.s3, gap: space.s4, flexGrow: 1 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -29,7 +35,7 @@ export default function Welcome() {
       <View
         accessible
         accessibilityRole="image"
-        accessibilityLabel="The Joyspan Wheel: six petals for Body, Purpose, People, Freedom, Pleasure and Ease, opening like a flower. Illustration."
+        accessibilityLabel={t('wheelA11y')}
         style={{ alignItems: 'center', marginTop: space.s1 }}
       >
         <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -39,40 +45,40 @@ export default function Welcome() {
 
       <View style={{ gap: space.s2 }}>
         <Title size={40} accessibilityRole="header" style={{ letterSpacing: -0.6 }}>
-          Joy, measured.{'\n'}Years worth <Serif>living</Serif>.
+          {t('titleA')}<Serif>{t('titleSerif')}</Serif>{t('titleB')}
         </Title>
         <Body tone="ink2" size={19}>
-          Joy OS measures your Joyspan across six terms, names the lowest, and gives you one action a day for ninety days. A person is behind every number.
+          {t('lead')}
         </Body>
       </View>
 
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s2, rowGap: space.s1 }} accessible accessibilityLabel="The six terms: Healthspan, Purpose, Relationships, Freedom, Daily Pleasure, and less Preventable Suffering.">
-        {TERMS.map((t) => (
-          <View key={t.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <TermDot term={t.key} />
-            <Meta tone="ink">{t.space}</Meta>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s2, rowGap: space.s1 }} accessible accessibilityLabel={t('termsA11y')}>
+        {TERMS.map((term) => (
+          <View key={term.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <TermDot term={term.key} />
+            <Meta tone="ink">{tt.space(term.key)}</Meta>
           </View>
         ))}
       </View>
 
       <View style={{ gap: space.s1, marginTop: 'auto' }}>
-        <DaybreakButton onPress={() => router.push('/onboarding')} accessibilityHint="Sets up your ninety days: about three minutes">
-          Begin
+        <DaybreakButton onPress={() => router.push('/onboarding')} accessibilityHint={t('beginHint')}>
+          {t('begin')}
         </DaybreakButton>
-        <Button variant="secondary" block onPress={() => router.push('/signin')} accessibilityHint="Signs in with your AIWO ID: passkey, phone code or email link (specimen)">
-          Sign in
+        <Button variant="secondary" block onPress={() => router.push('/signin')} accessibilityHint={t('signInHint')}>
+          {t('signIn')}
         </Button>
         <Button variant="link" onPress={() => router.push('/check')} style={{ alignSelf: 'center' }}>
-          Not ready? Take the free Check
+          {t('notReady')}
         </Button>
       </View>
 
       <View style={{ gap: 4, alignItems: 'center' }}>
         <Meta size={13} tone="ink3" align="center">
-          Bands, never a number, until you choose the full Index. Your data stays yours.
+          {t('bandsNote')}
         </Meta>
         <Button variant="link" onPress={() => setCrisisOpen(true)} style={{ alignSelf: 'center', minHeight: 44 }}>
-          Need to talk now? Tele-MANAS 14416
+          {tc('crisis')}
         </Button>
         <Mono size={11} tone="ink3">
           AIWO · Edition 01 · method v1.0

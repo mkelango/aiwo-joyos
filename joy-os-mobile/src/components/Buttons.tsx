@@ -51,6 +51,7 @@ export function DaybreakButton({ children, onPress, disabled, icon, block = true
           flexDirection: 'row',
           gap: 8,
           alignSelf: block ? 'stretch' : 'flex-start',
+          maxWidth: '100%',
           opacity: disabled ? 0.5 : 1,
           transform: [{ scale: pressed ? 0.985 : 1 }],
         },
@@ -58,7 +59,7 @@ export function DaybreakButton({ children, onPress, disabled, icon, block = true
       ]}
     >
       {icon && <Icon name={icon} size={20} color={t.c.daybreakLabel} />}
-      <Text maxFontSizeMultiplier={1.6} style={{ fontFamily: t.fonts.sansBold, fontSize: fs, lineHeight: Math.round(fs * 1.3), color: t.c.daybreakLabel, letterSpacing: 0.1, textAlign: 'center' }}>
+      <Text maxFontSizeMultiplier={1.6} style={{ fontFamily: t.fonts.sansBold, fontSize: fs, lineHeight: Math.round(fs * 1.3), color: t.c.daybreakLabel, letterSpacing: 0.1, textAlign: 'center', flexShrink: 1 }}>
         {children}
       </Text>
     </Pressable>
@@ -117,6 +118,7 @@ export function Button({ children, onPress, variant = 'secondary', size = 'md', 
           justifyContent: 'center',
           gap: 8,
           alignSelf: block ? 'stretch' : 'flex-start',
+          maxWidth: '100%',
           opacity: disabled ? 0.5 : pressed ? 0.7 : 1,
           backgroundColor: pressed && variant === 'ghost' ? t.c.paperSunk : undefined,
         },
@@ -135,12 +137,13 @@ export function Button({ children, onPress, variant = 'secondary', size = 'md', 
             color: v[variant].color,
             textDecorationLine: variant === 'link' ? 'underline' : 'none',
             textDecorationColor: t.c.lineStrong,
+            flexShrink: 1,
           }}
         >
           {children}
         </Text>
       ) : (
-        <View>{children}</View>
+        <View style={{ flexShrink: 1 }}>{children}</View>
       )}
       {iconRight && <Icon name={iconRight} size={size === 'sm' ? 16 : 18} color={v[variant].color} />}
     </Pressable>
@@ -159,10 +162,10 @@ export function ArrowLink({ children, onPress, icon, accessibilityHint }: { chil
       accessibilityLabel={children}
       accessibilityHint={accessibilityHint}
       hitSlop={8}
-      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, opacity: pressed ? 0.6 : 1, alignSelf: 'flex-start' })}
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, opacity: pressed ? 0.6 : 1, alignSelf: 'flex-start', maxWidth: '100%' })}
     >
       {icon && <Icon name={icon} size={17} color={ink} />}
-      <Text maxFontSizeMultiplier={2} style={{ fontFamily: t.fonts.sans, fontSize: fs, lineHeight: Math.round(fs * 1.4), color: ink }}>
+      <Text maxFontSizeMultiplier={2} style={{ fontFamily: t.fonts.sans, fontSize: fs, lineHeight: Math.round(fs * 1.4), color: ink, flexShrink: 1 }}>
         {children}
       </Text>
       <Icon name="arrow-right" size={16} color={ink} />

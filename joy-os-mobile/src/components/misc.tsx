@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 import type { Person } from '../shared/types'
 import { useTheme } from '../theme/ThemeProvider'
@@ -37,7 +37,7 @@ export function Pill({ children, tone = 'neutral', style }: { children: string; 
     caution: { bg: c.termDSoft, fg: c.termDInk },
   }
   return (
-    <View style={[{ alignSelf: 'flex-start', backgroundColor: tones[tone].bg, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 3 }, style]}>
+    <View style={[{ alignSelf: 'flex-start', maxWidth: '100%', backgroundColor: tones[tone].bg, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 3 }, style]}>
       <Text maxFontSizeMultiplier={1.6} style={{ fontFamily: fonts.sansSemi, fontSize: 13 * textScale, color: tones[tone].fg }}>
         {children}
       </Text>
@@ -64,8 +64,13 @@ export function Progress({ value, max = 100, color, label }: { value: number; ma
 /** Segmented control (tabs within a screen). */
 export function Segmented<T extends string>({ value, onChange, items, style }: { value: T; onChange: (v: T) => void; items: { value: T; label: string }[]; style?: StyleProp<ViewStyle> }) {
   const { c, radius, fonts, textScale } = useTheme()
+  // Long Tamil or Hindi labels wrap onto a second row; the pill then softens to a card corner.
+  const [wrapped, setWrapped] = useState(false)
   return (
-    <View accessibilityRole="tablist" style={[{ flexDirection: 'row', backgroundColor: c.paperSunk, borderRadius: radius.pill, padding: 4, gap: 4, alignSelf: 'flex-start' }, style]}>
+    <View
+      accessibilityRole="tablist"
+      onLayout={(e) => setWrapped(e.nativeEvent.layout.height > 60 * textScale)}
+      style={[{ flexDirection: 'row', flexWrap: 'wrap', backgroundColor: c.paperSunk, borderRadius: wrapped ? radius.card + 8 : radius.pill, padding: 4, gap: 4, alignSelf: 'flex-start', maxWidth: '100%' }, style]}>
       {items.map((it) => {
         const on = it.value === value
         return (

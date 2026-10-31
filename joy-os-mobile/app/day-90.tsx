@@ -11,6 +11,10 @@ import { termByKey } from '@/shared/terms'
 import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { memberOnly } from '@/screens/b/parts'
+import { useDict, useLang, useTermText } from '@/lib/i18n'
+import { DAY90, SLOT_TEXT } from '@/screens/b/i18n/day90'
+import { useCommon, useTx } from '@/screens/b/i18n/common'
+import { txFor } from '@/screens/a/i18n'
 
 // DAY 90 (Memo p.18 screen 04; Playbook p39): the re-measure where the number went down.
 // Warm Ink ground in both schemes. A fall is a sentence and a named person, never red,
@@ -37,6 +41,14 @@ function Day90() {
   const [planState, setPlanState] = useState<'open' | 'agreed' | 'note' | 'noted'>('open')
   const [note, setNote] = useState('')
   const when = SLOTS.find((x) => x.value === slot)!
+  const t = useDict(DAY90)
+  const tc = useCommon()
+  const tx = useTx()
+  const lang = useLang()
+  const ax = (x: string) => txFor(lang, x)
+  const tt = useTermText()
+  const whenLong = tx(SLOT_TEXT[slot].long, when.long)
+  const slotLabel = (v: Slot) => tx(SLOT_TEXT[v].label, SLOTS.find((x) => x.value === v)!.label)
   const saveNote = () => {
     const t = note.trim()
     if (!t) return
@@ -55,12 +67,12 @@ function Day90() {
       <Pressable
         onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
         accessibilityRole="button"
-        accessibilityLabel="Back"
+        accessibilityLabel={tc('back')}
         hitSlop={8}
         style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44, alignSelf: 'flex-start', opacity: pressed ? 0.6 : 1 })}
       >
         <Icon name="chevron-left" size={18} color={INK.ink3} />
-        <Eyebrow>Back</Eyebrow>
+        <Eyebrow>{tc('back')}</Eyebrow>
       </Pressable>
     </View>
   )
@@ -68,9 +80,9 @@ function Day90() {
   return (
     <InkScreen top={back}>
       <View style={{ gap: space.s1 }}>
-        <Eyebrow tone="daybreak">Day 90 · re-measure</Eyebrow>
+        <Eyebrow tone="daybreak">{t('eyebrow')}</Eyebrow>
         <Title size={34} accessibilityRole="header">
-          The number went <Serif>down</Serif>. Here is why.
+          {t('titleA')}<Serif>{t('titleSerif')}</Serif>{t('titleB')}
         </Title>
       </View>
 
@@ -79,27 +91,27 @@ function Day90() {
         <View
           style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.s2, flexWrap: 'wrap' }}
           accessible
-          accessibilityLabel={`Joyspan Index moved from ${DAY90_SPECIMEN.from} to ${DAY90_SPECIMEN.to}, down ${fell}.`}
+          accessibilityLabel={t('movedA11y', { from: DAY90_SPECIMEN.from, to: DAY90_SPECIMEN.to, fell })}
         >
           <View style={{ gap: 2 }}>
             <Numeral size={56} tone="ink3">
               {DAY90_SPECIMEN.from}
             </Numeral>
-            <Eyebrow>Day 0</Eyebrow>
+            <Eyebrow>{t('day0')}</Eyebrow>
           </View>
           <View style={{ paddingBottom: 36 }}>
             <Icon name="arrow-right" size={22} color={INK.ink3} />
           </View>
           <View style={{ gap: 2 }}>
             <Numeral size={96}>{DAY90_SPECIMEN.to}</Numeral>
-            <Eyebrow>Day 90</Eyebrow>
+            <Eyebrow>{t('day90')}</Eyebrow>
           </View>
         </View>
         <Body size={19} style={{ lineHeight: 28 }}>
-          {DAY90_SPECIMEN.sentence}
+          {ax(DAY90_SPECIMEN.sentence)}
         </Body>
         <View style={{ borderWidth: 1, borderStyle: 'dashed', borderColor: INK.lineStrong, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2, alignSelf: 'flex-start' }}>
-          <Eyebrow size={11}>Specimen · not a real member</Eyebrow>
+          <Eyebrow size={11}>{t('specimen')}</Eyebrow>
         </View>
       </View>
 
@@ -109,19 +121,19 @@ function Day90() {
           <Avatar person={meera} size={48} />
           <View style={{ flex: 1, gap: 2 }}>
             <Body weight="semibold">{meera.name}</Body>
-            <Meta>Your physician · signed this measure</Meta>
+            <Meta>{t('physician')}</Meta>
           </View>
         </View>
-        <Body>{DAY90_SPECIMEN.person}</Body>
+        <Body>{ax(DAY90_SPECIMEN.person)}</Body>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Icon name="phone" size={15} color={INK.ink2} />
-          <Mono tone="ink2" size={15}>
-            {when.long}
+          <Mono tone="ink2" size={15} style={{ flexShrink: 1 }}>
+            {whenLong}
           </Mono>
         </View>
         {confirmed ? (
           <View accessibilityLiveRegion="polite" style={{ gap: 4 }}>
-            <Body weight="medium">{`Confirmed for ${when.long}. She will call you then; a reminder comes an hour before.`}</Body>
+            <Body weight="medium">{t('confirmed', { when: whenLong })}</Body>
             <Button
               variant="link"
               onPress={() => {
@@ -129,13 +141,13 @@ function Day90() {
                 setSlotOpen(true)
               }}
             >
-              Change the time
+              {t('changeTime')}
             </Button>
           </View>
         ) : (
           <View style={{ gap: space.s1 }}>
-            <DaybreakButton onPress={() => setConfirmed(true)} accessibilityHint="Confirms the call with Dr Meera">
-              {slot === 'thu' ? 'Confirm Thursday’s call' : `Confirm ${when.label}`}
+            <DaybreakButton onPress={() => setConfirmed(true)} accessibilityHint={t('confirmHint')}>
+              {slot === 'thu' ? t('confirmThu') : t('confirmSlot', { slot: slotLabel(slot) })}
             </DaybreakButton>
             <Button
               variant="ghost"
@@ -145,7 +157,7 @@ function Day90() {
               }}
               style={{ alignSelf: 'center' }}
             >
-              Another time suits me better
+              {t('another')}
             </Button>
           </View>
         )}
@@ -153,17 +165,16 @@ function Day90() {
 
       {/* What moved */}
       <View style={{ gap: space.s1 }}>
-        <Eyebrow {...H2}>What moved · all six</Eyebrow>
-        <Meta>Day 0 to Day 90, like for like. Tap a row for the reason.</Meta>
+        <Eyebrow {...H2}>{t('whatMoved')}</Eyebrow>
+        <Meta>{t('likeForLike')}</Meta>
         <View style={{ borderTopWidth: 1, borderTopColor: INK.line }}>
           {ORDER.map((k) => {
-            const t = termByKey(k)
             const now = DAY90_TERMS.find((x) => x.key === k)!
             const then = before.terms.find((x) => x.key === k)!
             const d = now.delta ?? 0
             const isOpen = open === k
             const sign = k === 'B' ? '−' : ''
-            const word = k === 'B' ? (d > 0 ? 'heavier' : d < 0 ? 'eased' : 'held') : d > 0 ? 'up' : d < 0 ? 'down' : 'held'
+            const word = t(k === 'B' ? (d > 0 ? 'heavier' : d < 0 ? 'eased' : 'held') : d > 0 ? 'up' : d < 0 ? 'down' : 'held')
             return (
               <Pressable
                 key={k}
@@ -171,12 +182,12 @@ function Day90() {
                 accessibilityRole="button"
                 accessibilityState={{ expanded: isOpen }}
                 aria-expanded={isOpen}
-                accessibilityLabel={`${t.space}, ${t.name}: ${k === 'B' ? 'minus ' : ''}${then.value} to ${k === 'B' ? 'minus ' : ''}${now.value}, ${word}${d ? ` ${Math.abs(d)}` : ''}.`}
+                accessibilityLabel={t('rowA11y', { space: tt.space(k), name: tt.name(k), then: `${k === 'B' ? t('minus') : ''}${then.value}`, now: `${k === 'B' ? t('minus') : ''}${now.value}`, word: `${word}${d ? ` ${Math.abs(d)}` : ''}` })}
                 style={({ pressed }) => ({ borderBottomWidth: 1, borderBottomColor: INK.line, paddingVertical: 14, gap: 6, opacity: pressed ? 0.75 : 1 })}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <TermDot term={k} />
-                  <Body style={{ flex: 1 }}>{t.space}</Body>
+                  <Body style={{ flex: 1 }}>{tt.space(k)}</Body>
                   <Mono tone="ink3" size={15}>{`${sign}${then.value}`}</Mono>
                   <Icon name="arrow-right" size={13} color={INK.ink3} />
                   <Mono tone="ink" size={17} style={{ minWidth: 34, textAlign: 'right' }}>{`${sign}${now.value}`}</Mono>
@@ -189,7 +200,7 @@ function Day90() {
                 </View>
                 {isOpen ? (
                   <Meta tone="ink2" style={{ paddingLeft: 20 }}>
-                    {DAY90_WHY[k]}
+                    {ax(DAY90_WHY[k])}
                   </Meta>
                 ) : null}
               </Pressable>
@@ -201,19 +212,19 @@ function Day90() {
 
       {/* The next ninety days */}
       <View style={{ gap: space.s2 }}>
-        <Eyebrow {...H2}>The next ninety days · a draft</Eyebrow>
-        <Meta>Drafted for the call. You and Dr Meera decide; Priya keeps it going.</Meta>
+        <Eyebrow {...H2}>{t('next90')}</Eyebrow>
+        <Meta>{t('draftedFor')}</Meta>
         {NEXT_90.map((n) => (
           <View key={n.day + n.title} style={{ flexDirection: 'row', gap: 14 }}>
-            <Mono size={13} tone="ink3" style={{ width: 56, paddingTop: 3 }}>
-              {n.day}
+            <Mono size={13} tone="ink3" style={lang === 'en' ? { width: 56, paddingTop: 3 } : { width: 84, paddingTop: 3 }}>
+              {ax(n.day)}
             </Mono>
             <View style={{ flex: 1, gap: 2 }}>
-              <Body weight="medium">{n.title}</Body>
-              <Meta>{n.detail}</Meta>
+              <Body weight="medium">{ax(n.title)}</Body>
+              <Meta>{ax(n.detail)}</Meta>
               {n.day === 'Day 60' ? (
                 <ArrowLink icon="compass" onPress={() => router.push('/cation/wealthcation')}>
-                  See Wealthcation
+                  {t('seeWealth')}
                 </ArrowLink>
               ) : null}
             </View>
@@ -222,34 +233,34 @@ function Day90() {
         <View style={{ borderTopWidth: 1, borderTopColor: INK.line, paddingTop: space.s2, gap: space.s1 }} accessibilityLiveRegion="polite">
           {planState === 'open' ? (
             <>
-              <Meta>{`Does this draft feel right? Your answer goes to Dr Meera and Priya before the call on ${when.long.split(' · ')[0]}.`}</Meta>
+              <Meta>{t('feelRight', { day: tx(SLOT_TEXT[slot].day, when.long.split(' · ')[0]) })}</Meta>
               <View style={{ flexDirection: 'row', gap: space.s1, flexWrap: 'wrap' }}>
                 <Button variant="secondary" icon="check" onPress={() => setPlanState('agreed')}>
-                  Looks right
+                  {t('looksRight')}
                 </Button>
                 <Button variant="ghost" icon="edit-3" onPress={() => setPlanState('note')}>
-                  I’d change something
+                  {t('change')}
                 </Button>
               </View>
             </>
           ) : planState === 'note' ? (
             <>
-              <TextField label="What would you change?" value={note} onChangeText={setNote} placeholder="Fewer calls in March, for a start" multiline />
+              <TextField label={t('whatChange')} value={note} onChangeText={setNote} placeholder={t('changePh')} multiline />
               <View style={{ flexDirection: 'row', gap: space.s1, flexWrap: 'wrap' }}>
                 <Button variant="secondary" icon="send" onPress={saveNote} disabled={!note.trim()}>
-                  Add to the call
+                  {t('addToCall')}
                 </Button>
                 <Button variant="ghost" onPress={() => setPlanState('open')}>
-                  Cancel
+                  {tc('cancel')}
                 </Button>
               </View>
             </>
           ) : (
             <>
-              <Body weight="medium">{planState === 'agreed' ? 'Noted. Dr Meera will start from this draft on the call.' : 'Noted for the call. Dr Meera and Priya will read it first.'}</Body>
+              <Body weight="medium">{planState === 'agreed' ? t('notedAgreed') : t('notedNote')}</Body>
               {planState === 'noted' ? <Meta>“{note.trim()}”</Meta> : null}
               <Button variant="link" onPress={() => setPlanState('open')}>
-                Undo
+                {t('undo')}
               </Button>
             </>
           )}
@@ -257,9 +268,9 @@ function Day90() {
       </View>
 
       <View style={{ gap: space.s1, borderTopWidth: 1, borderTopColor: INK.line, paddingTop: space.s2 }}>
-        <Meta>Nothing here counts against you. A lower number after a heavy quarter is the method working, not you failing.</Meta>
+        <Meta>{t('nothingCounts')}</Meta>
         <Button variant="ghost" icon="book-open" onPress={() => router.push('/index-result')} style={{ alignSelf: 'flex-start' }}>
-          How the Index is made
+          {t('howMade')}
         </Button>
       </View>
 
@@ -267,7 +278,7 @@ function Day90() {
         <Sheet
           open={slotOpen}
           onClose={() => setSlotOpen(false)}
-          title="Choose a time for the call"
+          title={t('chooseTime')}
           footer={
             <Button
               variant="ink"
@@ -278,14 +289,14 @@ function Day90() {
                 setSlotOpen(false)
               }}
             >
-              {`Confirm ${SLOTS.find((x) => x.value === pick)!.label}`}
+              {t('confirmSlot', { slot: slotLabel(pick) })}
             </Button>
           }
         >
-          <Meta>Thirty minutes with Dr Meera, by phone. These are the times she has kept for you this week.</Meta>
-          <Segmented value={pick} onChange={setPick} items={SLOTS.map((x) => ({ value: x.value, label: x.label }))} />
-          <Body>{SLOTS.find((x) => x.value === pick)!.long}</Body>
-          <Meta tone="ink3">None of these work? Message her in Care and she will find another.</Meta>
+          <Meta>{t('thirty')}</Meta>
+          <Segmented value={pick} onChange={setPick} items={SLOTS.map((x) => ({ value: x.value, label: slotLabel(x.value) }))} style={{ flexWrap: 'wrap' }} />
+          <Body>{tx(SLOT_TEXT[pick].long, SLOTS.find((x) => x.value === pick)!.long)}</Body>
+          <Meta tone="ink3">{t('noneWork')}</Meta>
         </Sheet>
       </InkSurface.Provider>
     </InkScreen>

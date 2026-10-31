@@ -5,6 +5,9 @@ import { Body, Button, Card, DaybreakButton, Divider, Eyebrow, Icon, type IconNa
 import { useTheme } from '@/theme/ThemeProvider'
 import { DEVICES, HEALTHKIT_TYPES, WEAR_NIGHTS } from '@/screens/b/accountData'
 import { CheckLine, memberOnly } from '@/screens/b/parts'
+import { useDict } from '@/lib/i18n'
+import { DEV, DEVICE_NOTE, SIGNAL_TEXT, HK_TEXT } from '@/screens/b/i18n/devices'
+import { useCommon, useTx } from '@/screens/b/i18n/common'
 
 // DEVICES (Signals, Memo p.15–16): Oura by default via Terra, Apple Health with per-type
 // HealthKit reads and mindful-minutes write-back, Health Connect on Android, WHOOP, Garmin.
@@ -34,13 +37,20 @@ function Devices() {
   const gaps = WEAR_NIGHTS.filter((n) => n.h === 0)
   const short = WEAR_NIGHTS.filter((n) => n.h > 0 && n.h < 4)
   const isAndroid = Platform.OS === 'android'
+  const t = useDict(DEV)
+  const tc = useCommon()
+  const tx = useTx()
+  const via = (d: Device) => tx(DEVICE_NOTE[d.id]?.via, d.via)
+  const note = (d: Device) => tx(DEVICE_NOTE[d.id]?.note, d.note)
+  const sigs = (d: Device) => d.signals.map((s) => tx(SIGNAL_TEXT[s], s))
+  const lastSync = (d: Device) => (d.lastSync === 'Just now' ? t('justNow') : d.lastSync && DEVICE_NOTE[d.id]?.lastSync?.en === d.lastSync ? tx(DEVICE_NOTE[d.id]?.lastSync, d.lastSync) : d.lastSync)
 
   const sync = () => {
     setSyncing(true)
     setTimeout(() => {
       setSyncing(false)
       setDevices((ds) => ds.map((d) => (d.state === 'connected' ? { ...d, lastSync: 'Just now', freshness: 'fresh' as const } : d)))
-      setToast('Synced. 412 new samples, normalised into one record.')
+      setToast(t('synced'))
     }, 1200)
   }
 
@@ -57,33 +67,33 @@ function Devices() {
     <Screen>
       <ScreenHeader
         back
-        eyebrow="Devices and signals"
+        eyebrow={t('eyebrow')}
         title={
           <>
-            Bring your <Serif>own</Serif> device.
+            {t('titleA')}<Serif>{t('titleSerif')}</Serif>{t('titleB')}
           </>
         }
-        lead="Joy OS reads raw signals (sleep, heart rate variability, steps) from whatever you already wear, and turns them into one record you own."
+        lead={t('lead')}
       />
 
       <DaybreakButton icon="refresh-cw" onPress={sync} disabled={syncing}>
-        {syncing ? 'Syncing…' : 'Sync now'}
+        {syncing ? t('syncing') : t('syncNow')}
       </DaybreakButton>
 
       <Card tone="sunk" style={{ flexDirection: 'row', gap: 12 }}>
         <Icon name="shield-off" size={20} color={c.ink2} />
         <Meta style={{ flex: 1 }}>
           <Meta tone="ink" weight="semibold">
-            No vendor scores.
+            {t('noVendor')}
           </Meta>{' '}
-          Joy OS never imports a vendor’s readiness, strain or age score into the Index. We read the raw signals and measure them by the published method, so your Joyspan does not change when you change rings.
+          {t('noVendorBody')}
         </Meta>
       </Card>
 
       {/* Connected */}
       <View style={{ gap: space.s2 }}>
         <View style={{ gap: 8 }}>
-          <SectionTitle>Reading now</SectionTitle>
+          <SectionTitle>{t('readingNow')}</SectionTitle>
           <SpecimenTag />
         </View>
         {connected.map((d) => (
@@ -95,24 +105,24 @@ function Devices() {
               <View style={{ flex: 1, gap: 2 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <Body weight="medium">{d.name}</Body>
-                  {d.isDefault ? <Pill tone="daybreak">Default</Pill> : null}
+                  {d.isDefault ? <Pill tone="daybreak">{t('default')}</Pill> : null}
                 </View>
-                <Meta size={14}>{d.via}</Meta>
+                <Meta size={14}>{via(d)}</Meta>
               </View>
-              <Pill tone={d.freshness === 'fresh' ? 'ink' : 'neutral'}>{d.freshness === 'fresh' ? 'Fresh' : 'Stale'}</Pill>
+              <Pill tone={d.freshness === 'fresh' ? 'ink' : 'neutral'}>{d.freshness === 'fresh' ? t('fresh') : t('stale')}</Pill>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Icon name="clock" size={14} color={c.ink3} />
               <Meta size={14}>
-                Last sync · <Mono size={14} tone="ink2">{syncing ? 'syncing…' : d.lastSync ?? '—'}</Mono>
+                {t('lastSync')}<Mono size={14} tone="ink2">{syncing ? t('syncingLower') : lastSync(d) ?? '—'}</Mono>
               </Meta>
             </View>
-            <Meta>{d.note}</Meta>
+            <Meta>{note(d)}</Meta>
             <Meta size={14} tone="ink3">
-              {d.signals.join(' · ')}
+              {sigs(d).join(' · ')}
             </Meta>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-              <Eyebrow>Feeds</Eyebrow>
+              <Eyebrow>{t('feeds')}</Eyebrow>
               {d.terms.map((t) => (
                 <TermChip key={t} term={t} />
               ))}
@@ -120,17 +130,17 @@ function Devices() {
             {d.id === 'apple' ? (
               <View style={{ gap: space.s2, marginTop: space.s1 }}>
                 <Divider />
-                <Eyebrow>HealthKit · read, per type</Eyebrow>
+                <Eyebrow>{t('hkRead')}</Eyebrow>
                 {hk.map((x) => (
-                  <Toggle key={x.id} checked={x.on} onChange={(v) => setHk((h) => h.map((z) => (z.id === x.id ? { ...z, on: v } : z)))} label={x.label} />
+                  <Toggle key={x.id} checked={x.on} onChange={(v) => setHk((h) => h.map((z) => (z.id === x.id ? { ...z, on: v } : z)))} label={tx(HK_TEXT[x.id], x.label)} />
                 ))}
                 <Divider />
-                <Eyebrow>Write back</Eyebrow>
-                <Toggle checked={writeBack} onChange={setWriteBack} label="Mindful minutes" description="When you finish a Practice or today’s action. Nothing else is ever written to Apple Health." />
+                <Eyebrow>{t('writeBack')}</Eyebrow>
+                <Toggle checked={writeBack} onChange={setWriteBack} label={t('mindful')} description={t('mindfulD')} />
               </View>
             ) : null}
             <Button size="sm" variant="ghost" onPress={() => setDisconnect(d)}>
-              Disconnect
+              {t('disconnect')}
             </Button>
           </Card>
         ))}
@@ -138,14 +148,14 @@ function Devices() {
 
       {/* Data quality */}
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>Data quality</SectionTitle>
-        <Body tone="ink2">A signal is used only when there is enough of it. Nights with under four hours of wear are kept but not counted; gaps are never filled in.</Body>
+        <SectionTitle>{t('quality')}</SectionTitle>
+        <Body tone="ink2">{t('qualityBody')}</Body>
         <Card tone="raised" style={{ gap: space.s2 }}>
-          <Meta>Hours the Oura Ring was worn each night, 15–28 January. The dashed line marks four hours, the minimum for a night to count.</Meta>
+          <Meta>{t('wearBody')}</Meta>
           <View
             accessible
             accessibilityRole="image"
-            accessibilityLabel={`Ring wear per night: ${wornNights} of 14 nights usable; no data on ${gaps.map((g) => `${g.d} January`).join(' and ')}; ${short.map((s) => `${s.d} January`).join(', ')} too short.`}
+            accessibilityLabel={t('wearA11y', { n: wornNights, gaps: gaps.map((g) => t('jan', { d: g.d })).join(t('and')), short: short.map((s) => t('jan', { d: s.d })).join(', ') })}
             style={{ alignItems: 'center' }}
           >
             <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`}>
@@ -175,22 +185,22 @@ function Devices() {
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s2, rowGap: 4 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <TermDot term="H" />
-              <Meta size={14}>Healthspan signal · usable night</Meta>
+              <Meta size={14}>{t('usable')}</Meta>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: c.lineStrong }} />
-              <Meta size={14}>Not counted</Meta>
+              <Meta size={14}>{t('notCounted')}</Meta>
             </View>
           </View>
         </Card>
         <Card tone="raised" style={{ gap: space.s1 + 4 }}>
           {(
             [
-              [true, 'Wear time', `${wornNights} of 14 nights`, 'Enough for sleep regularity and HRV this fortnight.'],
-              [false, 'Gaps', `${gaps.length} nights`, `No data on ${gaps.map((g) => g.d).join(' and ')} Jan: ring charging. Not imputed.`],
-              [false, 'Short nights', `${short.length} ${short.length === 1 ? 'night' : 'nights'}`, `${short[0]?.d ?? '—'} Jan: 3.2 h worn. Kept, not used for HRV.`],
-              [true, 'Source overlap', 'Sleep from Oura', 'Apple Health sleep is off, so there is one source of truth for sleep.'],
-              [true, 'Freshness', 'Under 72 h', 'Signals older than 72 hours are marked stale and never pick today’s action.'],
+              [true, t('qWear'), t('qWearV', { n: wornNights }), t('qWearN')],
+              [false, t('qGaps'), t('qGapsV', { n: gaps.length }), t('qGapsN', { list: gaps.map((g) => g.d).join(t('and')) })],
+              [false, t('qShort'), `${short.length} ${short.length === 1 ? t('night') : t('nights')}`, t('qShortN', { d: short[0]?.d ?? '—' })],
+              [true, t('qOverlap'), t('qOverlapV'), t('qOverlapN')],
+              [true, t('qFresh'), t('qFreshV'), t('qFreshN')],
             ] as [boolean, string, string, string][]
           ).map(([ok, label, value, note]) => (
             <CheckLine key={label} icon={ok ? 'check' : 'alert-circle'}>
@@ -207,31 +217,31 @@ function Devices() {
 
       {/* Also works with */}
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>Also works with</SectionTitle>
-        <Body tone="ink2">Change rings, keep your history.</Body>
+        <SectionTitle>{t('also')}</SectionTitle>
+        <Body tone="ink2">{t('alsoBody')}</Body>
         {others.map((d) => (
           <Card key={d.id} tone="outline" style={{ gap: space.s1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <Icon name={iconFor(d.id)} size={20} color={c.ink2} />
               <View style={{ flex: 1 }}>
                 <Body weight="medium">{d.name}</Body>
-                <Meta size={14}>{d.via}</Meta>
+                <Meta size={14}>{via(d)}</Meta>
               </View>
             </View>
-            <Meta>{d.note}</Meta>
+            <Meta>{note(d)}</Meta>
             <Meta size={14} tone="ink3">
-              {d.signals.join(' · ')}
+              {sigs(d).join(' · ')}
             </Meta>
             {d.state === 'android' && !isAndroid ? (
               <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                 <Icon name="smartphone" size={15} color={c.ink3} />
                 <Meta size={14} tone="ink3" style={{ flex: 1 }}>
-                  Connect from Joy OS on an Android phone.
+                  {t('androidOnly')}
                 </Meta>
               </View>
             ) : (
               <Button size="sm" variant="secondary" icon="link" onPress={() => setConnect(d)}>
-                {`Connect ${d.name}`}
+                {t('connectName', { name: d.name })}
               </Button>
             )}
           </Card>
@@ -244,7 +254,7 @@ function Devices() {
           setConnect(null)
           setLinking(false)
         }}
-        title={`Connect ${connect?.name ?? ''}`}
+        title={t('connectName', { name: connect?.name ?? '' })}
         footer={
           <Button
             variant="ink"
@@ -259,28 +269,28 @@ function Devices() {
                 setDevices((ds) => ds.map((x) => (x.id === d.id ? { ...x, state: 'connected' as const, lastSync: 'Just now', freshness: 'fresh' as const } : x)))
                 setLinking(false)
                 setConnect(null)
-                setToast(`${d.name} connected${d.via.startsWith('via') ? ` ${d.via}` : ''}. The first sync can take up to an hour.`)
+                setToast(t('connectedToast', { name: d.name, via: d.via.startsWith('via') ? ` ${via(d)}` : '' }))
               }, 1000)
             }}
           >
-            {linking ? 'Connecting…' : 'Continue to sign in (specimen)'}
+            {linking ? t('connecting') : t('continueSignIn')}
           </Button>
         }
       >
         {connect ? (
           <>
-            <Body>{`You will sign in to ${connect.name} on its own page and choose what to share. Joy OS never sees your password.`}</Body>
-            <Eyebrow>What we would read</Eyebrow>
+            <Body>{t('signInOwn', { name: connect.name })}</Body>
+            <Eyebrow>{t('wouldRead')}</Eyebrow>
             {connect.signals.map((s) => (
-              <CheckLine key={s}>{s}</CheckLine>
+              <CheckLine key={s}>{tx(SIGNAL_TEXT[s], s)}</CheckLine>
             ))}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-              <Eyebrow>Feeds</Eyebrow>
+              <Eyebrow>{t('feeds')}</Eyebrow>
               {connect.terms.map((t) => (
                 <TermChip key={t} term={t} />
               ))}
             </View>
-            <Meta size={14} tone="ink3">Each type is a separate permission you can switch off. Raw samples are stored with their source.</Meta>
+            <Meta size={14} tone="ink3">{t('eachType')}</Meta>
           </>
         ) : null}
       </Sheet>
@@ -288,11 +298,11 @@ function Devices() {
       <Sheet
         open={!!disconnect}
         onClose={() => setDisconnect(null)}
-        title={`Disconnect ${disconnect?.name ?? ''}?`}
+        title={t('disconnectQ', { name: disconnect?.name ?? '' })}
         footer={
           <View style={{ flexDirection: 'row', gap: space.s1, justifyContent: 'flex-end' }}>
             <Button variant="ghost" onPress={() => setDisconnect(null)}>
-              Keep connected
+              {t('keepConnected')}
             </Button>
             <Button
               variant="ink"
@@ -300,20 +310,20 @@ function Devices() {
                 if (disconnect) {
                   const d = disconnect
                   setDevices((ds) => ds.map((x) => (x.id === d.id ? { ...x, state: 'available' as const } : x)))
-                  setToast(`${d.name} disconnected.`)
+                  setToast(t('disconnected', { name: d.name }))
                 }
                 setDisconnect(null)
               }}
             >
-              Disconnect
+              {t('disconnect')}
             </Button>
           </View>
         }
       >
-        <Body>We stop reading new data within a minute. What we already have stays in your record unless you ask us to erase it in the Trust centre.</Body>
+        <Body>{t('stopReading')}</Body>
       </Sheet>
 
-      <Sheet open={!!toast} onClose={() => setToast(null)} title="Devices" footer={<Button variant="secondary" block onPress={() => setToast(null)}>Close</Button>}>
+      <Sheet open={!!toast} onClose={() => setToast(null)} title={t('devices')} footer={<Button variant="secondary" block onPress={() => setToast(null)}>{tc('close')}</Button>}>
         <Body>{toast}</Body>
       </Sheet>
     </Screen>

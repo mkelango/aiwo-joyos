@@ -9,12 +9,14 @@ import { BandLabel, DaybreakButton, Delta, Eyebrow, MethodLine, SpecimenTag, Ter
 import { Button, Card, Progress } from '@/components/ui'
 import { INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
 import { termByKey, termColor } from '@/data/terms'
-import { METHODS, bandFor } from '@/domain/indexEngine'
+import { bandFor } from '@/domain/indexEngine'
 import type { TermKey } from '@/domain/types'
 import { SIGNAL_READINGS, SITTINGS, TERM_DETAIL, type InstrumentBlock, type SampleItem } from './_data'
 import { HumanWritten, Switch } from './_parts'
 import { ORDER, scaleOf, scoreAnswers, signalId, signalSources } from './_scoring'
 import { IN_REMEASURE_WINDOW, SPECIMEN_TODAY, addDays, useMeasured } from './_store'
+import { BLOCK_TEXT, SIGNAL_READING_TEXT, SIGNAL_SOURCE_TEXT, SITTING_TITLE, fmtLocal, rich, useCore } from './_i18n'
+import { INSTRUMENT_NOTE, useT } from '@/lib/i18n'
 
 // TAKE THE INDEX (Memo p.11 "≈60 validated items over two sittings"; Plan §4B).
 // Immersive: MemberLayout hides the chrome on this route. One item per screen,
@@ -88,6 +90,7 @@ export default function TakeIndex() {
   const [savedStage, setSavedStage] = useState<'step' | 'review'>('step')
   const topRef = useRef<HTMLDivElement>(null)
 
+  const { t: c, pick } = useCore()
   const answeredCount = Object.keys(answers).filter((id) => answers[id] !== undefined).length
   const step = steps[cursor]
 
@@ -137,27 +140,27 @@ export default function TakeIndex() {
       <div className="flex items-center justify-between gap-3 pb-5">
         <div className="flex items-center gap-3">
           <AiwoMark size={20} />
-          <span className="eyebrow text-ink-3">The Joyspan Index</span>
+          <span className="eyebrow text-ink-3">{c('tkBrand')}</span>
         </div>
         {stage === 'step' || stage === 'review' ? (
           <Button variant="ghost" size="sm" onClick={saveLater}>
-            <X size={16} /> <span className="hidden sm:inline">Save and continue later</span><span className="sm:hidden">Save · later</span>
+            <X size={16} /> <span className="hidden sm:inline">{c('tkSaveLater')}</span><span className="sm:hidden">{c('tkSaveShort')}</span>
           </Button>
         ) : (
-          <Link to="/app/index" className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[14px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring" aria-label="Close and return to My Index">
-            <X size={16} /> Close
+          <Link to="/app/index" className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[14px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring" aria-label={c('tkCloseAria')}>
+            <X size={16} /> {c('close')}
           </Link>
         )}
       </div>
 
       {sittingOf && step && (
         <div className="mb-8">
-          <div className="flex items-center justify-between gap-3 text-[13px] text-ink-2">
-            <span className="eyebrow text-ink-3">Sitting {sittingOf.n} of 2 · {sittingOf.title}</span>
-            {step.type === 'item' && <span className="num shrink-0">Item {step.item.position} of {sittingOf.total}</span>}
-            {step.type === 'signals' && <span className="eyebrow shrink-0 text-ink-3">Signals</span>}
+          <div className="flex items-start justify-between gap-3 text-[13px] text-ink-2">
+            <span className="eyebrow min-w-0 text-ink-3">{c('tkSittingOf', { n: sittingOf.n, title: pick(SITTING_TITLE[sittingOf.n], sittingOf.title) })}</span>
+            {step.type === 'item' && <span className="num shrink-0">{c('tkItemOf', { n: step.item.position, t: sittingOf.total })}</span>}
+            {step.type === 'signals' && <span className="eyebrow shrink-0 text-ink-3">{c('tkSignals')}</span>}
           </div>
-          <Progress className="mt-2" value={progressValue} max={sittingOf.total} label={`Sitting ${sittingOf.n} progress`} />
+          <Progress className="mt-2" value={progressValue} max={sittingOf.total} label={c('tkProgress', { n: sittingOf.n })} />
           <div className="mt-2 flex gap-1" aria-hidden>
             {sittingOf.blocks.map((bl, i) => (
               <span key={bl.code} className="h-1 flex-1 rounded-full" style={{ background: (step.type === 'intro' || step.type === 'item') && i === step.b ? termColor[bl.term] : 'var(--line)' }} />
@@ -179,7 +182,7 @@ export default function TakeIndex() {
             {stage === 'overview' && (
               <Overview
                 resumable={resumable}
-                resumeLabel={draft ? describeCursor(steps[draft.cursor], draft.stage) : ''}
+                resumeLabel={draft ? describeCursor(c, steps[draft.cursor], draft.stage) : ''}
                 answered={answeredCount}
                 onStart={() => (resumable && draft ? resume(draft.stage) : go(0))}
                 onRestart={() => {
@@ -245,7 +248,7 @@ export default function TakeIndex() {
                 }}
               />
             )}
-            {stage === 'saved' && <Saved where={describeCursor(steps[cursor], savedStage)} answered={answeredCount} onResume={() => resume(savedStage)} />}
+            {stage === 'saved' && <Saved where={describeCursor(c, steps[cursor], savedStage)} answered={answeredCount} onResume={() => resume(savedStage)} />}
             {stage === 'scoring' && (
               <Scoring
                 answers={answers}
@@ -259,7 +262,7 @@ export default function TakeIndex() {
 
       {(stage === 'step' || stage === 'review') && (
         <p className="mt-10 flex items-center justify-center gap-2 text-center text-[13px] text-ink-3">
-          <CloudOff size={14} aria-hidden /> Saved on this phone after every answer. Works offline; syncs when you are back.
+          <CloudOff size={14} aria-hidden className="shrink-0" /> {c('tkOffline')}
         </p>
       )}
     </div>
@@ -269,31 +272,34 @@ export default function TakeIndex() {
 function startPosition(block: InstrumentBlock) {
   return block.sample[0]?.position ?? 1
 }
-function describeCursor(step: Step | undefined, stage: 'step' | 'review' = 'step') {
-  if (stage === 'review' || !step) return 'the review'
+type Tr = ReturnType<typeof useCore>['t']
+function describeCursor(c: Tr, step: Step | undefined, stage: 'step' | 'review' = 'step') {
+  if (stage === 'review' || !step) return c('curReview')
   const sit = SITTINGS[step.s]
-  if (step.type === 'item') return `item ${step.item.position} of ${sit.total}, sitting ${sit.n}`
-  if (step.type === 'break') return 'the start of sitting 2'
-  if (step.type === 'signals') return `the signals check, sitting ${sit.n}`
-  return `${sit.blocks[step.b].name}, sitting ${sit.n}`
+  if (step.type === 'item') return c('curItem', { p: step.item.position, t: sit.total, n: sit.n })
+  if (step.type === 'break') return c('curBreak')
+  if (step.type === 'signals') return c('curSignals', { n: sit.n })
+  return c('curIntro', { name: sit.blocks[step.b].name, n: sit.n })
 }
 
 // ─── Overview ───────────────────────────────────────────────────────────────
 function Overview({ resumable, resumeLabel, answered, onStart, onRestart }: { resumable: boolean; resumeLabel: string; answered: number; onStart: () => void; onRestart: () => void }) {
+  const { t: c, lang, pick, method } = useCore()
+  const tr = useT()
   return (
     <div className="flex flex-1 flex-col">
       <Eyebrow tone="daybreak">
-        {IN_REMEASURE_WINDOW ? 'Re-measure' : 'Preview'} · Index grade · {METHODS['v1.0'].label} · Day {MEMBER.dayOfLoop} of 90
+        {c('ovEyebrow', { kind: c(IN_REMEASURE_WINDOW ? 'mbRemeasure' : 'mbPreview'), grade: c('gradeFullIndex'), method: method('v1.0'), day: tr('dayOf', { n: MEMBER.dayOfLoop }) })}
       </Eyebrow>
       <h1 className="mt-3 text-[2.2rem] font-light leading-tight text-ink md:text-[2.8rem]">
-        About <span className="num">20</span> minutes, in <em>two</em> sittings.
+        {rich(c('ovTitle'), { n: <span className="num">20</span> })}
       </h1>
       <p className="mt-4 text-[17px] leading-relaxed text-ink-2">
-        <span className="num">{TOTAL}</span> validated statements across the six terms, with your Oura and Apple Health signals beside them; you confirm the signals at the end of each sitting. Answer for how things are, not how you would like them to be. There are no right answers, and you can stop at any point.
+        {rich(c('ovBody'), { n: <span className="num">{TOTAL}</span> })}
       </p>
       {!IN_REMEASURE_WINDOW && (
         <p className="mt-3 text-[15px] text-ink-2">
-          Your re-measure opens on Day <span className="num">76</span> ({new Date(`${addDays(MEMBER.loopStarted, 76)}T12:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}). This preview is scored the same way and kept beside your history; it does not replace your January measure.
+          {rich(c('ovOpens'), { n: <span className="num">76</span>, date: fmtLocal(new Date(`${addDays(MEMBER.loopStarted, 76)}T12:00`), lang, { day: 'numeric', month: 'short' }) })}
         </p>
       )}
 
@@ -302,11 +308,11 @@ function Overview({ resumable, resumeLabel, answered, onStart, onRestart }: { re
           <li key={s.n}>
             <Card tone="raised" as="div" className="!p-5">
               <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-                <div>
-                  <p className="eyebrow text-ink-3">Sitting {s.n}</p>
-                  <p className="mt-1 text-[19px] text-ink">{s.title}</p>
+                <div className="min-w-0">
+                  <p className="eyebrow text-ink-3">{c('ovSitting', { n: s.n })}</p>
+                  <p className="mt-1 text-[19px] text-ink">{pick(SITTING_TITLE[s.n], s.title)}</p>
                 </div>
-                <span className="flex shrink-0 items-center gap-1.5 text-[14px] text-ink-2"><Clock size={14} /> <span className="num">{s.minutes}</span> min · <span className="num">{s.total}</span> items</span>
+                <span className="flex shrink-0 items-center gap-1.5 text-[14px] text-ink-2"><Clock size={14} /> {rich(c('ovMinItems'), { m: <span className="num">{s.minutes}</span>, n: <span className="num">{s.total}</span> })}</span>
               </div>
               <ul className="mt-4 flex flex-wrap gap-2">
                 {s.blocks.map((b) => (
@@ -315,7 +321,7 @@ function Overview({ resumable, resumeLabel, answered, onStart, onRestart }: { re
                   </li>
                 ))}
                 <li className="inline-flex items-center gap-2 rounded-full border border-dashed border-line px-2.5 py-1 text-[13px] text-ink-2">
-                  <Watch size={13} aria-hidden /> Signals check
+                  <Watch size={13} aria-hidden /> {c('ovSignalsCheck')}
                 </li>
               </ul>
             </Card>
@@ -324,17 +330,17 @@ function Overview({ resumable, resumeLabel, answered, onStart, onRestart }: { re
       </ol>
 
       <div className="mt-6 space-y-2 text-[14px] text-ink-2">
-        <p className="flex gap-2"><ShieldCheck size={16} className="mt-0.5 shrink-0 text-ink-3" /> Your answers are scored by the Index engine and seen by your named team only as you consented. Never by an employer or insurer.</p>
-        <p className="flex gap-2"><Check size={16} className="mt-0.5 shrink-0 text-ink-3" /> A term without enough answers is shown as “not yet measured”, never guessed.</p>
+        <p className="flex gap-2"><ShieldCheck size={16} className="mt-0.5 shrink-0 text-ink-3" /> {c('ovConsent')}</p>
+        <p className="flex gap-2"><Check size={16} className="mt-0.5 shrink-0 text-ink-3" /> {c('ovNotGuessed')}</p>
       </div>
       <p className="mt-4 rounded-card bg-paper-sunk px-4 py-3 text-[13px] text-ink-2">
-        <b className="font-medium text-ink">Specimen wording.</b> All <span className="num">{ITEM_COUNT}</span> items are here, each at its real position. Licensed item wording is loaded from the instrument registry; the wording shown is indicative.
+        {rich(c('ovSpec'), { b: <b className="font-medium text-ink">{c('ovSpecB')}</b>, n: <span className="num">{ITEM_COUNT}</span> })}
       </p>
 
       <div className="mt-auto flex flex-col gap-2 pt-8">
-        {resumable && <p className="text-center text-[14px] text-ink-2"><span className="num">{answered}</span> answers kept. You stopped at {resumeLabel}.</p>}
-        <DaybreakButton onClick={onStart} className="w-full">{resumable ? 'Continue where you left off' : 'Begin sitting 1'}</DaybreakButton>
-        {resumable && <Button variant="ghost" onClick={onRestart} className="self-center">Start again from the beginning</Button>}
+        {resumable && <p className="text-center text-[14px] text-ink-2">{rich(c('ovKept'), { n: <span className="num">{answered}</span>, where: resumeLabel })}</p>}
+        <DaybreakButton onClick={onStart} className="w-full">{resumable ? c('ovContinue') : c('ovBegin1')}</DaybreakButton>
+        {resumable && <Button variant="ghost" onClick={onRestart} className="self-center">{c('ovRestart')}</Button>}
       </div>
     </div>
   )
@@ -343,34 +349,36 @@ function Overview({ resumable, resumeLabel, answered, onStart, onRestart }: { re
 // ─── Instrument intro ───────────────────────────────────────────────────────
 function InstrumentIntro({ block, index, of, onBegin, onBack }: { block: InstrumentBlock; index: number; of: number; onBegin: () => void; onBack: () => void }) {
   const term = termByKey(block.term)
+  const { t: c, name, pick } = useCore()
+  const bt = BLOCK_TEXT[block.code]
   return (
     <div className="flex flex-1 flex-col">
-      <p className="eyebrow text-ink-3">Instrument <span className="num">{index + 1}</span> of <span className="num">{of}</span></p>
+      <p className="eyebrow text-ink-3">{rich(c('inOf'), { i: <span className="num">{index + 1}</span>, n: <span className="num">{of}</span> })}</p>
       <h1 className="mt-3 text-[2rem] font-light leading-tight text-ink md:text-[2.5rem]">{block.name}</h1>
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <TermChip term={block.term} withSpace={term.space !== term.name} />
-        <span className="flex items-center gap-1.5 text-[14px] text-ink-2"><Clock size={14} /> about <span className="num">{block.minutes}</span> min · <span className="num">{block.items}</span> items</span>
+        <span className="flex items-center gap-1.5 text-[14px] text-ink-2"><Clock size={14} /> {rich(c('inAbout'), { m: <span className="num">{block.minutes}</span>, n: <span className="num">{block.items}</span> })}</span>
       </div>
-      <p className="mt-6 text-[19px] leading-relaxed text-ink">{block.about}</p>
+      <p className="mt-6 text-[19px] leading-relaxed text-ink">{pick(bt?.about, block.about)}</p>
       {block.careNote && (
         <div className="mt-5 rounded-card border border-line p-4">
-          <p className="text-[15px] text-ink-2">{block.careNote}</p>
-          <HumanWritten by="Clinical office" className="mt-3" />
+          <p className="text-[15px] text-ink-2">{pick(bt?.careNote, block.careNote)}</p>
+          <HumanWritten by={c('clinicalOffice')} className="mt-3" />
         </div>
       )}
       <dl className="mt-6 grid gap-3 rounded-card bg-paper-sunk p-4 text-[14px] sm:grid-cols-2">
         <div>
-          <dt className="eyebrow text-ink-3">Feeds</dt>
-          <dd className="mt-1 text-ink">{term.name} · <span className="num text-ink-2">{term.formula.split('=')[0].trim()}</span></dd>
+          <dt className="eyebrow text-ink-3">{c('inFeeds')}</dt>
+          <dd className="mt-1 text-ink">{name(block.term)} · <span className="num text-ink-2">{term.formula.split('=')[0].trim()}</span></dd>
         </div>
         <div>
-          <dt className="eyebrow text-ink-3">Licence</dt>
+          <dt className="eyebrow text-ink-3">{c('inLicence')}</dt>
           <dd className="mt-1 text-ink">{block.attribution}</dd>
         </div>
       </dl>
       <div className="mt-auto flex flex-col gap-2 pt-10">
-        <DaybreakButton onClick={onBegin} className="w-full">Begin</DaybreakButton>
-        <Button variant="ghost" onClick={onBack} className="self-center"><ArrowLeft size={15} /> Back</Button>
+        <DaybreakButton onClick={onBegin} className="w-full">{c('inBegin')}</DaybreakButton>
+        <Button variant="ghost" onClick={onBack} className="self-center"><ArrowLeft size={15} /> {c('back')}</Button>
       </div>
     </div>
   )
@@ -381,6 +389,7 @@ function ItemScreen({ block, item, value, fromReview, onAnswer, onNext, onBack }
   const reduce = useReducedMotion()
   const timer = useRef<number | undefined>(undefined)
   const scale = scaleOf(block, item)
+  const { t: c, lang } = useCore()
   useEffect(() => () => window.clearTimeout(timer.current), [])
 
   const choose = (v: number) => {
@@ -408,8 +417,9 @@ function ItemScreen({ block, item, value, fromReview, onAnswer, onNext, onBack }
         <TermDot term={block.term} />
         <span className="eyebrow text-ink-3">{block.code} · {block.timeframe}</span>
       </div>
+      {lang !== 'en' && <p lang={lang} className="mt-3 rounded-card bg-paper-sunk px-3 py-2 text-[13px] text-ink-2">{INSTRUMENT_NOTE[lang]}</p>}
       {item.stem && <p className="mt-4 text-[17px] text-ink-2">{item.stem}</p>}
-      <h1 id={headingId} className={clsx('text-[1.8rem] font-light leading-snug text-ink md:text-[2.2rem]', item.stem ? 'mt-1' : 'mt-4')}>
+      <h1 id={headingId} lang="en" className={clsx('text-[1.8rem] font-light leading-snug text-ink md:text-[2.2rem]', item.stem ? 'mt-1' : 'mt-4')}>
         {item.text}
       </h1>
 
@@ -435,12 +445,12 @@ function ItemScreen({ block, item, value, fromReview, onAnswer, onNext, onBack }
           )
         })}
       </div>
-      <p className="mt-3 hidden text-[13px] text-ink-3 md:block">Keys <span className="num">1–{scale.length}</span> choose an answer.</p>
+      <p className="mt-3 hidden text-[13px] text-ink-3 md:block">{rich(c('itKeys'), { r: <span className="num">1–{scale.length}</span> })}</p>
 
       <div className="mt-auto flex items-center justify-between gap-3 pt-10">
-        <Button variant="ghost" onClick={onBack}><ArrowLeft size={15} /> Back</Button>
+        <Button variant="ghost" onClick={onBack}><ArrowLeft size={15} /> {c('back')}</Button>
         <DaybreakButton onClick={onNext} disabled={value === undefined} className="min-w-[10rem]">
-          {fromReview ? 'Back to review' : 'Next'}
+          {fromReview ? c('itBackReview') : c('itNext')}
         </DaybreakButton>
       </div>
     </div>
@@ -450,14 +460,15 @@ function ItemScreen({ block, item, value, fromReview, onAnswer, onNext, onBack }
 // ─── The signals beside the answers (one per sitting) ───────────────────────
 function SignalsStep({ sitting, off, fromReview, onToggle, onConfirm, onBack }: { sitting: number; off: string[]; fromReview: boolean; onToggle: (id: string, on: boolean) => void; onConfirm: () => void; onBack: () => void }) {
   const terms = SITTING_TERMS[sitting]
+  const { t: c, name, pick } = useCore()
   return (
     <div className="flex flex-1 flex-col">
-      <Eyebrow tone="daybreak">Sitting {sitting + 1} · your signals</Eyebrow>
+      <Eyebrow tone="daybreak">{c('sgEyebrow', { n: sitting + 1 })}</Eyebrow>
       <h1 className="mt-3 text-[2rem] font-light leading-tight text-ink md:text-[2.4rem]">
-        These readings sit <em>beside</em> your answers.
+        {rich(c('sgTitle'))}
       </h1>
       <p className="mt-4 text-[17px] leading-relaxed text-ink-2">
-        Read on this phone from Oura and Apple Health over the last 30 days, summarised, never shown raw to anyone. Leave any of them out and that term is scored from your answers alone.
+        {c('sgBody')}
       </p>
       <ul className="mt-6 space-y-4">
         {terms.map((k) => {
@@ -468,10 +479,10 @@ function SignalsStep({ sitting, off, fromReview, onToggle, onConfirm, onBack }: 
               <Card tone="raised" as="div" className="!p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <TermChip term={k} withSpace={term.space !== term.name} />
-                  <span className="num text-[13px] text-ink-3">{TERM_DETAIL[k].survey}% answers · {TERM_DETAIL[k].signals}% signals</span>
+                  <span className="num text-[13px] text-ink-3">{c('sgShare', { s: TERM_DETAIL[k].survey, g: TERM_DETAIL[k].signals })}</span>
                 </div>
                 {sources.length === 0 ? (
-                  <p className="mt-3 text-[15px] text-ink-2">{term.name} has no wearable signal. It is measured by what you say, and that is enough.</p>
+                  <p className="mt-3 text-[15px] text-ink-2">{c('noWearable', { term: name(k) })}</p>
                 ) : (
                   <ul className="mt-4 space-y-4">
                     {sources.map((src, i) => {
@@ -481,8 +492,8 @@ function SignalsStep({ sitting, off, fromReview, onToggle, onConfirm, onBack }: 
                           <Switch
                             checked={!off.includes(id)}
                             onChange={(v) => onToggle(id, v)}
-                            label={src}
-                            description={<span className="num">{SIGNAL_READINGS[src] ?? 'Reading on this phone'}</span>}
+                            label={pick(SIGNAL_SOURCE_TEXT[src], src)}
+                            description={<span className="num">{SIGNAL_READINGS[src] ? pick(SIGNAL_READING_TEXT[src], SIGNAL_READINGS[src]) : c('sgReading')}</span>}
                           />
                         </li>
                       )
@@ -495,8 +506,8 @@ function SignalsStep({ sitting, off, fromReview, onToggle, onConfirm, onBack }: 
         })}
       </ul>
       <div className="mt-auto flex flex-col gap-2 pt-10">
-        <DaybreakButton onClick={onConfirm} className="w-full">{fromReview ? 'Confirm and back to review' : 'Confirm these signals'}</DaybreakButton>
-        <Button variant="ghost" onClick={onBack} className="self-center"><ArrowLeft size={15} /> Back</Button>
+        <DaybreakButton onClick={onConfirm} className="w-full">{fromReview ? c('sgConfirmBack') : c('sgConfirm')}</DaybreakButton>
+        <Button variant="ghost" onClick={onBack} className="self-center"><ArrowLeft size={15} /> {c('back')}</Button>
       </div>
     </div>
   )
@@ -504,15 +515,16 @@ function SignalsStep({ sitting, off, fromReview, onToggle, onConfirm, onBack }: 
 
 // ─── Between sittings ───────────────────────────────────────────────────────
 function SittingBreak({ onContinue, onLater }: { onContinue: () => void; onLater: () => void }) {
+  const { t: c, pick } = useCore()
   return (
     <div className="flex flex-1 flex-col">
-      <Eyebrow tone="daybreak">Sitting 1 · done</Eyebrow>
-      <h1 className="mt-3 text-[2.2rem] font-light leading-tight text-ink">Half way. <em>Take</em> a breath.</h1>
+      <Eyebrow tone="daybreak">{c('brEyebrow')}</Eyebrow>
+      <h1 className="mt-3 text-[2.2rem] font-light leading-tight text-ink">{rich(c('brTitle'))}</h1>
       <p className="mt-4 text-[17px] leading-relaxed text-ink-2">
-        Your answers for Body, Purpose and People are saved. Sitting 2 covers Freedom, Pleasure and Ease, about ten minutes. Many people take it the next evening{IN_REMEASURE_WINDOW ? '; the re-measure window stays open until Day 90' : ''}.
+        {c('brBody', { s1: pick(SITTING_TITLE[1], SITTINGS[0].title), s2: pick(SITTING_TITLE[2], SITTINGS[1].title), tail: IN_REMEASURE_WINDOW ? c('brTail') : '' })}
       </p>
       <Card tone="sunk" className="mt-6">
-        <p className="eyebrow text-ink-3">Next · sitting 2</p>
+        <p className="eyebrow text-ink-3">{c('brNext')}</p>
         <ul className="mt-3 flex flex-wrap gap-2">
           {SITTINGS[1].blocks.map((b) => (
             <li key={b.code} className="inline-flex items-center gap-2 rounded-full border border-line bg-paper-raised px-2.5 py-1 text-[13px] text-ink-2">
@@ -522,8 +534,8 @@ function SittingBreak({ onContinue, onLater }: { onContinue: () => void; onLater
         </ul>
       </Card>
       <div className="mt-auto flex flex-col gap-2 pt-10">
-        <DaybreakButton onClick={onContinue} className="w-full">Begin sitting 2</DaybreakButton>
-        <Button variant="ghost" onClick={onLater} className="self-center">Continue later</Button>
+        <DaybreakButton onClick={onContinue} className="w-full">{c('brBegin2')}</DaybreakButton>
+        <Button variant="ghost" onClick={onLater} className="self-center">{c('brLater')}</Button>
       </div>
     </div>
   )
@@ -533,20 +545,22 @@ function SittingBreak({ onContinue, onLater }: { onContinue: () => void; onLater
 function Review({ answers, answered, signalsOff, confirmed, onEdit, onEditSignals, onSubmit }: { answers: Record<string, number>; answered: number; signalsOff: string[]; confirmed: number[]; onEdit: (id: string) => void; onEditSignals: (s: number) => void; onSubmit: () => void }) {
   const complete = answered >= ITEM_COUNT
   const firstMissing = SITTINGS.flatMap((s) => s.blocks.flatMap((b) => b.sample)).find((i) => answers[i.id] === undefined)
+  const { t: c, lang, pick } = useCore()
   return (
     <div className="flex flex-1 flex-col">
-      <Eyebrow tone="daybreak">Before you submit</Eyebrow>
-      <h1 className="mt-3 text-[2.2rem] font-light leading-tight text-ink">Check your <em>answers</em>.</h1>
+      <Eyebrow tone="daybreak">{c('rvEyebrow')}</Eyebrow>
+      <h1 className="mt-3 text-[2.2rem] font-light leading-tight text-ink">{rich(c('rvTitle'))}</h1>
       <p className="mt-3 text-[17px] text-ink-2">
-        <span className="num text-ink">{answered}</span> of <span className="num text-ink">{ITEM_COUNT}</span> items answered. Change anything that does not sound like you.
+        {rich(c('rvCount'), { a: <span className="num text-ink">{answered}</span>, n: <span className="num text-ink">{ITEM_COUNT}</span> })}
       </p>
+      {lang !== 'en' && <p lang={lang} className="mt-3 rounded-card bg-paper-sunk px-3 py-2 text-[13px] text-ink-2">{INSTRUMENT_NOTE[lang]}</p>}
       <div className="mt-6 space-y-6">
         {SITTINGS.map((sit, si) => {
           const sources = SITTING_TERMS[si].flatMap((k) => signalSources(k).map((src, i) => ({ k, src, id: signalId(k, i) })))
           const used = sources.filter((x) => !signalsOff.includes(x.id)).length
           return (
-            <section key={sit.n} aria-label={`Sitting ${sit.n}`}>
-              <p className="eyebrow mb-2 text-ink-3">Sitting {sit.n} · {sit.title}</p>
+            <section key={sit.n} aria-label={c('ovSitting', { n: sit.n })}>
+              <p className="eyebrow mb-2 text-ink-3">{c('ovSitting', { n: sit.n })} · {pick(SITTING_TITLE[sit.n], sit.title)}</p>
               <ul className="divide-y divide-line rounded-card border border-line bg-paper-raised">
                 {sit.blocks.flatMap((b) =>
                   b.sample.map((item) => {
@@ -556,13 +570,13 @@ function Review({ answers, answered, signalsOff, confirmed, onEdit, onEditSignal
                       <li key={item.id} className="flex items-start gap-3 px-4 py-3">
                         <span className="mt-1.5"><TermDot term={b.term} /></span>
                         <div className="min-w-0 flex-1">
-                          <p className="text-[15px] text-ink">{item.stem && item.stem.endsWith('…') ? `${item.stem.replace('…', '')} ${item.text.replace('…', '')}` : item.text}</p>
+                          <p lang="en" className="text-[15px] text-ink">{item.stem && item.stem.endsWith('…') ? `${item.stem.replace('…', '')} ${item.text.replace('…', '')}` : item.text}</p>
                           <p className="mt-0.5 text-[13px] text-ink-3">
-                            <span className="num">{b.code} · {item.position}</span> · {label ? <span className="text-ink-2">{label}</span> : <span className="text-error">Not answered</span>}
+                            <span className="num">{b.code} · {item.position}</span> · {label ? <span lang="en" className="text-ink-2">{label}</span> : <span className="text-error">{c('rvNotAnswered')}</span>}
                           </p>
                         </div>
-                        <Button variant="ghost" size="sm" onClick={() => onEdit(item.id)} aria-label={`Edit answer: ${item.text}`}>
-                          <Pencil size={14} /> Edit
+                        <Button variant="ghost" size="sm" onClick={() => onEdit(item.id)} aria-label={c('rvEditAria', { text: item.text })}>
+                          <Pencil size={14} /> {c('rvEdit')}
                         </Button>
                       </li>
                     )
@@ -571,13 +585,13 @@ function Review({ answers, answered, signalsOff, confirmed, onEdit, onEditSignal
                 <li className="flex items-start gap-3 px-4 py-3">
                   <Watch size={15} className="mt-1 shrink-0 text-ink-3" aria-hidden />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[15px] text-ink">Signals beside these answers</p>
+                    <p className="text-[15px] text-ink">{c('rvSignals')}</p>
                     <p className="mt-0.5 text-[13px] text-ink-3">
-                      {sources.length === 0 ? 'None for these terms' : <><span className="num">{used}</span> of <span className="num">{sources.length}</span> used</>} · {confirmed.includes(si) ? <span className="text-ink-2">Confirmed</span> : <span className="text-ink-2">Not yet confirmed</span>}
+                      {sources.length === 0 ? c('rvNone') : rich(c('rvUsed'), { u: <span className="num">{used}</span>, n: <span className="num">{sources.length}</span> })} · {confirmed.includes(si) ? <span className="text-ink-2">{c('rvConfirmed')}</span> : <span className="text-ink-2">{c('rvNotConfirmed')}</span>}
                     </p>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => onEditSignals(si)} aria-label={`Review signals for sitting ${sit.n}`}>
-                    <Pencil size={14} /> Edit
+                  <Button variant="ghost" size="sm" onClick={() => onEditSignals(si)} aria-label={c('rvSignalsAria', { n: sit.n })}>
+                    <Pencil size={14} /> {c('rvEdit')}
                   </Button>
                 </li>
               </ul>
@@ -588,11 +602,11 @@ function Review({ answers, answered, signalsOff, confirmed, onEdit, onEditSignal
       <div className="mt-auto flex flex-col gap-2 pt-10">
         {!complete && (
           <p role="alert" className="text-center text-[14px] text-error">
-            Please answer the items marked “not answered”.{' '}
-            {firstMissing && <button onClick={() => onEdit(firstMissing.id)} className="underline underline-offset-4 focus-ring">Go to the first one</button>}
+            {c('rvPlease')}{' '}
+            {firstMissing && <button onClick={() => onEdit(firstMissing.id)} className="underline underline-offset-4 focus-ring">{c('rvFirst')}</button>}
           </p>
         )}
-        <DaybreakButton onClick={onSubmit} disabled={!complete} className="w-full">Submit for scoring</DaybreakButton>
+        <DaybreakButton onClick={onSubmit} disabled={!complete} className="w-full">{c('rvSubmit')}</DaybreakButton>
       </div>
     </div>
   )
@@ -600,21 +614,22 @@ function Review({ answers, answered, signalsOff, confirmed, onEdit, onEditSignal
 
 // ─── Saved for later ────────────────────────────────────────────────────────
 function Saved({ where, answered, onResume }: { where: string; answered: number; onResume: () => void }) {
+  const { t: c } = useCore()
   return (
     <div className="flex flex-1 flex-col">
-      <Eyebrow>Saved on this phone</Eyebrow>
-      <h1 className="mt-3 text-[2.2rem] font-light leading-tight text-ink">Pick it up <em>whenever</em>.</h1>
+      <Eyebrow>{c('svEyebrow')}</Eyebrow>
+      <h1 className="mt-3 text-[2.2rem] font-light leading-tight text-ink">{rich(c('svTitle'))}</h1>
       <p className="mt-4 text-[17px] leading-relaxed text-ink-2">
-        <span className="num text-ink">{answered}</span> answers kept. You will start again at {where}. Nothing is scored until you submit, and nobody is told you paused.
+        {rich(c('svBody'), { n: <span className="num text-ink">{answered}</span>, where })}
       </p>
       <p className="mt-3 text-[15px] text-ink-2">
         {IN_REMEASURE_WINDOW
-          ? <>The re-measure window is open until Day <span className="num">90</span>. One gentle reminder, never inside your quiet hours (<span className="num">{MEMBER.quietHours}</span>).</>
-          : <>This is a preview; your re-measure opens on Day <span className="num">76</span>. No reminders are sent for a preview.</>}
+          ? rich(c('svOpenUntil'), { n: <span className="num">90</span>, q: <span className="num">{MEMBER.quietHours}</span> })
+          : rich(c('svPreview'), { n: <span className="num">76</span> })}
       </p>
       <div className="mt-auto flex flex-col gap-2 pt-10">
-        <DaybreakButton onClick={onResume} className="w-full">Continue now</DaybreakButton>
-        <Link to="/app" className="self-center py-2 text-[15px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring">Back to Today</Link>
+        <DaybreakButton onClick={onResume} className="w-full">{c('svNow')}</DaybreakButton>
+        <Link to="/app" className="self-center py-2 text-[15px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring">{c('svToday')}</Link>
       </div>
     </div>
   )
@@ -626,11 +641,12 @@ function Scoring({ answers, signalsOff, onSee }: { answers: Record<string, numbe
   const latest = INDEX_HISTORY[0]
   const result = useMemo(() => scoreAnswers(answers, signalsOff), [answers, signalsOff])
   const { engine } = result
+  const { t: c, name, space, method } = useCore()
   const STAGES = [
-    'Checking every term has enough answers',
-    `Scoring six terms · ${METHODS[latest.method].label} · ${latest.engineBuild}`,
-    `Geometric mean of five ${engine.gm.toFixed(1)}, minus λ·B ${engine.burden.toFixed(1)}`,
-    'Pinning the method, the date and the next measure',
+    c('scStage1'),
+    c('scStage2', { m: method(latest.method), b: latest.engineBuild }),
+    c('scStage3', { gm: engine.gm.toFixed(1), b: engine.burden.toFixed(1) }),
+    c('scStage4'),
   ]
   const [done, setDone] = useState(0)
   useEffect(() => {
@@ -640,13 +656,13 @@ function Scoring({ answers, signalsOff, onSee }: { answers: Record<string, numbe
   }, [done, reduce, STAGES.length])
   const finished = done >= STAGES.length
   const lowest = termByKey(result.lowest)
-  const coachFirst = TEAM.find((p) => p.id === 'p_priya')?.name.split(' ')[0] ?? 'Your coach'
+  const coachFirst = TEAM.find((p) => p.id === 'p_priya')?.name.split(' ')[0] ?? c('scYourCoach')
   const next = IN_REMEASURE_WINDOW ? addDays(SPECIMEN_TODAY, 90) : MEMBER.nextMeasure
 
   return (
     <div className="flex flex-1 flex-col">
-      <Eyebrow tone="daybreak">Scoring with {METHODS[latest.method].label}</Eyebrow>
-      <h1 className="mt-3 text-[2.2rem] font-light leading-tight text-ink">{finished ? <>Your Index is <em>ready</em>.</> : 'One moment.'}</h1>
+      <Eyebrow tone="daybreak">{c('scEyebrow', { m: method(latest.method) })}</Eyebrow>
+      <h1 className="mt-3 text-[2.2rem] font-light leading-tight text-ink">{finished ? rich(c('scReady')) : c('scMoment')}</h1>
       <ol className="mt-6 space-y-3" aria-live="polite">
         {STAGES.map((s, i) => (
           <li key={s} className={clsx('flex items-center gap-3 text-[15px] transition-opacity', i < done ? 'text-ink' : i === done ? 'text-ink-2' : 'text-ink-3 opacity-50')}>
@@ -666,26 +682,26 @@ function Scoring({ answers, signalsOff, onSee }: { answers: Record<string, numbe
                 <JoyspanWheel terms={result.terms} size={180} />
                 <div className="text-center sm:text-left">
                   <div className="flex items-end justify-center gap-3 sm:justify-start">
-                    <span className="num text-[5rem] font-light leading-[0.85] text-ink" aria-label={`Joyspan Index ${engine.value} of 100`}>{engine.value}</span>
+                    <span className="num text-[5rem] font-light leading-[0.85] text-ink" aria-label={c('jiAria', { v: engine.value })}>{engine.value}</span>
                     <span className="mb-1 flex flex-col gap-1">
                       <Delta value={engine.value - latest.value} />
                       <BandLabel band={bandFor(engine.value)} />
                     </span>
                   </div>
                   <p className="mt-3 text-[17px] text-ink-2">
-                    {engine.value === latest.value ? 'The same as' : engine.value > latest.value ? 'Up from' : 'From'} <span className="num">{latest.value}</span> on your January measure. Lowest term: <span className="text-ink">{lowest.name}</span>.
+                    {rich(c(engine.value === latest.value ? 'scSame' : engine.value > latest.value ? 'scUp' : 'scFrom'), { v: <span className="num">{latest.value}</span>, term: <span className="text-ink">{name(lowest.key)}</span> })}
                   </p>
                   {engine.value < latest.value && (
-                    <p className="mt-2 text-[15px] text-ink-2">A lower number is information, not a verdict. {coachFirst} will go through it with you at your next review. Your employer and your circle never see it.</p>
+                    <p className="mt-2 text-[15px] text-ink-2">{c('scLower', { coach: coachFirst })}</p>
                   )}
                 </div>
               </div>
-              <ul className="mt-5 grid grid-cols-2 gap-x-6 gap-y-2 border-t border-line pt-4 sm:grid-cols-3" aria-label="Your six terms from this sitting">
+              <ul className="mt-5 grid grid-cols-2 gap-x-6 gap-y-2 border-t border-line pt-4 sm:grid-cols-3" aria-label={c('scTermsAria')}>
                 {ORDER.map((k) => {
                   const s = result.terms.find((t) => t.key === k)!
                   return (
                     <li key={k} className="flex items-center justify-between gap-2 text-[14px] text-ink-2">
-                      <span className="flex items-center gap-2"><TermDot term={k} /> {termByKey(k).space}</span>
+                      <span className="flex min-w-0 items-center gap-2"><TermDot term={k} /> <span className="min-w-0 break-words">{space(k)}</span></span>
                       <span className="num text-ink">{s.value === null ? '—' : k === 'B' ? `−${s.value}` : s.value}</span>
                     </li>
                   )
@@ -696,13 +712,13 @@ function Scoring({ answers, signalsOff, onSee }: { answers: Record<string, numbe
                 <SpecimenTag />
               </div>
               {!IN_REMEASURE_WINDOW && (
-                <p className="mt-3 text-[14px] text-ink-2">A preview on Day <span className="num">{MEMBER.dayOfLoop}</span>: kept beside your history on My Index. Your recorded Index stays at <span className="num">{latest.value}</span> until the Day-90 re-measure.</p>
+                <p className="mt-3 text-[14px] text-ink-2">{rich(c('scPreviewDay'), { d: <span className="num">{MEMBER.dayOfLoop}</span>, v: <span className="num">{latest.value}</span> })}</p>
               )}
             </Card>
             {result.phqFlag && (
               <div className="mt-4 rounded-card border border-line p-4">
-                <p className="text-[15px] text-ink-2">Some of your Ease answers are above the level where a clinician takes a look. Dr Sanjay Menon will read them within 48 hours and may call. This is routine.</p>
-                <HumanWritten by="Clinical office" className="mt-3" />
+                <p className="text-[15px] text-ink-2">{c('scPhq', { space: space('B') })}</p>
+                <HumanWritten by={c('clinicalOffice')} className="mt-3" />
               </div>
             )}
           </motion.div>
@@ -710,10 +726,10 @@ function Scoring({ answers, signalsOff, onSee }: { answers: Record<string, numbe
       </AnimatePresence>
 
       <div className="mt-auto flex flex-col gap-2 pt-10">
-        <DaybreakButton onClick={onSee} disabled={!finished} className="w-full">{IN_REMEASURE_WINDOW ? 'See your Day-90 result' : 'See your Index'}</DaybreakButton>
+        <DaybreakButton onClick={onSee} disabled={!finished} className="w-full">{IN_REMEASURE_WINDOW ? c('scSeeDay90') : c('scSeeIndex')}</DaybreakButton>
         {finished && !IN_REMEASURE_WINDOW && (
           <Link to="/app/index/day-90" className="inline-flex items-center justify-center gap-1.5 self-center py-2 text-[15px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring">
-            How the Day-90 result is shown <ArrowRight size={14} />
+            {c('scHowDay90')} <ArrowRight size={14} />
           </Link>
         )}
       </div>

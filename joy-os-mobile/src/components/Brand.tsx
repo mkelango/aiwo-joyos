@@ -3,7 +3,9 @@ import type { ReactNode } from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { NOTICES } from '../screens/b/_data'
 import { notifReadStore, useStore } from '../screens/b/bStore'
+import { useDict } from '../lib/i18n'
 import { useTheme } from '../theme/ThemeProvider'
+import { KIT } from './_i18n'
 import { Icon } from './Icon'
 import { Eyebrow } from './Text'
 
@@ -22,12 +24,13 @@ export function AiwoMark({ size = 20, color }: { size?: number; color?: string }
 /** The app bar used on Today and other tab roots. */
 export function AppBar({ right, label = 'Joy OS' }: { right?: ReactNode; label?: string }) {
   const { space } = useTheme()
+  const t = useDict(KIT)
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.gutter, minHeight: 52, width: '100%', maxWidth: 640, alignSelf: 'center' }}>
-      <Pressable onPress={() => router.navigate('/')} accessibilityRole="link" accessibilityLabel={`AIWO ${label}, Today`} hitSlop={8}>
+      <Pressable onPress={() => router.navigate('/')} accessibilityRole="link" accessibilityLabel={t('appBarHome', { label })} hitSlop={8}>
         <AiwoMark />
       </Pressable>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1, flexShrink: 1, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
         {right}
         <NotificationsBell />
         <Eyebrow size={12} style={{ letterSpacing: 12 * 0.24 }} tone="ink2">
@@ -42,13 +45,14 @@ export function AppBar({ right, label = 'Joy OS' }: { right?: ReactNode; label?:
  *  says something is not yet opened. Shared with the Notifications screen's read state. */
 function NotificationsBell() {
   const { c } = useTheme()
+  const t = useDict(KIT)
   const [rd] = useStore(notifReadStore)
   const unread = NOTICES.filter((n) => !rd.cleared.includes(n.id) && !rd.read.includes(n.id)).length
   return (
     <Pressable
       onPress={() => router.push('/notifications')}
       accessibilityRole="button"
-      accessibilityLabel={unread ? `Notifications, ${unread} not yet opened` : 'Notifications, all read'}
+      accessibilityLabel={unread ? t('notifUnread', { n: unread }) : t('notifAllRead')}
       hitSlop={6}
       style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
     >

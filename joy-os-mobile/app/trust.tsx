@@ -30,6 +30,9 @@ import type { AccessEvent, Consent } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { CLAIMS_LOG, EXPORTS_PAST, EXTRA_ACCESS } from '@/screens/b/accountData'
 import { ChoiceCard, Done, Field, FilterChips, TimelineStep, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
+import { useDict } from '@/lib/i18n'
+import { TRUST, SCOPE_TEXT, CONSENT_T, ACCESS_T, EXPORT_T, CLAIM_STATE, CLAIM_BY, CLAIM_T } from '@/screens/b/i18n/trust'
+import { ROLE, useCommon, useTx } from '@/screens/b/i18n/common'
 
 // TRUST CENTRE (Memo module 14, p.27): who has seen my data, consents by purpose, export
 // (FHIR / JSON, ≤72 h), delete (step-up, honoured ≤24 h), research, aggregates-only for
@@ -44,6 +47,15 @@ export default memberOnly(Trust)
 function Trust() {
   const { c, space } = useTheme()
   const [toast, setToast] = useState<string | null>(null)
+  const t = useDict(TRUST)
+  const tc = useCommon()
+  const tx = useTx()
+  const role_ = (r: string) => tx(ROLE[r], r)
+  const cName = (x: Consent) => tx(CONSENT_T[x.id]?.name, x.name)
+  const cPurpose = (x: Consent) => tx(CONSENT_T[x.id]?.purpose, x.purpose)
+  const aWho = (e: AccessEvent) => tx(ACCESS_T[e.id]?.who, e.who)
+  const aWhat = (e: AccessEvent) => tx(ACCESS_T[e.id]?.what, e.what)
+  const aPurpose = (e: AccessEvent) => tx(ACCESS_T[e.id]?.purpose, e.purpose)
 
   // Access log
   const all = useMemo<AccessEvent[]>(() => [...ACCESS_LOG, ...EXTRA_ACCESS].sort((a, b) => b.at.localeCompare(a.at)), [])
@@ -59,7 +71,7 @@ function Trust() {
   const [confirm, setConfirm] = useState<Consent | null>(null)
   const applyConsent = (x: Consent, v: boolean) => {
     setConsent((s) => ({ ...s, [x.id]: { on: v, changed: true } }))
-    setToast(`${x.name} ${v ? 'turned on' : 'withdrawn'}. Takes effect everywhere within 24 hours.`)
+    setToast(t(v ? 'turnedOn' : 'withdrawnT', { name: cName(x) }))
   }
   const granted = Object.values(consent).filter((x) => x.on).length
   const groups = (['core', 'cohort', 'device', 'calendar', 'whatsapp', 'partner'] as const).map((g) => ({ g, items: CONSENTS.filter((x) => x.scope === g) })).filter((x) => x.items.length)
@@ -68,9 +80,9 @@ function Trust() {
   const [format, setFormat] = useState<'fhir' | 'json'>('fhir')
   const [exp, setExp] = useState<ExportStatus>('idle')
   const steps: { key: ExportStatus; label: string }[] = [
-    { key: 'requested', label: 'Requested' },
-    { key: 'preparing', label: 'Preparing your copy' },
-    { key: 'ready', label: 'Ready to download' },
+    { key: 'requested', label: t('requested') },
+    { key: 'preparing', label: t('preparing') },
+    { key: 'ready', label: t('readyDl') },
   ]
   const expIdx = steps.findIndex((s) => s.key === exp)
   const [shared, setShared] = useState(false)
@@ -125,8 +137,8 @@ function Trust() {
   const sendAsk = () => {
     if (!guard(askText, () => setAskOpen(false))) return
     const e: typeof askErr = {}
-    if (!askEntry) e.entry = 'Choose the entry you are asking about.'
-    if (askText.trim().length < 5) e.text = 'Tell us what you would like to know.'
+    if (!askEntry) e.entry = t('errEntry')
+    if (askText.trim().length < 5) e.text = t('errText')
     setAskErr(e)
     if (Object.keys(e).length) return
     setAskSent(true)
@@ -152,21 +164,21 @@ function Trust() {
     <Screen>
       <ScreenHeader
         back
-        eyebrow="Trust centre · one tap from your Index"
+        eyebrow={t('eyebrow')}
         title={
           <>
-            Your data is <Serif>yours</Serif>.
+            {t('titleA')}<Serif>{t('titleSerif')}</Serif>{t('titleB')}
           </>
         }
-        lead="See who has looked at it and why, change what you have agreed to, take a copy, or ask us to erase it. Every change is logged, including ours."
+        lead={t('lead')}
       />
 
       {/* Summary */}
       <View style={{ flexDirection: 'row', gap: space.s1 + 4 }}>
         {(
           [
-            ['eye', 'People who looked', String(people), 'in the last 30 days'],
-            ['check-square', 'Consents given', `${granted}/${CONSENTS.length}`, 'each by purpose'],
+            ['eye', t('peopleLooked'), String(people), t('last30')],
+            ['check-square', t('consentsGiven'), `${granted}/${CONSENTS.length}`, t('byPurpose')],
           ] as [IconName, string, string, string][]
         ).map(([icon, label, value, sub]) => (
           <Card key={label} tone="raised" style={{ flex: 1, gap: 6 }}>
@@ -181,24 +193,24 @@ function Trust() {
       {/* Who has seen my data */}
       <View style={{ gap: space.s2 }}>
         <View style={{ gap: 8 }}>
-          <SectionTitle>Who has seen my data</SectionTitle>
+          <SectionTitle>{t('whoSeen')}</SectionTitle>
           <SpecimenTag />
         </View>
-        <Title size={24}>Every look, with a name and a reason.</Title>
-        <Body tone="ink2">Coaches, clinicians, concierges, venues, the Index engine and the Science Office all leave a line here. Nobody reads your record without one.</Body>
-        <FilterChips label="Filter by who looked" value={role} onChange={(v) => setRole(v)} items={[{ value: 'all', label: 'Everyone' }, ...roles.map((r) => ({ value: r, label: r }))]} />
+        <Title size={24}>{t('everyLook')}</Title>
+        <Body tone="ink2">{t('everyLookBody')}</Body>
+        <FilterChips label={t('filter')} value={role} onChange={(v) => setRole(v)} items={[{ value: 'all', label: t('everyone') }, ...roles.map((r) => ({ value: r, label: role_(r) }))]} />
         <Card tone="raised" style={{ gap: 0 }}>
           <Meta size={14} tone="ink3" accessibilityLiveRegion="polite">
-            {`${rows.length} ${rows.length === 1 ? 'entry' : 'entries'} · newest first`}
+            {t('entries', { n: rows.length, unit: rows.length === 1 ? t('entry') : t('entriesW') })}
           </Meta>
           {visible.map((e) => (
-            <View key={e.id} accessible accessibilityLabel={`${e.at}. ${e.who}, ${e.role}, saw ${e.what}. Purpose: ${e.purpose}.`} style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.line, gap: 4 }}>
+            <View key={e.id} accessible accessibilityLabel={t('rowA11y', { at: e.at, who: aWho(e), role: role_(e.role), what: aWhat(e), purpose: aPurpose(e) })} style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.line, gap: 4 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.s1, flexWrap: 'wrap' }}>
-                <Body weight="medium">{e.who}</Body>
-                <Eyebrow tone="ink2">{e.role}</Eyebrow>
+                <Body weight="medium">{aWho(e)}</Body>
+                <Eyebrow tone="ink2">{role_(e.role)}</Eyebrow>
               </View>
-              <Meta tone="ink">{e.what}</Meta>
-              <Meta size={14}>{e.purpose}</Meta>
+              <Meta tone="ink">{aWhat(e)}</Meta>
+              <Meta size={14}>{aPurpose(e)}</Meta>
               <Mono size={12} tone="ink3">
                 {e.at}
               </Mono>
@@ -206,27 +218,27 @@ function Trust() {
           ))}
           {rows.length > 4 ? (
             <Button variant="link" onPress={() => setShowAll((s) => !s)}>
-              {showAll ? 'Show fewer' : `Show all ${rows.length}`}
+              {showAll ? t('showFewer') : t('showAll', { n: rows.length })}
             </Button>
           ) : null}
           <Button variant="ghost" size="sm" icon="help-circle" onPress={() => openAsk()} style={{ marginTop: space.s1 }}>
-            Ask about an entry
+            {t('askEntry')}
           </Button>
         </Card>
       </View>
 
       {/* Consents */}
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>Consents by purpose</SectionTitle>
+        <SectionTitle>{t('consentsTitle')}</SectionTitle>
         <Title size={24}>
-          Agree to each purpose <Serif>separately</Serif>.
+          {t('agreeA')}<Serif>{t('agreeSerif')}</Serif>{t('agreeB')}
         </Title>
-        <Body tone="ink2">Care, Data and Publishing are three different consents, and every device, calendar and partner has its own. A change takes effect everywhere within 24 hours.</Body>
+        <Body tone="ink2">{t('agreeBody')}</Body>
         <Card tone="raised" style={{ gap: space.s2 }}>
           {groups.map(({ g, items }, gi) => (
             <View key={g} style={{ gap: space.s2 }}>
               {gi > 0 ? <Divider /> : null}
-              <Eyebrow>{SCOPE_LABEL[g]}</Eyebrow>
+              <Eyebrow>{tx(SCOPE_TEXT[g], SCOPE_LABEL[g])}</Eyebrow>
               {items.map((x) => {
                 const s = consent[x.id]
                 return (
@@ -234,8 +246,8 @@ function Trust() {
                     key={x.id}
                     checked={s.on}
                     onChange={(v) => (!v && (x.scope === 'core' || x.scope === 'cohort') ? setConfirm(x) : applyConsent(x, v))}
-                    label={x.name}
-                    description={`${x.purpose}. ${s.changed ? 'Change recorded · in effect everywhere within 24 h.' : s.on && x.since ? `Given ${fmtDate(x.since)}.` : 'Not given.'}`}
+                    label={cName(x)}
+                    description={`${cPurpose(x)}. ${s.changed ? t('changeRec') : s.on && x.since ? t('given', { date: fmtDate(x.since) }) : t('notGiven')}`}
                   />
                 )
               })}
@@ -248,10 +260,10 @@ function Trust() {
       <Card tone="raised" style={{ gap: space.s2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Icon name="download" size={18} color={c.ink2} />
-          <Eyebrow>Export</Eyebrow>
+          <Eyebrow>{t('export')}</Eyebrow>
         </View>
-        <Title size={24}>Take a full copy, in an open format.</Title>
-        <Body tone="ink2">Index history with methods, answers, signals, Ledger, messages and your clinical record. Ready within 72 hours; the link lasts 7 days.</Body>
+        <Title size={24}>{t('exportTitle')}</Title>
+        <Body tone="ink2">{t('exportBody')}</Body>
         <Segmented
           value={format}
           onChange={setFormat}
@@ -260,10 +272,10 @@ function Trust() {
             { value: 'json', label: 'JSON' },
           ]}
         />
-        <Meta>{format === 'fhir' ? 'For doctors, hospitals and ABDM: clinical systems read it directly.' : 'For you, or any app: every record with its method version.'}</Meta>
+        <Meta>{format === 'fhir' ? t('fhirNote') : t('jsonNote')}</Meta>
         {exp === 'idle' ? (
           <DaybreakButton icon="download" onPress={() => setExp('requested')}>
-            Request export
+            {t('request')}
           </DaybreakButton>
         ) : (
           <View style={{ gap: space.s2 }} accessibilityLiveRegion="polite">
@@ -274,29 +286,29 @@ function Trust() {
                 </TimelineStep>
               ))}
             </View>
-            {shared ? <Done>{Platform.OS === 'web' ? 'Copy saved to your downloads. Keep it somewhere private.' : 'Copy handed to your share sheet. Keep it somewhere private.'}</Done> : null}
+            {shared ? <Done>{Platform.OS === 'web' ? t('savedDl') : t('handed')}</Done> : null}
             <Meta>
               {exp === 'ready'
-                ? `Your ${format === 'fhir' ? 'FHIR R4 bundle' : 'JSON file'} is ready · 2.6 MB · the link expires in 7 days.`
-                : `Requested ${fmtDate('2027-01-28')} · ready by ${fmtDate('2027-01-31')} at the latest. We will tell you by email and in the app.`}
+                ? t('readyLine', { format: format === 'fhir' ? 'FHIR R4 bundle' : t('jsonFile') })
+                : t('reqLine', { a: fmtDate('2027-01-28'), b: fmtDate('2027-01-31') })}
             </Meta>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s1 }}>
               {exp === 'ready' ? (
                 <Button variant="ink" size="sm" icon={Platform.OS === 'web' ? 'download' : 'share'} onPress={shareCopy}>
-                  {Platform.OS === 'web' ? 'Download copy (specimen)' : 'Share copy (specimen)'}
+                  {Platform.OS === 'web' ? t('dlCopy') : t('shareCopy')}
                 </Button>
               ) : null}
               <Button variant="ghost" size="sm" onPress={() => { setExp('idle'); setShared(false) }}>
-                {exp === 'ready' ? 'Done' : 'Cancel request'}
+                {exp === 'ready' ? tc('done') : t('cancelReq')}
               </Button>
             </View>
           </View>
         )}
         <Divider />
-        <Eyebrow>Earlier</Eyebrow>
+        <Eyebrow>{t('earlier')}</Eyebrow>
         {EXPORTS_PAST.map((x) => (
           <Meta key={x.id} size={14}>
-            <Mono size={14} tone="ink2">{fmtDate(x.requested)}</Mono> · {x.format} · <Mono size={14} tone="ink2">{x.size}</Mono> · {x.status}
+            <Mono size={14} tone="ink2">{fmtDate(x.requested)}</Mono> · {tx(EXPORT_T[x.id]?.format, x.format)} · <Mono size={14} tone="ink2">{x.size}</Mono> · {tx(EXPORT_T[x.id]?.status, x.status)}
           </Meta>
         ))}
       </Card>
@@ -305,10 +317,10 @@ function Trust() {
       <Card tone="raised" style={{ gap: space.s2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Icon name="trash-2" size={18} color={c.ink2} />
-          <Eyebrow>Delete</Eyebrow>
+          <Eyebrow>{t('delete')}</Eyebrow>
         </View>
-        <Title size={24}>Leave, and take your data with you.</Title>
-        {['Withdrawing a consent is honoured everywhere within 24 hours.', 'Erasing your account removes your Joy OS record within 24 hours of confirmation.', 'Your clinical record is kept only as long as medical-records law requires, then erased.'].map((x) => (
+        <Title size={24}>{t('leaveTitle')}</Title>
+        {[t('d1'), t('d2'), t('d3')].map((x) => (
           <View key={x} style={{ flexDirection: 'row', gap: 10 }}>
             <Icon name="check" size={15} color={c.ink2} />
             <Meta style={{ flex: 1 }}>{x}</Meta>
@@ -317,45 +329,45 @@ function Trust() {
         {scheduled ? (
           <Card tone="sunk" padding={16} style={{ gap: space.s1 }}>
             <Body weight="medium" accessibilityLiveRegion="polite">
-              Erasure scheduled · completes by <Mono tone="ink">29.01.2027 17:40</Mono>
+              {t('scheduledA')}<Mono tone="ink">29.01.2027 17:40</Mono>
             </Body>
-            <Meta>You can still change your mind until then. A confirmation has gone to your email.</Meta>
+            <Meta>{t('changeMind')}</Meta>
             <Button variant="secondary" size="sm" onPress={() => setScheduled(false)}>
-              Cancel erasure
+              {t('cancelErase')}
             </Button>
           </Card>
         ) : (
           <Button variant="secondary" icon="trash-2" onPress={() => setDel('explain')}>
-            Erase my account…
+            {t('eraseBtn')}
           </Button>
         )}
       </Card>
 
       {/* Research */}
       <Card tone="raised" style={{ gap: space.s1 }}>
-        <Eyebrow>Research</Eyebrow>
+        <Eyebrow>{t('research')}</Eyebrow>
         <Toggle
           checked={research}
           onChange={(v) => {
             setResearch(v)
-            setToast(v ? 'Research consent given.' : 'Research consent withdrawn. Takes effect within 24 hours.')
+            setToast(v ? t('researchOn') : t('researchOff'))
           }}
-          label="Help the Science Office validate the Index"
-          description="Your de-identified six-term record joins the research registry for the v1.1 calibration. Separate from Publishing; leave any time."
+          label={t('researchL')}
+          description={t('researchD')}
         />
       </Card>
 
       {/* Aggregates */}
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>Employers, insurers and partners</SectionTitle>
+        <SectionTitle>{t('employers')}</SectionTitle>
         <Title size={24}>
-          They see the crowd, <Serif>never</Serif> you.
+          {t('crowdA')}<Serif>{t('crowdSerif')}</Serif>{t('crowdB')}
         </Title>
         {(
           [
-            ['briefcase', 'Your employer sees aggregates only', `Only groups of ${TENANT.minCohort} or more, with no cell under ${TENANT.minCell}. No names, no drill-down, no individual answers. AIWO holds the data, not your employer.`],
-            ['shield', 'Insurers, only if you say so', 'Star Health is not granted. If you agree, they receive cohort outcomes: never your Index, never a clinical result.'],
-            ['lock', 'Venues get no health data', 'Hotels and Houses see your name, room and dietary note. Readings from Signal Points flow into your record, not theirs.'],
+            ['briefcase', t('empHead'), t('empBody', { min: TENANT.minCohort, cell: TENANT.minCell })],
+            ['shield', t('insHead'), t('insBody')],
+            ['lock', t('venHead'), t('venBody')],
           ] as [IconName, string, string][]
         ).map(([icon, head, body]) => (
           <Card key={head} tone="sunk" style={{ gap: 6 }}>
@@ -372,18 +384,18 @@ function Trust() {
 
       {/* Claims log */}
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>The claims log</SectionTitle>
-        <Body tone="ink2">Every claim we make passes the Science Office first. Refused and withdrawn claims stay on the record.</Body>
+        <SectionTitle>{t('claims')}</SectionTitle>
+        <Body tone="ink2">{t('claimsBody')}</Body>
         <Card tone="raised" style={{ gap: 0 }}>
           {CLAIMS_LOG.map((cl, i) => (
             <View key={cl.claim} style={{ gap: 4, paddingVertical: 12, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: c.line }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: space.s1 }}>
-                <Body style={{ flex: 1 }}>{cl.claim}</Body>
-                <Pill tone={cl.state === 'Approved' ? 'ink' : 'neutral'}>{cl.state}</Pill>
+                <Body style={{ flex: 1 }}>{tx(CLAIM_T[i]?.claim, cl.claim)}</Body>
+                <Pill tone={cl.state === 'Approved' ? 'ink' : 'neutral'}>{tx(CLAIM_STATE[cl.state], cl.state)}</Pill>
               </View>
-              <Meta size={14}>{cl.note}</Meta>
+              <Meta size={14}>{tx(CLAIM_T[i]?.note, cl.note)}</Meta>
               <Meta size={13} tone="ink3">
-                {cl.by} · <Mono size={13} tone="ink3">{fmtDate(cl.on)}</Mono>
+                {tx(CLAIM_BY[cl.by], cl.by)} · <Mono size={13} tone="ink3">{fmtDate(cl.on)}</Mono>
               </Meta>
             </View>
           ))}
@@ -391,7 +403,7 @@ function Trust() {
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Icon name="map-pin" size={14} color={c.ink3} />
           <Meta size={14} tone="ink3" style={{ flex: 1 }}>
-            Stored in India (Mumbai region) under the DPDP Act 2023. Encrypted at rest and in transit. Never sold.
+            {t('stored')}
           </Meta>
         </View>
       </View>
@@ -400,11 +412,11 @@ function Trust() {
       <Sheet
         open={!!confirm}
         onClose={() => setConfirm(null)}
-        title={`Withdraw ${confirm?.name ?? ''} consent?`}
+        title={t('withdrawQ', { name: confirm ? cName(confirm) : '' })}
         footer={
           <View style={{ flexDirection: 'row', gap: space.s1, justifyContent: 'flex-end' }}>
             <Button variant="ghost" onPress={() => setConfirm(null)}>
-              Keep it
+              {tc('keepIt')}
             </Button>
             <Button
               variant="ink"
@@ -413,32 +425,32 @@ function Trust() {
                 setConfirm(null)
               }}
             >
-              Withdraw
+              {t('withdraw')}
             </Button>
           </View>
         }
       >
         <Body>
           {confirm?.id === 'c_care'
-            ? 'Your coach, concierge and clinicians will stop seeing your record within 24 hours. Your Index and Ledger stay yours, but nobody will call when something drifts.'
+            ? t('wCare')
             : confirm?.id === 'c_data'
-              ? 'We will stop keeping new signals and answers within 24 hours. Your Index cannot be re-measured without it.'
-              : 'You will be removed from future aggregate results within 24 hours. Results already published cannot be un-published, but contain no one’s identity.'}
+              ? t('wData')
+              : t('wPub')}
         </Body>
-        <Meta>You can give it again at any time.</Meta>
+        <Meta>{t('giveAgain')}</Meta>
       </Sheet>
 
       {/* Erase flow */}
-      <Sheet open={del !== 'closed'} onClose={closeDel} title="Erase your Joy OS account">
+      <Sheet open={del !== 'closed'} onClose={closeDel} title={t('eraseTitle')}>
         {del === 'explain' ? (
           <>
-            <Body>This erases your Index history, answers, Ledger, signals, messages and household shares. Kavya’s own record is not touched.</Body>
-            <Meta>Take a copy first if you might want it. Exports are ready within 72 hours.</Meta>
-            <ChoiceCard kind="checkbox" selected={understood} onPress={() => setUnderstood((u) => !u)} accessibilityLabel="I understand this cannot be undone after 24 hours." title={<Body>I understand this cannot be undone after 24 hours.</Body>} />
-            {tried && !understood ? <Meta tone="error">Tick the box to continue.</Meta> : null}
+            <Body>{t('eraseBody')}</Body>
+            <Meta>{t('copyFirst')}</Meta>
+            <ChoiceCard kind="checkbox" selected={understood} onPress={() => setUnderstood((u) => !u)} accessibilityLabel={t('understand')} title={<Body>{t('understand')}</Body>} />
+            {tried && !understood ? <Meta tone="error">{t('tick')}</Meta> : null}
             <View style={{ flexDirection: 'row', gap: space.s1, justifyContent: 'flex-end' }}>
               <Button variant="ghost" onPress={closeDel}>
-                Not now
+                {t('notNow')}
               </Button>
               <Button
                 variant="ink"
@@ -450,16 +462,16 @@ function Trust() {
                   }
                 }}
               >
-                Continue
+                {tc('continue')}
               </Button>
             </View>
           </>
         ) : del === 'confirm' ? (
           <>
-            <Field label="Type ERASE to confirm" value={typed} onChangeText={setTyped} autoCapitalize="characters" autoCorrect={false} error={tried && typed !== 'ERASE' ? 'Type ERASE in capitals.' : null} />
+            <Field label={t('typeErase')} value={typed} onChangeText={setTyped} autoCapitalize="characters" autoCorrect={false} error={tried && typed !== 'ERASE' ? t('typeCaps') : null} />
             <View style={{ flexDirection: 'row', gap: space.s1, justifyContent: 'flex-end' }}>
               <Button variant="ghost" onPress={() => setDel('explain')}>
-                Back
+                {tc('back')}
               </Button>
               <Button
                 variant="ink"
@@ -471,7 +483,7 @@ function Trust() {
                   }
                 }}
               >
-                Continue
+                {tc('continue')}
               </Button>
             </View>
           </>
@@ -481,12 +493,12 @@ function Trust() {
               <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: c.paperSunk, alignItems: 'center', justifyContent: 'center' }}>
                 <Icon name="key" size={28} color={c.ink} />
               </View>
-              <Body weight="medium">Confirm it’s you</Body>
-              <Meta align="center">A step-up check with your passkey: Face ID, Touch ID or your device PIN. Joy OS never sees it.</Meta>
+              <Body weight="medium">{t('confirmYou')}</Body>
+              <Meta align="center">{t('stepUp')}</Meta>
             </View>
             <View style={{ flexDirection: 'row', gap: space.s1, justifyContent: 'flex-end' }}>
               <Button variant="ghost" onPress={closeDel}>
-                Cancel
+                {tc('cancel')}
               </Button>
               <Button
                 variant="ink"
@@ -496,7 +508,7 @@ function Trust() {
                   closeDel()
                 }}
               >
-                Use passkey (specimen)
+                {t('usePasskey')}
               </Button>
             </View>
           </>
@@ -506,46 +518,46 @@ function Trust() {
       <Sheet
         open={askOpen}
         onClose={() => setAskOpen(false)}
-        title={askSent ? 'Sent' : 'Ask about an entry'}
+        title={askSent ? t('sent') : t('askEntry')}
         footer={
           askSent ? (
             <Button variant="secondary" block onPress={() => setAskOpen(false)}>
-              Close
+              {tc('close')}
             </Button>
           ) : (
             <Button variant="ink" block icon="send" onPress={sendAsk}>
-              Send to the DPO
+              {t('sendDpo')}
             </Button>
           )
         }
       >
         {askSent ? (
           <>
-            <Done>Sent to the DPO · reply within 7 days.</Done>
-            <Meta>{`About: ${all.find((e) => e.id === askEntry)?.who ?? ''} · ${all.find((e) => e.id === askEntry)?.at ?? ''}. A person writes back in Messages and by email.`}</Meta>
+            <Done>{t('sentDpo')}</Done>
+            <Meta>{(() => { const en = all.find((e) => e.id === askEntry); return t('about', { who: en ? aWho(en) : '', at: en?.at ?? '' }) })()}</Meta>
           </>
         ) : (
           <>
-            <Meta>Our Data Protection Officer answers every question in person. Choose the entry, then ask.</Meta>
-            <View style={{ gap: space.s1 }} accessibilityRole="radiogroup" accessibilityLabel="Entry">
+            <Meta>{t('dpoBody')}</Meta>
+            <View style={{ gap: space.s1 }} accessibilityRole="radiogroup" accessibilityLabel={t('entryL')}>
               {all.map((e) => (
                 <ChoiceCard
                   key={e.id}
                   selected={askEntry === e.id}
                   onPress={() => { setAskEntry(e.id); setAskErr((x) => ({ ...x, entry: undefined })) }}
-                  accessibilityLabel={`${e.who}, ${e.role}, ${e.at}: ${e.what}`}
-                  title={`${e.who} · ${e.role}`}
-                  sub={<Meta size={14}>{`${e.what} · ${e.at}`}</Meta>}
+                  accessibilityLabel={`${aWho(e)}, ${role_(e.role)}, ${e.at}: ${aWhat(e)}`}
+                  title={`${aWho(e)} · ${role_(e.role)}`}
+                  sub={<Meta size={14}>{`${aWhat(e)} · ${e.at}`}</Meta>}
                 />
               ))}
             </View>
             {askErr.entry ? <Meta tone="error">{askErr.entry}</Meta> : null}
-            <Field label="Your question" value={askText} onChangeText={(v) => { setAskText(v); if (askErr.text) setAskErr((x) => ({ ...x, text: undefined })) }} multiline maxLength={600} placeholder="e.g. Why did the concierge need my household?" error={askErr.text} />
+            <Field label={t('yourQ')} value={askText} onChangeText={(v) => { setAskText(v); if (askErr.text) setAskErr((x) => ({ ...x, text: undefined })) }} multiline maxLength={600} placeholder={t('qPh')} error={askErr.text} />
           </>
         )}
       </Sheet>
 
-      <Sheet open={!!toast} onClose={() => setToast(null)} title="Recorded" footer={<Button variant="secondary" block onPress={() => setToast(null)}>Close</Button>}>
+      <Sheet open={!!toast} onClose={() => setToast(null)} title={t('recorded')} footer={<Button variant="secondary" block onPress={() => setToast(null)}>{tc('close')}</Button>}>
         <Body>{toast}</Body>
       </Sheet>
     </Screen>

@@ -9,7 +9,9 @@ import { TEAM } from '@/data/member'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { AUTO_REPLY, PEOPLE_DETAIL, THREADS, type Msg, type Thread } from './_data'
 import { TeleManasStrip } from './_parts'
-import { fmtDay, fmtTime } from './_util'
+import { fmtDay, fmtTime, rich } from './_util'
+import { useDict } from '@/lib/i18n'
+import { MSG, useData } from './_i18n'
 
 // MESSAGES (Care bridge): threaded inbox with the coach, the concierge and the
 // physician. A person replies; VIVA may draft, the person signs by name. The
@@ -23,6 +25,8 @@ const specimenNow = () => { const d = new Date(); return new Date(2027, 0, 28, d
 const shortName = (name: string) => (name.startsWith('Dr') ? name.split(' ').slice(0, 2).join(' ') : name.split(' ')[0])
 
 export default function Messages() {
+  const tr = useDict(MSG)
+  const dx = useData()
   const { setCrisisOpen } = useApp()
   const [params, setParams] = useSearchParams()
   const [threads, setThreads] = useState<Thread[]>(() => {
@@ -73,7 +77,7 @@ export default function Messages() {
 
   const send = () => {
     const text = draft.trim()
-    if (!text) { setError('Write a message first.'); return }
+    if (!text) { setError(tr('writeFirst')); return }
     // Emergency intercept runs first — before the message goes anywhere else.
     if (interceptsCrisis(text)) {
       setHeld(true)
@@ -84,7 +88,7 @@ export default function Messages() {
     const now = Date.now()
     const msg: Msg = { id: `new_${now}`, from: 'me', at: specimenNow(), body: text }
     const tp = person(active.personId)
-    const replyIn = active.clinical ? `${shortName(tp.name)} will reply within 2 working days.` : `${shortName(tp.name)} usually replies ${PEOPLE_DETAIL[tp.id]?.replies.replace(/^Replies /, '').toLowerCase() ?? 'within 1 working day'}.`
+    const replyIn = active.clinical ? tr('replyClinical', { name: shortName(tp.name) }) : tr(PEOPLE_DETAIL[tp.id]?.replies.startsWith('Replies the same day') ? 'replySame' : 'replyDay', { name: shortName(tp.name) })
     const sys: Msg = { id: `sys_${now}`, from: 'system', at: msg.at, body: replyIn }
     const tid = active.id
     setThreads((ts) => ts.map((t) => (t.id === tid ? { ...t, subject: t.messages.length === 0 ? text.slice(0, 48) : t.subject, messages: [...t.messages.filter((m) => m.from !== 'system'), msg, sys] } : t)))
@@ -115,20 +119,20 @@ export default function Messages() {
   return (
     <div>
       <PageHeader
-        eyebrow="Care · Messages"
-        title={<>A person <em className="font-serif">replies</em></>}
-        lead="VIVA may help draft a reply; your coach, concierge or physician reads it, changes it and signs it by name."
+        eyebrow={tr('eyebrow')}
+        title={rich(tr('title'), { em: <em className="font-serif">{tr('titleEm')}</em> })}
+        lead={tr('lead')}
       />
 
       <Card className="grid grid-cols-1 overflow-hidden !p-0 lg:h-[720px] lg:grid-cols-[340px_minmax(0,1fr)]">
         {/* Thread list */}
         <div className={clsx('flex min-h-0 flex-col border-line lg:border-r', activeId ? 'hidden lg:flex' : 'flex')}>
           <div className="space-y-3 border-b border-line p-4">
-            <Button variant="secondary" size="sm" className="w-full" onClick={() => setPicker(true)}><Plus size={15} /> New message</Button>
-            <Tabs value={filter} onChange={changeFilter} items={[{ value: 'all', label: 'All' }, { value: 'unread', label: <>Unread{threads.some((t) => t.unread) && <span className="num ml-1 text-ink-3">{threads.reduce((a, t) => a + t.unread, 0)}</span>}</> }, { value: 'clinical', label: 'Clinical' }]} />
+            <Button variant="secondary" size="sm" className="w-full" onClick={() => setPicker(true)}><Plus size={15} /> {tr('newMessage')}</Button>
+            <Tabs value={filter} onChange={changeFilter} items={[{ value: 'all', label: tr('all') }, { value: 'unread', label: <>{tr('unread')}{threads.some((t) => t.unread) && <span className="num ml-1 text-ink-3">{threads.reduce((a, t) => a + t.unread, 0)}</span>}</> }, { value: 'clinical', label: tr('clinical') }]} />
           </div>
-          <ul className="min-h-0 flex-1 overflow-y-auto" aria-label="Conversations">
-            {visible.length === 0 && <li className="p-6 text-[15px] text-ink-2">Nothing here. You are all caught up.</li>}
+          <ul className="min-h-0 flex-1 overflow-y-auto" aria-label={tr('conversations')}>
+            {visible.length === 0 && <li className="p-6 text-[15px] text-ink-2">{tr('caughtUp')}</li>}
             {visible.map((t) => {
               const tp = person(t.personId)
               const last = [...t.messages].reverse().find((m) => m.from !== 'system')
@@ -147,45 +151,45 @@ export default function Messages() {
                         {last && <span className="num shrink-0 text-[12px] text-ink-3">{fmtDay(last.at).split(',')[0]}</span>}
                       </span>
                       <span className="mt-0.5 flex items-center gap-1.5 text-[13px] text-ink-2">
-                        {tp.role}{t.clinical && <><span aria-hidden>·</span><Stethoscope size={12} /> Clinical</>}
+                        {dx(tp.role)}{t.clinical && <><span aria-hidden>·</span><Stethoscope size={12} /> {tr('clinical')}</>}
                       </span>
-                      <span className="mt-1 line-clamp-2 block text-[14px] text-ink-2">{last ? last.body : 'Start a conversation.'}</span>
+                      <span className="mt-1 line-clamp-2 block text-[14px] text-ink-2">{last ? last.body : tr('startConv')}</span>
                     </span>
-                    {t.unread > 0 && <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-daybreak" aria-label={`${t.unread} unread`} />}
+                    {t.unread > 0 && <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-daybreak" aria-label={tr('nUnread', { n: t.unread })} />}
                   </button>
                 </li>
               )
             })}
           </ul>
           <div className="hidden border-t border-line p-4 text-[13px] text-ink-3 lg:block">
-            Messages are not monitored around the clock. For anything urgent, call Tele-MANAS <span className="num">14416</span> or <span className="num">112</span>.
+            {rich(tr('notMonitored'), { a: <span className="num">14416</span>, b: <span className="num">112</span> })}
           </div>
         </div>
 
         {/* Conversation */}
         <div className={clsx('h-[calc(100dvh-210px)] min-h-[520px] min-w-0 flex-col lg:flex lg:h-auto lg:min-h-0', activeId ? 'flex' : 'hidden')}>
           <div className="flex items-center gap-3 border-b border-line px-4 py-3 md:px-6">
-            <button onClick={() => { setActiveId(null); setParams({}, { replace: true }) }} className="rounded-full p-2 text-ink-2 hover:bg-paper-sunk focus-ring lg:hidden" aria-label="Back to conversations">
+            <button onClick={() => { setActiveId(null); setParams({}, { replace: true }) }} className="rounded-full p-2 text-ink-2 hover:bg-paper-sunk focus-ring lg:hidden" aria-label={tr('backToList')}>
               <ArrowLeft size={18} />
             </button>
             <Avatar person={p} size={40} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-[16px] text-ink">{p.name}</p>
-              <p className="truncate text-[13px] text-ink-2">{p.role} · {active.subject}</p>
+              <p className="truncate text-[13px] text-ink-2">{dx(p.role)} · {dx(active.subject)}</p>
             </div>
-            {active.clinical && <Pill tone="caution"><Stethoscope size={12} /> Clinical</Pill>}
+            {active.clinical && <Pill tone="caution"><Stethoscope size={12} /> {tr('clinical')}</Pill>}
           </div>
 
           {active.clinical && (
             <p className="border-b border-line bg-paper-sunk px-4 py-2.5 text-[13px] text-ink-2 md:px-6">
-              Clinical conversation. Kept in your clinical record under medical-records law; written only by your physician, never drafted by AI.
+              {tr('clinicalNote')}
             </p>
           )}
 
-          <div ref={logRef} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-6 md:px-6" role="log" aria-label={`Conversation with ${p.name}`}>
+          <div ref={logRef} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-6 md:px-6" role="log" aria-label={tr('convWith', { name: p.name })}>
             {active.messages.length === 0 && (
               <p className="mx-auto max-w-sm py-16 text-center text-[15px] text-ink-2">
-                Write to {p.name}. A person reads every message; replies are signed by name.
+                {tr('writeTo', { name: p.name })}
               </p>
             )}
             {active.messages.map((m, i) => {
@@ -201,8 +205,8 @@ export default function Messages() {
               {held && (
                 <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mx-auto max-w-md rounded-card border border-line bg-paper-raised p-4 text-center">
                   <ShieldAlert size={18} className="mx-auto text-ink-2" />
-                  <p className="mt-2 text-[15px] text-ink">Your message was held and passed to a person.</p>
-                  <p className="mt-1 text-[14px] text-ink-2">Dr Sanjay Menon has been told and will reach you within 15 minutes. Tele-MANAS <a className="num underline" href="tel:14416">14416</a> is free, any hour.</p>
+                  <p className="mt-2 text-[15px] text-ink">{tr('heldTitle')}</p>
+                  <p className="mt-1 text-[14px] text-ink-2">{rich(tr('heldBody'), { tel: <a className="num underline" href="tel:14416">14416</a> })}</p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -214,7 +218,7 @@ export default function Messages() {
             onSubmit={(e) => { e.preventDefault(); send() }}
             noValidate
           >
-            <label htmlFor="composer" className="sr-only">Message to {p.name}</label>
+            <label htmlFor="composer" className="sr-only">{tr('messageTo', { name: p.name })}</label>
             <textarea
               id="composer"
               rows={3}
@@ -223,14 +227,14 @@ export default function Messages() {
               onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send() } }}
               aria-describedby="composer-hint"
               aria-invalid={!!error}
-              placeholder={`Write to ${p.name.split(' ')[0] === 'Dr' ? p.name : p.name.split(' ')[0]}…`}
+              placeholder={tr('writeToShort', { name: p.name.split(' ')[0] === 'Dr' ? p.name : p.name.split(' ')[0] })}
               className="w-full resize-none rounded-lg border border-line-strong bg-paper-raised px-3 py-2.5 text-[16px] text-ink placeholder:text-ink-3 focus:border-ink focus:outline-none focus-ring"
             />
             <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p id="composer-hint" className={clsx('text-[13px]', error ? 'text-error' : 'text-ink-3')} role={error ? 'alert' : undefined}>
-                {error ?? (active.clinical ? 'Clinical replies within 2 working days. Not for emergencies.' : 'A person reads this. ⌘ + Enter to send.')}
+                {error ?? (active.clinical ? tr('hintClinical') : tr('hintPerson'))}
               </p>
-              <DaybreakButton type="submit" className="!h-12 !text-[17px]">Send</DaybreakButton>
+              <DaybreakButton type="submit" className="!h-12 !text-[17px]">{tr('send')}</DaybreakButton>
             </div>
           </form>
         </div>
@@ -239,25 +243,25 @@ export default function Messages() {
       <div className="mt-8 grid gap-4 md:grid-cols-3">
         <Card tone="outline">
           <PenLine size={18} className="text-ink-3" />
-          <p className="mt-3 text-[16px] text-ink">Signed by name</p>
-          <p className="mt-1 text-[14px] text-ink-2">Every reply carries the name of the person who sent it. No bot ever speaks as your coach.</p>
+          <p className="mt-3 text-[16px] text-ink">{tr('signedTitle')}</p>
+          <p className="mt-1 text-[14px] text-ink-2">{tr('signedBody')}</p>
         </Card>
         <Card tone="outline">
           <Sparkles size={18} className="text-ink-3" />
-          <p className="mt-3 text-[16px] text-ink">AI may draft</p>
-          <p className="mt-1 text-[14px] text-ink-2">VIVA can suggest a first draft from your quarter digest. The person edits and approves it, and the message says so.</p>
+          <p className="mt-3 text-[16px] text-ink">{tr('draftTitle')}</p>
+          <p className="mt-1 text-[14px] text-ink-2">{tr('draftBody')}</p>
         </Card>
         <Card tone="outline">
           <Stethoscope size={18} className="text-ink-3" />
-          <p className="mt-3 text-[16px] text-ink">Clinical is labelled</p>
-          <p className="mt-1 text-[14px] text-ink-2">Messages from your physician are marked clinical, kept in the clinical record and never drafted by AI.</p>
+          <p className="mt-3 text-[16px] text-ink">{tr('labelTitle')}</p>
+          <p className="mt-1 text-[14px] text-ink-2">{tr('labelBody')}</p>
         </Card>
       </div>
 
       <TeleManasStrip className="mt-8" />
 
-      <Sheet open={picker} onClose={() => setPicker(false)} title="New message">
-        <p className="text-[16px] text-ink-2">Choose who to write to. A person reads every message and signs every reply.</p>
+      <Sheet open={picker} onClose={() => setPicker(false)} title={tr('newMessage')}>
+        <p className="text-[16px] text-ink-2">{tr('pickIntro')}</p>
         <ul className="mt-5 space-y-2">
           {TEAM.map((m) => {
             const has = threads.find((t) => t.personId === m.id && t.messages.length > 0)
@@ -268,22 +272,23 @@ export default function Messages() {
                   <Avatar person={m} size={42} />
                   <span className="min-w-0 flex-1">
                     <span className="block text-[16px] text-ink">{m.name}</span>
-                    <span className="flex flex-wrap items-center gap-1.5 text-[13px] text-ink-2">{m.role}{isClinicalPerson(m.id) && <><span aria-hidden>·</span><Stethoscope size={12} /> Clinical</>}</span>
-                    {d && <span className="mt-0.5 block text-[13px] text-ink-3">{d.replies}</span>}
+                    <span className="flex flex-wrap items-center gap-1.5 text-[13px] text-ink-2">{dx(m.role)}{isClinicalPerson(m.id) && <><span aria-hidden>·</span><Stethoscope size={12} /> {tr('clinical')}</>}</span>
+                    {d && <span className="mt-0.5 block text-[13px] text-ink-3">{dx(d.replies)}</span>}
                   </span>
-                  <span className="shrink-0 text-[13px] text-ink-3">{has ? 'Continue' : 'Start'}</span>
+                  <span className="shrink-0 text-[13px] text-ink-3">{has ? tr('continue') : tr('start')}</span>
                 </button>
               </li>
             )
           })}
         </ul>
-        <p className="mt-5 text-[13px] text-ink-3">Not for emergencies. Tele-MANAS <a className="num underline" href="tel:14416">14416</a> is free, any hour.</p>
+        <p className="mt-5 text-[13px] text-ink-3">{rich(tr('notEmergency'), { tel: <a className="num underline" href="tel:14416">14416</a> })}</p>
       </Sheet>
     </div>
   )
 }
 
 function Bubble({ m }: { m: Msg }) {
+  const tr = useDict(MSG)
   if (m.from === 'system') {
     return <p className="mx-auto flex w-fit items-center gap-1.5 rounded-full bg-paper-sunk px-3 py-1.5 text-center text-[13px] text-ink-2" role="status"><Clock size={13} className="text-ink-3" /> {m.body}</p>
   }
@@ -296,10 +301,10 @@ function Bubble({ m }: { m: Msg }) {
         </div>
         <p className={clsx('mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-ink-3', mine && 'justify-end')}>
           <span className="num">{fmtTime(m.at)}</span>
-          {mine && <span className="inline-flex items-center gap-1">{m.id.startsWith('new_') ? <><Check size={12} /> Delivered</> : <><CheckCheck size={12} /> Read</>}</span>}
-          {m.signed && <span>· Signed, {m.signed}</span>}
-          {m.drafted && <span className="inline-flex items-center gap-1">· <Sparkles size={11} /> drafted with VIVA, edited and sent by a person</span>}
-          {m.clinical && <span>· Clinical</span>}
+          {mine && <span className="inline-flex items-center gap-1">{m.id.startsWith('new_') ? <><Check size={12} /> {tr('delivered')}</> : <><CheckCheck size={12} /> {tr('read')}</>}</span>}
+          {m.signed && <span>{tr('signedBy', { name: m.signed })}</span>}
+          {m.drafted && <span className="inline-flex items-center gap-1">· <Sparkles size={11} /> {tr('draftedVia')}</span>}
+          {m.clinical && <span>{tr('clinicalDot')}</span>}
         </p>
       </div>
     </div>

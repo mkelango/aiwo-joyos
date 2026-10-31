@@ -9,6 +9,9 @@ import type { MethodVersion, TermKey, TermScore } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { AI_LIMITS, DISPLAY_RULES, GRADES, NEVER_IMPORTED } from '@/screens/b/_data'
 import { CheckLine, IconButton, ORDER } from '@/screens/b/parts'
+import { useDict, useTermText } from '@/lib/i18n'
+import { METHOD, GRADE_TEXT, RULES_TEXT, NEVER_TEXT, AI_TEXT, LICENCE_TEXT, METHOD_LABEL } from '@/screens/b/i18n/method'
+import { BAND, useTx } from '@/screens/b/i18n/common'
 
 // THE METHOD (Memo p.10): the formula, a live worked example run through the same engine as
 // your Index, the three grades, the instrument registry with licences, method versions,
@@ -22,90 +25,95 @@ export default function Method() {
   const terms: TermScore[] = ORDER.map((k) => ({ key: k, value: vals[k], band: bandFor(vals[k], k === 'B') }))
   const res = joyspanIndex(terms, 'v1.0')!
   const low = lowestTerm(terms)
+  const t = useDict(METHOD)
+  const tt = useTermText()
+  const tx = useTx()
+  const bandWord = (b: ReturnType<typeof bandFor>) => (b === 'not-yet-measured' ? b : tx(BAND[b], b))
   const step = (k: TermKey, d: number) => setVals((v) => ({ ...v, [k]: Math.max(0, Math.min(100, v[k] + d)) }))
 
   return (
     <Screen>
       <ScreenHeader
         back
-        eyebrow="The method · v1.0"
+        eyebrow={t('eyebrow')}
         title={
           <>
-            How the number is <Serif>made</Serif>.
+            {t('titleA')}<Serif>{t('titleSerif')}</Serif>{t('titleB')}
           </>
         }
-        lead="Every score in Joy OS says “method v1.0”. This is that method, in full: the formula, the instruments, and what we never do."
+        lead={t('lead')}
       />
 
       <Card tone="ink" style={{ gap: space.s1 }}>
-        <Eyebrow>The formula</Eyebrow>
+        <Eyebrow>{t('formula')}</Eyebrow>
         <Mono tone="ink" size={18}>
           JI = GM(H, P, R, F, D) − λ·B
         </Mono>
-        <Meta>{`The geometric mean of five terms rewards balance: one low term pulls the Index down more than an average would. Burden (B) is subtracted with λ = ${METHODS['v1.0'].lambda}. Bounded 0–100.`}</Meta>
+        <Meta>{t('formulaBody', { lambda: METHODS['v1.0'].lambda })}</Meta>
       </Card>
 
       <View style={{ gap: space.s2 }}>
         <View style={{ gap: 8 }}>
-          <SectionTitle>A worked example</SectionTitle>
+          <SectionTitle>{t('worked')}</SectionTitle>
           <SpecimenTag />
         </View>
-        <Body tone="ink2">Specimen, not a member. Move any term and the same engine that scores your Index recomputes it.</Body>
+        <Body tone="ink2">{t('workedBody')}</Body>
         <Card tone="raised" style={{ gap: space.s1 }}>
           {ORDER.map((k, i) => {
-            const t = termByKey(k)
+            const tm = termByKey(k)
+            const sp = tt.space(k)
             return (
               <View key={k}>
                 {i ? <Divider /> : null}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 }}>
                   <TermDot term={k} />
                   <View style={{ flex: 1 }}>
-                    <Body>{t.space}</Body>
-                    {k === 'B' || t.name !== t.space ? <Meta size={13}>{k === 'B' ? `${t.name} · lower is better` : t.name}</Meta> : null}
+                    <Body>{sp}</Body>
+                    {k === 'B' || tm.name !== tm.space ? <Meta size={13}>{k === 'B' ? t('lowerBetter', { name: tt.name(k) }) : tt.name(k)}</Meta> : null}
                   </View>
-                  <IconButton icon="minus" label={`${t.space} down 5`} onPress={() => step(k, -5)} disabled={vals[k] <= 0} />
-                  <Mono size={20} tone="ink" style={{ width: 40, textAlign: 'center' }} accessibilityLabel={`${t.space} ${vals[k]}`}>
+                  <IconButton icon="minus" label={t('down5', { space: sp })} onPress={() => step(k, -5)} disabled={vals[k] <= 0} />
+                  <Mono size={20} tone="ink" style={{ width: 40, textAlign: 'center' }} accessibilityLabel={`${sp} ${vals[k]}`}>
                     {String(vals[k])}
                   </Mono>
-                  <IconButton icon="plus" label={`${t.space} up 5`} onPress={() => step(k, 5)} disabled={vals[k] >= 100} />
+                  <IconButton icon="plus" label={t('up5', { space: sp })} onPress={() => step(k, 5)} disabled={vals[k] >= 100} />
                 </View>
               </View>
             )
           })}
         </Card>
         <Card tone="sunk" style={{ gap: space.s1 }} >
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.s2, flexWrap: 'wrap' }} accessible accessibilityLabel={`Specimen Index ${res.value}, ${bandFor(res.value)}`} accessibilityLiveRegion="polite">
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.s2, flexWrap: 'wrap' }} accessible accessibilityLabel={t('specIdxA11y', { v: res.value, band: bandWord(bandFor(res.value)) })} accessibilityLiveRegion="polite">
             <Numeral size={72}>{String(res.value)}</Numeral>
             <View style={{ paddingBottom: 8, gap: 6 }}>
               <BandLabel band={bandFor(res.value)} />
-              <Meta size={14}>Specimen Index</Meta>
+              <Meta size={14}>{t('specIdx')}</Meta>
             </View>
           </View>
           <Mono tone="ink2">{`GM ${res.gm} − ${res.lambda} × ${vals.B} = ${res.value}`}</Mono>
           <Meta>
-            {'Lowest term: '}
-            <Body weight="semibold">{termByKey(low).space}</Body>
-            {'. That is where the ninety days would begin.'}
+            {t('lowestA')}
+            <Body weight="semibold">{tt.space(low)}</Body>
+            {t('lowestB')}
           </Meta>
         </Card>
       </View>
 
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>Three grades</SectionTitle>
+        <SectionTitle>{t('grades')}</SectionTitle>
         {GRADES.map((g) => (
           <Card key={g.key} tone="raised" style={{ gap: 4 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-              <Body weight="medium">{g.name}</Body>
-              <Pill>{g.who}</Pill>
+              <Body weight="medium">{tx(GRADE_TEXT[g.key]?.name, g.name)}</Body>
+              <Pill>{tx(GRADE_TEXT[g.key]?.who, g.who)}</Pill>
             </View>
-            <Meta>{g.what}</Meta>
+            <Meta>{tx(GRADE_TEXT[g.key]?.what, g.what)}</Meta>
           </Card>
         ))}
       </View>
 
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>Instrument registry</SectionTitle>
-        <Body tone="ink2">Validated instruments only, each with its licence. Gated ones are not used until the licence is in place.</Body>
+        <SectionTitle>{t('registry')}</SectionTitle>
+        <Body tone="ink2">{t('registryBody')}</Body>
         <Card tone="raised" padding={8} style={{ paddingHorizontal: 16 }}>
           {INSTRUMENTS.map((ins, i) => (
             <View key={ins.code}>
@@ -114,12 +122,12 @@ export default function Method() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <TermDot term={ins.term} />
                   <Body style={{ flexShrink: 1 }}>{ins.code}</Body>
-                  <Meta size={13}>{termByKey(ins.term).space}</Meta>
-                  <Pill tone={ins.status === 'live' ? 'ink' : 'neutral'}>{ins.status === 'live' ? 'In use' : ins.status === 'gated' ? 'Gated' : 'In review'}</Pill>
+                  <Meta size={13}>{tt.space(ins.term)}</Meta>
+                  <Pill tone={ins.status === 'live' ? 'ink' : 'neutral'}>{ins.status === 'live' ? t('inUse') : ins.status === 'gated' ? t('gated') : t('inReview')}</Pill>
                 </View>
                 <Meta size={14}>
                   <Mono size={14} tone="ink2">{String(ins.items)}</Mono>
-                  {` items · ${ins.licence} · ${ins.translation}`}
+                  {t('items', { licence: tx(LICENCE_TEXT[ins.licence], ins.licence), tr: tx(LICENCE_TEXT[ins.translation], ins.translation) })}
                 </Meta>
               </View>
             </View>
@@ -128,7 +136,7 @@ export default function Method() {
       </View>
 
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>Method versions</SectionTitle>
+        <SectionTitle>{t('versions')}</SectionTitle>
         <Card tone="raised" padding={8} style={{ paddingHorizontal: 16 }}>
           {(Object.keys(METHODS) as MethodVersion[]).map((v, i) => (
             <View key={v}>
@@ -138,62 +146,62 @@ export default function Method() {
                   {v}
                 </Mono>
                 <View style={{ flex: 1 }}>
-                  <Body>{METHODS[v].label}</Body>
+                  <Body>{tx(METHOD_LABEL[v], METHODS[v].label)}</Body>
                   <Meta size={14}>
                     {`λ ${METHODS[v].lambda} · `}
                     <Mono size={14} tone="ink2">{METHODS[v].published}</Mono>
                   </Meta>
                 </View>
-                <Pill tone={v === 'v1.0' ? 'ink' : 'neutral'}>{v === 'v1.0' ? 'Current' : v === 'v1.1' ? 'Calibrating' : 'Planned'}</Pill>
+                <Pill tone={v === 'v1.0' ? 'ink' : 'neutral'}>{v === 'v1.0' ? t('current') : v === 'v1.1' ? t('calibrating') : t('planned')}</Pill>
               </View>
             </View>
           ))}
         </Card>
-        <Meta size={14} tone="ink3">A new version never rewrites an old score. Each score keeps the method it was made with.</Meta>
+        <Meta size={14} tone="ink3">{t('neverRewrite')}</Meta>
       </View>
 
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>Display rules</SectionTitle>
+        <SectionTitle>{t('rules')}</SectionTitle>
         <Card tone="raised" style={{ gap: space.s1 }}>
-          {DISPLAY_RULES.map((r) => (
-            <CheckLine key={r}>{r}</CheckLine>
+          {DISPLAY_RULES.map((r, i) => (
+            <CheckLine key={r}>{tx(RULES_TEXT[i], r)}</CheckLine>
           ))}
         </Card>
       </View>
 
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>Never imported into the Index</SectionTitle>
-        <Body tone="ink2">Devices give us raw signals. Their own scores stay outside your number.</Body>
+        <SectionTitle>{t('never')}</SectionTitle>
+        <Body tone="ink2">{t('neverBody')}</Body>
         <Card tone="sunk" style={{ gap: space.s1 }}>
-          {NEVER_IMPORTED.map((r) => (
+          {NEVER_IMPORTED.map((r, i) => (
             <CheckLine key={r} icon="x">
-              {r}
+              {tx(NEVER_TEXT[i], r)}
             </CheckLine>
           ))}
         </Card>
       </View>
 
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>What the AI may and may not do</SectionTitle>
+        <SectionTitle>{t('ai')}</SectionTitle>
         <Card tone="raised" style={{ gap: space.s1 }}>
-          {AI_LIMITS.map((r) => (
+          {AI_LIMITS.map((r, i) => (
             <CheckLine key={r} icon="info">
-              {r}
+              {tx(AI_TEXT[i], r)}
             </CheckLine>
           ))}
         </Card>
       </View>
 
       <Title size={22}>
-        Five minutes, eighteen statements, <Serif>bands</Serif> only.
+        {t('tryA')}<Serif>{t('trySerif')}</Serif>{t('tryB')}
       </Title>
       <DaybreakButton icon="arrow-right" onPress={() => router.push('/check')}>
-        Try the method on yourself
+        {t('tryBtn')}
       </DaybreakButton>
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <Icon name="book-open" size={14} color={c.ink3} />
         <Meta size={14} tone="ink3" style={{ flex: 1 }}>
-          Published by the AIWO Science Office. Weights and λ are configuration, reviewed quarterly, with results published up and down.
+          {t('published')}
         </Meta>
       </View>
     </Screen>

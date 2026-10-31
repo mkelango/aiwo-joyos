@@ -32,6 +32,14 @@ export function useToneColor(tone: Tone): string {
   }
 }
 
+/** Tamil or Devanagari text. Letter-spacing breaks their joined shapes, so tracking is dropped. */
+const INDIC = /[\u0900-\u097F\u0B80-\u0BFF]/
+function hasIndic(children: ReactNode): boolean {
+  if (typeof children === 'string') return INDIC.test(children)
+  if (Array.isArray(children)) return children.some((c) => typeof c === 'string' && INDIC.test(c))
+  return false
+}
+
 type Weight = 'light' | 'regular' | 'medium' | 'semibold' | 'bold'
 
 interface BaseProps extends Omit<TextProps, 'style'> {
@@ -72,12 +80,13 @@ export function Eyebrow({ children, tone = 'ink3', color, size, style, align, ..
   const t = useTheme()
   const col = useToneColor(tone)
   const fs = (size ?? t.type.label) * t.textScale
+  const indic = hasIndic(children)
   return (
     <RNText
       maxFontSizeMultiplier={t.maxScale.label}
       {...rest}
       style={[
-        { fontFamily: t.fonts.mono, fontSize: fs, lineHeight: Math.round(fs * 1.5), letterSpacing: fs * 0.14, textTransform: 'uppercase', color: color ?? col, textAlign: align },
+        { fontFamily: t.fonts.mono, fontSize: fs, lineHeight: Math.round(fs * (indic ? 1.7 : 1.5)), letterSpacing: indic ? 0 : fs * 0.14, textTransform: 'uppercase', color: color ?? col, textAlign: align },
         style,
       ]}
     >

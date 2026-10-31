@@ -25,6 +25,10 @@ import { OptionRow } from '@/screens/a/parts'
 import { termByKey } from '@/shared/terms'
 import { useTheme } from '@/theme/ThemeProvider'
 import { memberOnly } from '@/screens/b/parts'
+import { INSTRUMENT_NOTE, useDict, useLang } from '@/lib/i18n'
+import { TAKE } from '@/screens/b/i18n/indexTake'
+import { useCommon } from '@/screens/b/i18n/common'
+import { txFor } from '@/screens/a/i18n'
 
 // TAKE THE INDEX (Memo p.10–11; Plan §4B): two sittings of about ten minutes, organised by
 // instrument (a short intro before each one), one item per screen, progress always visible,
@@ -60,6 +64,11 @@ export default memberOnly(TakeIndex)
 function TakeIndex() {
   const { c, space } = useTheme()
   const { offline, setCrisisOpen } = useApp()
+  const t = useDict(TAKE)
+  const tc = useCommon()
+  const lang = useLang()
+  const ax = (x: string) => txFor(lang, x)
+  const note = lang !== 'en' ? <Meta size={14} tone="ink3">{INSTRUMENT_NOTE[lang]}</Meta> : null
   const items = useMemo<Flat[]>(
     () => SITTINGS.flatMap((s) => s.blocks.flatMap((b) => b.sample.map((item) => ({ sitting: s.n, sittingTitle: s.title, block: b, item })))),
     [],
@@ -107,15 +116,15 @@ function TakeIndex() {
     <Card tone="sunk" style={{ gap: space.s1 }}>
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <Icon name="user-check" size={18} color={c.ink} />
-        <Body style={{ flex: 1 }}>A clinician will read these answers within 48 hours. Dr Sanjay Menon may call you; you do not need to do anything.</Body>
+        <Body style={{ flex: 1 }}>{t('careBody')}</Body>
       </View>
-      <Meta>If you need someone now, Tele-MANAS is free and confidential on 14416, any time.</Meta>
+      <Meta>{t('careNow')}</Meta>
       <View style={{ flexDirection: 'row', gap: space.s1, flexWrap: 'wrap' }}>
         <Button size="sm" variant="ink" icon="life-buoy" onPress={() => setCrisisOpen(true)}>
-          Talk to someone now
+          {t('talkNow')}
         </Button>
-        <Button size="sm" variant="secondary" icon="phone" onPress={() => Linking.openURL('tel:14416').catch(() => {})} accessibilityLabel="Call Tele-MANAS, 1 4 4 1 6">
-          Call 14416
+        <Button size="sm" variant="secondary" icon="phone" onPress={() => Linking.openURL('tel:14416').catch(() => {})} accessibilityLabel={t('callA11y')}>
+          {t('call')}
         </Button>
       </View>
     </Card>
@@ -128,30 +137,30 @@ function TakeIndex() {
       <Screen>
         <ScreenHeader
           back
-          eyebrow="Joyspan Index · two sittings"
+          eyebrow={t('introEyebrow')}
           title={
             <>
-              Twenty minutes, <Serif>honestly</Serif> answered.
+              {t('introA')}<Serif>{t('introSerif')}</Serif>{t('introB')}
             </>
           }
-          lead="Two sittings of about ten minutes each, on different days if you like. There are no right answers, and you can stop at any point."
+          lead={t('introLead')}
         />
         {resuming ? (
           <Card tone="soft" style={{ gap: space.s1 }} >
-            <Eyebrow tone="daybreak">Kept on this phone</Eyebrow>
-            <Progress value={answered} max={items.length} color={c.ink} label={`${answered} of ${items.length} answered`} />
+            <Eyebrow tone="daybreak">{t('kept')}</Eyebrow>
+            <Progress value={answered} max={items.length} color={c.ink} label={t('answeredOf', { n: answered, total: items.length })} />
             <Meta>
-              <Mono size={15} tone="ink">{`${answered} of ${items.length}`}</Mono> answered. Nothing has been sent.
+              <Mono size={15} tone="ink">{t('nOfTotal', { n: answered, total: items.length })}</Mono>{t('nothingSent')}
             </Meta>
           </Card>
         ) : null}
         {SITTINGS.map((s) => (
           <Card key={s.n} tone="raised" style={{ gap: space.s2 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-              <Eyebrow {...H2}>{`Sitting ${s.n}`}</Eyebrow>
-              <Mono tone="ink3" size={13}>{`${s.total} items · ${s.minutes} min`}</Mono>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+              <Eyebrow {...H2}>{t('sitting', { n: s.n })}</Eyebrow>
+              <Mono tone="ink3" size={13}>{t('itemsMin', { items: s.total, min: s.minutes })}</Mono>
             </View>
-            <Title size={24}>{s.title}</Title>
+            <Title size={24}>{ax(s.title)}</Title>
             <View style={{ gap: 6 }}>
               {s.blocks.map((b) => (
                 <View key={b.code} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -169,25 +178,25 @@ function TakeIndex() {
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <Icon name="lock" size={16} color={c.ink2} />
             <Meta style={{ flex: 1 }}>
-              Scored by the Index engine (method v1.0), never by AI. Answers stay on this phone until you send them. Your employer never sees them.
+              {t('scoredBy')}
             </Meta>
           </View>
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <Icon name="heart" size={16} color={c.ink2} />
-            <Meta style={{ flex: 1 }}>If an answer about mood crosses a care threshold, a clinician reads it within 48 hours.</Meta>
+            <Meta style={{ flex: 1 }}>{t('threshold')}</Meta>
           </View>
         </Card>
-        <Meta tone="ink3">{`This specimen shows ${items.length} of the ${totalItems} items, at least one from each instrument.`}</Meta>
+        <Meta tone="ink3">{t('specimenShows', { n: items.length, total: totalItems })}</Meta>
         <View style={{ gap: space.s1 }}>
-          <DaybreakButton onPress={() => goTo(resuming ? resumeAt() : 0)}>{resuming ? 'Pick up where you left off' : 'Begin sitting 1'}</DaybreakButton>
+          <DaybreakButton onPress={() => goTo(resuming ? resumeAt() : 0)}>{resuming ? t('pickUp') : t('begin1')}</DaybreakButton>
           {resuming ? (
             <Button
               variant="ghost"
               onPress={() => setSaved(EMPTY)}
-              accessibilityHint="Clears the answers kept on this phone"
+              accessibilityHint={t('clearsHint')}
               style={{ alignSelf: 'center' }}
             >
-              Start again
+              {t('startAgain')}
             </Button>
           ) : null}
         </View>
@@ -199,7 +208,7 @@ function TakeIndex() {
   if (step.kind === 'block') {
     const { i } = step
     const b = items[i].block
-    const t = termByKey(b.term)
+    const tm = termByKey(b.term)
     const here = items.filter((x) => x.block.code === b.code).length
     return (
       <Screen>
@@ -207,42 +216,42 @@ function TakeIndex() {
           <Pressable
             onPress={() => (i === 0 ? setStep({ kind: 'intro' }) : i === firstOf2 ? setStep({ kind: 'break' }) : setStep({ kind: 'item', i: i - 1 }))}
             accessibilityRole="button"
-            accessibilityLabel="Back"
+            accessibilityLabel={tc('back')}
             hitSlop={8}
             style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44 }}
           >
             <Icon name="chevron-left" size={18} color={c.ink3} />
-            <Eyebrow>Back</Eyebrow>
+            <Eyebrow>{tc('back')}</Eyebrow>
           </Pressable>
-          <Pressable onPress={pause} accessibilityRole="button" accessibilityLabel="Pause and finish later" hitSlop={8} style={{ minHeight: 44, justifyContent: 'center' }}>
-            <Eyebrow tone="ink2">Pause</Eyebrow>
+          <Pressable onPress={pause} accessibilityRole="button" accessibilityLabel={t('pauseA11y')} hitSlop={8} style={{ minHeight: 44, justifyContent: 'center' }}>
+            <Eyebrow tone="ink2">{t('pause')}</Eyebrow>
           </Pressable>
         </View>
-        <Progress value={i} max={items.length} color={c.ink} label={`${i} of ${items.length} answered`} />
+        <Progress value={i} max={items.length} color={c.ink} label={t('answeredOf', { n: i, total: items.length })} />
         <ScreenHeader
-          eyebrow={`Sitting ${items[i].sitting} · next instrument`}
+          eyebrow={t('nextInstrument', { n: items[i].sitting })}
           title={
             <>
               {b.name.split(' · ')[0]}
               {b.name.includes(' · ') ? <Serif>{` · ${b.name.split(' · ').slice(1).join(' · ')}`}</Serif> : null}
             </>
           }
-          lead={b.about}
+          lead={ax(b.about)}
         />
         <Card tone="raised" style={{ gap: space.s1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1, flexWrap: 'wrap' }}>
-            <TermChip term={b.term} withSpace={t.name !== t.space} />
+            <TermChip term={b.term} withSpace={tm.name !== tm.space} />
             <Eyebrow>{b.code}</Eyebrow>
           </View>
           <Divider />
           {[
-            ['Timeframe', b.timeframe],
-            ['Items', `${b.items} in the full measure · ${here} in this specimen`],
-            ['Time', `About ${b.minutes} min`],
-            ['Source', b.attribution],
+            [t('kTimeframe'), b.timeframe],
+            [t('kItems'), t('itemsVal', { items: b.items, here })],
+            [t('kTime'), t('timeVal', { min: b.minutes })],
+            [t('kSource'), b.attribution],
           ].map(([k, v]) => (
             <View key={k} style={{ flexDirection: 'row', gap: 12, minHeight: 28 }} accessible accessibilityLabel={`${k}: ${v}`}>
-              <Eyebrow style={{ width: 88, paddingTop: 3 }}>{k}</Eyebrow>
+              <Eyebrow style={{ width: 96, paddingTop: 3 }}>{k}</Eyebrow>
               <Meta tone="ink" style={{ flex: 1 }}>
                 {v}
               </Meta>
@@ -252,7 +261,7 @@ function TakeIndex() {
         {b.careNote ? (
           <Card tone="sunk" padding={16} style={{ flexDirection: 'row', gap: 10 }}>
             <Icon name="heart" size={16} color={c.ink2} />
-            <Meta style={{ flex: 1 }}>{b.careNote}</Meta>
+            <Meta style={{ flex: 1 }}>{ax(b.careNote)}</Meta>
           </Card>
         ) : null}
         <DaybreakButton
@@ -261,7 +270,7 @@ function TakeIndex() {
             setStep({ kind: 'item', i })
           }}
         >
-          {`Begin ${b.code}`}
+          {t('beginCode', { code: b.code })}
         </DaybreakButton>
       </Screen>
     )
@@ -282,17 +291,17 @@ function TakeIndex() {
       <Screen>
         <View style={{ gap: space.s1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <Pressable onPress={back} accessibilityRole="button" accessibilityLabel="Previous" hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44 }}>
+            <Pressable onPress={back} accessibilityRole="button" accessibilityLabel={t('previous')} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44 }}>
               <Icon name="chevron-left" size={18} color={c.ink3} />
-              <Eyebrow>Back</Eyebrow>
+              <Eyebrow>{tc('back')}</Eyebrow>
             </Pressable>
-            <Pressable onPress={pause} accessibilityRole="button" accessibilityLabel="Pause and finish later" hitSlop={8} style={{ minHeight: 44, justifyContent: 'center' }}>
-              <Eyebrow tone="ink2">Pause</Eyebrow>
+            <Pressable onPress={pause} accessibilityRole="button" accessibilityLabel={t('pauseA11y')} hitSlop={8} style={{ minHeight: 44, justifyContent: 'center' }}>
+              <Eyebrow tone="ink2">{t('pause')}</Eyebrow>
             </Pressable>
           </View>
-          <Progress value={i + 1} max={items.length} color={c.ink} label={`Question ${i + 1} of ${items.length}`} />
+          <Progress value={i + 1} max={items.length} color={c.ink} label={t('question', { n: i + 1, total: items.length })} />
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
-            <Eyebrow>{`Sitting ${f.sitting} · ${posInSitting} of ${within.length}`}</Eyebrow>
+            <Eyebrow style={{ flexShrink: 1 }}>{t('sittingPos', { s: f.sitting, pos: posInSitting, len: within.length })}</Eyebrow>
             <Mono size={13} tone="ink3">{`${i + 1} / ${items.length}`}</Mono>
           </View>
         </View>
@@ -302,6 +311,7 @@ function TakeIndex() {
             <TermChip term={f.block.term} withSpace={termByKey(f.block.term).name !== termByKey(f.block.term).space} />
             <Eyebrow>{f.block.code}</Eyebrow>
           </View>
+          {note}
           <Meta>{f.item.stem ?? f.block.timeframe}</Meta>
           <Title size={26} accessibilityRole="header">
             {f.item.text}
@@ -319,13 +329,13 @@ function TakeIndex() {
         ) : f.block.careNote ? (
           <Card tone="sunk" padding={16} style={{ flexDirection: 'row', gap: 10 }}>
             <Icon name="heart" size={16} color={c.ink2} />
-            <Meta style={{ flex: 1 }}>{f.block.careNote}</Meta>
+            <Meta style={{ flex: 1 }}>{ax(f.block.careNote)}</Meta>
           </Card>
         ) : null}
 
         <View style={{ gap: space.s1 }}>
           <DaybreakButton onPress={() => next(i)} disabled={value === undefined}>
-            {fromReview ? 'Back to review' : i + 1 === items.length ? 'Review answers' : 'Next'}
+            {fromReview ? t('backReview') : i + 1 === items.length ? t('reviewAnswers') : tc('next')}
           </DaybreakButton>
           <Meta size={14} tone="ink3" align="center">
             {f.block.name} · {f.block.attribution}
@@ -340,24 +350,24 @@ function TakeIndex() {
     return (
       <Screen>
         <ScreenHeader
-          eyebrow="Sitting 1 · done"
+          eyebrow={t('breakEyebrow')}
           title={
             <>
-              Half way. <Serif>Rest</Serif> a moment.
+              {t('breakA')}<Serif>{t('breakSerif')}</Serif>{t('breakB')}
             </>
           }
-          lead="Sitting 2 covers Freedom, Pleasure and Ease. Today or another day is fine; your answers are kept on this phone."
+          lead={t('breakLead')}
         />
         <Card tone="raised" style={{ gap: space.s1 }}>
-          <Progress value={firstOf2} max={items.length} color={c.ink} label={`${firstOf2} of ${items.length} answered`} />
+          <Progress value={firstOf2} max={items.length} color={c.ink} label={t('answeredOf', { n: firstOf2, total: items.length })} />
           <Meta>
-            <Mono size={15} tone="ink">{`${firstOf2} of ${items.length}`}</Mono> answered · about ten minutes to go
+            <Mono size={15} tone="ink">{t('nOfTotal', { n: firstOf2, total: items.length })}</Mono>{t('tenToGo')}
           </Meta>
         </Card>
         <View style={{ gap: space.s1 }}>
-          <DaybreakButton onPress={() => goTo(firstOf2)}>Begin sitting 2</DaybreakButton>
+          <DaybreakButton onPress={() => goTo(firstOf2)}>{t('begin2')}</DaybreakButton>
           <Button variant="ghost" onPress={pause} style={{ alignSelf: 'center' }}>
-            Finish another day
+            {t('anotherDay')}
           </Button>
         </View>
       </Screen>
@@ -369,26 +379,26 @@ function TakeIndex() {
     return (
       <Screen>
         <ScreenHeader
-          eyebrow="Paused"
+          eyebrow={t('paused')}
           title={
             <>
-              Kept <Serif>safe</Serif> on this phone.
+              {t('pausedA')}<Serif>{t('pausedSerif')}</Serif>{t('pausedB')}
             </>
           }
-          lead={`${answered} of ${items.length} answered. Pick up where you left off whenever you like, from Today or from here; nothing is sent until you review and send.`}
+          lead={t('pausedLead', { n: answered, total: items.length })}
         />
         <Card tone="raised" style={{ gap: space.s1 }}>
-          <Progress value={answered} max={items.length} color={c.ink} label={`${answered} of ${items.length} answered`} />
+          <Progress value={answered} max={items.length} color={c.ink} label={t('answeredOf', { n: answered, total: items.length })} />
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <Icon name="smartphone" size={16} color={c.ink2} />
-            <Meta style={{ flex: 1 }}>Saved on this phone just now. Closing the app is fine.</Meta>
+            <Meta style={{ flex: 1 }}>{t('savedJustNow')}</Meta>
           </View>
         </Card>
-        {offline ? <Meta tone="ink3">You are offline. That is fine: the Index works offline and sends when you are back.</Meta> : null}
+        {offline ? <Meta tone="ink3">{t('offline')}</Meta> : null}
         <View style={{ gap: space.s1 }}>
-          <DaybreakButton onPress={() => goTo(resumeAt())}>Carry on now</DaybreakButton>
+          <DaybreakButton onPress={() => goTo(resumeAt())}>{t('carryOn')}</DaybreakButton>
           <Button variant="ghost" onPress={leave} style={{ alignSelf: 'center' }}>
-            Back to Today
+            {tc('backToday')}
           </Button>
         </View>
       </Screen>
@@ -400,24 +410,25 @@ function TakeIndex() {
     return (
       <Screen>
         <ScreenHeader
-          eyebrow="Review"
+          eyebrow={t('review')}
           title={
             <>
-              Your answers, <Serif>before</Serif> they go.
+              {t('reviewA')}<Serif>{t('reviewSerif')}</Serif>{t('reviewB')}
             </>
           }
-          lead="Change anything you like. Once sent, the engine scores them and the Index arrives on Today."
+          lead={t('reviewLead')}
         />
         {phqHigh ? careCard : null}
+        {note}
         {SITTINGS.map((s) => (
           <Card key={s.n} tone="raised" style={{ gap: space.s1 }}>
-            <Eyebrow {...H2}>{`Sitting ${s.n} · ${s.title}`}</Eyebrow>
+            <Eyebrow {...H2}>{t('sittingTitle', { n: s.n, title: ax(s.title) })}</Eyebrow>
             {items
               .map((f, idx) => ({ f, idx }))
               .filter(({ f }) => f.sitting === s.n)
               .map(({ f, idx }, j) => {
                 const v = answers[f.item.id]
-                const label = f.block.scale.find((o) => o.value === v)?.label ?? 'Not answered'
+                const label = f.block.scale.find((o) => o.value === v)?.label ?? t('notAnswered')
                 return (
                   <View key={f.item.id}>
                     {j > 0 ? <Divider /> : null}
@@ -427,7 +438,7 @@ function TakeIndex() {
                         setStep({ kind: 'item', i: idx })
                       }}
                       accessibilityRole="button"
-                      accessibilityLabel={`${f.item.text} Your answer: ${label}. Change.`}
+                      accessibilityLabel={t('yourAnswer', { text: f.item.text, label })}
                       style={({ pressed }) => ({ paddingVertical: 12, gap: 4, opacity: pressed ? 0.7 : 1 })}
                     >
                       <Meta size={14} tone="ink3">
@@ -439,7 +450,7 @@ function TakeIndex() {
                           {label}
                         </Meta>
                         <Meta size={14} tone="ink2" style={{ textDecorationLine: 'underline' }}>
-                          Change
+                          {t('change')}
                         </Meta>
                       </View>
                     </Pressable>
@@ -456,15 +467,15 @@ function TakeIndex() {
               setSaved(EMPTY)
             }}
             disabled={answered < items.length}
-            accessibilityHint="Sends your answers to the Index engine."
+            accessibilityHint={t('sendHint')}
           >
-            Send for scoring
+            {t('send')}
           </DaybreakButton>
           {answered < items.length ? (
-            <Meta tone="ink3" align="center">{`${items.length - answered} still to answer. Tap one above.`}</Meta>
+            <Meta tone="ink3" align="center">{t('stillTo', { n: items.length - answered })}</Meta>
           ) : null}
           <Button variant="ghost" onPress={pause} style={{ alignSelf: 'center' }}>
-            Keep it on the phone for now
+            {t('keepPhone')}
           </Button>
         </View>
       </Screen>
@@ -475,27 +486,27 @@ function TakeIndex() {
   return (
     <Screen>
       <ScreenHeader
-        eyebrow="Sent · engine 1.0.4 · method v1.0"
+        eyebrow={t('sentEyebrow')}
         title={
           <>
-            Thank you. That was <Serif>honest</Serif> work.
+            {t('thanksA')}<Serif>{t('thanksSerif')}</Serif>{t('thanksB')}
           </>
         }
-        lead="Your Index is being scored now. It will be on Today within a minute, with the method on show."
+        lead={t('thanksLead')}
       />
       <Card tone="sunk" style={{ gap: space.s1 }}>
         <Meta>
           <Meta tone="ink" weight="semibold">
-            What happens next.
+            {t('whatNext')}
           </Meta>{' '}
-          Priya sees your six terms, not your answers. If anything about mood crossed a care threshold, Dr Sanjay Menon reads it within 48 hours. No AI writes about those answers.
+          {t('whatNextBody')}
         </Meta>
       </Card>
       {sentCare ? careCard : null}
       <View style={{ gap: space.s1 }}>
-        <DaybreakButton onPress={() => router.replace('/index-result')}>See your Index</DaybreakButton>
+        <DaybreakButton onPress={() => router.replace('/index-result')}>{t('seeIndex')}</DaybreakButton>
         <Button variant="ghost" onPress={() => router.replace('/')} style={{ alignSelf: 'center' }}>
-          Back to Today
+          {tc('backToday')}
         </Button>
       </View>
     </Screen>

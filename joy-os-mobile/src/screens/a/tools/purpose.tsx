@@ -6,15 +6,17 @@ import { useLocal } from '@/screens/a/local'
 import { TextField } from '@/screens/a/parts'
 import { CONTRIBUTIONS, IKIGAI_START, SPACE_TODAY, STATEMENT_START, TOMORROW_ANSWERS } from '@/screens/a/spacesData'
 import { useTheme } from '@/theme/ThemeProvider'
+import { useA } from '../i18n'
 import { ToolCard, ToolsHeading, shortDate } from './common'
 
 // PURPOSE: the Ikigai map (direction, contribution, daily anchors), the Tomorrow Question,
 // the 25-year statement.
 
 export function PurposeTools() {
+  const { t } = useA()
   return (
     <>
-      <ToolsHeading>Purpose tools</ToolsHeading>
+      <ToolsHeading>{t('Purpose tools')}</ToolsHeading>
       <IkigaiMap />
       <TomorrowQuestion />
       <Statement />
@@ -24,6 +26,7 @@ export function PurposeTools() {
 
 function IkigaiMap() {
   const { c, space, term } = useTheme()
+  const { t, tx, lang } = useA()
   const { setCrisisOpen } = useApp()
   const col = term('P')
   const [kept, setKept] = useLocal<boolean[]>('purposeKept', [true, false, false])
@@ -36,14 +39,14 @@ function IkigaiMap() {
   const [edit, setEdit] = useState(map)
   const [mapSaved, setMapSaved] = useState(false)
   const logIt = () => {
-    const t = line.trim()
+    const v = line.trim()
     const w = who.trim()
-    if (!t) return
-    if (interceptsCrisis(`${t} ${w}`)) {
+    if (!v) return
+    if (interceptsCrisis(`${v} ${w}`)) {
       setCrisisOpen(true)
       return
     }
-    setLog((l) => [{ id: `c${Date.now()}`, date: SPACE_TODAY, what: t, who: w || 'Someone it helped' }, ...l])
+    setLog((l) => [{ id: `c${Date.now()}`, date: SPACE_TODAY, what: v, who: w || 'Someone it helped' }, ...l])
     setLine('')
     setWho('')
     setLogged(true)
@@ -61,14 +64,14 @@ function IkigaiMap() {
     setEditOpen(false)
   }
   return (
-    <ToolCard title="Ikigai map" lead="Ikigai in its original sense: the small, daily reasons a life feels worth living. Not a Venn diagram.">
+    <ToolCard title={t('Ikigai map')} lead={t('Ikigai in its original sense: the small, daily reasons a life feels worth living. Not a Venn diagram.')}>
       <View style={{ gap: space.s2 }}>
         <View style={{ gap: 4, borderLeftWidth: 3, borderLeftColor: col.main, paddingLeft: 12 }}>
-          <Eyebrow>Direction</Eyebrow>
+          <Eyebrow>{t('Direction')}</Eyebrow>
           <Body>{map.direction}</Body>
         </View>
         <View style={{ gap: 4, borderLeftWidth: 3, borderLeftColor: col.soft, paddingLeft: 12 }}>
-          <Eyebrow>Contribution</Eyebrow>
+          <Eyebrow>{t('Contribution')}</Eyebrow>
           <Body>{map.contribution}</Body>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s2, flexWrap: 'wrap' }}>
@@ -79,18 +82,18 @@ function IkigaiMap() {
               setEdit(map)
               setEditOpen(true)
             }}
-            accessibilityLabel="Edit your direction and contribution"
+            accessibilityLabel={t('Edit your direction and contribution')}
           >
-            Edit
+            {t('Edit')}
           </Button>
           {mapSaved ? (
             <Meta tone="ink2" accessibilityLiveRegion="polite">
-              Kept. Private to you.
+              {t('Kept. Private to you.')}
             </Meta>
           ) : null}
         </View>
         <View style={{ gap: 6 }}>
-          <Eyebrow>Daily anchors · today</Eyebrow>
+          <Eyebrow>{t('Daily anchors · today')}</Eyebrow>
           {IKIGAI_START.anchors.map((a, i) => (
             <Pressable
               key={a}
@@ -110,28 +113,28 @@ function IkigaiMap() {
         </View>
         <Divider />
         <View style={{ gap: 6 }}>
-          <Eyebrow>Contribution log · latest</Eyebrow>
+          <Eyebrow>{t('Contribution log · latest')}</Eyebrow>
           {log.slice(0, 5).map((x) => (
             <View key={x.id} style={{ flexDirection: 'row', gap: 12 }}>
               <Mono size={13} tone="ink3" style={{ width: 52 }}>
-                {shortDate(x.date)}
+                {shortDate(x.date, lang)}
               </Mono>
               <Meta style={{ flex: 1 }}>
-                <Meta tone="ink">{x.what}</Meta> · {x.who}
+                <Meta tone="ink">{x.what}</Meta> · {tx(x.who)}
               </Meta>
             </View>
           ))}
         </View>
         <View style={{ gap: space.s1 }}>
-          <TextField label="Who did your work help today?" value={line} onChangeText={(v) => (setLine(v), setLogged(false))} placeholder="Answered Ishaan’s question on pump sizing" />
-          <TextField label="Who · optional" value={who} onChangeText={setWho} placeholder="Ishaan, graduate engineer" onSubmitEditing={logIt} />
+          <TextField label={tx('Who did your work help today?')} value={line} onChangeText={(v) => (setLine(v), setLogged(false))} placeholder={t('Answered Ishaan’s question on pump sizing')} />
+          <TextField label={t('Who · optional')} value={who} onChangeText={setWho} placeholder={t('Ishaan, graduate engineer')} onSubmitEditing={logIt} />
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s2, flexWrap: 'wrap' }}>
             <Button onPress={logIt} disabled={!line.trim()} icon="plus">
-              Log it
+              {t('Log it')}
             </Button>
             {logged ? (
               <Meta tone="ink2" accessibilityLiveRegion="polite">
-                Logged. One line is enough.
+                {t('Logged. One line is enough.')}
               </Meta>
             ) : null}
           </View>
@@ -140,16 +143,16 @@ function IkigaiMap() {
       <Sheet
         open={editOpen}
         onClose={() => setEditOpen(false)}
-        title="Your Ikigai map"
+        title={t('Your Ikigai map')}
         footer={
           <Button variant="ink" block onPress={saveMap} disabled={!edit.direction.trim() || !edit.contribution.trim()}>
-            Save
+            {t('Save')}
           </Button>
         }
       >
-        <Meta>Write it the way you would say it to a friend. Your coach sees that it exists, not what it says.</Meta>
-        <TextField label="Direction · where your days are pointed" value={edit.direction} onChangeText={(v) => setEdit((e) => ({ ...e, direction: v }))} multiline />
-        <TextField label="Contribution · who it is for" value={edit.contribution} onChangeText={(v) => setEdit((e) => ({ ...e, contribution: v }))} multiline />
+        <Meta>{t('Write it the way you would say it to a friend. Your coach sees that it exists, not what it says.')}</Meta>
+        <TextField label={t('Direction · where your days are pointed')} value={edit.direction} onChangeText={(v) => setEdit((e) => ({ ...e, direction: v }))} multiline />
+        <TextField label={t('Contribution · who it is for')} value={edit.contribution} onChangeText={(v) => setEdit((e) => ({ ...e, contribution: v }))} multiline />
       </Sheet>
     </ToolCard>
   )
@@ -157,34 +160,35 @@ function IkigaiMap() {
 
 function TomorrowQuestion() {
   const { space } = useTheme()
+  const { t, tx, lang } = useA()
   const { setCrisisOpen } = useApp()
   const [text, setText] = useState('')
   const [answers, setAnswers] = useLocal('tomorrow', TOMORROW_ANSWERS)
   const [saved, setSaved] = useState(false)
   const save = () => {
-    const t = text.trim()
-    if (!t) return
-    if (interceptsCrisis(t)) {
+    const v = text.trim()
+    if (!v) return
+    if (interceptsCrisis(v)) {
       setCrisisOpen(true)
       return
     }
-    setAnswers((a) => [{ week: 4, date: '2027-01-28', text: t }, ...a])
+    setAnswers((a) => [{ week: 4, date: '2027-01-28', text: v }, ...a])
     setText('')
     setSaved(true)
   }
   return (
-    <ToolCard title="The Tomorrow Question" lead="Once a week, on Sunday evening. Practice week 2.">
+    <ToolCard title={t('The Tomorrow Question')} lead={t('Once a week, on Sunday evening. Practice week 2.')}>
       <Body size={22} style={{ lineHeight: 30 }}>
-        What would make tomorrow worth waking for?
+        {tx('What would make tomorrow worth waking for?')}
       </Body>
-      <TextField label="Your answer" hideLabel value={text} onChangeText={(v) => (setText(v), setSaved(false))} placeholder="One thing, however small" multiline onSubmitEditing={save} />
+      <TextField label={t('Your answer')} hideLabel value={text} onChangeText={(v) => (setText(v), setSaved(false))} placeholder={t('One thing, however small')} multiline onSubmitEditing={save} />
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s2, flexWrap: 'wrap' }}>
         <Button onPress={save} disabled={!text.trim()} icon="check">
-          Keep this answer
+          {t('Keep this answer')}
         </Button>
         {saved ? (
           <Meta accessibilityLiveRegion="polite" tone="ink2">
-            Kept. Private to you.
+            {t('Kept. Private to you.')}
           </Meta>
         ) : null}
       </View>
@@ -192,7 +196,7 @@ function TomorrowQuestion() {
         {answers.map((a) => (
           <View key={`${a.week}-${a.date}-${a.text}`} style={{ flexDirection: 'row', gap: 12 }}>
             <Mono size={13} tone="ink3" style={{ width: 52 }}>
-              {shortDate(a.date)}
+              {shortDate(a.date, lang)}
             </Mono>
             <Meta tone="ink" style={{ flex: 1 }}>
               {a.text}
@@ -206,6 +210,7 @@ function TomorrowQuestion() {
 
 function Statement() {
   const { space } = useTheme()
+  const { t } = useA()
   const { setCrisisOpen } = useApp()
   const [open, setOpen] = useState(false)
   const [text, setText] = useLocal('statement', STATEMENT_START)
@@ -216,23 +221,23 @@ function Statement() {
   const short = sentences.slice(0, 2).join(' ')
   const long = sentences.length > 2
   const save = () => {
-    const t = draft.trim()
-    if (!t) return
-    if (interceptsCrisis(t)) {
+    const v = draft.trim()
+    if (!v) return
+    if (interceptsCrisis(v)) {
       setCrisisOpen(true)
       return
     }
-    setText(t)
+    setText(v)
     setSaved(true)
     setEditOpen(false)
   }
   return (
-    <ToolCard title="The 25-year statement" lead="Written once, read each quarter. Your coach knows it exists, not what it says.">
+    <ToolCard title={t('The 25-year statement')} lead={t('Written once, read each quarter. Your coach knows it exists, not what it says.')}>
       <Body style={{ fontStyle: 'normal' }}>{open || !long ? text : short}</Body>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s2, flexWrap: 'wrap' }}>
         {long ? (
-          <Button variant="link" onPress={() => setOpen(!open)} accessibilityLabel={open ? 'Show less of the statement' : 'Read the whole statement'}>
-            {open ? 'Show less' : 'Read it all'}
+          <Button variant="link" onPress={() => setOpen(!open)} accessibilityLabel={open ? t('Show less of the statement') : t('Read the whole statement')}>
+            {open ? t('Show less') : t('Read it all')}
           </Button>
         ) : null}
         <Button
@@ -242,33 +247,33 @@ function Statement() {
             setDraft(text)
             setEditOpen(true)
           }}
-          accessibilityLabel="Edit the 25-year statement"
+          accessibilityLabel={t('Edit the 25-year statement')}
         >
-          Edit
+          {t('Edit')}
         </Button>
       </View>
       {saved ? (
         <Meta tone="ink2" accessibilityLiveRegion="polite">
-          Kept. Private to you.
+          {t('Kept. Private to you.')}
         </Meta>
       ) : null}
       <Meta size={14} tone="ink3">
-        Last read on Day 1 · next on Day 90
+        {t('Last read on Day 1 · next on Day 90')}
       </Meta>
       <Sheet
         open={editOpen}
         onClose={() => setEditOpen(false)}
-        title="The 25-year statement"
+        title={t('The 25-year statement')}
         footer={
           <Button variant="ink" block onPress={save} disabled={!draft.trim()}>
-            Save
+            {t('Save')}
           </Button>
         }
       >
-        <Meta>Who do you want to be in twenty-five years, and who will be with you? A few honest sentences are enough.</Meta>
-        <TextField label="Your statement" hideLabel value={draft} onChangeText={setDraft} multiline style={{ minHeight: 200 }} />
+        <Meta>{t('Who do you want to be in twenty-five years, and who will be with you? A few honest sentences are enough.')}</Meta>
+        <TextField label={t('Your statement')} hideLabel value={draft} onChangeText={setDraft} multiline style={{ minHeight: 200 }} />
         <Meta size={14} tone="ink3">
-          Private to you. Not read by VIVA unless you ask it to.
+          {t('Private to you. Not read by VIVA unless you ask it to.')}
         </Meta>
       </Sheet>
     </ToolCard>

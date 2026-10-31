@@ -1,10 +1,11 @@
 import { useId } from 'react'
 import { View, type StyleProp, type ViewStyle } from 'react-native'
 import Svg, { Circle, Defs, Pattern, Rect } from 'react-native-svg'
-import { termByKey } from '../shared/terms'
+import { useDict, useTermText } from '../lib/i18n'
 import type { Band, TermKey } from '../shared/types'
 import { useTheme } from '../theme/ThemeProvider'
 import { Body, Eyebrow, Meta } from './Text'
+import { KIT } from './_i18n'
 
 /** Svg id safe from React's useId (":r1:" → "r1"). */
 export function useSvgId(prefix: string) {
@@ -43,8 +44,8 @@ export function TermDot({ term, size = 10 }: { term: TermKey; size?: number }) {
 /** Term chip — a colour never appears without its name (Principle 06). */
 export function TermChip({ term, withSpace = false, size = 'sm', style }: { term: TermKey; withSpace?: boolean; size?: 'sm' | 'md'; style?: StyleProp<ViewStyle> }) {
   const t = useTheme()
-  const info = termByKey(term)
-  const label = withSpace ? `${info.space} · ${info.name}` : info.name
+  const tt = useTermText()
+  const label = withSpace ? `${tt.space(term)} · ${tt.name(term)}` : tt.name(term)
   return (
     <View
       accessible
@@ -55,6 +56,7 @@ export function TermChip({ term, withSpace = false, size = 'sm', style }: { term
           alignItems: 'center',
           gap: 8,
           alignSelf: 'flex-start',
+          maxWidth: '100%',
           borderRadius: t.radius.pill,
           borderWidth: 1,
           borderColor: t.c.line,
@@ -66,14 +68,15 @@ export function TermChip({ term, withSpace = false, size = 'sm', style }: { term
       ]}
     >
       <TermDot term={term} />
-      {size === 'sm' ? <Meta tone="ink" size={14}>{label}</Meta> : <Body size={15}>{label}</Body>}
+      {size === 'sm' ? <Meta tone="ink" size={14} style={{ flexShrink: 1 }}>{label}</Meta> : <Body size={15} style={{ flexShrink: 1 }}>{label}</Body>}
     </View>
   )
 }
 
 /** Band label — STEADY · UNEVEN · THIN, letterspaced Mono. */
 export function BandLabel({ band, style }: { band: Band; style?: StyleProp<ViewStyle> }) {
-  const text = band === 'not-yet-measured' ? 'not yet measured' : band
+  const t = useDict(KIT)
+  const text = t(band === 'not-yet-measured' ? 'bandNone' : band === 'steady' ? 'bandSteady' : band === 'uneven' ? 'bandUneven' : 'bandThin')
   return (
     <View style={style}>
       <Eyebrow tone="ink2">{text}</Eyebrow>

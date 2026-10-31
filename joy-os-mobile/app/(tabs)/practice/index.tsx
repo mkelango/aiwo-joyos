@@ -29,18 +29,18 @@ import { useTheme } from '@/theme/ThemeProvider'
 import { PRACTICE_CONTENT, PRACTICE_PULSE } from '@/screens/b/journeyData'
 import { practiceStore, todayIso, useStore, weekdayIndex } from '@/screens/b/bStore'
 import { AudioPlayer, PrimaryChip } from '@/screens/b/parts'
+import { Rich, useA } from '@/screens/a/i18n'
 
 // THE JOYSPIRATION PRACTICE (Memo p.21): eight weeks; five-minute audio in the Mentor's
 // voice, a science note from the faculty, one practice daily / weekly / yearly, the weekly
 // circle, and the Index before and after. One Daybreak: “Practised today”.
 
 const CURRENT = CIRCLE.week
-const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
-const DAYS_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const PRACTISED = [true, true, false, true, false, false, false]
 
 export default function Practice() {
   const { c, space, radius } = useTheme()
+  const { t, tx, lang, name, week: DAYS, weekFull: DAYS_FULL } = useA()
   const week = PRACTICE_WEEKS.find((w) => w.week === CURRENT)!
   const content = PRACTICE_CONTENT.find((p) => p.week === CURRENT)!
   const before = INDEX_HISTORY[0]
@@ -56,17 +56,13 @@ export default function Practice() {
   return (
     <Screen inTabs top={<AppBar />}>
       <ScreenHeader
-        eyebrow={`The Joyspiration Practice · Week ${CURRENT} of 8`}
-        title={
-          <>
-            Don’t postpone <Serif>joy</Serif>.
-          </>
-        }
-        lead="Five minutes a day in the Mentor’s voice, a note from the faculty on why it works, and your circle every Monday. Eight weeks, measured before and after."
+        eyebrow={t('The Joyspiration Practice · Week {n} of 8', { n: CURRENT })}
+        title={<Rich text={t('Don’t postpone *joy*.')} wrap={(w) => <Serif>{w}</Serif>} />}
+        lead={t('Five minutes a day in the Mentor’s voice, a note from the faculty on why it works, and your circle every Monday. Eight weeks, measured before and after.')}
       />
 
       {/* The eight weeks */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityLabel="The eight weeks" contentContainerStyle={{ gap: space.s1 + 2, paddingRight: space.s2 }} style={{ marginHorizontal: -space.gutter, paddingLeft: space.gutter, flexGrow: 0 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityLabel={t('The eight weeks')} contentContainerStyle={{ gap: space.s1 + 2, paddingRight: space.s2 }} style={{ marginHorizontal: -space.gutter, paddingLeft: space.gutter, flexGrow: 0 }}>
         {PRACTICE_WEEKS.map((w) => {
           const st = w.week < CURRENT ? 'done' : w.week === CURRENT ? 'now' : 'next'
           // Earlier weeks count as practised unless the member un-marked them in the week screen.
@@ -76,7 +72,7 @@ export default function Practice() {
               key={w.week}
               onPress={() => router.push(`/practice/${w.week}`)}
               accessibilityRole="link"
-              accessibilityLabel={`Week ${w.week}, ${w.title}. ${st === 'now' ? `This week${kept ? ', practised' : ''}` : st === 'next' ? (kept ? 'Upcoming, practised ahead' : 'Upcoming') : kept ? 'Practised' : 'Earlier week, not marked'}`}
+              accessibilityLabel={t('Week {n}, {title}. {state}', { n: w.week, title: tx(w.title), state: st === 'now' ? `${t('This week')}${kept ? t(', practised') : ''}` : st === 'next' ? (kept ? t('Upcoming, practised ahead') : t('Upcoming')) : kept ? t('Practised') : t('Earlier week, not marked') })}
               style={({ pressed }) => ({
                 width: 148,
                 minHeight: 112,
@@ -92,10 +88,10 @@ export default function Practice() {
             >
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Mono tone="ink">{`W${w.week}`}</Mono>
-                {kept ? <Icon name="check" size={14} color={c.ink2} /> : w.term === 'ALL' ? <Eyebrow size={11}>All</Eyebrow> : <TermDot term={w.term} />}
+                {kept ? <Icon name="check" size={14} color={c.ink2} /> : w.term === 'ALL' ? <Eyebrow size={11}>{t('All')}</Eyebrow> : <TermDot term={w.term} />}
               </View>
               <Meta tone={st === 'next' ? 'ink2' : 'ink'} size={14}>
-                {w.title}
+                {tx(w.title)}
               </Meta>
             </Pressable>
           )
@@ -105,44 +101,44 @@ export default function Practice() {
       {/* The Mentor's audio */}
       <Card tone="raised" style={{ gap: space.s2 }}>
         <View style={{ gap: 6 }}>
-          <Eyebrow>{`Week ${CURRENT} · the Mentor’s voice · 5 min`}</Eyebrow>
-          <Title size={24}>{content.audioTitle}</Title>
-          <Meta size={14}>C. Sivasankaran, Mentor, AIWO Limited · English</Meta>
+          <Eyebrow>{t('Week {n} · the Mentor’s voice · 5 min', { n: CURRENT })}</Eyebrow>
+          <Title size={24}>{tx(content.audioTitle)}</Title>
+          <Meta size={14}>{t('C. Sivasankaran, Mentor, AIWO Limited · English')}</Meta>
           <PrimaryChip primary={week.term} />
         </View>
-        <AudioPlayer week={CURRENT} title={content.audioTitle} seconds={content.seconds} transcript={content.transcript} startAt={74} />
+        <AudioPlayer week={CURRENT} title={tx(content.audioTitle)} seconds={content.seconds} transcript={content.transcript} startAt={74} />
       </Card>
 
       {/* Today's practice */}
       <Card tone="sunk" style={{ gap: space.s2 }}>
-        <Eyebrow tone="daybreak">Today’s practice</Eyebrow>
+        <Eyebrow tone="daybreak">{t('Today’s practice')}</Eyebrow>
         {!doneToday ? (
           <>
-            <Title size={24}>{content.daily}</Title>
-            <DaybreakButton onPress={() => setDoneToday(true)} accessibilityHint="Marks today’s practice as kept. You can undo it.">
-              Practised today
+            <Title size={24}>{tx(content.daily)}</Title>
+            <DaybreakButton onPress={() => setDoneToday(true)} accessibilityHint={t('Marks today’s practice as kept. You can undo it.')}>
+              {t('Practised today')}
             </DaybreakButton>
           </>
         ) : (
           <View style={{ gap: space.s1 }} accessibilityLiveRegion="polite">
             <Title size={24}>
-              Kept. <Serif>Well done.</Serif>
+              <Rich text={t('Kept. *Well done.*')} wrap={(w) => <Serif>{w}</Serif>} />
             </Title>
-            <Meta>Add the pleasure to your Joy Ledger, so it counts towards Daily Pleasure.</Meta>
+            <Meta>{t('Add the pleasure to your Joy Ledger, so it counts towards Daily Pleasure.')}</Meta>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.s2 }}>
-              <ArrowLink onPress={() => router.push('/ledger')}>Open the Ledger</ArrowLink>
+              <ArrowLink onPress={() => router.push('/ledger')}>{t('Open the Ledger')}</ArrowLink>
               <Button variant="ghost" onPress={() => setDoneToday(false)}>
-                Undo
+                {t('Undo')}
               </Button>
             </View>
           </View>
         )}
         <Divider />
-        <Eyebrow>This week</Eyebrow>
+        <Eyebrow>{t('This week')}</Eyebrow>
         <View
           style={{ flexDirection: 'row', justifyContent: 'space-between' }}
           accessible
-          accessibilityLabel={`Practised on ${practised.filter(Boolean).length} days this week so far: ${DAYS_FULL.filter((_, i) => practised[i]).join(', ')}.`}
+          accessibilityLabel={t('Practised on {n} days this week so far: {days}.', { n: practised.filter(Boolean).length, days: DAYS_FULL.filter((_, i) => practised[i]).join(', ') })}
         >
           {DAYS.map((d, i) => (
             <View key={i} style={{ alignItems: 'center', gap: 6 }}>
@@ -151,18 +147,18 @@ export default function Practice() {
             </View>
           ))}
         </View>
-        <Meta>Missed days are fine. The practice is there when you are.</Meta>
+        <Meta>{t('Missed days are fine. The practice is there when you are.')}</Meta>
       </Card>
 
       {/* Science note */}
       <Card tone="outline" style={{ gap: space.s1 + 4 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Icon name="book" size={16} color={c.ink2} />
-          <Eyebrow>Science note · from the faculty</Eyebrow>
+          <Eyebrow style={{ flexShrink: 1 }}>{t('Science note · from the faculty')}</Eyebrow>
         </View>
-        <Title size={22}>{content.science.title}</Title>
-        <Body tone="ink2">{content.science.body}</Body>
-        <Meta tone="ink">{content.science.faculty}</Meta>
+        <Title size={22}>{tx(content.science.title)}</Title>
+        <Body tone="ink2">{tx(content.science.body)}</Body>
+        <Meta tone="ink">{tx(content.science.faculty)}</Meta>
         <Mono size={12} tone="ink3">
           {content.science.ref}
         </Mono>
@@ -170,61 +166,61 @@ export default function Practice() {
 
       {/* Three rhythms */}
       <Card tone="raised" style={{ gap: space.s1 }}>
-        <Eyebrow>One practice, three rhythms</Eyebrow>
+        <Eyebrow>{t('One practice, three rhythms')}</Eyebrow>
         {[
-          ['Daily', content.daily],
-          ['Weekly', content.weekly],
-          ['Yearly', content.yearly],
+          [t('Daily'), content.daily],
+          [t('Weekly'), content.weekly],
+          [t('Yearly'), content.yearly],
         ].map(([k, v], i) => (
           <View key={k} style={{ gap: 4, paddingVertical: 10, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: c.line }}>
             <Eyebrow tone="ink2">{k}</Eyebrow>
-            <Body>{v}</Body>
+            <Body>{tx(v)}</Body>
           </View>
         ))}
       </Card>
 
       {/* Weekly circle */}
       <Card tone="raised" style={{ gap: space.s1 + 4 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Eyebrow>{`Weekly circle · ${CIRCLE.when}`}</Eyebrow>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+          <Eyebrow style={{ flexShrink: 1 }}>{t('Weekly circle · {when}', { when: tx(CIRCLE.when) })}</Eyebrow>
           <Icon name="users" size={16} color={c.ink3} />
         </View>
-        <Meta>This week’s prompt, from Priya</Meta>
+        <Meta>{t('This week’s prompt, from Priya')}</Meta>
         <Title size={22}>
-          <Serif>“{content.circlePrompt}”</Serif>
+          <Serif>“{tx(content.circlePrompt)}”</Serif>
         </Title>
         <ArrowLink icon="calendar" onPress={() => router.push('/circles')}>
-          Your circle of eight
+          {t('Your circle of eight')}
         </ArrowLink>
       </Card>
 
       {/* Mentor quote */}
       <Card tone="soft" style={{ gap: space.s2 }}>
         <Title size={24}>
-          <Serif>“Your circumstances are part of your life. They do not have to become the whole of your life.”</Serif>
+          <Serif>{`“${tx('Your circumstances are part of your life. They do not have to become the whole of your life.')}”`}</Serif>
         </Title>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <View style={{ width: 28, height: 1, backgroundColor: c.lineStrong }} />
           <Meta tone="ink">C. Sivasankaran</Meta>
-          <Eyebrow>Mentor, AIWO Limited</Eyebrow>
+          <Eyebrow>{t('Mentor, AIWO Limited')}</Eyebrow>
         </View>
       </Card>
 
       {/* Before and after */}
       <View style={{ gap: space.s2 }}>
         <View style={{ gap: 8 }}>
-          <SectionTitle>The Index, before and after</SectionTitle>
+          <SectionTitle>{t('The Index, before and after')}</SectionTitle>
           <SpecimenTag />
         </View>
         <Card tone="raised" style={{ gap: 0 }}>
           <View style={{ flexDirection: 'row', paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: c.line }}>
-            <Eyebrow style={{ flex: 1 }}>Term</Eyebrow>
-            <Eyebrow style={{ width: 76, textAlign: 'right' }}>Before W1</Eyebrow>
-            <Eyebrow style={{ width: 70, textAlign: 'right' }}>After W8</Eyebrow>
+            <Eyebrow style={{ flex: 1 }}>{t('Term')}</Eyebrow>
+            <Eyebrow style={{ width: 76, textAlign: 'right' }}>{t('Before W1')}</Eyebrow>
+            <Eyebrow style={{ width: 70, textAlign: 'right' }}>{t('After W8')}</Eyebrow>
           </View>
-          <View accessible accessibilityLabel={`Joyspan Index ${before.value} before; after not yet measured`} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.line }}>
+          <View accessible accessibilityLabel={t('Joyspan Index {n} before; after not yet measured', { n: before.value })} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.line }}>
             <Body style={{ flex: 1 }} weight="medium">
-              Joyspan Index
+              {t('Joyspan Index')}
             </Body>
             <Mono size={20} tone="ink" style={{ width: 76, textAlign: 'right' }}>
               {String(before.value)}
@@ -233,16 +229,15 @@ export default function Practice() {
               —
             </Mono>
           </View>
-          {before.terms.map((t) => {
-            const term = termByKey(t.key)
-            const shown = t.key === 'B' ? `−${t.value}` : String(t.value)
+          {before.terms.map((x) => {
+            const shown = x.key === 'B' ? `−${x.value}` : String(x.value)
             return (
-              <View key={t.key} accessible accessibilityLabel={`${term.name} ${t.key === 'B' ? 'minus ' : ''}${t.value} before; after not yet measured`} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.line }}>
+              <View key={x.key} accessible accessibilityLabel={t('{name} {minus}{v} before; after not yet measured', { name: name(x.key), minus: x.key === 'B' ? t('minus ') : '', v: String(x.value) })} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.line }}>
                 <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <TermDot term={t.key} />
+                  <TermDot term={x.key} />
                   <View style={{ flex: 1, gap: 4 }}>
-                    <Meta tone="ink">{term.name}</Meta>
-                    {t.key === before.lowestTerm ? <Pill tone="daybreak">Week 4</Pill> : null}
+                    <Meta tone="ink">{name(x.key)}</Meta>
+                    {x.key === before.lowestTerm ? <Pill tone="daybreak">{t('Week 4')}</Pill> : null}
                   </View>
                 </View>
                 <Mono tone="ink" style={{ width: 76, textAlign: 'right' }}>
@@ -254,17 +249,17 @@ export default function Practice() {
               </View>
             )
           })}
-          <Meta style={{ marginTop: space.s2 }}>The after column fills when you re-take the Index in Week 8. It will be shown whether it rises or falls, with the same method.</Meta>
+          <Meta style={{ marginTop: space.s2 }}>{t('The after column fills when you re-take the Index in Week 8. It will be shown whether it rises or falls, with the same method.')}</Meta>
           <MethodLine style={{ marginTop: space.s1 }} method={before.method} grade={before.grade} takenOn={before.takenOn} next={before.nextMeasure} />
         </Card>
 
         <Card tone="sunk" style={{ gap: space.s2 }}>
-          <Eyebrow>Between the measures</Eyebrow>
-          <Body tone="ink2">Joy moments a day in your Ledger, averaged by Practice week.</Body>
+          <Eyebrow>{t('Between the measures')}</Eyebrow>
+          <Body tone="ink2">{t('Joy moments a day in your Ledger, averaged by Practice week.')}</Body>
           <View
             accessible
             accessibilityRole="image"
-            accessibilityLabel={`Joy moments a day: ${PRACTICE_PULSE.map((p) => `week ${p.week.slice(1)}, ${p.moments}`).join('; ')}. Week 4 so far.`}
+            accessibilityLabel={t('Joy moments a day: {list}. Week 4 so far.', { list: PRACTICE_PULSE.map((p) => t('week {n}, {m}', { n: p.week.slice(1), m: p.moments })).join('; ') })}
             style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.s2, height: 150, paddingTop: 20 }}
           >
             {PRACTICE_PULSE.map((p) => (
@@ -281,14 +276,14 @@ export default function Practice() {
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <TermDot term="D" />
-            <Meta size={14}>Daily Pleasure · Joy Ledger density · W4 so far</Meta>
+            <Meta size={14} style={{ flexShrink: 1 }}>{t('Daily Pleasure · Joy Ledger density · W4 so far')}</Meta>
           </View>
         </Card>
       </View>
 
       <View style={{ gap: space.s1 }}>
-        <Meta tone="ink3" size={14}>On Joy OS Plus for anyone; in full inside Mindcation; a taste in every Joycation. English first; Tamil and Hindi at J3.</Meta>
-        <ArrowLink onPress={() => router.push(`/practice/${CURRENT}`)}>{`Week ${CURRENT} in full, with reflection`}</ArrowLink>
+        <Meta tone="ink3" size={14}>{t('On Joy OS Plus for anyone; in full inside Mindcation; a taste in every Joycation. English first; Tamil and Hindi at J3.')}</Meta>
+        <ArrowLink onPress={() => router.push(`/practice/${CURRENT}`)}>{t('Week {n} in full, with reflection', { n: CURRENT })}</ArrowLink>
       </View>
     </Screen>
   )

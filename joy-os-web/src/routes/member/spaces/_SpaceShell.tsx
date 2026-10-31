@@ -12,6 +12,7 @@ import { CATIONS, PRACTICE_WEEKS } from '@/data/platform'
 import { termByKey, termColor } from '@/data/terms'
 import type { TermKey } from '@/domain/types'
 import { ROOM_VERDICT, VIVA_DRAFT, actionsFor, termHistory } from './_data'
+import { useSpaceText } from './_i18n'
 
 // Shared shell for the six spaces (Memo p.19): the term, its score with method,
 // its 90-day history, what moves it, three actions, the VIVA tool, the lead
@@ -94,11 +95,11 @@ export function ToolCard({ eyebrow, title, sub, aside, children, className, tone
 }
 
 /** Recharts tooltip in tokens. */
-export function ChartTip({ active, payload, label, unit = '', names }: { active?: boolean; payload?: { value: number; name?: string; dataKey?: string; color?: string }[]; label?: string; unit?: string; names?: Record<string, string> }) {
+export function ChartTip({ active, payload, label, unit = '', names, fmt }: { active?: boolean; payload?: { value: number; name?: string; dataKey?: string; color?: string }[]; label?: string; unit?: string; names?: Record<string, string>; fmt?: (label: string) => string }) {
   if (!active || !payload?.length) return null
   return (
     <div className="rounded-lg border border-line bg-paper-raised px-3 py-2 text-[13px] shadow-card">
-      <p className="eyebrow text-ink-3">{label}</p>
+      <p className="eyebrow text-ink-3">{fmt && label ? fmt(label) : label}</p>
       {payload.map((p) => (
         <p key={String(p.dataKey)} className="mt-0.5 flex items-center gap-2 text-ink">
           {payload.length > 1 && <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />}
@@ -118,23 +119,26 @@ export function TermRule({ term, className }: { term: TermKey; className?: strin
 
 function ScoreHero({ term }: { term: TermKey }) {
   const t = termByKey(term)
+  const { t: tx, tt, d } = useSpaceText()
+  const name = tt.name(term)
   const s = termScore(term)
   const isB = term === 'B'
   const history = termHistory(term)
   const fulls = INDEX_HISTORY.slice().reverse().map((ix) => ({ on: ix.takenOn, v: ix.terms.find((x) => x.key === term)!.value, grade: ix.grade }))
   const diff = s.delta ?? 0
+  const sv = { n: Math.abs(diff), prev: s.prev ?? '' }
   const sentence = isB
-    ? `${diff < 0 ? `Eased by ${Math.abs(diff)}` : diff > 0 ? `Rose by ${diff}` : 'Unchanged'} since October (−${s.prev}). Lower is better.`
-    : `${diff > 0 ? `Up ${diff}` : diff < 0 ? `Down ${Math.abs(diff)}` : 'Unchanged'} since October (${s.prev}).${diff < 0 ? ' That is useful to know. Coach Priya will call you this week to talk it through.' : ''}`
+    ? tx(diff < 0 ? 'sh.bEased' : diff > 0 ? 'sh.bRose' : 'sh.bSame', sv)
+    : tx(diff > 0 ? 'sh.up' : diff < 0 ? 'sh.down' : 'sh.same', sv)
   const gradId = `g-${term}`
   return (
     <Card className="relative overflow-hidden !p-0">
       <TermRule term={term} className="!h-1 rounded-none" />
       <div className="grid gap-8 p-5 md:grid-cols-2 md:p-7">
         <div className="min-w-0">
-          <Eyebrow>Your {t.name} score{isB ? ' · lower is better' : ''}</Eyebrow>
+          <Eyebrow>{tx('sh.yourScore', { name })}{isB ? tx('sh.lowerSuffix') : ''}</Eyebrow>
           <div className="mt-3 flex items-end gap-4">
-            <span className="num text-[5.25rem] font-light leading-[0.85] tracking-tight text-ink md:text-[6.5rem]" aria-label={`${t.name} ${isB ? 'minus ' : ''}${s.value} of 100`}>
+            <span className="num text-[5.25rem] font-light leading-[0.85] tracking-tight text-ink md:text-[6.5rem]" aria-label={tx(isB ? 'sh.ariaB' : 'sh.aria', { name, v: s.value ?? '' })}>
               {isB ? '−' : ''}{s.value}
             </span>
             <span className="mb-1.5 flex flex-col gap-1">
@@ -145,14 +149,14 @@ function ScoreHero({ term }: { term: TermKey }) {
           <p className="mt-4 text-[17px] text-ink-2">{sentence}</p>
           <dl className="mt-5 space-y-3 border-t border-line pt-4 text-[14px]">
             <div>
-              <dt className="eyebrow text-ink-3">Framework</dt>
-              <dd className="mt-1 text-ink">{t.framework}</dd>
+              <dt className="eyebrow text-ink-3">{tx('sh.framework')}</dt>
+              <dd className="mt-1 break-words text-ink">{d(t.framework)}</dd>
             </div>
             <div>
-              <dt className="eyebrow text-ink-3">Instruments</dt>
+              <dt className="eyebrow text-ink-3">{tx('sh.instruments')}</dt>
               <dd className="mt-1.5 flex flex-wrap gap-1.5">
                 {t.instruments.map((i) => (
-                  <span key={i} className="rounded-full border border-line px-2.5 py-0.5 font-mono text-[12px] text-ink-2">{i}</span>
+                  <span key={i} className="rounded-full border border-line px-2.5 py-0.5 font-mono text-[12px] text-ink-2">{d(i)}</span>
                 ))}
               </dd>
             </div>
@@ -162,7 +166,7 @@ function ScoreHero({ term }: { term: TermKey }) {
         </div>
         <div className="min-w-0">
           <p className="text-[15px] text-ink-2">
-            Weekly pulse from short-form items, last ninety days{isB ? '. Lower is better, so a falling line is good news' : ''}.
+            {tx(isB ? 'sh.pulseB' : 'sh.pulse')}
           </p>
           <div className="mt-3 h-[150px] w-full" aria-hidden>
             <ResponsiveContainer width="100%" height="100%">
@@ -181,14 +185,14 @@ function ScoreHero({ term }: { term: TermKey }) {
             </ResponsiveContainer>
           </div>
           <p className="sr-only">
-            {t.name} weekly pulse: {history.map((h) => `${h.label} ${h.value}`).join(', ')}.
+            {tx('sh.pulseSr', { name, list: history.map((h) => `${h.label} ${h.value}`).join(', ') })}
           </p>
-          <ol className="mt-4 grid grid-cols-3 gap-2" aria-label="Full measures">
+          <ol className="mt-4 grid grid-cols-3 gap-2" aria-label={tx('sh.fullMeasures')}>
             {fulls.map((f) => (
               <li key={f.on} className="rounded-xl bg-paper-sunk px-3 py-2.5">
                 <span className="eyebrow block text-ink-3">{fmtDate(f.on).slice(3)}</span>
                 <span className="num text-[1.4rem] font-light text-ink">{isB ? '−' : ''}{f.v}</span>
-                <span className="block text-[12px] text-ink-3">{f.grade === 'clinical' ? 'Clinical' : 'Index'}</span>
+                <span className="block text-[12px] text-ink-3">{f.grade === 'clinical' ? tx('sh.clinical') : tx('sh.index')}</span>
               </li>
             ))}
           </ol>
@@ -200,14 +204,15 @@ function ScoreHero({ term }: { term: TermKey }) {
 
 function WhatMoves({ term }: { term: TermKey }) {
   const t = termByKey(term)
+  const { t: tx, d } = useSpaceText()
   const parts = [...t.formula.split('=')[1].matchAll(/([0-9.]+)·([^+]+)/g)].map((m) => ({ w: Number(m[1]), name: m[2].trim() }))
   return (
-    <ToolCard eyebrow="What moves this term" title={t.whatMoves} sub={term === 'B' ? 'Burden is scored 0–100 where higher is worse. Each part below pushes it; easing any of them lowers it.' : 'Your score is a weighted blend of these instruments. Weights are configuration, published on the method page.'}>
+    <ToolCard eyebrow={tx('sh.whatMoves')} title={d(t.whatMoves)} sub={tx(term === 'B' ? 'sh.whatMovesSubB' : 'sh.whatMovesSub')}>
       <ul className="space-y-3">
         {parts.map((p) => (
           <li key={p.name}>
             <div className="flex items-baseline justify-between gap-3 text-[14px]">
-              <span className="text-ink">{p.name}</span>
+              <span className="min-w-0 break-words text-ink">{d(p.name)}</span>
               <span className="num text-ink-3">×{p.w.toFixed(2)}</span>
             </div>
             <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-paper-sunk">
@@ -216,42 +221,43 @@ function WhatMoves({ term }: { term: TermKey }) {
           </li>
         ))}
       </ul>
-      <p className="mt-5 font-mono text-[12px] text-ink-3">{t.formula}</p>
+      <p className="mt-5 break-words font-mono text-[12px] text-ink-3">{t.formula}</p>
     </ToolCard>
   )
 }
 
 function ThreeActions({ term }: { term: TermKey }) {
   const actions = actionsFor(term)
+  const { t: tx, tt, d } = useSpaceText()
   const [added, setAdded] = useState<Record<string, boolean>>({})
   const [open, setOpen] = useState<string | null>(null)
   return (
-    <ToolCard eyebrow={`Three actions for ${termByKey(term).name}`} sub="Today picks one from your lowest term. Add any of these to the pool; “not today” is always allowed.">
+    <ToolCard eyebrow={tx('sh.threeActions', { name: tt.name(term) })} sub={tx('sh.threeSub')}>
       <ul className="divide-y divide-line">
         {actions.map((a) => (
           <li key={a.id} className="py-4 first:pt-0 last:pb-0">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[17px] text-ink">{a.title}</p>
-                <p className="mt-0.5 text-[14px] text-ink-2">{a.detail}</p>
+                <p className="text-[17px] text-ink">{d(a.title)}</p>
+                <p className="mt-0.5 text-[14px] text-ink-2">{d(a.detail)}</p>
                 <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-3">
-                  <span className="inline-flex items-center gap-1"><Clock size={13} /> <span className="num">{a.minutes}</span> min</span>
-                  <span>{a.timeOfDay === 'any' ? 'Any time' : a.timeOfDay[0].toUpperCase() + a.timeOfDay.slice(1)}</span>
-                  <span>{a.shared ? 'Together' : 'Solo'}</span>
+                  <span className="inline-flex items-center gap-1"><Clock size={13} /> <span className="num">{a.minutes}</span> {tx('c.min')}</span>
+                  <span>{tx(`tod.${a.timeOfDay}`)}</span>
+                  <span>{a.shared ? tx('sh.together') : tx('sh.solo')}</span>
                   <button className="underline-offset-4 hover:text-ink hover:underline focus-ring rounded" aria-expanded={open === a.id} onClick={() => setOpen(open === a.id ? null : a.id)}>
-                    {open === a.id ? 'Hide reason' : 'Why this'}
+                    {open === a.id ? tx('sh.hideReason') : tx('sh.whyThis')}
                   </button>
                 </p>
                 <AnimatePresence initial={false}>
                   {open === a.id && (
                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
-                      <p className="mt-3 rounded-xl bg-paper-sunk p-3 text-[14px] text-ink-2"><b className="font-medium text-ink">{a.why}</b> {a.evidence}</p>
+                      <p className="mt-3 rounded-xl bg-paper-sunk p-3 text-[14px] text-ink-2"><b className="font-medium text-ink">{d(a.why)}</b> {d(a.evidence)}</p>
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
               <Button size="sm" variant={added[a.id] ? 'ghost' : 'secondary'} onClick={() => setAdded((s) => ({ ...s, [a.id]: !s[a.id] }))} aria-pressed={!!added[a.id]} className="shrink-0">
-                {added[a.id] ? <><Check size={15} /> Added</> : 'Add'}
+                {added[a.id] ? <><Check size={15} /> {tx('sh.added')}</> : tx('sh.add')}
               </Button>
             </div>
           </li>
@@ -263,6 +269,7 @@ function ThreeActions({ term }: { term: TermKey }) {
 
 function VivaTool({ term }: { term: TermKey }) {
   const t = termByKey(term)
+  const { t: tx, d: dx } = useSpaceText()
   const d = VIVA_DRAFT[term]
   const [state, setState] = useState<'idle' | 'drafting' | 'shown'>('idle')
   const ask = () => {
@@ -270,27 +277,27 @@ function VivaTool({ term }: { term: TermKey }) {
     window.setTimeout(() => setState('shown'), 700)
   }
   return (
-    <ToolCard eyebrow="VIVA in this space" tone="sunk" aside={<Sparkles size={16} className="text-ink-3" aria-hidden />}>
+    <ToolCard eyebrow={tx('sh.viva')} tone="sunk" aside={<Sparkles size={16} className="text-ink-3" aria-hidden />}>
       <div className="flex flex-wrap gap-1.5">
-        {t.viva.map((v) => <span key={v} className="rounded-full bg-paper-raised px-2.5 py-1 font-mono text-[12px] text-ink-2">{v}</span>)}
+        {t.viva.map((v) => <span key={v} className="rounded-full bg-paper-raised px-2.5 py-1 font-mono text-[12px] text-ink-2">{dx(v)}</span>)}
       </div>
       {d ? (
         <>
           {state === 'idle' && (
             <button onClick={ask} className="mt-4 rounded-2xl border border-line bg-paper-raised px-4 py-3 text-left text-[15px] text-ink hover:border-line-strong focus-ring">
-              “{d.ask}”
-              <span className="eyebrow mt-1 block text-ink-3">Tap to ask · {d.tool}</span>
+              “{dx(d.ask)}”
+              <span className="eyebrow mt-1 block text-ink-3">{tx('sh.tapToAsk', { tool: d.tool })}</span>
             </button>
           )}
           {state !== 'idle' && (
             <div className="mt-4 space-y-3" aria-live="polite">
-              <p className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-ink px-4 py-2.5 text-[15px] text-paper">{d.ask}</p>
+              <p className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-ink px-4 py-2.5 text-[15px] text-paper">{dx(d.ask)}</p>
               {state === 'drafting' ? (
-                <p className="eyebrow text-ink-3">VIVA is drafting…</p>
+                <p className="eyebrow text-ink-3">{tx('sh.drafting')}</p>
               ) : (
                 <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24 }} className="rounded-2xl rounded-bl-md bg-paper-raised p-4">
-                  <p className="text-[15px] leading-relaxed text-ink">{d.draft}</p>
-                  <p className="eyebrow mt-3 text-ink-3">Drafted by VIVA · {d.tool} · method v1.0 · {d.reviewer}</p>
+                  <p className="text-[15px] leading-relaxed text-ink">{dx(d.draft)}</p>
+                  <p className="eyebrow mt-3 break-words text-ink-3">{tx('sh.draftedBy', { tool: d.tool, reviewer: dx(d.reviewer) })}</p>
                 </motion.div>
               )}
             </div>
@@ -298,12 +305,12 @@ function VivaTool({ term }: { term: TermKey }) {
         </>
       ) : (
         <div className="mt-4 rounded-2xl border border-line bg-paper-raised p-4">
-          <p className="flex items-center gap-2 text-[15px] text-ink"><ShieldCheck size={16} aria-hidden /> Guardrail · no AI text on any screen result</p>
-          <p className="mt-1.5 text-[14px] text-ink-2">VIVA reflects your Second Arrow journal text back to you, and nothing else here. Screen results on this page are pre-approved copy written and signed by the Clinical Office.</p>
+          <p className="flex items-center gap-2 text-[15px] text-ink"><ShieldCheck size={16} className="shrink-0" aria-hidden /> {tx('sh.guardrail')}</p>
+          <p className="mt-1.5 text-[14px] text-ink-2">{tx('sh.guardrailBody')}</p>
         </div>
       )}
       <Link to="/app/viva" className="mt-auto inline-flex items-center gap-1.5 pt-5 text-[15px] text-ink underline-offset-4 hover:underline focus-ring rounded">
-        Open VIVA <ArrowRight size={15} />
+        {tx('sh.openViva')} <ArrowRight size={15} />
       </Link>
     </ToolCard>
   )
@@ -311,19 +318,21 @@ function VivaTool({ term }: { term: TermKey }) {
 
 function LeadCation({ term }: { term: TermKey }) {
   const t = termByKey(term)
+  const { t: tx, tt, d } = useSpaceText()
+  const space = tt.space(term)
   const list = t.leadCations.map((n) => CATIONS.find((c) => c.name === n)).filter(Boolean) as typeof CATIONS
   const lead = list[0]
   return (
-    <ToolCard eyebrow={`Lead ’cation · ${t.space}`} title={lead.name} sub={lead.promise} aside={<Pill tone={lead.status === 'LIVE' ? 'positive' : 'neutral'}>{lead.status}</Pill>}>
+    <ToolCard eyebrow={tx('sh.lead', { space })} title={lead.name} sub={d(lead.promise)} aside={<Pill tone={lead.status === 'LIVE' ? 'positive' : 'neutral'}>{tx(`status.${lead.status}`)}</Pill>}>
       <dl className="grid grid-cols-2 gap-3 text-[14px]">
-        <div><dt className="eyebrow text-ink-3">Stay</dt><dd className="mt-0.5 text-ink">{lead.nights}</dd></div>
-        <div><dt className="eyebrow text-ink-3">From</dt><dd className="num mt-0.5 text-ink">{lead.priceFrom}</dd></div>
-        <div className="col-span-2"><dt className="eyebrow text-ink-3">Day-90 measure</dt><dd className="mt-0.5 text-ink-2">{lead.day90Measure}</dd></div>
-        <div className="col-span-2"><dt className="eyebrow text-ink-3">Where</dt><dd className="mt-0.5 flex items-center gap-1.5 text-ink-2"><MapPin size={13} aria-hidden /> {lead.venues.join(' · ')}</dd></div>
+        <div><dt className="eyebrow text-ink-3">{tx('sh.stay')}</dt><dd className="mt-0.5 text-ink">{tx('sh.nights', { n: parseInt(lead.nights, 10) })}</dd></div>
+        <div><dt className="eyebrow text-ink-3">{tx('sh.from')}</dt><dd className="num mt-0.5 text-ink">{lead.priceFrom}</dd></div>
+        <div className="col-span-2"><dt className="eyebrow text-ink-3">{tx('sh.day90')}</dt><dd className="mt-0.5 break-words text-ink-2">{d(lead.day90Measure)}</dd></div>
+        <div className="col-span-2"><dt className="eyebrow text-ink-3">{tx('sh.where')}</dt><dd className="mt-0.5 flex items-center gap-1.5 text-ink-2"><MapPin size={13} aria-hidden /> {lead.venues.join(' · ')}</dd></div>
       </dl>
-      {list.length > 1 && <p className="mt-4 text-[13px] text-ink-3">Also for {t.space}: {list.slice(1).map((c) => c.name).join(', ')}</p>}
+      {list.length > 1 && <p className="mt-4 text-[13px] text-ink-3">{tx('sh.alsoFor', { space, list: list.slice(1).map((c) => c.name).join(', ') })}</p>}
       <Link to={`/app/cation/${lead.slug}`} className="mt-auto inline-flex items-center gap-1.5 pt-5 text-[15px] text-ink underline-offset-4 hover:underline focus-ring rounded">
-        See the {lead.name} <ArrowRight size={15} />
+        {tx('sh.seeThe', { name: lead.name })} <ArrowRight size={15} />
       </Link>
     </ToolCard>
   )
@@ -331,15 +340,16 @@ function LeadCation({ term }: { term: TermKey }) {
 
 function PracticeLink({ term }: { term: TermKey }) {
   const week = PRACTICE_WEEKS.find((w) => w.term === term)!
+  const { t: tx, tt, d, r } = useSpaceText()
   return (
-    <ToolCard eyebrow="The Practice · eight weeks" title={<>Week <span className="num">{week.week}</span> · {week.title}</>} sub={`Five minutes a day with the Mentor, then the weekly circle. This is the week written for ${termByKey(term).name}.`}>
-      <ol className="flex gap-1.5" aria-label={`Week ${week.week} of 8`}>
+    <ToolCard eyebrow={tx('sh.practice')} title={r('sh.weekTitle', { n: <span className="num">{week.week}</span>, title: d(week.title) })} sub={tx('sh.practiceSub', { name: tt.name(term) })}>
+      <ol className="flex gap-1.5" aria-label={tx('sh.weekOf8', { n: week.week })}>
         {PRACTICE_WEEKS.map((w) => (
           <li key={w.week} className={clsx('flex h-8 flex-1 items-center justify-center rounded-lg font-mono text-[12px]', w.week === week.week ? 'bg-ink text-paper' : 'bg-paper-sunk text-ink-3')}>{w.week}</li>
         ))}
       </ol>
       <Link to={`/app/practice/week/${week.week}`} className="mt-auto inline-flex items-center gap-1.5 pt-5 text-[15px] text-ink underline-offset-4 hover:underline focus-ring rounded">
-        <BookOpen size={16} /> Open week {week.week} <ArrowRight size={15} />
+        <BookOpen size={16} /> {tx('sh.openWeek', { n: week.week })} <ArrowRight size={15} />
       </Link>
     </ToolCard>
   )
@@ -347,22 +357,25 @@ function PracticeLink({ term }: { term: TermKey }) {
 
 export function SpaceShell({ term, title, headerActions, children }: { term: TermKey; title: ReactNode; headerActions?: ReactNode; children: ReactNode }) {
   const t = termByKey(term)
+  const { t: tx, tt, d } = useSpaceText()
+  const space = tt.space(term)
+  const name = tt.name(term)
   return (
-    <div>
+    <div className="min-w-0">
       <Link to="/app/spaces" className="mb-5 inline-flex items-center gap-1.5 text-[14px] text-ink-2 hover:text-ink focus-ring rounded">
-        <ArrowLeft size={15} /> All six spaces
+        <ArrowLeft size={15} /> {tx('sh.allSpaces')}
       </Link>
       <PageHeader
-        eyebrow={<span className="inline-flex items-center gap-2 text-ink"><TermDot term={term} size={11} /> {t.space === t.name ? t.space : `${t.space} · ${t.name}`}</span>}
+        eyebrow={<span className="inline-flex items-center gap-2 text-ink"><TermDot term={term} size={11} /> {t.space === t.name ? space : `${space} · ${name}`}</span>}
         title={title}
-        lead={ROOM_VERDICT[term]}
+        lead={d(ROOM_VERDICT[term])}
         actions={headerActions}
       />
       <Reveal><ScoreHero term={term} /></Reveal>
       <div className="mt-8 space-y-6">{children}</div>
       <section className="mt-14" aria-labelledby={`around-${term}`}>
         <div className="mb-5 flex items-center gap-3">
-          <h2 id={`around-${term}`} className="eyebrow text-ink-3">Around {t.space}</h2>
+          <h2 id={`around-${term}`} className="eyebrow text-ink-3">{tx('sh.around', { space })}</h2>
           <TermRule term={term} className="!h-px flex-1 opacity-50" />
         </div>
         <div className="grid gap-6 lg:grid-cols-12">

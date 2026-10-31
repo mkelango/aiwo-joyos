@@ -8,6 +8,7 @@ import { useTheme } from '@/theme/ThemeProvider'
 import { PRACTICE_CONTENT } from '@/screens/b/journeyData'
 import { practiceStore, useStore } from '@/screens/b/bStore'
 import { AudioPlayer, Field, PrimaryChip, useCrisisGuard } from '@/screens/b/parts'
+import { localDate, Rich, useA } from '@/screens/a/i18n'
 
 // PRACTICE WEEK (Memo p.21): one week in full — audio, the practice, the science note,
 // a private reflection (crisis-intercepted) and "Mark practised", the one Daybreak.
@@ -21,6 +22,7 @@ export default function PracticeWeek() {
 
 function WeekView({ n }: { n: string }) {
   const { c, space } = useTheme()
+  const { t, tx, lang, name } = useA()
   const num = Number(n)
   const week = PRACTICE_WEEKS.find((w) => w.week === num)
   const content = PRACTICE_CONTENT.find((p) => p.week === num)
@@ -51,9 +53,9 @@ function WeekView({ n }: { n: string }) {
   if (!week || !content) {
     return (
       <Screen inTabs>
-        <ScreenHeader back="The Practice" eyebrow="The Joyspiration Practice" title="That week is not part of the Practice." lead="The Practice runs for eight weeks. Each has five minutes of audio, a science note and one practice." />
+        <ScreenHeader back={t('The Practice')} eyebrow={t('The Joyspiration Practice')} title={t('That week is not part of the Practice.')} lead={t('The Practice runs for eight weeks. Each has five minutes of audio, a science note and one practice.')} />
         <Button variant="secondary" onPress={() => router.replace('/practice')}>
-          Back to the Practice
+          {t('Back to the Practice')}
         </Button>
       </Screen>
     )
@@ -62,13 +64,13 @@ function WeekView({ n }: { n: string }) {
   const status = num < CIRCLE.week ? 'done' : num === CIRCLE.week ? 'now' : 'next'
   const prev = PRACTICE_WEEKS.find((w) => w.week === num - 1)
   const next = PRACTICE_WEEKS.find((w) => w.week === num + 1)
-  const term = week.term === 'ALL' ? null : termByKey(week.term)
+  const termName = week.term === 'ALL' ? null : name(week.term)
   const opens = new Date(2027, 0, 11 + (num - 1) * 7).toISOString()
 
   const save = () => {
     if (!guard(reflection)) return
     if (reflection.trim().length < 3) {
-      setError('Write a few words first. It stays private to you.')
+      setError(t('Write a few words first. It stays private to you.'))
       return
     }
     setError('')
@@ -79,63 +81,63 @@ function WeekView({ n }: { n: string }) {
 
   return (
     <Screen inTabs>
-      <ScreenHeader back="The Practice" eyebrow={`Week ${num} of 8 · ${term ? term.name : 'All six terms'}`} title={week.title} lead={content.mentorLine} />
+      <ScreenHeader back={t('The Practice')} eyebrow={t('Week {n} of 8 · {term}', { n: num, term: termName ?? t('All six terms') })} title={tx(week.title)} lead={tx(content.mentorLine)} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s1, alignItems: 'center' }}>
         <PrimaryChip primary={week.term} />
-        {status === 'now' ? <Pill tone="daybreak">This week</Pill> : status === 'next' ? <Pill>{`Opens ${fmtDate(opens)}`}</Pill> : practised ? <Pill tone="ink">Practised</Pill> : <Pill>Earlier week · not marked</Pill>}
+        {status === 'now' ? <Pill tone="daybreak">{t('This week')}</Pill> : status === 'next' ? <Pill>{t('Opens {date}', { date: fmtDate(opens, lang) })}</Pill> : practised ? <Pill tone="ink">{t('Practised')}</Pill> : <Pill>{t('Earlier week · not marked')}</Pill>}
       </View>
       {status === 'next' ? (
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Icon name="lock" size={16} color={c.ink3} />
-          <Meta style={{ flex: 1 }}>{`You can read ahead. The circle takes this week together on ${fmtDate(opens)}.`}</Meta>
+          <Meta style={{ flex: 1 }}>{t('You can read ahead. The circle takes this week together on {date}.', { date: fmtDate(opens, lang) })}</Meta>
         </View>
       ) : null}
 
       <Card tone="raised" style={{ gap: space.s2 }}>
         <View style={{ gap: 6 }}>
-          <Eyebrow>{`Week ${num} · the Mentor’s voice · 5 min`}</Eyebrow>
-          <Title size={24}>{content.audioTitle}</Title>
-          <Meta size={14}>C. Sivasankaran, Mentor, AIWO Limited · English</Meta>
+          <Eyebrow>{t('Week {n} · the Mentor’s voice · 5 min', { n: num })}</Eyebrow>
+          <Title size={24}>{tx(content.audioTitle)}</Title>
+          <Meta size={14}>{t('C. Sivasankaran, Mentor, AIWO Limited · English')}</Meta>
         </View>
-        <AudioPlayer week={num} title={content.audioTitle} seconds={content.seconds} transcript={content.transcript} />
+        <AudioPlayer week={num} title={tx(content.audioTitle)} seconds={content.seconds} transcript={content.transcript} />
       </Card>
 
       {/* The practice */}
       <Card tone="sunk" style={{ gap: space.s2 }}>
-        <Eyebrow tone="daybreak">The practice</Eyebrow>
+        <Eyebrow tone="daybreak">{t('The practice')}</Eyebrow>
         {[
-          ['Daily', content.daily],
-          ['Weekly', content.weekly],
-          ['Yearly', content.yearly],
+          [t('Daily'), content.daily],
+          [t('Weekly'), content.weekly],
+          [t('Yearly'), content.yearly],
         ].map(([k, v]) => (
           <View key={k} style={{ gap: 4 }}>
             <Eyebrow tone="ink2">{k}</Eyebrow>
-            <Body>{v}</Body>
+            <Body>{tx(v)}</Body>
           </View>
         ))}
         {num === 8 ? (
           <Card tone="raised" padding={16} style={{ gap: space.s1 }}>
-            <Body weight="medium">This week, you take the Index again.</Body>
-            <Meta>About twenty minutes, saved as you go. Like for like with your baseline, then a signed delta at Day 90.</Meta>
+            <Body weight="medium">{t('This week, you take the Index again.')}</Body>
+            <Meta>{t('About twenty minutes, saved as you go. Like for like with your baseline, then a signed delta at Day 90.')}</Meta>
             <Button variant="ink" icon="refresh-cw" onPress={() => router.push('/index-take')}>
-              Re-take the Index
+              {t('Re-take the Index')}
             </Button>
           </Card>
         ) : null}
         {!practised ? (
           <View style={{ gap: space.s1 }}>
-            <DaybreakButton onPress={() => setPractised(true)} accessibilityHint="Marks this week as practised. You can undo it.">
-              Mark practised
+            <DaybreakButton onPress={() => setPractised(true)} accessibilityHint={t('Marks this week as practised. You can undo it.')}>
+              {t('Mark practised')}
             </DaybreakButton>
-            <Meta align="center">Mark it when it feels done. There is no deadline.</Meta>
+            <Meta align="center">{t('Mark it when it feels done. There is no deadline.')}</Meta>
           </View>
         ) : (
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: space.s1 }} accessibilityLiveRegion="polite">
             <Title size={22}>
-              Practised. <Serif>Thank you.</Serif>
+              <Rich text={t('Practised. *Thank you.*')} wrap={(w) => <Serif>{w}</Serif>} />
             </Title>
             <Button variant="link" onPress={() => setPractised(false)}>
-              Undo
+              {t('Undo')}
             </Button>
           </View>
         )}
@@ -145,11 +147,11 @@ function WeekView({ n }: { n: string }) {
       <Card tone="outline" style={{ gap: space.s1 + 4 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Icon name="book" size={16} color={c.ink2} />
-          <Eyebrow>Science note · from the faculty</Eyebrow>
+          <Eyebrow style={{ flexShrink: 1 }}>{t('Science note · from the faculty')}</Eyebrow>
         </View>
-        <Title size={22}>{content.science.title}</Title>
-        <Body tone="ink2">{content.science.body}</Body>
-        <Meta tone="ink">{content.science.faculty}</Meta>
+        <Title size={22}>{tx(content.science.title)}</Title>
+        <Body tone="ink2">{tx(content.science.body)}</Body>
+        <Meta tone="ink">{tx(content.science.faculty)}</Meta>
         <Mono size={12} tone="ink3">
           {content.science.ref}
         </Mono>
@@ -157,31 +159,31 @@ function WeekView({ n }: { n: string }) {
 
       {/* Reflection */}
       <View style={{ gap: space.s2 }}>
-        <SectionTitle aside={<Eyebrow tone="ink2">Private to you</Eyebrow>}>Reflection</SectionTitle>
+        <SectionTitle aside={<Eyebrow tone="ink2">{t('Private to you')}</Eyebrow>}>{t('Reflection')}</SectionTitle>
         <Card tone="raised" style={{ gap: space.s2 }}>
           <Field
-            label={content.reflection}
+            label={tx(content.reflection)}
             multiline
             maxLength={MAX}
             value={reflection}
-            onChangeText={(t) => {
-              setReflection(t)
+            onChangeText={(v) => {
+              setReflection(v)
               setSavedAt(null)
               if (error) setError('')
             }}
-            placeholder="A few honest words are enough."
+            placeholder={t('A few honest words are enough.')}
             error={error}
-            help="Never shared with your circle or coach unless you choose. VIVA does not read it."
+            help={t('Never shared with your circle or coach unless you choose. VIVA does not read it.')}
           />
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: space.s1 }}>
             <Button variant="secondary" onPress={save}>
-              Save reflection
+              {t('Save reflection')}
             </Button>
             {savedAt ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} accessibilityLiveRegion="polite">
                 <Icon name="check" size={15} color={c.ink2} />
                 <Meta>
-                  Saved at <Mono tone="ink2">{savedAt}</Mono>
+                  <Rich text={t('Saved at *{t}*', { t: localDate(savedAt, lang) })} wrap={(w) => <Mono tone="ink2">{w}</Mono>} />
                 </Meta>
               </View>
             ) : (
@@ -193,13 +195,13 @@ function WeekView({ n }: { n: string }) {
 
       {/* Circle prompt */}
       <Card tone="raised" style={{ gap: space.s1 + 4 }}>
-        <Eyebrow>The circle’s prompt</Eyebrow>
+        <Eyebrow>{t('The circle’s prompt')}</Eyebrow>
         <Title size={22}>
-          <Serif>“{content.circlePrompt}”</Serif>
+          <Serif>“{tx(content.circlePrompt)}”</Serif>
         </Title>
-        <Meta>{`${CIRCLE.when} with Priya · ${CIRCLE.callMinutes} minutes`}</Meta>
+        <Meta>{t('{when} with Priya · {n} minutes', { when: tx(CIRCLE.when), n: CIRCLE.callMinutes })}</Meta>
         <ArrowLink icon="users" onPress={() => router.push('/circles')}>
-          Your circle
+          {t('Your circle')}
         </ArrowLink>
       </Card>
 
@@ -218,20 +220,21 @@ function WeekView({ n }: { n: string }) {
 
 function WeekLink({ dir, n: w, title }: { dir: 'prev' | 'next'; n: number; title: string }) {
   const { c, radius } = useTheme()
+  const { t, tx } = useA()
   return (
     <Pressable
       onPress={() => router.setParams({ week: String(w) })}
       accessibilityRole="link"
-      accessibilityLabel={`${dir === 'prev' ? 'Previous' : 'Next'}: week ${w}, ${title}`}
+      accessibilityLabel={t(dir === 'prev' ? 'Previous: week {n}, {t}' : 'Next: week {n}, {t}', { n: w, t: tx(title) })}
       style={({ pressed }) => ({ flex: 1, minHeight: 80, borderWidth: 1, borderColor: c.line, borderRadius: radius.card, padding: 14, gap: 4, alignItems: dir === 'next' ? 'flex-end' : 'flex-start', opacity: pressed ? 0.7 : 1 })}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
         {dir === 'prev' ? <Icon name="arrow-left" size={13} color={c.ink3} /> : null}
-        <Eyebrow>{`Week ${w}`}</Eyebrow>
+        <Eyebrow>{t('Week {n}', { n: w })}</Eyebrow>
         {dir === 'next' ? <Icon name="arrow-right" size={13} color={c.ink3} /> : null}
       </View>
       <Meta tone="ink" size={14} align={dir === 'next' ? 'right' : 'left'}>
-        {title}
+        {tx(title)}
       </Meta>
     </Pressable>
   )

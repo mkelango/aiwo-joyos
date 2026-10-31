@@ -14,9 +14,10 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavThemeProvider } fro
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect, useMemo } from 'react'
+import { Platform } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { CrisisSheet } from '../src/components/CrisisSheet'
-import { AppProvider } from '../src/lib/store'
+import { AppProvider, useApp } from '../src/lib/store'
 import { ThemeProvider, useTheme } from '../src/theme/ThemeProvider'
 
 SplashScreen.preventAutoHideAsync().catch(() => {})
@@ -55,6 +56,11 @@ export default function RootLayout() {
 
 function RootNavigator() {
   const { scheme, c } = useTheme()
+  const { lang } = useApp()
+  // Web: tell the browser (and screen readers) which language the page is in.
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') document.documentElement.lang = lang === 'en' ? 'en' : `${lang}-IN`
+  }, [lang])
   const navTheme = useMemo(() => {
     const base = scheme === 'dark' ? DarkTheme : DefaultTheme
     return {

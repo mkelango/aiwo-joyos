@@ -7,6 +7,9 @@ import { useTheme } from '@/theme/ThemeProvider'
 import { PEOPLE_DETAIL, THREADS, type Msg, type Thread } from '@/screens/b/accountData'
 import { messagesStore, useStore } from '@/screens/b/bStore'
 import { ChoiceCard, Done, Field, useCrisisGuard, memberOnly } from '@/screens/b/parts'
+import { useDict, useLang } from '@/lib/i18n'
+import { MSG, REPLIES_TEXT } from '@/screens/b/i18n/messages'
+import { ROLE, useTx } from '@/screens/b/i18n/common'
 
 // MESSAGES (Care bridge): every thread with a named person. VIVA may draft; a person signs.
 // Three views on one route: the inbox, a thread (?t=<id>) and a new message (?compose=1&to=<person>).
@@ -41,25 +44,37 @@ function Messages() {
   return <Inbox />
 }
 
+/** Reply time and role in the member's language (English data stays as the fallback). */
+function usePersonText() {
+  const tx = useTx()
+  const lang = useLang()
+  return {
+    replies: (id: string) => tx(REPLIES_TEXT[id], PEOPLE_DETAIL[id].replies),
+    repliesLower: (id: string) => (lang === 'en' ? PEOPLE_DETAIL[id].replies.toLowerCase() : tx(REPLIES_TEXT[id], PEOPLE_DETAIL[id].replies)),
+    role: (r: string) => tx(ROLE[r], r),
+  }
+}
+
 function Inbox() {
   const { c, space } = useTheme()
+  const t = useDict(MSG)
   const { all, isUnread } = useThreads()
   const unread = all.filter(isUnread).length
   return (
     <Screen>
       <ScreenHeader
-        back="Care"
-        eyebrow="Care · messages"
+        back={t('care')}
+        eyebrow={t('inboxEyebrow')}
         title={
           <>
-            A person <Serif>reads</Serif> every word.
+            {t('inboxA')}<Serif>{t('inboxSerif')}</Serif>{t('inboxB')}
           </>
         }
-        lead="Your coach, physician, psychologist and concierge reply here. VIVA may draft a reply; the person reads it and signs it before it reaches you."
+        lead={t('inboxLead')}
       />
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s1 }}>
-        <SectionTitle>Threads</SectionTitle>
-        <Meta size={14}>{unread ? `${unread} with a new reply` : 'All read'}</Meta>
+        <SectionTitle>{t('threads')}</SectionTitle>
+        <Meta size={14}>{unread ? t('newReplies', { n: unread }) : t('allRead')}</Meta>
       </View>
       <Card tone="raised" padding={0}>
         {all.map((th, i) => {
@@ -71,7 +86,7 @@ function Inbox() {
               key={th.id}
               onPress={() => router.push(`/messages?t=${th.id}`)}
               accessibilityRole="button"
-              accessibilityLabel={`${p.name}, ${th.subject}${th.clinical ? ', clinical thread' : ''}${un ? ', new reply' : ''}. ${last.body}`}
+              accessibilityLabel={`${p.name}, ${th.subject}${th.clinical ? t('clinicalThread') : ''}${un ? t('newReply') : ''}. ${last.body}`}
               style={({ pressed }) => ({ flexDirection: 'row', gap: 12, padding: 16, borderTopWidth: i ? 1 : 0, borderTopColor: c.line, opacity: pressed ? 0.7 : 1 })}
             >
               <Avatar person={p} size={44} />
@@ -80,12 +95,12 @@ function Inbox() {
                   <Body weight={un ? 'semibold' : 'regular'} style={{ flex: 1 }} numberOfLines={1}>
                     {p.name}
                   </Body>
-                  {th.clinical ? <Eyebrow>Clinical</Eyebrow> : null}
+                  {th.clinical ? <Eyebrow>{t('clinical')}</Eyebrow> : null}
                   {un ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.daybreak }} /> : null}
                 </View>
                 <Meta tone="ink">{th.subject}</Meta>
                 <Meta size={14} numberOfLines={2}>
-                  {last.from === 'me' ? `You: ${last.body}` : last.body}
+                  {last.from === 'me' ? t('you', { body: last.body }) : last.body}
                 </Meta>
                 <Mono size={12} tone="ink3">
                   {stamp(last.at)}
@@ -96,12 +111,12 @@ function Inbox() {
         })}
       </Card>
       <DaybreakButton icon="edit-3" onPress={() => router.push('/messages?compose=1')}>
-        New message
+        {t('newMessage')}
       </DaybreakButton>
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <Icon name="shield" size={15} color={c.ink3} />
         <Meta size={14} tone="ink3" style={{ flex: 1 }}>
-          Messages are not for emergencies. If today is heavy, call Tele-MANAS 14416, free, any hour. Clinical threads are read only by your clinician.
+          {t('notEmergency')}
         </Meta>
       </View>
     </Screen>
@@ -116,6 +131,8 @@ function ThreadView({ id }: { id: string }) {
   const [draft, setDraft] = useState('')
   const [err, setErr] = useState('')
   const [justSent, setJustSent] = useState(false)
+  const t = useDict(MSG)
+  const pt = usePersonText()
 
   useEffect(() => {
     if (thread) set((s) => (s.read.includes(id) ? s : { ...s, read: [...s.read, id] }))
@@ -124,22 +141,21 @@ function ThreadView({ id }: { id: string }) {
   if (!thread) {
     return (
       <Screen>
-        <ScreenHeader back eyebrow="Messages" title="That thread is not here." lead="It may have been closed. Your people are all a message away." />
+        <ScreenHeader back eyebrow={t('messages')} title={t('notHere')} lead={t('notHereLead')} />
         <Button variant="secondary" onPress={() => router.replace('/messages')}>
-          All messages
+          {t('allMessages')}
         </Button>
       </Screen>
     )
   }
   const p = person(thread.personId)
-  const d = PEOPLE_DETAIL[p.id]
 
   const send = () => {
     if (!guard(draft)) {
       setDraft('')
       return
     }
-    if (draft.trim().length < 2) return setErr('Write a message first.')
+    if (draft.trim().length < 2) return setErr(t('writeFirst'))
     const m: Msg = { id: `s${Date.now()}`, from: 'me', at: nowIso(), body: draft.trim() }
     set((s) => ({ ...s, sent: { ...s.sent, [thread.id]: [...(s.sent[thread.id] ?? []), m] } }))
     setDraft('')
@@ -149,14 +165,14 @@ function ThreadView({ id }: { id: string }) {
 
   return (
     <Screen>
-      <ScreenHeader back="Messages" eyebrow={`${p.role}${thread.clinical ? ' · clinical thread' : ''}`} title={p.name} lead={thread.subject} />
+      <ScreenHeader back={t('messages')} eyebrow={`${pt.role(p.role)}${thread.clinical ? t('clinicalEyebrow') : ''}`} title={p.name} lead={thread.subject} />
       {thread.clinical ? (
         <Card tone="sunk" padding={14} style={{ flexDirection: 'row', gap: 10 }}>
           <Icon name="lock" size={16} color={c.ink2} />
-          <Meta style={{ flex: 1 }}>Clinical thread. Read only by your clinician; replies are signed with their registration. Not for emergencies.</Meta>
+          <Meta style={{ flex: 1 }}>{t('clinicalNote')}</Meta>
         </Card>
       ) : null}
-      <View style={{ gap: space.s2 }} accessibilityLabel="Conversation">
+      <View style={{ gap: space.s2 }} accessibilityLabel={t('convo')}>
         {thread.messages.map((m) => {
           const mine = m.from === 'me'
           return (
@@ -166,35 +182,35 @@ function ThreadView({ id }: { id: string }) {
               </View>
               <Meta size={12} tone="ink3" align={mine ? 'right' : 'left'}>
                 {stamp(m.at)}
-                {m.signed ? ` · signed ${m.signed}` : ''}
-                {m.drafted ? ' · drafted with VIVA' : ''}
-                {mine && m.id.startsWith('s') ? ' · sent · kept offline until it syncs' : ''}
+                {m.signed ? t('signed', { name: m.signed }) : ''}
+                {m.drafted ? t('drafted') : ''}
+                {mine && m.id.startsWith('s') ? t('sentOffline') : ''}
               </Meta>
             </View>
           )
         })}
       </View>
-      {justSent ? <Done>{`Sent. ${shortName(p.name)} · ${d.replies.toLowerCase()}.`}</Done> : null}
+      {justSent ? <Done>{t('sentDone', { name: shortName(p.name), replies: pt.repliesLower(p.id) })}</Done> : null}
       <Card tone="raised" style={{ gap: space.s2 }}>
         <Field
-          label={`Reply to ${shortName(p.name)}`}
+          label={t('replyTo', { name: shortName(p.name) })}
           value={draft}
           onChangeText={(v) => {
             setDraft(v)
             if (err) setErr('')
             if (justSent) setJustSent(false)
           }}
-          placeholder="Write a few words"
+          placeholder={t('fewWords')}
           multiline
           maxLength={1000}
           error={err}
-          help={d.replies}
+          help={pt.replies(p.id)}
         />
         <DaybreakButton icon="send" onPress={send}>
-          Send
+          {t('send')}
         </DaybreakButton>
       </Card>
-      <ArrowLink onPress={() => router.push('/messages')}>All messages</ArrowLink>
+      <ArrowLink onPress={() => router.push('/messages')}>{t('allMessages')}</ArrowLink>
     </Screen>
   )
 }
@@ -210,13 +226,15 @@ function Compose({ initialTo }: { initialTo: string }) {
   const [sent, setSent] = useState<string | null>(null)
   const p = to ? person(to) : null
   const d = p ? PEOPLE_DETAIL[p.id] : null
+  const t = useDict(MSG)
+  const pt = usePersonText()
 
   const submit = () => {
     if (!guard(`${subject} ${body}`)) return
     const e: typeof errors = {}
-    if (!to) e.to = 'Choose who this is for.'
-    if (subject.trim().length < 3) e.subject = 'Give it a short subject.'
-    if (body.trim().length < 5) e.body = 'Write a little more, so they can help.'
+    if (!to) e.to = t('errTo')
+    if (subject.trim().length < 3) e.subject = t('errSubject')
+    if (body.trim().length < 5) e.body = t('errBody')
     setErrors(e)
     if (Object.keys(e).length) return
     const id = `t_new_${Date.now()}`
@@ -229,32 +247,32 @@ function Compose({ initialTo }: { initialTo: string }) {
     return (
       <Screen>
         <ScreenHeader
-          back="Messages"
-          eyebrow="Sent"
+          back={t('messages')}
+          eyebrow={t('sent')}
           title={
             <>
-              With {shortName(p.name)}, <Serif>now</Serif>.
+              {t('withA', { name: shortName(p.name) })}<Serif>{t('withSerif', { name: shortName(p.name) })}</Serif>{t('withB')}
             </>
           }
-          lead={`${d.replies}. You will see the reply in this thread, and once in your notifications, outside your quiet hours.`}
+          lead={t('sentLead', { replies: pt.replies(p.id) })}
         />
         <Card tone="raised" style={{ gap: space.s1 }}>
           <Eyebrow>{subject}</Eyebrow>
           <Body>{body}</Body>
-          <Done>Sent · kept on this phone until it syncs</Done>
+          <Done>{t('sentKept')}</Done>
         </Card>
         <DaybreakButton icon="message-circle" onPress={() => router.replace(`/messages?t=${sent}`)}>
-          Open the thread
+          {t('openThread')}
         </DaybreakButton>
-        <ArrowLink onPress={() => router.replace('/messages')}>All messages</ArrowLink>
+        <ArrowLink onPress={() => router.replace('/messages')}>{t('allMessages')}</ArrowLink>
       </Screen>
     )
   }
 
   return (
     <Screen>
-      <ScreenHeader back eyebrow="New message" title="Who would you like to write to?" lead="Each person is named, with a reply time they keep." />
-      <View style={{ gap: space.s1 }} accessibilityRole="radiogroup" accessibilityLabel="Recipient">
+      <ScreenHeader back eyebrow={t('newMessage')} title={t('whoTitle')} lead={t('whoLead')} />
+      <View style={{ gap: space.s1 }} accessibilityRole="radiogroup" accessibilityLabel={t('recipient')}>
         {TEAM.map((tp) => {
           const pd = PEOPLE_DETAIL[tp.id]
           return (
@@ -265,15 +283,15 @@ function Compose({ initialTo }: { initialTo: string }) {
                 setTo(tp.id)
                 setErrors((x) => ({ ...x, to: undefined }))
               }}
-              accessibilityLabel={`${tp.name}, ${tp.role}. ${pd.replies}`}
+              accessibilityLabel={`${tp.name}, ${pt.role(tp.role)}. ${pt.replies(tp.id)}`}
               leading={<Avatar person={tp} size={40} />}
               title={
                 <View style={{ gap: 2 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <Body weight="medium">{tp.name}</Body>
-                    {pd.clinical ? <Pill>Clinical</Pill> : null}
+                    {pd.clinical ? <Pill>{t('clinical')}</Pill> : null}
                   </View>
-                  <Meta size={14}>{`${tp.role} · ${pd.replies}`}</Meta>
+                  <Meta size={14}>{`${pt.role(tp.role)} · ${pt.replies(tp.id)}`}</Meta>
                 </View>
               }
             />
@@ -288,38 +306,38 @@ function Compose({ initialTo }: { initialTo: string }) {
       {d?.clinical ? (
         <Card tone="sunk" padding={14} style={{ flexDirection: 'row', gap: 10 }}>
           <Icon name="lock" size={16} color={c.ink2} />
-          <Meta style={{ flex: 1 }}>{`This goes to a clinical thread, read only by ${p!.name}. ${d.replies}. For anything urgent, call 14416 or 112.`}</Meta>
+          <Meta style={{ flex: 1 }}>{t('clinicalTo', { name: p!.name, replies: pt.replies(p!.id) })}</Meta>
         </Card>
       ) : null}
       <Field
-        label="Subject"
+        label={t('subject')}
         value={subject}
         onChangeText={(v) => {
           setSubject(v)
           if (errors.subject) setErrors((x) => ({ ...x, subject: undefined }))
         }}
-        placeholder="e.g. Sleep this week"
+        placeholder={t('subjectPh')}
         maxLength={80}
         error={errors.subject}
       />
       <Field
-        label="Message"
+        label={t('message')}
         value={body}
         onChangeText={(v) => {
           setBody(v)
           if (errors.body) setErrors((x) => ({ ...x, body: undefined }))
         }}
-        placeholder="Write as you would speak"
+        placeholder={t('messagePh')}
         multiline
         maxLength={1000}
         error={errors.body}
         help={`${body.length}/1000`}
       />
       <DaybreakButton icon="send" onPress={submit}>
-        Send message
+        {t('sendMessage')}
       </DaybreakButton>
       <Meta size={14} tone="ink3" align="center">
-        A person reads it. Nothing is answered by a machine alone.
+        {t('personReads')}
       </Meta>
     </Screen>
   )

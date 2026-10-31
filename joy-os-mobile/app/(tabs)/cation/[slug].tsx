@@ -29,6 +29,7 @@ import { useTheme } from '@/theme/ThemeProvider'
 import { CATION_DETAIL, buildItinerary, type ItemKind } from '@/screens/b/journeyData'
 import { CheckLine, ChoiceCard, Field, IconButton, KeyValue, PrimaryChip, useCrisisGuard } from '@/screens/b/parts'
 import { useCationRequests } from '@/screens/a/local'
+import { localDate, Rich, useA } from '@/screens/a/i18n'
 
 // ’CATION DETAIL (Memo p.20): the template as configuration — primary term, Day-90 measure,
 // itinerary day by day, before and after, a named clinician present, and the request.
@@ -47,6 +48,9 @@ const KIND_ICON: Record<ItemKind, IconName> = {
 export default function CationDetail() {
   const { slug = '' } = useLocalSearchParams<{ slug: string }>()
   const { c: col, space, radius } = useTheme()
+  const { t, tx, lang, name } = useA()
+  /** Itinerary rows built from a template ("Intake with Dr …") translate around the name. */
+  const txRow = (s: string) => (s.startsWith('Intake with ') ? t('Intake with {name}', { name: s.slice('Intake with '.length) }) : tx(s))
   const cation = CATIONS.find((x) => x.slug === slug)
   const d = CATION_DETAIL[slug]
   const itinerary = useMemo(() => buildItinerary(slug), [slug])
@@ -68,9 +72,9 @@ export default function CationDetail() {
   if (!cation || !d) {
     return (
       <Screen inTabs>
-        <ScreenHeader back="Your ’cation" eyebrow="’Cation" title="We could not find that ’cation." lead="It may have been renamed. All ten are listed on your ’cation page." />
+        <ScreenHeader back={t('Your ’cation')} eyebrow={tx('’Cation')} title={t('We could not find that ’cation.')} lead={t('It may have been renamed. All ten are listed on your ’cation page.')} />
         <Button variant="secondary" onPress={() => router.replace('/cation')}>
-          See all ten ’cations
+          {t('See all ten ’cations')}
         </Button>
       </Screen>
     )
@@ -87,9 +91,9 @@ export default function CationDetail() {
 
   const submit = () => {
     const errs: Record<string, string> = {}
-    if (!interestOnly && !win) errs.win = 'Choose the dates that suit you.'
+    if (!interestOnly && !win) errs.win = t('Choose the dates that suit you.')
     if (!guard(`${outcome} ${dietary}`)) return
-    if (outcome.trim().length < 12) errs.outcome = 'In a sentence, what would you like to be different? It is how we measure the ’cation.'
+    if (outcome.trim().length < 12) errs.outcome = t('In a sentence, what would you like to be different? It is how we measure the ’cation.')
     setErrors(errs)
     if (Object.keys(errs).length === 0)
       setRequest(slug, { ref: `REQ-${slug.slice(0, 3).toUpperCase()}-${MEMBER.id.slice(-4)}-${String(Date.now()).slice(-4)}`, win, venue, guests, outcome: outcome.trim(), interestOnly })
@@ -98,75 +102,75 @@ export default function CationDetail() {
   return (
     <Screen inTabs>
       <ScreenHeader
-        back="Your ’cation"
-        eyebrow={`’Cation · ${interestOnly ? 'Opens FY28' : cation.status === 'NEW' ? 'New' : 'Live'}`}
+        back={t('Your ’cation')}
+        eyebrow={`${tx('’Cation')} · ${t(interestOnly ? 'Opens FY28' : cation.status === 'NEW' ? 'New' : 'Live')}`}
         title={
           <>
             {stem}
             <Serif>cation</Serif>
           </>
         }
-        lead={cation.promise}
+        lead={tx(cation.promise)}
       />
 
       {/* Facts */}
       <Card tone="raised" style={{ gap: space.s2 }}>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s1, alignItems: 'center' }}>
           <PrimaryChip primary={cation.primary} />
-          {isLowest ? <Pill tone="daybreak">{`Your lowest term · ${primaryScore}`}</Pill> : null}
+          {isLowest ? <Pill tone="daybreak">{t('Your lowest term · {n}', { n: String(primaryScore) })}</Pill> : null}
         </View>
         {d.secondary.length > 0 ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s1, alignItems: 'center' }}>
-            <Eyebrow>Secondary</Eyebrow>
+            <Eyebrow>{t('Secondary')}</Eyebrow>
             {d.secondary.map((k) => (
               <TermChip key={k} term={k} />
             ))}
           </View>
         ) : null}
         <View style={{ gap: 4 }}>
-          <Eyebrow>Day-90 measure in Joy OS</Eyebrow>
-          <Body>{cation.day90Measure}</Body>
-          <Meta>Measured like for like at Day 90 and stored in your record. The delta joins the published cohort aggregate, up or down.</Meta>
+          <Eyebrow>{t('Day-90 measure in Joy OS')}</Eyebrow>
+          <Body>{tx(cation.day90Measure)}</Body>
+          <Meta>{t('Measured like for like at Day 90 and stored in your record. The delta joins the published cohort aggregate, up or down.')}</Meta>
         </View>
         {d.note ? (
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Icon name="info" size={15} color={col.ink2} />
-            <Meta style={{ flex: 1 }}>{d.note}</Meta>
+            <Meta style={{ flex: 1 }}>{tx(d.note)}</Meta>
           </View>
         ) : null}
         <Divider />
         <View style={{ flexDirection: 'row', gap: space.s3 }}>
           <View style={{ gap: 4 }}>
-            <Eyebrow>Nights</Eyebrow>
+            <Eyebrow>{t('Nights')}</Eyebrow>
             <Mono size={22} tone="ink">{String(parseInt(cation.nights, 10))}</Mono>
           </View>
           <View style={{ gap: 4 }}>
-            <Eyebrow>From</Eyebrow>
+            <Eyebrow>{t('From')}</Eyebrow>
             <Mono size={22} tone="ink">{cation.priceFrom}</Mono>
           </View>
         </View>
         <View style={{ gap: 4 }}>
-          <Eyebrow>Venues</Eyebrow>
+          <Eyebrow>{t('Venues')}</Eyebrow>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s2, rowGap: 4 }}>
             {cation.venues.map((v) => (
               <View key={v} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Icon name="map-pin" size={13} color={col.ink2} />
-                <Meta tone="ink">{v}</Meta>
+                <Meta tone="ink">{tx(v)}</Meta>
               </View>
             ))}
           </View>
         </View>
         <View style={{ gap: 4 }}>
-          <Eyebrow>Clinician present</Eyebrow>
+          <Eyebrow>{t('Clinician present')}</Eyebrow>
           <Body>
-            {d.clinician.name} <Meta>· {d.clinician.role}</Meta>
+            {d.clinician.name} <Meta>· {tx(d.clinician.role)}</Meta>
           </Body>
         </View>
       </Card>
 
       {/* Itinerary */}
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>The itinerary, day by day</SectionTitle>
+        <SectionTitle>{t('The itinerary, day by day')}</SectionTitle>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityRole="tablist" contentContainerStyle={{ gap: space.s1, paddingRight: space.s2 }} style={{ marginHorizontal: -space.gutter, paddingLeft: space.gutter, flexGrow: 0 }}>
           {itinerary.map((x) => {
             const on = x.day === day
@@ -175,27 +179,27 @@ export default function CationDetail() {
                 key={x.day}
                 onPress={() => setDay(x.day)}
                 accessibilityRole="tab"
-                accessibilityLabel={`Day ${x.day}, ${x.title}`}
+                accessibilityLabel={t('Day {n}, {title}', { n: x.day, title: tx(x.title) })}
                 accessibilityState={{ selected: on }}
                 aria-selected={on}
                 style={{ minHeight: 44, minWidth: 64, paddingHorizontal: 14, borderRadius: radius.pill, borderWidth: 1, borderColor: on ? col.ink : col.line, backgroundColor: on ? col.ink : col.paperRaised, alignItems: 'center', justifyContent: 'center' }}
               >
-                <Mono color={on ? col.paper : col.ink}>{`Day ${x.day}`}</Mono>
+                <Mono color={on ? col.paper : col.ink}>{t('Day {n}', { n: x.day })}</Mono>
               </Pressable>
             )
           })}
         </ScrollView>
         <Card tone="outline" style={{ gap: space.s2 }}>
           <View style={{ gap: 4 }}>
-            <Eyebrow>{`Day ${current.day} of ${itinerary.length}`}</Eyebrow>
-            <Title size={22}>{current.title}</Title>
+            <Eyebrow>{t('Day {a} of {b}', { a: current.day, b: itinerary.length })}</Eyebrow>
+            <Title size={22}>{tx(current.title)}</Title>
           </View>
           <View accessibilityRole="list">
             {current.items.map((it, i) => (
               <View
                 key={i}
                 accessible
-                accessibilityLabel={`${it.time}. ${it.title}. ${it.kind}, ${it.where}${it.term ? `. ${termByKey(it.term).name}` : ''}`}
+                accessibilityLabel={t('{time}. {title}. {kind}, {where}{term}', { time: it.time, title: txRow(it.title), kind: tx(it.kind), where: tx(it.where), term: it.term ? `. ${name(it.term)}` : '' })}
                 style={{ flexDirection: 'row', gap: 12, paddingVertical: 12, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: col.line }}
               >
                 <Mono tone="ink2" style={{ width: 48 }}>
@@ -205,12 +209,12 @@ export default function CationDetail() {
                   <Icon name={KIND_ICON[it.kind]} size={15} color={col.ink2} />
                 </View>
                 <View style={{ flex: 1, gap: 2 }}>
-                  <Body>{it.title}</Body>
-                  <Meta size={14}>{`${it.kind} · ${it.where}`}</Meta>
+                  <Body>{txRow(it.title)}</Body>
+                  <Meta size={14}>{t('{kind} · {where}', { kind: tx(it.kind), where: tx(it.where) })}</Meta>
                   {it.term ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
                       <TermDot term={it.term} size={8} />
-                      <Meta size={13}>{termByKey(it.term).name}</Meta>
+                      <Meta size={13}>{name(it.term)}</Meta>
                     </View>
                   ) : null}
                 </View>
@@ -218,24 +222,24 @@ export default function CationDetail() {
             ))}
           </View>
         </Card>
-        <Meta tone="ink3" size={14}>Your itinerary works offline on the floor. Readings at Signal Points flow into your record as they are taken.</Meta>
+        <Meta tone="ink3" size={14}>{t('Your itinerary works offline on the floor. Readings at Signal Points flow into your record as they are taken.')}</Meta>
       </View>
 
       {/* Before / after */}
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>Before, and after</SectionTitle>
+        <SectionTitle>{t('Before, and after')}</SectionTitle>
         <Card tone="sunk" style={{ gap: space.s1 + 4 }}>
-          <Eyebrow>{`Before · ${CATION_PHASES[0].when}`}</Eyebrow>
+          <Eyebrow>{t('Before · {when}', { when: tx(CATION_PHASES[0].when) })}</Eyebrow>
           {['Consents: Care, Data and Publishing, each separate.', 'Your Index baseline, so there is something to compare.', d.beforeExtra, 'A first hello to the cohort you will travel with.', 'The named outcome, written in your own words on the booking.'].map((x) => (
-            <CheckLine key={x}>{x}</CheckLine>
+            <CheckLine key={x}>{tx(x)}</CheckLine>
           ))}
         </Card>
         <Card tone="sunk" style={{ gap: space.s1 + 4 }}>
-          <Eyebrow>After · ninety days from checkout</Eyebrow>
+          <Eyebrow>{t('After · ninety days from checkout')}</Eyebrow>
           {CATION_PHASES.slice(2).map((p) => (
             <View key={p.key} style={{ gap: 2 }}>
-              <Mono size={13} tone="ink3">{p.when}</Mono>
-              <Meta tone="ink">{p.key === 'remeasure' ? `Re-measure: ${cation.day90Measure}` : p.key === 'checkout' ? 'Hand-off: protocol live, coach and concierge named' : p.what}</Meta>
+              <Mono size={13} tone="ink3">{tx(p.when)}</Mono>
+              <Meta tone="ink">{p.key === 'remeasure' ? t('Re-measure: {m}', { m: tx(cation.day90Measure) }) : p.key === 'checkout' ? t('Hand-off: protocol live, coach and concierge named') : tx(p.what)}</Meta>
             </View>
           ))}
         </Card>
@@ -248,13 +252,13 @@ export default function CationDetail() {
             <Icon name="shield" size={20} color={col.ink} />
           </View>
           <View style={{ flex: 1 }}>
-            <Eyebrow>A named clinician, present</Eyebrow>
+            <Eyebrow>{t('A named clinician, present')}</Eyebrow>
             <Body weight="medium">{d.clinician.name}</Body>
           </View>
         </View>
-        <Meta>{`${d.clinician.role} · on site, not on call`}</Meta>
-        <Body tone="ink2">{d.clinician.note}</Body>
-        <Meta tone="ink3" size={14}>Venues receive your name, booking and dietary note only. No health data leaves AIWO for the hotel.</Meta>
+        <Meta>{t('{role} · on site, not on call', { role: tx(d.clinician.role) })}</Meta>
+        <Body tone="ink2">{tx(d.clinician.note)}</Body>
+        <Meta tone="ink3" size={14}>{t('Venues receive your name, booking and dietary note only. No health data leaves AIWO for the hotel.')}</Meta>
       </Card>
 
       {/* Request */}
@@ -262,34 +266,26 @@ export default function CationDetail() {
         <Card tone="soft" style={{ gap: space.s2 }}>
           <View accessibilityLiveRegion="polite" style={{ gap: space.s1 }}>
             <Title size={26}>
-              {interestOnly ? (
-                <>
-                  Your interest is <Serif>noted</Serif>.
-                </>
-              ) : (
-                <>
-                  Request <Serif>received</Serif>.
-                </>
-              )}
+              <Rich text={interestOnly ? t('Your interest is *noted*.') : t('Request *received*.')} wrap={(w) => <Serif>{w}</Serif>} />
             </Title>
             <Body tone="ink2">
               {interestOnly
-                ? `${concierge} will write when ${cation.name} opens, with dates first to you.`
-                : `${concierge}, your concierge, will confirm availability within one working day and send a Razorpay link with a GST invoice. Nothing has been charged.`}
+                ? t('{c} will write when {name} opens, with dates first to you.', { c: concierge, name: cation.name })
+                : t('{c}, your concierge, will confirm availability within one working day and send a Razorpay link with a GST invoice. Nothing has been charged.', { c: concierge })}
             </Body>
           </View>
           <View>
-            <KeyValue k="Reference">
+            <KeyValue k={t('Reference')}>
               <Mono tone="ink">{request.ref}</Mono>
             </KeyValue>
-            {!interestOnly ? <KeyValue k="Dates">{request.win}</KeyValue> : null}
-            <KeyValue k="Venue">{request.venue}</KeyValue>
-            <KeyValue k="Guests" last>
+            {!interestOnly ? <KeyValue k={t('Dates')}>{localDate(request.win, lang)}</KeyValue> : null}
+            <KeyValue k={t('Venue')}>{tx(request.venue)}</KeyValue>
+            <KeyValue k={t('Guests')} last>
               <Mono tone="ink">{String(request.guests)}</Mono>
             </KeyValue>
           </View>
-          <Eyebrow>What happens next</Eyebrow>
-          {['Consents and your Index baseline', 'Device posted and linked; home draw if needed', `${coach} reads your named outcome with you`].map((x, i) => (
+          <Eyebrow>{t('What happens next')}</Eyebrow>
+          {[t('Consents and your Index baseline'), t('Device posted and linked; home draw if needed'), t('{coach} reads your named outcome with you', { coach })].map((x, i) => (
             <View key={x} style={{ flexDirection: 'row', gap: 10 }}>
               <Mono tone="ink3">{String(i + 1)}</Mono>
               <Meta tone="ink" style={{ flex: 1 }}>
@@ -299,10 +295,10 @@ export default function CationDetail() {
           ))}
           <View style={{ gap: 0 }}>
             <ArrowLink icon="message-circle" onPress={() => router.push('/messages?t=t_ravi')}>
-              Message Ravi, your concierge
+              {t('Message Ravi, your concierge')}
             </ArrowLink>
             <ArrowLink icon="credit-card" onPress={() => router.push('/passport')}>
-              Your Joy Passport
+              {t('Your Joy Passport')}
             </ArrowLink>
           </View>
           <Button
@@ -316,23 +312,23 @@ export default function CationDetail() {
               setRequest(slug, null)
             }}
           >
-            Change the request
+            {t('Change the request')}
           </Button>
         </Card>
       ) : (
         <Card tone="raised" style={{ gap: space.s3 }}>
           <View style={{ gap: 4 }}>
             <Title size={24} accessibilityRole="header" aria-level={2}>
-              {interestOnly ? 'Register interest' : 'Request this ’cation'}
+              {interestOnly ? t('Register interest') : t('Request this ’cation')}
             </Title>
             <Meta>
-              From <Mono tone="ink">{cation.priceFrom}</Mono> per guest
+              <Rich text={t('From *{p}* per guest', { p: cation.priceFrom })} wrap={(w) => <Mono tone="ink">{w}</Mono>} />
             </Meta>
           </View>
 
           {!interestOnly ? (
-            <View style={{ gap: space.s1 }} accessibilityRole="radiogroup" accessibilityLabel="Dates">
-              <Eyebrow>Dates</Eyebrow>
+            <View style={{ gap: space.s1 }} accessibilityRole="radiogroup" accessibilityLabel={t('Dates')}>
+              <Eyebrow>{t('Dates')}</Eyebrow>
               {d.windows.map((w) => (
                 <ChoiceCard
                   key={w}
@@ -341,8 +337,8 @@ export default function CationDetail() {
                     setWin(w)
                     setErrors((e) => ({ ...e, win: '' }))
                   }}
-                  accessibilityLabel={w}
-                  title={<Mono tone="ink" size={16}>{w}</Mono>}
+                  accessibilityLabel={localDate(w, lang)}
+                  title={<Mono tone="ink" size={16}>{localDate(w, lang)}</Mono>}
                 />
               ))}
               {errors.win ? <Meta tone="error">{errors.win}</Meta> : null}
@@ -350,50 +346,50 @@ export default function CationDetail() {
           ) : null}
 
           {cation.venues.length > 1 ? (
-            <View style={{ gap: space.s1 }} accessibilityRole="radiogroup" accessibilityLabel="Venue">
-              <Eyebrow>Venue</Eyebrow>
+            <View style={{ gap: space.s1 }} accessibilityRole="radiogroup" accessibilityLabel={t('Venue')}>
+              <Eyebrow>{t('Venue')}</Eyebrow>
               {cation.venues.map((v) => (
-                <ChoiceCard key={v} selected={venue === v} onPress={() => setVenue(v)} accessibilityLabel={v} title={v} />
+                <ChoiceCard key={v} selected={venue === v} onPress={() => setVenue(v)} accessibilityLabel={tx(v)} title={tx(v)} />
               ))}
             </View>
           ) : (
             <View style={{ gap: 4 }}>
-              <Eyebrow>Venue</Eyebrow>
-              <Body>{venue}</Body>
+              <Eyebrow>{t('Venue')}</Eyebrow>
+              <Body>{tx(venue)}</Body>
             </View>
           )}
 
           <View style={{ gap: space.s1 }}>
-            <Eyebrow>Guests</Eyebrow>
+            <Eyebrow>{t('Guests')}</Eyebrow>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s2 }}>
-              <IconButton icon="minus" label="One fewer guest" disabled={forTwo || guests <= 1} onPress={() => setGuests((g) => Math.max(1, g - 1))} />
-              <Mono size={22} tone="ink" accessibilityLiveRegion="polite" accessibilityLabel={`${guests} guests`}>
+              <IconButton icon="minus" label={t('One fewer guest')} disabled={forTwo || guests <= 1} onPress={() => setGuests((g) => Math.max(1, g - 1))} />
+              <Mono size={22} tone="ink" accessibilityLiveRegion="polite" accessibilityLabel={t('{n} guests', { n: guests })}>
                 {String(guests)}
               </Mono>
-              <IconButton icon="plus" label="One more guest" disabled={forTwo || guests >= 2} onPress={() => setGuests((g) => Math.min(2, g + 1))} />
+              <IconButton icon="plus" label={t('One more guest')} disabled={forTwo || guests >= 2} onPress={() => setGuests((g) => Math.min(2, g + 1))} />
             </View>
-            {forTwo ? <Meta size={14}>Made for two. Each partner gives their own consents.</Meta> : <Meta size={14}>{guests >= 2 ? 'Two at most per booking. For a group, message Ravi.' : 'Yourself, or you and one guest.'}</Meta>}
+            {forTwo ? <Meta size={14}>{t('Made for two. Each partner gives their own consents.')}</Meta> : <Meta size={14}>{guests >= 2 ? t('Two at most per booking. For a group, message Ravi.') : t('Yourself, or you and one guest.')}</Meta>}
           </View>
 
           <Field
-            label="Your named outcome"
-            help="In your words. We measure the ’cation against it."
+            label={t('Your named outcome')}
+            help={t('In your words. We measure the ’cation against it.')}
             multiline
             value={outcome}
-            onChangeText={(t) => {
-              setOutcome(t)
+            onChangeText={(v) => {
+              setOutcome(v)
               if (errors.outcome) setErrors((e) => ({ ...e, outcome: '' }))
             }}
-            placeholder={d.outcomePlaceholder}
+            placeholder={tx(d.outcomePlaceholder)}
             error={errors.outcome}
           />
-          <Field label="Dietary note (optional)" help="Shared with the venue. Nothing clinical is." value={dietary} onChangeText={setDietary} placeholder="e.g. vegetarian, no onion or garlic" />
+          <Field label={t('Dietary note (optional)')} help={t('Shared with the venue. Nothing clinical is.')} value={dietary} onChangeText={setDietary} placeholder={t('e.g. vegetarian, no onion or garlic')} />
 
-          <DaybreakButton onPress={submit}>{interestOnly ? 'Register interest' : 'Request this ’cation'}</DaybreakButton>
+          <DaybreakButton onPress={submit}>{interestOnly ? t('Register interest') : t('Request this ’cation')}</DaybreakButton>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Icon name="shield" size={14} color={col.ink3} />
             <Meta size={14} tone="ink3" style={{ flex: 1 }}>
-              No payment now. Payment by Razorpay in INR once your dates are confirmed; GST at 18% added on the invoice. Specimen pricing.
+              {t('No payment now. Payment by Razorpay in INR once your dates are confirmed; GST at 18% added on the invoice. Specimen pricing.')}
             </Meta>
           </View>
         </Card>

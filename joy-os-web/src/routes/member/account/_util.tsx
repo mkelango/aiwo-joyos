@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { DEFAULT_NOTIF_PREFS, type NotifPrefs } from './_data'
+import { activeLang } from '@/lib/store'
 
 // Plain helpers for the account lane (kept apart from components for fast refresh).
 
@@ -16,7 +17,15 @@ export function fmtTime(iso: string) {
 }
 export function fmtDay(iso: string) {
   const d = new Date(iso)
-  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+  const lang = activeLang()
+  if (lang === 'en') return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+  return d.toLocaleDateString(`${lang}-IN`, { weekday: 'short', day: 'numeric', month: 'short', numberingSystem: 'latn' })
+}
+
+/** Fill a translated string whose {slots} hold styled nodes (numbers in Mono, an <em>). */
+export function rich(s: string, nodes: Record<string, ReactNode>): ReactNode {
+  const parts = s.split(/\{(\w+)\}/)
+  return parts.map((p, i) => (i % 2 ? <Fragment key={i}>{p in nodes ? nodes[p] : `{${p}}`}</Fragment> : p))
 }
 
 /** A quiet toast — a status line, never a celebration. */

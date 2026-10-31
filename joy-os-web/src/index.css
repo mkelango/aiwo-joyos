@@ -15,8 +15,10 @@
     line-height: 1.53;
     font-optical-sizing: auto;
   }
-  :lang(hi) body, [lang='hi'] { font-family: 'Mukta', var(--font-sans); }
-  :lang(ta) body, [lang='ta'] { font-family: 'Mukta Malar', var(--font-sans); }
+  /* Script fallbacks live in tokens.css (:root:lang(ta|hi)); an element marked lang inside
+     an English page (the language picker) still gets a Tamil or Devanagari face. */
+  [lang|='hi']:not(html) { font-family: 'Avenir Next', 'Nunito Sans', 'Mukta', 'Noto Sans Devanagari', system-ui, sans-serif; }
+  [lang|='ta']:not(html) { font-family: 'Avenir Next', 'Nunito Sans', 'Mukta Malar', 'Noto Sans Tamil', system-ui, sans-serif; }
   ::selection { background: var(--daybreak-soft); color: var(--ink); }
   :focus-visible { outline: 2px solid var(--daybreak); outline-offset: 2px; border-radius: 6px; }
   h1, h2, h3 { font-weight: 300; letter-spacing: -0.01em; }
@@ -35,6 +37,9 @@
     text-transform: uppercase;
     line-height: 1.5;
   }
+  /* Tamil and Devanagari have no capitals and break apart under wide tracking:
+     the Mono-caps label keeps its size step but drops the tracking. */
+  :where(:lang(ta), :lang(hi)) .eyebrow { letter-spacing: 0.02em; font-size: 13px; line-height: 1.45; }
   /* House names: caps, +240 */
   .house {
     font-family: var(--font-mono);

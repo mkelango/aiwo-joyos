@@ -8,6 +8,9 @@ import { useTheme } from '@/theme/ThemeProvider'
 import { DEMO_ACCOUNTS, SPECIMEN_AIWO_ID, SPECIMEN_OTP } from '@/screens/b/_data'
 import { sessionStore, useStore } from '@/screens/b/bStore'
 import { Done, Field, StepHead } from '@/screens/b/parts'
+import { useDict } from '@/lib/i18n'
+import { SIGNIN } from '@/screens/b/i18n/entry'
+import { useCommon } from '@/screens/b/i18n/common'
 
 // SIGN IN: AIWO ID first, then one of three ways in — passkey, a one-time code by SMS, or a
 // link by email. Demo accounts for the specimen. One Daybreak per step. On success the member
@@ -39,6 +42,8 @@ export default function SignIn() {
   const [busy, setBusy] = useState(false)
   const [who, setWho] = useState('Arjun')
   const codeRef = useRef<TextInputInstance>(null)
+  const t = useDict(SIGNIN)
+  const tc = useCommon()
 
   useEffect(() => {
     if (phase !== 'otp-code' || resendIn <= 0) return
@@ -58,8 +63,8 @@ export default function SignIn() {
 
   const submitId = () => {
     const v = aiwoId.trim().toUpperCase()
-    if (!v) return setIdErr('Enter your AIWO ID. It is on your Index card and in your welcome email.')
-    if (!ID_RE.test(v)) return setIdErr('An AIWO ID looks like AIWO-7F3K-22Q9.')
+    if (!v) return setIdErr(t('errIdEmpty'))
+    if (!ID_RE.test(v)) return setIdErr(t('errIdShape'))
     setAiwoId(v)
     setIdErr('')
     setPhase('method')
@@ -73,8 +78,8 @@ export default function SignIn() {
   }
   const sendCode = () => {
     const digits = phone.replace(/\D/g, '')
-    if (digits.length !== 10) return setPhoneErr('Enter the 10-digit mobile number on your account.')
-    if (!/^[6-9]/.test(digits)) return setPhoneErr('Indian mobile numbers start with 6, 7, 8 or 9.')
+    if (digits.length !== 10) return setPhoneErr(t('errPhoneLen'))
+    if (!/^[6-9]/.test(digits)) return setPhoneErr(t('errPhoneStart'))
     setPhoneErr('')
     setCode('')
     setCodeErr('')
@@ -83,15 +88,15 @@ export default function SignIn() {
     setTimeout(() => codeRef.current?.focus(), 50)
   }
   const verify = () => {
-    if (code.length !== 6) return setCodeErr('Enter all six digits.')
+    if (code.length !== 6) return setCodeErr(t('errCodeLen'))
     if (code !== SPECIMEN_OTP) {
       setCode('')
-      return setCodeErr('That code did not match. Check the SMS and try again.')
+      return setCodeErr(t('errCodeWrong'))
     }
     finish('otp')
   }
   const sendLink = () => {
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) return setEmailErr('Enter the email address on your account.')
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) return setEmailErr(t('errEmail'))
     setEmailErr('')
     setPhase('email-sent')
   }
@@ -105,7 +110,7 @@ export default function SignIn() {
     <View style={{ flex: 1, backgroundColor: c.paper, paddingTop: insets.top }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.gutter - 8, minHeight: 52, width: '100%', maxWidth: 640, alignSelf: 'center' }}>
         {phase !== 'done' ? (
-          <Pressable onPress={goBack} accessibilityRole="button" accessibilityLabel="Back" hitSlop={6} style={({ pressed }) => ({ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: pressed ? c.paperSunk : undefined })}>
+          <Pressable onPress={goBack} accessibilityRole="button" accessibilityLabel={tc('back')} hitSlop={6} style={({ pressed }) => ({ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: pressed ? c.paperSunk : undefined })}>
             <Icon name="chevron-left" size={22} color={c.ink} />
           </Pressable>
         ) : (
@@ -119,13 +124,13 @@ export default function SignIn() {
           {phase === 'id' ? (
             <>
               <StepHead
-                eyebrow="Sign in · step 1 of 2"
+                eyebrow={t('step1')}
                 title={
                   <>
-                    Welcome <Serif>back</Serif>.
+                    {t('welcomeA')}<Serif>{t('welcomeSerif')}</Serif>{t('welcomeB')}
                   </>
                 }
-                lead="Your AIWO ID is the same in Joy OS, LifeOS and at every House. It is on your Index card."
+                lead={t('idLead')}
               />
               <Field
                 label="AIWO ID"
@@ -142,49 +147,52 @@ export default function SignIn() {
                 returnKeyType="next"
               />
               <DaybreakButton icon="arrow-right" onPress={submitId}>
-                Continue
+                {tc('continue')}
               </DaybreakButton>
               <Card tone="sunk" style={{ gap: space.s1 }}>
-                <Eyebrow>Demo accounts · specimen</Eyebrow>
-                {DEMO_ACCOUNTS.map((a) => (
+                <Eyebrow>{t('demo')}</Eyebrow>
+                {DEMO_ACCOUNTS.map((a) => {
+                  const role = a.id === 'arjun' ? t('roleArjun') : a.id === 'lakshmi' ? t('roleLakshmi') : a.role
+                  return (
                   <Pressable
                     key={a.id}
                     onPress={() => finish('demo', a.name.split(' ')[0])}
                     accessibilityRole="button"
-                    accessibilityLabel={`Sign in as ${a.name}, ${a.role}`}
+                    accessibilityLabel={t('signInAs', { name: a.name, role })}
                     style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, opacity: pressed ? 0.7 : 1 })}
                   >
                     <Avatar person={a} size={40} />
                     <View style={{ flex: 1 }}>
                       <Body>{a.name}</Body>
-                      <Meta size={14}>{a.role}</Meta>
+                      <Meta size={14}>{role}</Meta>
                       <Mono size={12} tone="ink3">
                         {a.aiwoId}
                       </Mono>
                     </View>
                     <Icon name="chevron-right" size={18} color={c.ink3} />
                   </Pressable>
-                ))}
+                  )
+                })}
               </Card>
               <Button variant="link" onPress={() => router.replace('/onboarding')} style={{ alignSelf: 'center' }}>
-                New to Joy OS? Begin here
+                {t('newHere')}
               </Button>
               <Button variant="ghost" size="sm" onPress={() => setAiwoId(SPECIMEN_AIWO_ID)} style={{ alignSelf: 'center' }}>
-                Fill the specimen ID
+                {t('fillId')}
               </Button>
             </>
           ) : null}
 
           {phase === 'method' ? (
             <>
-              <StepHead eyebrow="Sign in · step 2 of 2" title="How would you like to sign in?" lead={`AIWO ID ${aiwoId}`} />
+              <StepHead eyebrow={t('step2')} title={t('howTitle')} lead={`AIWO ID ${aiwoId}`} />
               <Segmented<Method>
                 value={method}
                 onChange={setMethod}
                 items={[
-                  { value: 'passkey', label: 'Passkey' },
-                  { value: 'otp', label: 'Phone' },
-                  { value: 'email', label: 'Email' },
+                  { value: 'passkey', label: t('passkey') },
+                  { value: 'otp', label: t('phone') },
+                  { value: 'email', label: tc('email') },
                 ]}
               />
               {method === 'passkey' ? (
@@ -192,10 +200,10 @@ export default function SignIn() {
                   <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: c.paperSunk, alignItems: 'center', justifyContent: 'center' }}>
                     <Icon name="key" size={24} color={c.ink} />
                   </View>
-                  <Title size={22}>Face ID, Touch ID or your screen lock.</Title>
-                  <Meta>A passkey lives on this phone. Nothing to remember, nothing to type, and it cannot be phished.</Meta>
+                  <Title size={22}>{t('passkeyTitle')}</Title>
+                  <Meta>{t('passkeyBody')}</Meta>
                   <DaybreakButton icon="key" onPress={usePasskey} disabled={busy}>
-                    {busy ? 'Checking…' : 'Use passkey (specimen)'}
+                    {busy ? t('checking') : t('usePasskey')}
                   </DaybreakButton>
                 </Card>
               ) : null}
@@ -208,7 +216,7 @@ export default function SignIn() {
                       </Mono>
                     </View>
                     <Field
-                      label="Mobile number"
+                      label={t('mobile')}
                       value={phone}
                       onChangeText={(v) => {
                         setPhone(v.replace(/\D/g, '').slice(0, 10))
@@ -221,14 +229,14 @@ export default function SignIn() {
                       onSubmitEditing={sendCode}
                     />
                   </View>
-                  <DaybreakButton onPress={sendCode}>Send a code</DaybreakButton>
-                  <Meta size={14} tone="ink3">A six-digit code by SMS. It works for ten minutes.</Meta>
+                  <DaybreakButton onPress={sendCode}>{t('sendCode')}</DaybreakButton>
+                  <Meta size={14} tone="ink3">{t('codeNote')}</Meta>
                 </Card>
               ) : null}
               {method === 'email' ? (
                 <Card tone="raised" style={{ gap: space.s2 }}>
                   <Field
-                    label="Email"
+                    label={tc('email')}
                     value={email}
                     onChangeText={(v) => {
                       setEmail(v)
@@ -242,7 +250,7 @@ export default function SignIn() {
                     onSubmitEditing={sendLink}
                   />
                   <DaybreakButton icon="mail" onPress={sendLink}>
-                    Email me a link
+                    {t('emailLink')}
                   </DaybreakButton>
                 </Card>
               ) : null}
@@ -251,8 +259,8 @@ export default function SignIn() {
 
           {phase === 'otp-code' ? (
             <>
-              <StepHead eyebrow="Sign in · code" title="Enter the six digits." lead={`Sent by SMS to +91 ${phone.slice(0, 5)} ${phone.slice(5)}.`} />
-              <Pressable onPress={() => codeRef.current?.focus()} accessibilityRole="button" accessibilityLabel={`Code, ${code.length} of 6 digits entered`} style={{ flexDirection: 'row', gap: 8, justifyContent: 'space-between' }}>
+              <StepHead eyebrow={t('codeEyebrow')} title={t('codeTitle')} lead={t('sentTo', { phone: `${phone.slice(0, 5)} ${phone.slice(5)}` })} />
+              <Pressable onPress={() => codeRef.current?.focus()} accessibilityRole="button" accessibilityLabel={t('codeA11y', { n: code.length })} style={{ flexDirection: 'row', gap: 8, justifyContent: 'space-between' }}>
                 {Array.from({ length: 6 }, (_, i) => (
                   <View
                     key={i}
@@ -284,7 +292,7 @@ export default function SignIn() {
                 textContentType="oneTimeCode"
                 autoComplete="one-time-code"
                 maxLength={6}
-                accessibilityLabel="Six-digit code"
+                accessibilityLabel={t('codeInput')}
                 onSubmitEditing={verify}
                 style={{ position: 'absolute', opacity: 0, height: 1, width: 1 }}
               />
@@ -293,24 +301,24 @@ export default function SignIn() {
                   {codeErr}
                 </Meta>
               ) : null}
-              <DaybreakButton onPress={verify}>Verify and sign in</DaybreakButton>
+              <DaybreakButton onPress={verify}>{t('verify')}</DaybreakButton>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: space.s1 }}>
                 {resendIn > 0 ? (
                   <Meta>
-                    Resend in <Mono tone="ink2">{`${resendIn} s`}</Mono>
+                    {t('resendIn')}<Mono tone="ink2">{`${resendIn} s`}</Mono>{t('resendInB')}
                   </Meta>
                 ) : (
                   <Button variant="link" onPress={() => { setResendIn(30); setCode(''); setCodeErr('') }}>
-                    Resend the code
+                    {t('resend')}
                   </Button>
                 )}
                 <Button variant="link" onPress={() => setPhase('method')}>
-                  Change number
+                  {t('changeNumber')}
                 </Button>
               </View>
               <Card tone="sunk" padding={14}>
                 <Meta size={14}>
-                  Specimen: the code is <Mono size={14} tone="ink">{SPECIMEN_OTP}</Mono>. Any other code shows the error.
+                  {t('specimenCodeA')}<Mono size={14} tone="ink">{SPECIMEN_OTP}</Mono>{t('specimenCodeB')}
                 </Meta>
               </Card>
             </>
@@ -318,14 +326,14 @@ export default function SignIn() {
 
           {phase === 'email-sent' ? (
             <>
-              <StepHead eyebrow="Sign in · email" title="Link sent." lead={`Open the email we sent to ${email.trim()} on this phone. The link works once, for fifteen minutes.`} />
+              <StepHead eyebrow={t('emailEyebrow')} title={t('linkSent')} lead={t('linkLead', { email: email.trim() })} />
               <Card tone="raised" style={{ gap: space.s1, alignItems: 'flex-start' }}>
                 <Icon name="mail" size={24} color={c.ink} />
-                <Meta>No email after two minutes? Check promotions or spam, or use your phone number instead.</Meta>
+                <Meta>{t('noEmail')}</Meta>
               </Card>
-              <DaybreakButton onPress={() => finish('email')}>I opened the link (specimen)</DaybreakButton>
+              <DaybreakButton onPress={() => finish('email')}>{t('openedLink')}</DaybreakButton>
               <Button variant="link" onPress={() => setPhase('method')}>
-                Use another way
+                {t('anotherWay')}
               </Button>
             </>
           ) : null}
@@ -333,27 +341,27 @@ export default function SignIn() {
           {phase === 'done' ? (
             <>
               <StepHead
-                eyebrow="Signed in"
+                eyebrow={t('signedIn')}
                 title={
                   <>
-                    Good to see you, <Serif>{who}</Serif>.
+                    {t('goodA')}<Serif>{who}</Serif>{t('goodB')}
                   </>
                 }
-                lead={next === 'onboarding' ? 'Next, a few choices and three consents, so your Index is yours to keep.' : 'Your ninety days are where you left them.'}
+                lead={next === 'onboarding' ? t('nextOnb') : t('whereLeft')}
               />
-              <Done>Signed in on this phone. You can sign out from Profile at any time.</Done>
+              <Done>{t('doneNote')}</Done>
               <DaybreakButton icon="arrow-right" onPress={enter}>
-                {next === 'onboarding' ? 'Set up Joy OS' : 'Go to Today'}
+                {next === 'onboarding' ? t('setUp') : tc('goToday')}
               </DaybreakButton>
             </>
           ) : null}
 
           <View style={{ marginTop: 'auto', alignItems: 'center', gap: 4 }}>
             <Button variant="link" onPress={() => setCrisisOpen(true)} style={{ alignSelf: 'center' }}>
-              Need to talk now? Tele-MANAS 14416
+              {tc('crisis')}
             </Button>
             <Meta size={13} tone="ink3" align="center">
-              Specimen sign-in. No credential leaves this phone.
+              {t('footer')}
             </Meta>
           </View>
         </View>

@@ -70,6 +70,13 @@ function usePersisted<T>(key: string, initial: T, ready: Record<string, unknown>
 
 const KEYS = ['themePref', 'textSize', 'lang', 'actionState', 'ledger'] as const
 
+// The member's language for plain formatters (fmtDate and friends) that run outside a hook.
+// Set on every AppProvider render, so it always matches the context value children read.
+let ACTIVE_LANG: Lang = 'en'
+export function activeLang(): Lang {
+  return ACTIVE_LANG
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [stored, setStored] = useState<Record<string, unknown> | null>(null)
 
@@ -97,6 +104,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [themePrefStored, setThemePref] = usePersisted<ThemePref>('themePref', 'system', stored)
   const [textSize, setTextSize] = usePersisted<TextSize>('textSize', 'default', stored)
   const [lang, setLang] = usePersisted<Lang>('lang', 'en', stored)
+  ACTIVE_LANG = lang
   const [actionState, setActionState] = usePersisted<ActionState>('actionState', 'todo', stored)
   const [ledger, setLedger] = usePersisted<LedgerEntry[]>('ledger', LEDGER, stored)
   const [offline, setOffline] = useState(false)
@@ -143,7 +151,18 @@ export function useApp() {
 
 /** Emergency intercept — runs before anything else touches free text (Memo p.24).
  *  Every free-text input calls this on submit; a match opens the CrisisSheet first. */
-const CRISIS = /\b(kill myself|suicide|end my life|self[- ]?harm|want to die|hurt myself)\b/i
+const CRISIS = /\b(kill myself|suicide|end my life|self[- ]?harm|want to die|hurt myself|khudkushi|aatmahatya|atmahatya|marna chah(ta|ti)|jaan de d(u|oo)n|tharkolai|thatkolai|saaganum|saaga venum)\b/i
+// Tamil and Hindi phrases. \b does not work for Indic scripts, so these match as plain
+// substrings after normalising (NFD, nukta dropped so ख़/ख and नुक़सान/नुकसान both match).
+// Starter list pending clinical review of the translated intercept.
+const CRISIS_INDIC_PHRASES = [
+  'தற்கொலை', 'சாக வேண்டும்', 'சாகணும்', 'சாகப் போகிறேன்', 'செத்துவிட', 'உயிரை மாய்த்து', 'உயிரை விட', 'என்னை நானே காயப்படுத்த', 'வாழ விருப்பமில்லை', 'வாழப் பிடிக்கவில்லை',
+  'आत्महत्या', 'खुदकुशी', 'मरना चाहता', 'मरना चाहती', 'मर जाना चाहता', 'मर जाना चाहती', 'जान दे दूँ', 'जान दे दूं', 'जान दे दूंगा', 'जान दे दूंगी', 'खुद को नुकसान', 'अपने आप को नुकसान', 'खुद को चोट', 'जीना नहीं चाहता', 'जीना नहीं चाहती',
+]
+const indicNorm = (s: string) => s.normalize('NFD').replace(/\u093C/g, '').replace(/\s+/g, ' ')
+const CRISIS_INDIC = CRISIS_INDIC_PHRASES.map(indicNorm)
 export function interceptsCrisis(text: string) {
-  return CRISIS.test(text)
+  if (CRISIS.test(text)) return true
+  const t = indicNorm(text)
+  return CRISIS_INDIC.some((p) => t.includes(p))
 }

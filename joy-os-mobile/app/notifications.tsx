@@ -6,6 +6,9 @@ import { useTheme } from '@/theme/ThemeProvider'
 import { NOTICES, type Notice } from '@/screens/b/_data'
 import { notifPrefsStore, notifReadStore, useStore, validatePrefs, type NotifPrefs } from '@/screens/b/bStore'
 import { Done, TimeStepper, memberOnly } from '@/screens/b/parts'
+import { useDict } from '@/lib/i18n'
+import { NOTIF, NOTICE_TEXT } from '@/screens/b/i18n/notifications'
+import { perDayKey, useCommon, usePrefsError, useTx } from '@/screens/b/i18n/common'
 
 // NOTIFICATIONS: the few things we sent you, grouped Today / Earlier, each opening where it
 // belongs; then the rules we keep — quiet hours, at most three a day, and the channels. The
@@ -22,6 +25,10 @@ function Notifications() {
   const [draft, setDraft] = useState<NotifPrefs>(prefs)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const t = useDict(NOTIF)
+  const tc = useCommon()
+  const tx = useTx()
+  const prefsErr = usePrefsError()
 
   // Pick up the stored preferences once they have been read from the phone.
   useEffect(() => setDraft(prefs), [prefs])
@@ -38,7 +45,7 @@ function Notifications() {
     router.push(n.href)
   }
   const save = () => {
-    const err = validatePrefs(draft)
+    const err = prefsErr(validatePrefs(draft))
     if (err) return setError(err)
     setPrefs({ ...draft, savedAt: new Date().toISOString() })
     setSaved(true)
@@ -48,24 +55,24 @@ function Notifications() {
     <Screen>
       <ScreenHeader
         back
-        eyebrow="Notifications"
+        eyebrow={t('eyebrow')}
         title={
           <>
-            A few things, then <Serif>quiet</Serif>.
+            {t('titleA')}<Serif>{t('titleSerif')}</Serif>{t('titleB')}
           </>
         }
-        lead="At most three a day, never in your quiet hours. A fall in your Index is never sent here; a person tells you."
+        lead={t('lead')}
       />
 
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s1, flexWrap: 'wrap' }}>
-        <Meta>{unread ? `${unread} not yet opened` : 'All read'}</Meta>
-        <View style={{ flexDirection: 'row', gap: 4 }}>
+        <Meta>{unread ? t('notOpened', { n: unread }) : t('allRead')}</Meta>
+        <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap' }}>
           <Button variant="ghost" size="sm" disabled={!unread} onPress={() => setRd((r) => ({ ...r, read: Array.from(new Set([...r.read, ...shown.map((n) => n.id)])) }))}>
-            Mark all read
+            {t('markAll')}
           </Button>
           {shown.length ? (
             <Button variant="ghost" size="sm" onPress={() => setRd((r) => ({ read: r.read, cleared: Array.from(new Set([...r.cleared, ...shown.map((n) => n.id)])) }))}>
-              Clear
+              {t('clear')}
             </Button>
           ) : null}
         </View>
@@ -74,9 +81,9 @@ function Notifications() {
       {shown.length === 0 ? (
         <Card tone="sunk" style={{ gap: space.s1, alignItems: 'flex-start' }}>
           <Icon name="moon" size={22} color={c.ink2} />
-          <Body>Nothing new. We stay quiet by design.</Body>
+          <Body>{t('nothingNew')}</Body>
           <Button variant="link" onPress={() => setRd({ read: [], cleared: [] })}>
-            Show recent again
+            {t('showAgain')}
           </Button>
         </Card>
       ) : (
@@ -85,16 +92,21 @@ function Notifications() {
           if (!items.length) return null
           return (
             <View key={g} style={{ gap: space.s1 }}>
-              <SectionTitle>{g}</SectionTitle>
+              <SectionTitle>{t(g)}</SectionTitle>
               <Card tone="raised" padding={0}>
                 {items.map((n, i) => {
                   const isNew = !rd.read.includes(n.id)
+                  const nt = NOTICE_TEXT[n.id]
+                  const title = tx(nt?.title, n.title)
+                  const body = tx(nt?.body, n.body)
+                  const cta = tx(nt?.cta, n.cta)
+                  const at = tx(nt?.at, n.at)
                   return (
                     <Pressable
                       key={n.id}
                       onPress={() => open(n)}
                       accessibilityRole="button"
-                      accessibilityLabel={`${isNew ? 'New. ' : ''}${n.title}. ${n.body}. ${n.at}. ${n.cta}.`}
+                      accessibilityLabel={`${isNew ? t('newA11y') : ''}${title}. ${body}. ${at}. ${cta}.`}
                       style={({ pressed }) => ({ flexDirection: 'row', gap: 12, padding: 16, borderTopWidth: i ? 1 : 0, borderTopColor: c.line, opacity: pressed ? 0.7 : 1 })}
                     >
                       <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: c.paperSunk, alignItems: 'center', justifyContent: 'center' }}>
@@ -103,18 +115,18 @@ function Notifications() {
                       <View style={{ flex: 1, gap: 2 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                           <Body weight={isNew ? 'semibold' : 'regular'} style={{ flex: 1 }}>
-                            {n.title}
+                            {title}
                           </Body>
                           {isNew ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.daybreak }} /> : null}
                         </View>
                         <Meta size={14} numberOfLines={2}>
-                          {n.body}
+                          {body}
                         </Meta>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <Mono size={12} tone="ink3">
-                            {n.at}
+                            {at}
                           </Mono>
-                          <Meta size={13} tone="ink">{`${n.cta} →`}</Meta>
+                          <Meta size={13} tone="ink">{`${cta} →`}</Meta>
                         </View>
                       </View>
                     </Pressable>
@@ -127,42 +139,42 @@ function Notifications() {
       )}
 
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>Quiet hours</SectionTitle>
+        <SectionTitle>{tc('quietHours')}</SectionTitle>
         <Card tone="raised" style={{ gap: space.s2 }}>
           <Meta>
-            {'Quiet now from '}
+            {t('quietNowA')}
             <Mono tone="ink">{prefs.quiet.from}</Mono>
-            {' until '}
+            {t('quietNowB')}
             <Mono tone="ink">{prefs.quiet.to}</Mono>
-            {`. ${prefs.perDay} a day at most.`}
+            {t('quietNowC', { n: prefs.perDay })}
           </Meta>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s2 }}>
-            <TimeStepper label="From" value={draft.quiet.from} onChange={(v) => edit((d) => ({ ...d, quiet: { ...d.quiet, from: v } }))} />
-            <TimeStepper label="Until" value={draft.quiet.to} onChange={(v) => edit((d) => ({ ...d, quiet: { ...d.quiet, to: v } }))} />
+            <TimeStepper label={tc('from')} value={draft.quiet.from} onChange={(v) => edit((d) => ({ ...d, quiet: { ...d.quiet, from: v } }))} />
+            <TimeStepper label={tc('until')} value={draft.quiet.to} onChange={(v) => edit((d) => ({ ...d, quiet: { ...d.quiet, to: v } }))} />
           </View>
-          <Meta size={14}>If you ever ask for help, a person can reach you at any hour.</Meta>
+          <Meta size={14}>{tc('quietExceptionShort')}</Meta>
         </Card>
       </View>
 
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>Reminders a day</SectionTitle>
+        <SectionTitle>{tc('remindersADay')}</SectionTitle>
         <Card tone="raised" style={{ gap: space.s2 }}>
           <Segmented<string> value={String(draft.perDay)} onChange={(v) => edit((d) => ({ ...d, perDay: Number(v) }))} items={['0', '1', '2', '3'].map((n) => ({ value: n, label: n }))} />
-          <Meta>{draft.perDay === 0 ? 'None. You open Joy OS when you choose.' : draft.perDay === 1 ? 'One: today’s action, in the morning.' : draft.perDay === 2 ? 'Two: today’s action, and one Joy Ledger prompt.' : 'Three: today’s action and two Ledger prompts. Never more.'}</Meta>
+          <Meta>{tc(perDayKey(draft.perDay))}</Meta>
           <Divider />
-          <Toggle checked={draft.kinds.action} onChange={(v) => edit((d) => ({ ...d, kinds: { ...d.kinds, action: v } }))} label="Today’s action" description="One a day, at a time that fits your calendar." />
-          <Toggle checked={draft.kinds.ledger} onChange={(v) => edit((d) => ({ ...d, kinds: { ...d.kinds, ledger: v } }))} label="Joy Ledger prompts" description="Ten seconds: anything good in the last few hours?" />
-          <Toggle checked={draft.kinds.circle} onChange={(v) => edit((d) => ({ ...d, kinds: { ...d.kinds, circle: v } }))} label="Circle reminder" description="Monday, an hour before the call." />
-          <Toggle checked={draft.kinds.letter} onChange={(v) => edit((d) => ({ ...d, kinds: { ...d.kinds, letter: v } }))} label="The Joyspan Letter" description="Quarterly, by email." />
+          <Toggle checked={draft.kinds.action} onChange={(v) => edit((d) => ({ ...d, kinds: { ...d.kinds, action: v } }))} label={tc('kAction')} description={tc('kActionD')} />
+          <Toggle checked={draft.kinds.ledger} onChange={(v) => edit((d) => ({ ...d, kinds: { ...d.kinds, ledger: v } }))} label={tc('kLedger')} description={tc('kLedgerD')} />
+          <Toggle checked={draft.kinds.circle} onChange={(v) => edit((d) => ({ ...d, kinds: { ...d.kinds, circle: v } }))} label={tc('kCircle')} description={tc('kCircleD')} />
+          <Toggle checked={draft.kinds.letter} onChange={(v) => edit((d) => ({ ...d, kinds: { ...d.kinds, letter: v } }))} label={tc('kLetter')} description={tc('kLetterD')} />
         </Card>
       </View>
 
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>How to reach you</SectionTitle>
+        <SectionTitle>{tc('howToReach')}</SectionTitle>
         <Card tone="raised" style={{ gap: space.s2 }}>
-          <Toggle checked={draft.channels.app} onChange={(v) => edit((d) => ({ ...d, channels: { ...d.channels, app: v } }))} label="App notifications" description="Today’s action and Ledger prompts." />
-          <Toggle checked={draft.channels.whatsapp} onChange={(v) => edit((d) => ({ ...d, channels: { ...d.channels, whatsapp: v } }))} label="WhatsApp" description="Ledger prompts and reminders only. Never clinical content." />
-          <Toggle checked={draft.channels.email} onChange={(v) => edit((d) => ({ ...d, channels: { ...d.channels, email: v } }))} label="Email" description="The quarterly Joyspan Letter and receipts." />
+          <Toggle checked={draft.channels.app} onChange={(v) => edit((d) => ({ ...d, channels: { ...d.channels, app: v } }))} label={tc('chApp')} description={tc('chAppD')} />
+          <Toggle checked={draft.channels.whatsapp} onChange={(v) => edit((d) => ({ ...d, channels: { ...d.channels, whatsapp: v } }))} label={tc('chWa')} description={tc('chWaD')} />
+          <Toggle checked={draft.channels.email} onChange={(v) => edit((d) => ({ ...d, channels: { ...d.channels, email: v } }))} label={tc('chEmail')} description={tc('chEmailD')} />
         </Card>
       </View>
 
@@ -171,9 +183,9 @@ function Notifications() {
           {error}
         </Meta>
       ) : null}
-      <DaybreakButton onPress={save}>{saved ? 'Saved' : 'Save'}</DaybreakButton>
-      {saved ? <Done>{`Quiet from ${draft.quiet.from} until ${draft.quiet.to} · ${draft.perDay} a day. Settings shows the same.`}</Done> : null}
-      <Eyebrow align="center">No streaks · no countdowns · no badges</Eyebrow>
+      <DaybreakButton onPress={save}>{saved ? tc('saved') : tc('save')}</DaybreakButton>
+      {saved ? <Done>{t('savedLine', { from: draft.quiet.from, to: draft.quiet.to, n: draft.perDay })}</Done> : null}
+      <Eyebrow align="center">{t('noStreaks')}</Eyebrow>
     </Screen>
   )
 }

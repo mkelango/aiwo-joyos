@@ -3,15 +3,18 @@ import { Check, Phone } from 'lucide-react'
 import { useId, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { inputCls } from './_util'
+import { useDict } from '@/lib/i18n'
+import { COMMON } from './_i18n'
 
 // Local parts for the Care, Trust and Account lane. Built on the shared kit's tokens.
 
 /** Tele-MANAS — always visible on Care surfaces (Memo p.24). */
 export function TeleManasStrip({ className }: { className?: string }) {
+  const t = useDict(COMMON)
   return (
     <div className={clsx('flex flex-col gap-3 rounded-card border border-line bg-paper-sunk px-5 py-4 sm:flex-row sm:items-center sm:justify-between', className)}>
       <p className="text-[15px] text-ink-2">
-        <span className="text-ink">If things feel heavy, talk to a person now.</span> Tele-MANAS is free, 24 hours, in 20 languages.
+        <span className="text-ink">{t('teleLead')}</span> {t('teleRest')}
       </p>
       <a href="tel:14416" className="inline-flex shrink-0 items-center gap-2 self-start rounded-full bg-ink px-4 py-2 text-[15px] font-medium text-paper focus-ring sm:self-auto">
         <Phone size={15} /> Tele-MANAS <span className="num">14416</span>
@@ -27,9 +30,9 @@ export function LinkButton({ to, children, variant = 'secondary', size = 'md', c
     ghost: 'text-ink-2 hover:bg-paper-sunk hover:text-ink',
     ink: 'bg-ink text-paper hover:opacity-90',
   }
-  const s = { sm: 'h-9 px-3 text-[14px]', md: 'h-11 px-4 text-[15px]' }
+  const s = { sm: 'min-h-9 px-3 py-1.5 text-[14px] leading-tight', md: 'min-h-11 px-4 py-2 text-[15px] leading-tight' }
   return (
-    <Link to={to} className={clsx('inline-flex items-center justify-center gap-2 rounded-full font-medium transition-colors focus-ring', v[variant], s[size], className)}>
+    <Link to={to} className={clsx('inline-flex items-center justify-center gap-2 rounded-full text-center font-medium transition-colors focus-ring', v[variant], s[size], className)}>
       {children}
     </Link>
   )

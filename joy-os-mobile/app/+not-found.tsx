@@ -4,6 +4,9 @@ import { AiwoMark, Body, Button, Card, DaybreakButton, Eyebrow, ListRow, Divider
 import { useApp } from '@/lib/store'
 import { useTheme } from '@/theme/ThemeProvider'
 import { sessionStore, useStore } from '@/screens/b/bStore'
+import { useDict } from '@/lib/i18n'
+import { NOT_FOUND } from '@/screens/b/i18n/entry'
+import { useCommon } from '@/screens/b/i18n/common'
 
 // NOT FOUND: an address the app does not have (an old link, a typo, a retired page). Said
 // plainly, with the way home and the few places people usually mean. There is no public site,
@@ -15,6 +18,8 @@ export default function NotFound() {
   const { setCrisisOpen } = useApp()
   const [session] = useStore(sessionStore)
   const signedIn = session.signedIn
+  const t = useDict(NOT_FOUND)
+  const tc = useCommon()
   const go = (href: '/' | '/welcome' | '/care' | '/settings' | '/check' | '/signin') => router.replace(href)
 
   return (
@@ -25,44 +30,44 @@ export default function NotFound() {
       </View>
 
       <View style={{ gap: space.s1 }}>
-        <Eyebrow tone="daybreak">Not found</Eyebrow>
+        <Eyebrow tone="daybreak">{t('eyebrow')}</Eyebrow>
         <Title size={34} accessibilityRole="header">
-          This page is not <Serif>here</Serif>.
+          {t('titleA')}<Serif>{t('titleSerif')}</Serif>{t('titleB')}
         </Title>
-        <Body tone="ink2">The link may be old, or a word in it may have changed. Nothing about your record has moved; it is all where you left it.</Body>
+        <Body tone="ink2">{t('lead')}</Body>
       </View>
 
       <Card tone="sunk" padding={16} style={{ gap: 4 }}>
-        <Eyebrow>You asked for</Eyebrow>
-        <Mono tone="ink" size={15} accessibilityLabel={`Address ${path}`}>
+        <Eyebrow>{t('asked')}</Eyebrow>
+        <Mono tone="ink" size={15} accessibilityLabel={t('address', { path })}>
           {path || '/'}
         </Mono>
       </Card>
 
       <DaybreakButton icon="arrow-right" onPress={() => go(signedIn ? '/' : '/welcome')}>
-        {signedIn ? 'Go to Today' : 'Go to the welcome screen'}
+        {signedIn ? tc('goToday') : t('goWelcome')}
       </DaybreakButton>
 
       {signedIn ? (
         <Card tone="raised" padding={8} style={{ paddingHorizontal: 16 }}>
-          <ListRow icon="heart" title="Care" sub="Your coach, clinicians and messages" onPress={() => go('/care')} />
+          <ListRow icon="heart" title={t('care')} sub={t('careSub')} onPress={() => go('/care')} />
           <Divider />
-          <ListRow icon="settings" title="Settings" sub="Language, theme, notifications" onPress={() => go('/settings')} />
+          <ListRow icon="settings" title={t('settings')} sub={t('settingsSub')} onPress={() => go('/settings')} />
         </Card>
       ) : (
         <Card tone="raised" padding={8} style={{ paddingHorizontal: 16 }}>
-          <ListRow icon="log-in" title="Sign in" sub="AIWO ID · passkey, phone or email" onPress={() => go('/signin')} />
+          <ListRow icon="log-in" title={t('signIn')} sub={t('signInSub')} onPress={() => go('/signin')} />
           <Divider />
-          <ListRow icon="check-circle" title="Take the free Check" sub="18 statements · bands only · 5 minutes" onPress={() => go('/check')} />
+          <ListRow icon="check-circle" title={t('check')} sub={t('checkSub')} onPress={() => go('/check')} />
         </Card>
       )}
 
       <View style={{ gap: 4, alignItems: 'center' }}>
         <Button variant="link" onPress={() => setCrisisOpen(true)} style={{ alignSelf: 'center' }}>
-          Need to talk now? Tele-MANAS 14416
+          {tc('crisis')}
         </Button>
         <Meta size={13} tone="ink3" align="center">
-          Specimen build · method v1.0
+          {t('footer')}
         </Meta>
       </View>
     </Screen>

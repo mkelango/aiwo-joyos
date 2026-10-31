@@ -1,30 +1,33 @@
 import clsx from 'clsx'
 import { Sparkles } from 'lucide-react'
 import { useId, type CSSProperties, type ReactNode } from 'react'
+import { useCore } from './_i18n'
 
 // Lane-local parts shared by the member core screens.
 
 /** Provenance on every AI draft (Memo p.27, guardrail 7: every output attributable). */
 export function Provenance({ tool, prompt = 'prompt v3', method = 'v1.0', className }: { tool: string; prompt?: string; method?: string; className?: string }) {
+  const { t } = useCore()
   return (
     <span className={clsx('inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5 rounded-full border border-line bg-paper-sunk px-2.5 py-1 font-mono text-[11px] uppercase tracking-[0.08em] text-ink-3', className)}>
       <Sparkles size={11} aria-hidden />
-      <span>drafted by VIVA</span>
+      <span>{t('draftedBy')}</span>
       <span aria-hidden>·</span>
       <span className="text-ink-2">{tool}</span>
       <span aria-hidden>·</span>
       <span>{prompt}</span>
       <span aria-hidden>·</span>
-      <span>method {method}</span>
+      <span>{t('methodV', { m: method })}</span>
     </span>
   )
 }
 
 /** A label for text that is pre-approved and human-written — never AI (Memo p.27, guardrail 2). */
 export function HumanWritten({ by, className }: { by: string; className?: string }) {
+  const { t } = useCore()
   return (
-    <span className={clsx('inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 font-mono text-[11px] uppercase tracking-[0.08em] text-ink-3', className)}>
-      Not written by AI · pre-approved · {by}
+    <span className={clsx('inline-flex flex-wrap items-center gap-1.5 rounded-full border border-line px-2.5 py-1 font-mono text-[11px] uppercase tracking-[0.08em] text-ink-3', className)}>
+      {t('bySeen', { by })}
     </span>
   )
 }

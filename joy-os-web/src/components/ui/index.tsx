@@ -3,6 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 import type { Person } from '@/domain/types'
+import { useDict } from '@/lib/i18n'
+import { SHARED } from '@/components/_i18n'
 
 export function Card({ children, className, tone = 'raised', as: As = 'section', ...rest }: { children: ReactNode; className?: string; tone?: 'raised' | 'sunk' | 'ink' | 'soft' | 'outline'; as?: 'section' | 'div' | 'article' | 'li' } & React.HTMLAttributes<HTMLElement>) {
   const tones = {
@@ -22,7 +24,7 @@ export function Card({ children, className, tone = 'raised', as: As = 'section',
 export function PageHeader({ eyebrow, title, lead, actions, className }: { eyebrow?: ReactNode; title: ReactNode; lead?: ReactNode; actions?: ReactNode; className?: string }) {
   return (
     <header className={clsx('mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between', className)}>
-      <div className="max-w-3xl">
+      <div className="min-w-0 max-w-3xl break-words">
         {eyebrow && <p className="eyebrow mb-3 text-daybreak-ink">{eyebrow}</p>}
         <h1 className="font-sans text-[2rem] font-light leading-tight tracking-tight text-ink md:text-[2.6rem]">{title}</h1>
         {lead && <p className="mt-3 text-[17px] leading-relaxed text-ink-2">{lead}</p>}
@@ -35,7 +37,7 @@ export function PageHeader({ eyebrow, title, lead, actions, className }: { eyebr
 export function SectionTitle({ children, aside, className }: { children: ReactNode; aside?: ReactNode; className?: string }) {
   return (
     <div className={clsx('mb-4 flex items-baseline justify-between gap-4', className)}>
-      <h2 className="eyebrow text-ink-3">{children}</h2>
+      <h2 className="eyebrow min-w-0 break-words text-ink-3">{children}</h2>
       {aside}
     </div>
   )
@@ -48,9 +50,9 @@ export function Button({ children, variant = 'secondary', size = 'md', className
     ink: 'bg-ink text-paper hover:opacity-90',
     link: 'text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink px-0',
   }
-  const s = { sm: 'h-9 px-3 text-[14px]', md: 'h-11 px-4 text-[15px]' }
+  const s = { sm: 'min-h-9 px-3 py-1.5 text-[14px] leading-tight', md: 'min-h-11 px-4 py-2 text-[15px] leading-tight' }
   return (
-    <button type="button" className={clsx('inline-flex items-center justify-center gap-2 rounded-full font-medium transition-colors focus-ring disabled:opacity-50', v[variant], variant !== 'link' && s[size], className)} {...rest}>
+    <button type="button" className={clsx('inline-flex items-center justify-center gap-2 rounded-full text-center font-medium transition-colors focus-ring disabled:opacity-50', v[variant], variant !== 'link' && s[size], className)} {...rest}>
       {children}
     </button>
   )
@@ -101,11 +103,12 @@ export function Progress({ value, max = 100, className, color = 'var(--daybreak)
 
 /** Day N of 90 ring — the loop is the heartbeat (Memo p.13). */
 export function LoopRing({ day, of = 90, size = 64 }: { day: number; of?: number; size?: number }) {
+  const t = useDict(SHARED)
   const r = size / 2 - 4
   const circ = 2 * Math.PI * r
   const marks = [15, 45, 60, 76, 90]
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={`Day ${day} of ${of}`}>
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={t('loopDay', { n: day, of })}>
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--line)" strokeWidth={3} />
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--daybreak)" strokeWidth={3} strokeDasharray={`${(day / of) * circ} ${circ}`} strokeLinecap="round" transform={`rotate(-90 ${size / 2} ${size / 2})`} />
       {marks.map((m) => {
@@ -123,7 +126,7 @@ export function Toggle({ checked, onChange, label, description }: { checked: boo
   const id = useId()
   return (
     <div className="flex items-start justify-between gap-4">
-      <div>
+      <div className="min-w-0 break-words">
         <label id={`${id}-l`} htmlFor={id} className="text-[16px] text-ink">{label}</label>
         {description && <p className="mt-0.5 text-[14px] text-ink-2">{description}</p>}
       </div>
@@ -156,7 +159,7 @@ export function Tabs<T extends string>({ value, onChange, items, className }: { 
         onChange(items[to].value)
         ;(e.currentTarget.children[to] as HTMLElement | undefined)?.focus()
       }}
-      className={clsx('inline-flex gap-1 rounded-full bg-paper-sunk p-1', className)}
+      className={clsx('inline-flex max-w-full gap-1 overflow-x-auto rounded-full bg-paper-sunk p-1', className)}
     >
       {items.map((it) => (
         <button
@@ -166,7 +169,7 @@ export function Tabs<T extends string>({ value, onChange, items, className }: { 
           tabIndex={value === it.value ? 0 : -1}
           aria-selected={value === it.value}
           onClick={() => onChange(it.value)}
-          className={clsx('rounded-full px-4 py-1.5 text-[14px] transition-colors focus-ring', value === it.value ? 'bg-paper-raised text-ink shadow-card' : 'text-ink-2 hover:text-ink')}
+          className={clsx('shrink-0 whitespace-nowrap rounded-full px-4 py-1.5 text-[14px] transition-colors focus-ring', value === it.value ? 'bg-paper-raised text-ink shadow-card' : 'text-ink-2 hover:text-ink')}
         >
           {it.label}
         </button>
@@ -176,6 +179,7 @@ export function Tabs<T extends string>({ value, onChange, items, className }: { 
 }
 
 export function Sheet({ open, onClose, title, children, side = 'right' }: { open: boolean; onClose: () => void; title: ReactNode; children: ReactNode; side?: 'right' | 'center' }) {
+  const t = useDict(SHARED)
   const dialog = useRef<HTMLDivElement>(null)
   const close = useRef(onClose)
   close.current = onClose
@@ -184,7 +188,7 @@ export function Sheet({ open, onClose, title, children, side = 'right' }: { open
     if (!open) return
     const prev = document.activeElement as HTMLElement | null
     const el = dialog.current
-    ;(el?.querySelector<HTMLElement>('button[aria-label="Close"]') ?? el)?.focus()
+    ;(el?.querySelector<HTMLElement>('button[data-sheet-close]') ?? el)?.focus()
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') return close.current()
       if (e.key !== 'Tab' || !el) return
@@ -221,9 +225,9 @@ export function Sheet({ open, onClose, title, children, side = 'right' }: { open
             exit={side === 'right' ? { x: 40 } : { y: 16, opacity: 0 }}
             transition={{ duration: 0.24 }}
           >
-            <div className="flex items-center justify-between border-b border-line px-6 py-4">
-              <h2 className="text-[18px] text-ink">{title}</h2>
-              <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
+            <div className="flex items-center justify-between gap-3 border-b border-line px-6 py-4">
+              <h2 className="min-w-0 break-words text-[18px] text-ink">{title}</h2>
+              <Button variant="ghost" size="sm" onClick={onClose} aria-label={t('close')} data-sheet-close="" className="shrink-0">
                 <X size={18} />
               </Button>
             </div>

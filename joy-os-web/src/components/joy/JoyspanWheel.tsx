@@ -1,7 +1,10 @@
 import { motion, useReducedMotion } from 'framer-motion'
 import { useId } from 'react'
 import type { TermKey, TermScore } from '@/domain/types'
-import { termByKey, termColor } from '@/data/terms'
+import { termColor } from '@/data/terms'
+import { useDict, useTermText } from '@/lib/i18n'
+import { SHARED } from '@/components/_i18n'
+import { useBandText } from './primitives'
 
 // The Joyspan Wheel (Brand Identity Playbook p45, p62, p65).
 // Six fixed petals, clockwise from the top: Body, Purpose, People, Freedom, Pleasure, Ease.
@@ -28,6 +31,9 @@ interface Props {
 
 export function JoyspanWheel({ terms, size = 240, value, showLabels = false, highlight = null, onSelect, animate = true, guide = true }: Props) {
   const reduce = useReducedMotion()
+  const tx = useDict(SHARED)
+  const tt = useTermText()
+  const bandText = useBandText()
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '')
   const pad = showLabels ? 56 : 4
   const box = size + pad * 2
@@ -47,11 +53,11 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
 
   const full = petalPath(inner, outer)
   const describe = terms
-    .map((t) => `${termByKey(t.key).name} ${t.key === 'B' ? 'minus ' : ''}${t.value ?? 'not yet measured'}${t.value !== null ? ', ' + t.band : ''}`)
+    .map((t) => `${tt.name(t.key)} ${t.key === 'B' ? tx('minus') : ''}${t.value ?? tx('bandNone')}${t.value !== null ? ', ' + bandText(t.band) : ''}`)
     .join('; ')
 
   return (
-    <svg width={box} height={box} viewBox={`0 0 ${box} ${box}`} role="img" aria-label={`Joyspan Wheel${value != null ? `, Index ${value}` : ''}. ${describe}`} className="max-w-full shrink-0">
+    <svg width={box} height={box} viewBox={`0 0 ${box} ${box}`} role="img" aria-label={`${tx('wheel')}${value != null ? tx('wheelIndex', { v: value }) : ''}. ${describe}`} className="max-w-full shrink-0">
       <defs>
         <pattern id={`hatch-${uid}`} width="4.5" height="4.5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
           <rect width="4.5" height="4.5" fill="var(--term-b-soft)" />
@@ -79,7 +85,7 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
             onKeyDown={interactive ? (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onSelect!(k)) : undefined}
             tabIndex={interactive ? 0 : undefined}
             role={interactive ? 'button' : undefined}
-            aria-label={interactive ? `${termByKey(k).space}: ${termByKey(k).name} ${v ?? 'not yet measured'}` : undefined}
+            aria-label={interactive ? `${tt.space(k)}: ${tt.name(k)} ${v ?? tx('bandNone')}` : undefined}
           >
             <clipPath id={clipId}>
               <motion.circle
@@ -106,11 +112,10 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
           const a = ((i * 60 - 90) * Math.PI) / 180
           const x = c + Math.cos(a) * (outer + 30)
           const y = c + Math.sin(a) * (outer + 30)
-          const term = termByKey(k)
           return (
             <g key={`l-${k}`}>
               <text x={x} y={y - 7} textAnchor="middle" fontFamily="var(--font-sans)" fontSize={13} fill="var(--ink)">
-                {term.space}
+                {tt.space(k)}
               </text>
               <text x={x} y={y + 10} textAnchor="middle" fontFamily="var(--font-mono)" fontSize={12} fill="var(--ink-3)">
                 {t?.value == null ? '—' : k === 'B' ? `−${t.value}` : t.value}

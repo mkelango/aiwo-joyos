@@ -2,7 +2,9 @@ import { router } from 'expo-router'
 import type { ReactNode } from 'react'
 import { Pressable, ScrollView, View, type StyleProp, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useDict } from '../lib/i18n'
 import { useTheme } from '../theme/ThemeProvider'
+import { KIT } from './_i18n'
 import { Icon } from './Icon'
 import { Body, Eyebrow, Title } from './Text'
 
@@ -58,7 +60,8 @@ interface HeaderProps {
 /** ScreenHeader — the one headline on the screen (accessibilityRole="header"). */
 export function ScreenHeader({ eyebrow, title, lead, back, right }: HeaderProps) {
   const { c, space } = useTheme()
-  const backLabel = typeof back === 'string' ? back : 'Back'
+  const t = useDict(KIT)
+  const backLabel = typeof back === 'string' ? back : t('back')
   return (
     <View style={{ gap: space.s1 }}>
       {back ? (
@@ -91,7 +94,7 @@ export function ScreenHeader({ eyebrow, title, lead, back, right }: HeaderProps)
 export function SectionTitle({ children, aside }: { children: string; aside?: ReactNode }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-      <Eyebrow accessibilityRole="header" aria-level={2}>{children}</Eyebrow>
+      <Eyebrow accessibilityRole="header" aria-level={2} style={{ flexShrink: 1 }}>{children}</Eyebrow>
       {aside}
     </View>
   )
@@ -99,10 +102,11 @@ export function SectionTitle({ children, aside }: { children: string; aside?: Re
 
 /** Placeholder body for a route a lane has not built yet. */
 export function StubScreen({ eyebrow, title, lane, back = true, inTabs = false }: { eyebrow: string; title: string; lane: 'A' | 'B'; back?: boolean; inTabs?: boolean }) {
+  const t = useDict(KIT)
   return (
     <Screen inTabs={inTabs}>
       <ScreenHeader eyebrow={eyebrow} title={title} back={back} />
-      <Body tone="ink3">Lane {lane} builds this screen.</Body>
+      <Body tone="ink3">{t('stub', { lane })}</Body>
     </Screen>
   )
 }

@@ -7,6 +7,8 @@ import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { palettes } from '@/theme/tokens'
 import { sessionStore, useStore } from './bStore'
+import { useDict } from '@/lib/i18n'
+import { PARTS } from './i18n/parts'
 
 // Lane B helpers: ’Cation, Practice, Care, account and entry screens.
 // Built only from theme tokens and the shared kit; no raw colours.
@@ -16,13 +18,14 @@ export const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 /** Primary-term chip that also handles the master ’cation (all six terms, each named in VoiceOver). */
 export function PrimaryChip({ primary, style }: { primary: TermKey | 'ALL'; style?: StyleProp<ViewStyle> }) {
   const { c, radius } = useTheme()
+  const t = useDict(PARTS)
   if (primary !== 'ALL') {
     return <TermChip term={primary} style={style} />
   }
   return (
     <View
       accessible
-      accessibilityLabel="All six terms: Healthspan, Purpose, Relationships, Freedom, Daily Pleasure and Preventable Suffering"
+      accessibilityLabel={t('allSixA11y')}
       style={[{ flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', borderRadius: radius.pill, borderWidth: 1, borderColor: c.line, backgroundColor: c.paperRaised, paddingHorizontal: 10, paddingVertical: 4 }, style]}
     >
       <View style={{ flexDirection: 'row', gap: 2 }}>
@@ -30,8 +33,8 @@ export function PrimaryChip({ primary, style }: { primary: TermKey | 'ALL'; styl
           <TermDot key={k} term={k} size={8} />
         ))}
       </View>
-      <Meta tone="ink" size={14}>
-        All six terms
+      <Meta tone="ink" size={14} style={{ flexShrink: 1 }}>
+        {t('allSix')}
       </Meta>
     </View>
   )
@@ -266,6 +269,7 @@ export function HereMarker({ label }: { label: string }) {
 /** A time stepper (quarter hours) — no native time picker needed, works with VoiceOver adjust. */
 export function TimeStepper({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   const { c, radius } = useTheme()
+  const t = useDict(PARTS)
   const toMin = (s: string) => {
     const [h, m] = s.split(':').map(Number)
     return h * 60 + m
@@ -287,11 +291,11 @@ export function TimeStepper({ label, value, onChange }: { label: string; value: 
     >
       <Eyebrow>{label}</Eyebrow>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: c.lineStrong, borderRadius: radius.card, backgroundColor: c.paperRaised, paddingHorizontal: 4, minHeight: 52 }}>
-        <IconButton bare icon="minus" label={`${label} earlier by 15 minutes`} onPress={() => step(-15)} size={44} />
+        <IconButton bare icon="minus" label={t('earlier', { label })} onPress={() => step(-15)} size={44} />
         <Mono size={22} tone="ink">
           {value}
         </Mono>
-        <IconButton bare icon="plus" label={`${label} later by 15 minutes`} onPress={() => step(15)} size={44} />
+        <IconButton bare icon="plus" label={t('later', { label })} onPress={() => step(15)} size={44} />
       </View>
     </View>
   )
@@ -302,6 +306,7 @@ export const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor
 /** The Mentor's five-minute audio — simulated playback, offline download, transcript. */
 export function AudioPlayer({ week, title, seconds, transcript, startAt = 0 }: { week: number; title: string; seconds: number; transcript: string[]; startAt?: number }) {
   const { c, space, radius } = useTheme()
+  const t = useDict(PARTS)
   const [playing, setPlaying] = useState(false)
   const [pos, setPos] = useState(startAt)
   const [rate, setRate] = useState<1 | 1.25 | 0.8>(1)
@@ -351,7 +356,7 @@ export function AudioPlayer({ week, title, seconds, transcript, startAt = 0 }: {
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s2 }}>
         <IconButton
           icon={playing ? 'pause' : 'play'}
-          label={playing ? 'Pause' : `Play ${title}`}
+          label={playing ? t('pause') : t('play', { title })}
           filled
           size={56}
           onPress={() => {
@@ -368,7 +373,7 @@ export function AudioPlayer({ week, title, seconds, transcript, startAt = 0 }: {
           <View
             accessible
             accessibilityRole="progressbar"
-            accessibilityLabel={`Played ${fmtTime(pos)} of ${fmtTime(seconds)}`}
+            accessibilityLabel={t('played', { pos: fmtTime(pos), total: fmtTime(seconds) })}
             style={{ flexDirection: 'row', justifyContent: 'space-between' }}
           >
             <Mono size={12} tone="ink3">
@@ -379,21 +384,21 @@ export function AudioPlayer({ week, title, seconds, transcript, startAt = 0 }: {
         </View>
       </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s1 }}>
-        <SmallPill icon="rotate-ccw" label="15 s" a11y="Back fifteen seconds" onPress={() => setPos((p) => Math.max(0, p - 15))} />
-        <SmallPill label={`${rate}×`} a11y={`Playback speed ${rate} times. Changes speed.`} onPress={() => setRate((r) => (r === 1 ? 1.25 : r === 1.25 ? 0.8 : 1))} mono />
-        <SmallPill icon={showText ? 'chevron-up' : 'chevron-down'} label="Transcript" a11y={showText ? 'Hide transcript' : 'Show transcript'} onPress={() => setShowText((s) => !s)} />
+        <SmallPill icon="rotate-ccw" label="15 s" a11y={t('back15')} onPress={() => setPos((p) => Math.max(0, p - 15))} />
+        <SmallPill label={`${rate}×`} a11y={t('speed', { rate })} onPress={() => setRate((r) => (r === 1 ? 1.25 : r === 1.25 ? 0.8 : 1))} mono />
+        <SmallPill icon={showText ? 'chevron-up' : 'chevron-down'} label={t('transcript')} a11y={showText ? t('hideTranscript') : t('showTranscript')} onPress={() => setShowText((s) => !s)} />
       </View>
       <View style={{ borderTopWidth: 1, borderTopColor: c.line, paddingTop: space.s2 }}>
         <Toggle
           checked={offline}
           onChange={setOffline}
-          label="Keep for offline"
-          description={offline ? (downloading < 100 ? `Downloading… ${downloading}%` : 'Saved on this device · 4.6 MB · plays with no signal') : 'Download this week’s audio for a flight or the car.'}
+          label={t('offline')}
+          description={offline ? (downloading < 100 ? t('downloading', { pct: downloading }) : t('savedDevice')) : t('downloadHint')}
         />
       </View>
       {showText ? (
         <View style={{ backgroundColor: c.paperSunk, borderRadius: radius.card, padding: space.s2, gap: space.s1 }}>
-          <Eyebrow>Transcript · follows the audio</Eyebrow>
+          <Eyebrow>{t('transcriptFollows')}</Eyebrow>
           {transcript.map((t, i) => (
             <Body key={i} tone={i === active && pos > 0 ? 'ink' : 'ink2'}>
               {t}
@@ -423,11 +428,12 @@ function SmallPill({ icon, label, a11y, onPress, mono }: { icon?: IconName; labe
 /** Step progress for flows: "Step 2 of 6 · Intent" plus segment bar. */
 export function StepProgress({ step, steps }: { step: number; steps: readonly string[] }) {
   const { c, space } = useTheme()
+  const t = useDict(PARTS)
   return (
-    <View style={{ gap: space.s1 }} accessible accessibilityLabel={`Step ${step + 1} of ${steps.length}: ${steps[step]}`}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.s1 }}>
-        <Eyebrow>{`Step ${step + 1} of ${steps.length}`}</Eyebrow>
-        <Eyebrow tone="ink2">{steps[step]}</Eyebrow>
+    <View style={{ gap: space.s1 }} accessible accessibilityLabel={t('stepOfA11y', { n: step + 1, total: steps.length, name: steps[step] })}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.s1, flexWrap: 'wrap' }}>
+        <Eyebrow>{t('stepOf', { n: step + 1, total: steps.length })}</Eyebrow>
+        <Eyebrow tone="ink2" style={{ flexShrink: 1, textAlign: 'right' }}>{steps[step]}</Eyebrow>
       </View>
       <View style={{ flexDirection: 'row', gap: 4 }}>
         {steps.map((s, i) => (

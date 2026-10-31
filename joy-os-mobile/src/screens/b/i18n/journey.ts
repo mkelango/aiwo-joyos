@@ -1,0 +1,236 @@
+import type { Dict } from '@/lib/i18n'
+import type { L3 } from './common'
+
+// Circles, Passport and Events.
+
+export const CIRCLES = {
+  eyebrow: { en: 'Circle of eight · Fairmont January', ta: 'எட்டுப் பேர் வட்டம் · Fairmont ஜனவரி', hi: 'आठ लोगों का सर्कल · Fairmont जनवरी' },
+  titleA: { en: 'Eight people, one ', ta: 'எட்டுப் பேர், ஒரு ', hi: 'आठ लोग, एक ' },
+  titleSerif: { en: 'Monday', ta: 'திங்கள்', hi: 'सोमवार' },
+  titleB: { en: '.', ta: '.', hi: '।' },
+  lead: { en: 'The same eight, with {coach}, every {when} for thirty minutes, for the ninety days. Formed in person before checkout.', ta: 'அதே எட்டுப் பேர், {coach} உடன், தொண்ணூறு நாட்களுக்கு ஒவ்வொரு திங்கள் இரவு 7 மணிக்கும் முப்பது நிமிடங்கள். புறப்படும் முன் நேரில் உருவானது.', hi: 'वही आठ लोग, {coach} के साथ, नब्बे दिन तक हर सोमवार शाम 7 बजे तीस मिनट। चेकआउट से पहले आमने-सामने बना।' },
+  nextCall: { en: 'Next call', ta: 'அடுத்த அழைப்பு', hi: 'अगली कॉल' },
+  weekOf: { en: 'Week {n} of the Practice', ta: 'பயிற்சியின் வாரம் {n}', hi: 'अभ्यास का हफ़्ता {n}' },
+  monday: { en: 'Monday {date}', ta: 'திங்கள் {date}', hi: 'सोमवार {date}' },
+  minutesA: { en: ' minutes · video or audio · with {coach}', ta: ' நிமிடங்கள் · வீடியோ அல்லது ஒலி · {coach} உடன்', hi: ' मिनट · वीडियो या ऑडियो · {coach} के साथ' },
+  inCircle: { en: 'In this circle: {list}, with {coach}.', ta: 'இந்த வட்டத்தில்: {list}, {coach} உடன்.', hi: 'इस सर्कल में: {list}, {coach} के साथ।' },
+  promptFrom: { en: 'This week’s prompt, from Priya', ta: 'இந்த வாரக் கேள்வி, Priya-விடமிருந்து', hi: 'इस हफ़्ते का सवाल, Priya की ओर से' },
+  join: { en: 'Join Monday’s call', ta: 'திங்கள் அழைப்பில் சேருங்கள்', hi: 'सोमवार की कॉल से जुड़ें' },
+  roomOpens: { en: 'The room opens ten minutes before. Audio only is always fine.', ta: 'அறை பத்து நிமிடங்கள் முன்பே திறக்கும். ஒலி மட்டும் என்றாலும் எப்போதும் சரி.', hi: 'रूम दस मिनट पहले खुलता है। सिर्फ़ ऑडियो भी हमेशा ठीक है।' },
+  agreed: { en: 'What the eight of you agreed', ta: 'நீங்கள் எட்டுப் பேரும் ஒப்புக்கொண்டது', hi: 'आप आठों ने क्या तय किया' },
+  a1: { en: 'First names only. Cameras optional.', ta: 'முதல் பெயர்கள் மட்டும். கேமரா விருப்பத்தேர்வு.', hi: 'सिर्फ़ पहला नाम। कैमरा अपनी मर्ज़ी।' },
+  a2: { en: 'What is said in the circle stays in the circle. Nothing is recorded.', ta: 'வட்டத்தில் சொல்லப்படுவது வட்டத்திலேயே இருக்கும். எதுவும் பதிவு செய்யப்படுவதில்லை.', hi: 'सर्कल में कही बात सर्कल में ही रहती है। कुछ भी रिकॉर्ड नहीं होता।' },
+  a3: { en: 'No one is ranked, scored or compared. There is no leaderboard.', ta: 'யாரும் தரவரிசைப்படுத்தப்படுவதோ மதிப்பிடப்படுவதோ ஒப்பிடப்படுவதோ இல்லை. தரவரிசைப் பட்டியல் இல்லை.', hi: 'किसी की रैंकिंग, स्कोरिंग या तुलना नहीं होती। कोई लीडरबोर्ड नहीं।' },
+  a4: { en: 'Missing a Monday is fine. The circle is there the next week.', ta: 'ஒரு திங்கள் தவறினாலும் பரவாயில்லை. அடுத்த வாரமும் வட்டம் இருக்கும்.', hi: 'कोई सोमवार छूट जाए तो कोई बात नहीं। अगले हफ़्ते सर्कल वहीं होगा।' },
+  worries: { en: 'If something said in the circle worries Priya, she reaches out to that person privately, never in front of the group.', ta: 'வட்டத்தில் சொல்லப்பட்ட ஏதாவது Priya-வுக்குக் கவலை தந்தால், அவர் அந்த நபரைத் தனிப்பட்ட முறையில் தொடர்புகொள்வார், குழுவின் முன் ஒருபோதும் இல்லை.', hi: 'अगर सर्कल में कही कोई बात Priya को चिंतित करे, तो वे उस व्यक्ति से अकेले में बात करती हैं, समूह के सामने कभी नहीं।' },
+  weeksSoFar: { en: 'The weeks so far', ta: 'இதுவரையிலான வாரங்கள்', hi: 'अब तक के हफ़्ते' },
+  formed: { en: 'Formed', ta: 'உருவானது', hi: 'बना' },
+  formedAt: { en: 'Formed at Fairmont Mumbai', ta: 'Fairmont Mumbai-இல் உருவானது', hi: 'Fairmont Mumbai में बना' },
+  weekN: { en: 'Week {n}', ta: 'வாரம் {n}', hi: 'हफ़्ता {n}' },
+  sessionA11y: { en: '{label}, {date}: {title}. {n} of 8 there. {note}', ta: '{label}, {date}: {title}. 8 இல் {n} பேர் வந்தனர். {note}', hi: '{label}, {date}: {title}। 8 में से {n} मौजूद। {note}' },
+  there: { en: ' there · notes by Priya, first names only', ta: ' பேர் வந்தனர் · Priya-வின் குறிப்புகள், முதல் பெயர்கள் மட்டும்', hi: ' मौजूद · Priya के नोट्स, सिर्फ़ पहले नाम' },
+  others: { en: 'Other circles', ta: 'பிற வட்டங்கள்', hi: 'दूसरे सर्कल' },
+  othersBody: { en: 'Formed by life stage and language. Join one, or none; your circle of eight stays the same.', ta: 'வாழ்க்கைக் கட்டம், மொழி வாரியாக உருவானவை. ஒன்றில் சேருங்கள், அல்லது எதிலும் வேண்டாம்; உங்கள் எட்டுப் பேர் வட்டம் அப்படியே இருக்கும்.', hi: 'ज़िंदगी के पड़ाव और भाषा के हिसाब से बने। किसी एक से जुड़ें, या किसी से नहीं; आपका आठ लोगों का सर्कल वैसा ही रहेगा।' },
+  ledBy: { en: '{when} · led by {lead}', ta: '{when} · தலைமை {lead}', hi: '{when} · अगुवाई {lead}' },
+  accepted: { en: 'Accepted. Dr Anjali will write before the first evening.', ta: 'ஏற்கப்பட்டது. முதல் மாலைக்கு முன் Dr Anjali எழுதுவார்.', hi: 'स्वीकार किया। पहली शाम से पहले Dr Anjali लिखेंगी।' },
+  requested: { en: 'Requested. {lead} will reply within two days.', ta: 'கோரிக்கை அனுப்பப்பட்டது. {lead} இரண்டு நாட்களுக்குள் பதிலளிப்பார்.', hi: 'अनुरोध भेजा गया। {lead} दो दिन में जवाब देंगे।' },
+  accept: { en: 'Accept the invitation', ta: 'அழைப்பை ஏற்கவும்', hi: 'न्योता स्वीकार करें' },
+  ask: { en: 'Ask to join', ta: 'சேரக் கேளுங்கள்', hi: 'जुड़ने का अनुरोध करें' },
+  salons: { en: 'Connections salons', ta: 'இணைப்புச் சந்திப்புகள்', hi: 'मेल-जोल की महफ़िलें' },
+  salonsBody: { en: 'Small evenings with a host and a theme. In person, never recorded.', ta: 'ஒரு விருந்தோம்பவர், ஒரு கருப்பொருளுடன் சிறு மாலைச் சந்திப்புகள். நேரில், ஒருபோதும் பதிவு செய்யப்படாது.', hi: 'एक मेज़बान और एक विषय के साथ छोटी शामें। आमने-सामने, कभी रिकॉर्ड नहीं।' },
+  hosted: { en: 'Hosted by {host}', ta: 'நடத்துபவர் {host}', hi: 'मेज़बान {host}' },
+  seats: { en: ' seats', ta: ' இருக்கைகள்', hi: ' सीटें' },
+  seatReq: { en: 'Seat requested · tap to undo', ta: 'இருக்கை கோரப்பட்டது · ரத்துசெய்யத் தட்டுங்கள்', hi: 'सीट माँगी गई · वापस लेने के लिए टैप करें' },
+  reqSeat: { en: 'Request a seat', ta: 'இருக்கை கோருங்கள்', hi: 'सीट माँगें' },
+  sheetTitle: { en: 'Monday’s circle', ta: 'திங்கள் வட்டம்', hi: 'सोमवार का सर्कल' },
+  doneAudio: { en: 'Done · audio only', ta: 'முடிந்தது · ஒலி மட்டும்', hi: 'हो गया · सिर्फ़ ऑडियो' },
+  doneSee: { en: 'Done · see you Monday', ta: 'முடிந்தது · திங்களன்று சந்திப்போம்', hi: 'हो गया · सोमवार को मिलते हैं' },
+  roomAt: { en: 'The room opens at 18:50 on Monday {date}, for thirty minutes with {coach} and the same eight.', ta: 'திங்கள் {date} அன்று 18:50 மணிக்கு அறை திறக்கும், {coach}-உம் அதே எட்டுப் பேரும் முப்பது நிமிடங்கள்.', hi: 'रूम सोमवार {date} को 18:50 पर खुलेगा, {coach} और उन्हीं आठ लोगों के साथ तीस मिनट।' },
+  room: { en: 'Room', ta: 'அறை', hi: 'रूम' },
+  joinBy: { en: 'Join by', ta: 'இதன் மூலம் சேருங்கள்', hi: 'ऐसे जुड़ें' },
+  video: { en: 'Video', ta: 'வீடியோ', hi: 'वीडियो' },
+  audioOnly: { en: 'Audio only', ta: 'ஒலி மட்டும்', hi: 'सिर्फ़ ऑडियो' },
+  remAudio: { en: 'Remembered: you join by audio, camera off. Good on a train or a slow signal.', ta: 'நினைவில் வைக்கப்பட்டது: நீங்கள் கேமரா இல்லாமல் ஒலி மூலம் சேர்வீர்கள். ரயிலிலோ மெதுவான சிக்னலிலோ நல்லது.', hi: 'याद रखा: आप ऑडियो से जुड़ेंगे, कैमरा बंद। ट्रेन में या कमज़ोर सिग्नल पर अच्छा।' },
+  remVideo: { en: 'Remembered: you join by video. Cameras are optional; first names only.', ta: 'நினைவில் வைக்கப்பட்டது: நீங்கள் வீடியோ மூலம் சேர்வீர்கள். கேமரா விருப்பத்தேர்வு; முதல் பெயர்கள் மட்டும்.', hi: 'याद रखा: आप वीडियो से जुड़ेंगे। कैमरा अपनी मर्ज़ी; सिर्फ़ पहले नाम।' },
+  remind: { en: 'Remind me an hour before', ta: 'ஒரு மணிநேரம் முன் நினைவூட்டுங்கள்', hi: 'एक घंटा पहले याद दिलाएँ' },
+  remindD: { en: 'At 18:00, outside your quiet hours. The only reminder for the circle.', ta: '18:00 மணிக்கு, உங்கள் அமைதி நேரத்துக்கு வெளியே. வட்டத்துக்கான ஒரே நினைவூட்டல்.', hi: '18:00 बजे, आपके शांत समय से बाहर। सर्कल का अकेला रिमाइंडर।' },
+  addedCal: { en: 'Added to your calendar · Mondays 19:00–19:30 until Day 90', ta: 'உங்கள் நாள்காட்டியில் சேர்க்கப்பட்டது · நாள் 90 வரை திங்கள்தோறும் 19:00–19:30', hi: 'आपके कैलेंडर में जोड़ा · दिन 90 तक हर सोमवार 19:00–19:30' },
+  removeCal: { en: 'Remove from calendar', ta: 'நாள்காட்டியிலிருந்து நீக்கு', hi: 'कैलेंडर से हटाएँ' },
+  addCal: { en: 'Add to calendar (specimen)', ta: 'நாள்காட்டியில் சேர் (மாதிரி)', hi: 'कैलेंडर में जोड़ें (नमूना)' },
+  cantMake: { en: 'If you cannot make it, nothing is counted; Priya will share the week’s notes.', ta: 'உங்களால் வர முடியாவிட்டால், எதுவும் கணக்கிடப்படாது; Priya அந்த வாரக் குறிப்புகளைப் பகிர்வார்.', hi: 'अगर आप न आ पाएँ, तो कुछ नहीं गिना जाता; Priya हफ़्ते के नोट्स भेज देंगी।' },
+} satisfies Dict
+
+/** Other circles: the copy we wrote about each (names of people stay as they are). */
+export const OTHER_CIRCLE_TEXT: Record<string, { name: L3; who: L3; when: L3; note: L3 }> = {
+  couples: { name: { en: 'Couples circle', ta: 'தம்பதியர் வட்டம்', hi: 'जोड़ों का सर्कल' }, who: { en: 'Four couples · with Kavya', ta: 'நான்கு தம்பதியர் · Kavya உடன்', hi: 'चार जोड़े · Kavya के साथ' }, when: { en: 'Alternate Thursdays · 8 pm', ta: 'ஒன்றுவிட்ட வியாழன்கள் · இரவு 8 மணி', hi: 'हर दूसरे गुरुवार · रात 8 बजे' }, note: { en: 'Each partner’s answers stay private to that partner.', ta: 'ஒவ்வொரு துணையின் பதில்களும் அவருக்கு மட்டுமே தெரியும்.', hi: 'हर साथी के जवाब सिर्फ़ उन्हीं तक रहते हैं।' } },
+  family: { name: { en: 'Family circle', ta: 'குடும்ப வட்டம்', hi: 'परिवार का सर्कल' }, who: { en: 'The Rao household · three generations', ta: 'Rao குடும்பம் · மூன்று தலைமுறைகள்', hi: 'Rao परिवार · तीन पीढ़ियाँ' }, when: { en: 'First Sunday · 11 am', ta: 'முதல் ஞாயிறு · காலை 11 மணி', hi: 'पहला रविवार · सुबह 11 बजे' }, note: { en: 'Lakshmi joins in elder mode; large type and voice.', ta: 'Lakshmi மூத்தோர் பயன்முறையில் சேர்கிறார்; பெரிய எழுத்தும் குரலும்.', hi: 'Lakshmi बुज़ुर्ग मोड में जुड़ती हैं; बड़े अक्षर और आवाज़।' } },
+  founders: { name: { en: 'Founders’ circle', ta: 'நிறுவனர்கள் வட்டம்', hi: 'फ़ाउंडर्स का सर्कल' }, who: { en: 'Eight founders after an exit or a transition', ta: 'வெளியேற்றம் அல்லது மாற்றத்துக்குப் பிந்தைய எட்டு நிறுவனர்கள்', hi: 'एग्ज़िट या बदलाव के बाद के आठ फ़ाउंडर' }, when: { en: 'Wednesdays · 7.30 am', ta: 'புதன்கிழமைகள் · காலை 7.30', hi: 'हर बुधवार · सुबह 7.30' }, note: { en: 'Formed by life stage and language.', ta: 'வாழ்க்கைக் கட்டம், மொழி வாரியாக உருவானது.', hi: 'ज़िंदगी के पड़ाव और भाषा के हिसाब से बना।' } },
+  alumni: { name: { en: 'Fairmont alumni circle', ta: 'Fairmont முன்னாள் விருந்தினர் வட்டம்', hi: 'Fairmont पूर्व-मेहमान सर्कल' }, who: { en: 'Guests of AIWO Joyspan 2027', ta: 'AIWO Joyspan 2027 விருந்தினர்கள்', hi: 'AIWO Joyspan 2027 के मेहमान' }, when: { en: 'Monthly · last Saturday', ta: 'மாதந்தோறும் · கடைசி சனி', hi: 'हर महीने · आख़िरी शनिवार' }, note: { en: 'For everyone who was there; join any month.', ta: 'அங்கு இருந்த அனைவருக்கும்; எந்த மாதமும் சேரலாம்.', hi: 'वहाँ मौजूद सभी के लिए; किसी भी महीने जुड़ें।' } },
+}
+
+export const CIRCLE_STATUS: Record<string, L3> = {
+  Invited: { en: 'Invited', ta: 'அழைக்கப்பட்டீர்கள்', hi: 'न्योता मिला' },
+  Open: { en: 'Open', ta: 'திறந்துள்ளது', hi: 'खुला' },
+  Member: { en: 'Member', ta: 'உறுப்பினர்', hi: 'सदस्य' },
+}
+
+export const SALON_TITLE: Record<string, L3> = {
+  sa1: { en: 'Food & memory', ta: 'உணவும் நினைவும்', hi: 'खाना और यादें' },
+  sa2: { en: 'Old friends, new questions', ta: 'பழைய நண்பர்கள், புதிய கேள்விகள்', hi: 'पुराने दोस्त, नए सवाल' },
+  sa3: { en: 'Music we grew up with', ta: 'நாம் வளர்ந்த இசை', hi: 'वह संगीत जिसके साथ हम बड़े हुए' },
+}
+
+/** The circle prompt for each Practice week. */
+export const CIRCLE_PROMPT: Record<number, L3> = {
+  1: { en: 'Which petal of your Wheel surprised you, and why?', ta: 'உங்கள் சக்கரத்தின் எந்த இதழ் உங்களை வியப்பில் ஆழ்த்தியது, ஏன்?', hi: 'आपके व्हील की किस पंखुड़ी ने आपको चौंकाया, और क्यों?' },
+  2: { en: 'Share one answer to the Tomorrow Question that came true.', ta: 'நாளைக் கேள்விக்கு நீங்கள் சொன்ன, நிஜமான ஒரு பதிலைப் பகிருங்கள்.', hi: 'कल के सवाल का एक जवाब बताइए जो सच हुआ।' },
+  3: { en: 'Without naming anyone, describe an entry you chose to close.', ta: 'யார் பெயரையும் சொல்லாமல், நீங்கள் முடித்துவைக்கத் தேர்ந்தெடுத்த ஒரு பதிவை விவரியுங்கள்.', hi: 'किसी का नाम लिए बिना, वह बात बताइए जिसे आपने ख़त्म करना चुना।' },
+  4: { en: 'Name one pleasure you have been saving for “later”. When is later?', ta: '“பிறகு” என்று நீங்கள் ஒதுக்கி வைத்திருக்கும் ஒரு மகிழ்ச்சியைச் சொல்லுங்கள். அந்தப் “பிறகு” எப்போது?', hi: 'कोई एक ख़ुशी बताइए जिसे आप “बाद में” के लिए बचा रहे हैं। वह “बाद में” कब है?' },
+  5: { en: 'Which small correction surprised you by how much it helped?', ta: 'எந்தச் சிறு திருத்தம் எவ்வளவு உதவியது என்று உங்களை வியப்பில் ஆழ்த்தியது?', hi: 'किस छोटे सुधार ने इतनी मदद की कि आप हैरान रह गए?' },
+  6: { en: 'Describe a second arrow you noticed yourself about to fire.', ta: 'நீங்களே எய்யப் போவதைக் கவனித்த ஒரு ‘இரண்டாவது அம்பை’ விவரியுங்கள்.', hi: 'वह ‘दूसरा तीर’ बताइए जिसे आपने ख़ुद को चलाते हुए पकड़ा।' },
+  7: { en: 'What is on your No list, and what will you do with the time?', ta: 'உங்கள் வேண்டாம் பட்டியலில் என்ன இருக்கிறது, அந்த நேரத்தில் என்ன செய்வீர்கள்?', hi: 'आपकी ना की सूची में क्या है, और उस समय का आप क्या करेंगे?' },
+  8: { en: 'What will you carry into the next ninety days?', ta: 'அடுத்த தொண்ணூறு நாட்களுக்குள் நீங்கள் எதை எடுத்துச் செல்வீர்கள்?', hi: 'अगले नब्बे दिनों में आप क्या साथ ले जाएँगे?' },
+}
+
+export const PASSPORT_T = {
+  eyebrow: { en: 'Joy Passport', ta: 'ஜாய் பாஸ்போர்ட்', hi: 'जॉय पासपोर्ट' },
+  titleA: { en: 'One card, ', ta: 'ஒரே அட்டை, நீங்கள் செல்லும் ', hi: 'एक कार्ड, आप जहाँ भी जाएँ, ' },
+  titleSerif: { en: 'everywhere', ta: 'எல்லா இடங்களிலும்', hi: 'हर जगह' },
+  titleB: { en: ' you go.', ta: '.', hi: '।' },
+  lead: { en: 'Show it at a ’cation, a Session or a House. It carries your name and your booking; your health data stays with you.', ta: '’கேஷன், Session அல்லது House-இல் இதைக் காட்டுங்கள். இதில் உங்கள் பெயரும் முன்பதிவும் மட்டும்; உங்கள் உடல்நலத் தரவு உங்களிடமே இருக்கும்.', hi: '’केशन, Session या House में इसे दिखाएँ। इसमें आपका नाम और बुकिंग है; सेहत का डेटा आपके पास ही रहता है।' },
+  cardEyebrow: { en: 'Joy Passport · AIWO', ta: 'ஜாய் பாஸ்போர்ட் · AIWO', hi: 'जॉय पासपोर्ट · AIWO' },
+  qrA11y: { en: 'Passport QR, {n}. Specimen.', ta: 'பாஸ்போர்ட் QR, {n}. மாதிரி.', hi: 'पासपोर्ट QR, {n}। नमूना।' },
+  number: { en: 'Number', ta: 'எண்', hi: 'नंबर' },
+  since: { en: 'Member since', ta: 'உறுப்பினரான நாள்', hi: 'सदस्य कब से' },
+  issuedAt: { en: 'Issued at', ta: 'வழங்கிய இடம்', hi: 'जारी हुआ' },
+  venues: { en: 'Venues see a name and a booking, never health data.', ta: 'தங்குமிடங்கள் பெயரையும் முன்பதிவையும் மட்டுமே பார்க்கும், உடல்நலத் தரவை ஒருபோதும் இல்லை.', hi: 'वेन्यू को नाम और बुकिंग दिखती है, सेहत का डेटा कभी नहीं।' },
+  show: { en: 'Show at check-in', ta: 'செக்-இன்னில் காட்டுங்கள்', hi: 'चेक-इन पर दिखाएँ' },
+  sameIndex: { en: 'The same Index, wherever you are', ta: 'நீங்கள் எங்கிருந்தாலும் அதே குறியீடு', hi: 'आप कहीं भी हों, वही इंडेक्स' },
+  joyspanIndex: { en: 'Joyspan Index', ta: 'ஜாய்ஸ்பான் குறியீடு', hi: 'जॉयस्पैन इंडेक्स' },
+  sameNumber: { en: 'Every House and ’cation reads the same number, by the same method. Nothing is re-scored by a venue.', ta: 'ஒவ்வொரு House-உம் ’கேஷனும் அதே முறையில் அதே எண்ணைப் படிக்கின்றன. எந்தத் தங்குமிடமும் மீண்டும் மதிப்பிடுவதில்லை.', hi: 'हर House और ’केशन एक ही तरीके से वही नंबर पढ़ता है। कोई वेन्यू दोबारा स्कोर नहीं करता।' },
+  sameNinety: { en: 'The same ninety days', ta: 'அதே தொண்ணூறு நாட்கள்', hi: 'वही नब्बे दिन' },
+  started: { en: 'Started {date} at checkout. A Session or a House visit continues it; it never restarts the clock.', ta: '{date} அன்று புறப்படும்போது தொடங்கியது. Session அல்லது House வருகை அதைத் தொடர்கிறது; கடிகாரம் ஒருபோதும் மீண்டும் தொடங்காது.', hi: '{date} को चेकआउट पर शुरू हुआ। Session या House जाना इसे आगे बढ़ाता है; घड़ी कभी फिर से शुरू नहीं होती।' },
+  stamps: { en: 'Stamps', ta: 'முத்திரைகள்', hi: 'मुहरें' },
+  stampsBody: { en: 'Where you have been and where you are going. Not a badge, not a count: a record you can show.', ta: 'நீங்கள் சென்ற இடங்களும் செல்லப்போகும் இடங்களும். பதக்கமும் அல்ல, எண்ணிக்கையும் அல்ல: நீங்கள் காட்டக்கூடிய ஒரு பதிவு.', hi: 'आप कहाँ गए और कहाँ जा रहे हैं। न बैज, न गिनती: एक रिकॉर्ड जो आप दिखा सकें।' },
+  pass: { en: 'Pass {ref}', ta: 'பாஸ் {ref}', hi: 'पास {ref}' },
+  passAt: { en: '{where} · pass {ref}', ta: '{where} · பாஸ் {ref}', hi: '{where} · पास {ref}' },
+  sessionCity: { en: 'Joyspan Session · {city}', ta: 'ஜாய்ஸ்பான் Session · {city}', hi: 'जॉयस्पैन Session · {city}' },
+  session: { en: 'Joyspan Session', ta: 'ஜாய்ஸ்பான் Session', hi: 'जॉयस्पैन Session' },
+  stampA11y: { en: '{kind}: {what}, {place}, {when}. {state}.', ta: '{kind}: {what}, {place}, {when}. {state}.', hi: '{kind}: {what}, {place}, {when}। {state}।' },
+  stamped: { en: 'Stamped', ta: 'முத்திரையிடப்பட்டது', hi: 'मुहर लगी' },
+  upcoming: { en: 'Upcoming', ta: 'வரவிருக்கிறது', hi: 'आने वाला' },
+  opens: { en: 'What it opens', ta: 'இது எதைத் திறக்கிறது', hi: 'इससे क्या खुलता है' },
+  booked: { en: '{n} of 4 booked', ta: '4 இல் {n} முன்பதிவு', hi: '4 में से {n} बुक' },
+  events: { en: 'Events and passes', ta: 'நிகழ்வுகளும் பாஸ்களும்', hi: 'इवेंट और पास' },
+  membership: { en: 'Your membership', ta: 'உங்கள் உறுப்பினர் திட்டம்', hi: 'आपकी सदस्यता' },
+  checkin: { en: 'Check-in', ta: 'செக்-இன்', hi: 'चेक-इन' },
+  checkinA11y: { en: 'Check-in QR for {name}, passport {n}. Specimen.', ta: '{name}-க்கான செக்-இன் QR, பாஸ்போர்ட் {n}. மாதிரி.', hi: '{name} के लिए चेक-इन QR, पासपोर्ट {n}। नमूना।' },
+  brightness: { en: 'Turn your brightness up and hold the phone flat. The desk sees your name and booking only.', ta: 'திரையின் ஒளியை அதிகரித்து, தொலைபேசியைச் சமமாகப் பிடியுங்கள். வரவேற்பு மேசை உங்கள் பெயரையும் முன்பதிவையும் மட்டுமே பார்க்கும்.', hi: 'स्क्रीन की रोशनी बढ़ाएँ और फ़ोन सीधा पकड़ें। डेस्क को सिर्फ़ आपका नाम और बुकिंग दिखती है।' },
+  stamp: { en: 'Stamp', ta: 'முத்திரை', hi: 'मुहर' },
+  place: { en: 'Place', ta: 'இடம்', hi: 'जगह' },
+  when: { en: 'When', ta: 'எப்போது', hi: 'कब' },
+  status: { en: 'Status', ta: 'நிலை', hi: 'स्थिति' },
+  stampedCheckout: { en: 'Stamped at checkout', ta: 'புறப்படும்போது முத்திரையிடப்பட்டது', hi: 'चेकआउट पर मुहर लगी' },
+  upcomingArrival: { en: 'Upcoming · stamped on arrival', ta: 'வரவிருக்கிறது · வந்தவுடன் முத்திரையிடப்படும்', hi: 'आने वाला · पहुँचने पर मुहर लगेगी' },
+  journey: { en: 'Your ’cation journey', ta: 'உங்கள் ’கேஷன் பயணம்', hi: 'आपकी ’केशन यात्रा' },
+  schedule: { en: 'See the schedule', ta: 'அட்டவணையைப் பாருங்கள்', hi: 'कार्यक्रम देखें' },
+} satisfies Dict
+
+export const STAMP_KIND: Record<string, L3> = {
+  '’Cation': { en: '’Cation', ta: '’கேஷன்', hi: '’केशन' },
+  House: { en: 'House', ta: 'House', hi: 'House' },
+  Session: { en: 'Session', ta: 'Session', hi: 'Session' },
+}
+
+export const ENTITLEMENT_TEXT: Record<string, { label: L3; detail: L3; used?: L3 }> = {
+  'Named coach and concierge': { label: { en: 'Named coach and concierge', ta: 'குறிப்பிட்ட பயிற்சியாளரும் கான்சியர்ஜும்', hi: 'तय कोच और कंसीयर्ज' }, detail: { en: 'Priya Natarajan · Ravi Shankar', ta: 'Priya Natarajan · Ravi Shankar', hi: 'Priya Natarajan · Ravi Shankar' } },
+  'Quarterly Index': { label: { en: 'Quarterly Index', ta: 'காலாண்டு குறியீடு', hi: 'तिमाही इंडेक्स' }, detail: { en: 'Next re-measure opens Day 76', ta: 'அடுத்த மறு அளவீடு நாள் 76 இல் திறக்கும்', hi: 'अगला दोबारा माप दिन 76 को खुलेगा' }, used: { en: '1 of 4 this year', ta: 'இந்த ஆண்டு 4 இல் 1', hi: 'इस साल 4 में से 1' } },
+  'Joyspan Sessions': { label: { en: 'Joyspan Sessions', ta: 'ஜாய்ஸ்பான் Sessions', hi: 'जॉयस्पैन Sessions' }, detail: { en: 'Any city, any House', ta: 'எந்த நகரமும், எந்த House-உம்', hi: 'कोई भी शहर, कोई भी House' } },
+  'Circle of eight': { label: { en: 'Circle of eight', ta: 'எட்டுப் பேர் வட்டம்', hi: 'आठ लोगों का सर्कल' }, detail: { en: 'Mondays 7 pm with Priya', ta: 'திங்கள்தோறும் இரவு 7 மணி, Priya உடன்', hi: 'हर सोमवार शाम 7 बजे, Priya के साथ' } },
+  'The Joyspiration Practice': { label: { en: 'The Joyspiration Practice', ta: 'ஜாய்ஸ்பிரேஷன் பயிற்சி', hi: 'जॉयस्पिरेशन अभ्यास' }, detail: { en: 'All eight weeks, audio offline', ta: 'எட்டு வாரங்களும், இணையம் இல்லாமல் ஒலி', hi: 'सभी आठ हफ़्ते, ऑफ़लाइन ऑडियो' } },
+  'Joyspan House access': { label: { en: 'Joyspan House access', ta: 'ஜாய்ஸ்பான் House அணுகல்', hi: 'जॉयस्पैन House में प्रवेश' }, detail: { en: 'Chennai · Mumbai opens FY28', ta: 'சென்னை · மும்பை FY28 இல் திறக்கும்', hi: 'चेन्नई · मुंबई FY28 में खुलेगा' } },
+}
+
+export const EVENTS_T = {
+  eyebrow: { en: 'Events · passes', ta: 'நிகழ்வுகள் · பாஸ்கள்', hi: 'इवेंट · पास' },
+  titleA: { en: 'The same Index, in a ', ta: 'மனிதர்கள் நிறைந்த ஒரு ', hi: 'लोगों से भरे ' },
+  titleSerif: { en: 'room', ta: 'அறையில்', hi: 'कमरे में' },
+  titleB: { en: ' full of people.', ta: ' அதே குறியீடு.', hi: ' वही इंडेक्स।' },
+  lead: { en: 'Sessions, salons and the flagship. Your pass opens the door; the venue sees a name and a booking, never health data.', ta: 'Sessions, சந்திப்புகள், முதன்மை நிகழ்வு. உங்கள் பாஸ் கதவைத் திறக்கும்; தங்குமிடம் பெயரையும் முன்பதிவையும் மட்டுமே பார்க்கும், உடல்நலத் தரவை ஒருபோதும் இல்லை.', hi: 'Sessions, महफ़िलें और मुख्य आयोजन। आपका पास दरवाज़ा खोलता है; वेन्यू को नाम और बुकिंग दिखती है, सेहत का डेटा कभी नहीं।' },
+  yourPasses: { en: 'Your passes', ta: 'உங்கள் பாஸ்கள்', hi: 'आपके पास' },
+  qrA11y: { en: 'Pass QR code for {name}, reference {code}. Specimen.', ta: '{name}-க்கான பாஸ் QR குறியீடு, குறிப்பு {code}. மாதிரி.', hi: '{name} के लिए पास QR कोड, संदर्भ {code}। नमूना।' },
+  gate: { en: 'Gate', ta: 'வாயில்', hi: 'गेट' },
+  seat: { en: 'Seat', ta: 'இருக்கை', hi: 'सीट' },
+  holder: { en: 'Holder', ta: 'உரிமையாளர்', hi: 'धारक' },
+  venueSees: { en: 'Venue sees name and booking only.', ta: 'தங்குமிடம் பெயரையும் முன்பதிவையும் மட்டுமே பார்க்கும்.', hi: 'वेन्यू को सिर्फ़ नाम और बुकिंग दिखती है।' },
+  inWallet: { en: 'In your wallet · specimen', ta: 'உங்கள் வாலட்டில் · மாதிரி', hi: 'आपके वॉलेट में · नमूना' },
+  addWallet: { en: 'Add to wallet (specimen)', ta: 'வாலட்டில் சேர் (மாதிரி)', hi: 'वॉलेट में जोड़ें (नमूना)' },
+  schedule: { en: 'Your schedule · Sat 20 Feb', ta: 'உங்கள் அட்டவணை · சனி 20 பிப்', hi: 'आपका कार्यक्रम · शनि 20 फ़र' },
+  scheduleBody: { en: 'Joyspan House Chennai. Items marked yours are held for you; add any to your calendar.', ta: 'ஜாய்ஸ்பான் House சென்னை. “உங்களுடையது” எனக் குறிக்கப்பட்டவை உங்களுக்காக ஒதுக்கப்பட்டுள்ளன; எதையும் நாள்காட்டியில் சேர்க்கலாம்.', hi: 'जॉयस्पैन House चेन्नई। “आपका” वाले आइटम आपके लिए रखे गए हैं; किसी को भी कैलेंडर में जोड़ें।' },
+  yours: { en: 'Yours', ta: 'உங்களுடையது', hi: 'आपका' },
+  addCal: { en: 'Add to calendar', ta: 'நாள்காட்டியில் சேர்', hi: 'कैलेंडर में जोड़ें' },
+  zones: { en: 'Experience Zones · by term', ta: 'அனுபவ மண்டலங்கள் · அம்சம் வாரியாக', hi: 'अनुभव ज़ोन · पहलू के हिसाब से' },
+  onSite: { en: 'Index issued on site', ta: 'நிகழ்விடத்திலேயே வழங்கப்பட்ட குறியீடு', hi: 'मौके पर जारी इंडेक्स' },
+  onSiteBody: { en: 'Your Index was taken on {date} at the flagship and handed to you on a card. At a Session, a short re-check happens at the Body Zone, like for like.', ta: 'உங்கள் குறியீடு {date} அன்று முதன்மை நிகழ்வில் எடுக்கப்பட்டு, அட்டையாக உங்களிடம் கொடுக்கப்பட்டது. Session-இல், உடல் மண்டலத்தில் அதே முறையில் ஒரு சிறு மறுபரிசோதனை நடக்கும்.', hi: 'आपका इंडेक्स {date} को मुख्य आयोजन में लिया गया और कार्ड पर आपको दिया गया। Session में, शरीर ज़ोन पर हूबहू वैसी ही एक छोटी दोबारा जाँच होती है।' },
+  day90A: { en: 'Your Day 90 is ', ta: 'உங்கள் நாள் 90: ', hi: 'आपका दिन 90 है ' },
+  day90B: { en: '. Today is Day {n}.', ta: '. இன்று நாள் {n}.', hi: '। आज दिन {n} है।' },
+  passport: { en: 'Your Joy Passport', ta: 'உங்கள் ஜாய் பாஸ்போர்ட்', hi: 'आपका जॉय पासपोर्ट' },
+  open: { en: 'Sessions open to book', ta: 'முன்பதிவுக்குத் திறந்த Sessions', hi: 'बुकिंग के लिए खुले Sessions' },
+  sessionCity: { en: 'Joyspan Session · {city}', ta: 'ஜாய்ஸ்பான் Session · {city}', hi: 'जॉयस्पैन Session · {city}' },
+  booked: { en: 'Booked', ta: 'முன்பதிவாகியது', hi: 'बुक हो गया' },
+  passAppears: { en: 'Pass {ref} · it appears here and in your Passport', ta: 'பாஸ் {ref} · இது இங்கேயும் உங்கள் பாஸ்போர்ட்டிலும் தெரியும்', hi: 'पास {ref} · यह यहाँ और आपके पासपोर्ट में दिखेगा' },
+  book: { en: 'Book a pass', ta: 'பாஸ் முன்பதிவு செய்', hi: 'पास बुक करें' },
+  allBooked: { en: 'Every open Session is booked. New dates appear here first.', ta: 'திறந்த எல்லா Session-களும் முன்பதிவாகிவிட்டன. புதிய தேதிகள் முதலில் இங்கே தோன்றும்.', hi: 'सभी खुले Session बुक हो गए। नई तारीख़ें सबसे पहले यहाँ दिखेंगी।' },
+  walletTitle: { en: 'Add to wallet', ta: 'வாலட்டில் சேர்', hi: 'वॉलेट में जोड़ें' },
+  addPass: { en: 'Add pass (specimen)', ta: 'பாஸைச் சேர் (மாதிரி)', hi: 'पास जोड़ें (नमूना)' },
+  walletBody: { en: 'The pass shows on your lock screen on the day, with the QR and gate. It holds your name and the booking only.', ta: 'அன்றைய நாளில் QR, வாயிலுடன் பாஸ் உங்கள் பூட்டுத் திரையில் தெரியும். அதில் உங்கள் பெயரும் முன்பதிவும் மட்டுமே.', hi: 'उस दिन पास QR और गेट के साथ आपकी लॉक स्क्रीन पर दिखेगा। इसमें सिर्फ़ आपका नाम और बुकिंग है।' },
+  bookedTitle: { en: 'Booked', ta: 'முன்பதிவாகியது', hi: 'बुक हो गया' },
+  confirm: { en: 'Confirm booking', ta: 'முன்பதிவை உறுதிசெய்', hi: 'बुकिंग पक्की करें' },
+  heldA: { en: 'Your seat is ', ta: 'உங்கள் இருக்கை ', hi: 'आपकी सीट ' },
+  heldSerif: { en: 'held', ta: 'ஒதுக்கப்பட்டது', hi: 'रखी गई' },
+  heldB: { en: '.', ta: '.', hi: '।' },
+  kSession: { en: 'Session', ta: 'Session', hi: 'Session' },
+  kWhen: { en: 'When', ta: 'எப்போது', hi: 'कब' },
+  kPass: { en: 'Pass', ta: 'பாஸ்', hi: 'पास' },
+  kWhere: { en: 'Where', ta: 'எங்கே', hi: 'कहाँ' },
+  kPrice: { en: 'Price', ta: 'விலை', hi: 'क़ीमत' },
+  raviWrite: { en: 'Ravi will write with the venue and travel notes. Included in your Circle membership; nothing is charged.', ta: 'Ravi தங்குமிடம், பயணக் குறிப்புகளுடன் எழுதுவார். உங்கள் Circle உறுப்பினர் திட்டத்தில் அடங்கும்; எந்தக் கட்டணமும் இல்லை.', hi: 'Ravi वेन्यू और यात्रा की जानकारी के साथ लिखेंगे। आपकी Circle सदस्यता में शामिल; कोई शुल्क नहीं।' },
+  oneSeat: { en: 'One seat for you. To bring Kavya or your mother, message Ravi after booking.', ta: 'உங்களுக்கு ஒரு இருக்கை. Kavya-வையோ உங்கள் அம்மாவையோ அழைத்து வர, முன்பதிவுக்குப் பின் Ravi-க்குச் செய்தி அனுப்புங்கள்.', hi: 'आपके लिए एक सीट। Kavya या अपनी माँ को लाना हो, तो बुकिंग के बाद Ravi को संदेश भेजें।' },
+} satisfies Dict
+
+export const PASS_STATUS: Record<string, L3> = {
+  Valid: { en: 'Valid', ta: 'செல்லுபடியானது', hi: 'मान्य' },
+  Used: { en: 'Used', ta: 'பயன்படுத்தப்பட்டது', hi: 'इस्तेमाल हुआ' },
+}
+export const EVENT_KIND: Record<string, L3> = {
+  Flagship: { en: 'Flagship', ta: 'முதன்மை நிகழ்வு', hi: 'मुख्य आयोजन' },
+  Session: { en: 'Session', ta: 'Session', hi: 'Session' },
+  Salon: { en: 'Salon', ta: 'சந்திப்பு', hi: 'महफ़िल' },
+}
+export const PASS_TEXT: Record<string, { gate: L3; seat: L3 }> = {
+  ev2: { gate: { en: 'Gate B · East lawn', ta: 'வாயில் B · கிழக்குப் புல்வெளி', hi: 'गेट B · पूर्वी लॉन' }, seat: { en: 'Open seating', ta: 'எங்கும் அமரலாம்', hi: 'कहीं भी बैठें' } },
+  ev1: { gate: { en: 'Grand ballroom', ta: 'பெரிய நடன அரங்கம்', hi: 'ग्रैंड बॉलरूम' }, seat: { en: 'Table 14', ta: 'மேசை 14', hi: 'टेबल 14' } },
+}
+export const SCHEDULE_TEXT: { title: L3; where: L3 }[] = [
+  { title: { en: 'Arrival; the Check at the door for guests', ta: 'வருகை; விருந்தினர்களுக்கு வாசலிலேயே செக்', hi: 'आगमन; मेहमानों के लिए दरवाज़े पर चेक' }, where: { en: 'East lawn', ta: 'கிழக்குப் புல்வெளி', hi: 'पूर्वी लॉन' } },
+  { title: { en: 'Opening: the Mentor, in conversation', ta: 'தொடக்கம்: வழிகாட்டியுடன் உரையாடல்', hi: 'शुरुआत: मेंटर के साथ बातचीत' }, where: { en: 'Main hall', ta: 'பிரதான அரங்கம்', hi: 'मुख्य हॉल' } },
+  { title: { en: 'Experience Zone: Pleasure', ta: 'அனுபவ மண்டலம்: மகிழ்ச்சி', hi: 'अनुभव ज़ोन: आनंद' }, where: { en: 'Courtyard', ta: 'முற்றம்', hi: 'आँगन' } },
+  { title: { en: 'Experience Zone: Body · capacity battery', ta: 'அனுபவ மண்டலம்: உடல் · திறன் சோதனைகள்', hi: 'अनुभव ज़ोन: शरीर · क्षमता परीक्षण' }, where: { en: 'Studio', ta: 'ஸ்டுடியோ', hi: 'स्टूडियो' } },
+  { title: { en: 'Lunch with your circle', ta: 'உங்கள் வட்டத்துடன் மதிய உணவு', hi: 'अपने सर्कल के साथ लंच' }, where: { en: 'Garden', ta: 'தோட்டம்', hi: 'बगीचा' } },
+  { title: { en: 'Freedom: the time audit, live', ta: 'சுதந்திரம்: நேரக் கணக்காய்வு, நேரலையில்', hi: 'स्वतंत्रता: समय का हिसाब, लाइव' }, where: { en: 'Library', ta: 'நூலகம்', hi: 'लाइब्रेरी' } },
+  { title: { en: 'Ease: the sleep plan, with Dr Vivek', ta: 'நிம்மதி: உறக்கத் திட்டம், Dr Vivek உடன்', hi: 'सहजता: नींद की योजना, Dr Vivek के साथ' }, where: { en: 'Quiet room', ta: 'அமைதி அறை', hi: 'शांत कमरा' } },
+  { title: { en: 'Your Index review with Priya, ten minutes', ta: 'Priya உடன் உங்கள் குறியீட்டு மறுஆய்வு, பத்து நிமிடங்கள்', hi: 'Priya के साथ आपके इंडेक्स की समीक्षा, दस मिनट' }, where: { en: 'Room 3', ta: 'அறை 3', hi: 'कमरा 3' } },
+]
+export const ZONE_TEXT: Record<string, { title: L3; what: L3; where: L3 }> = {
+  H: { title: { en: 'Body Zone', ta: 'உடல் மண்டலம்', hi: 'शरीर ज़ोन' }, what: { en: 'Capacity battery stations: grip, sit-to-stand, balance; blood pressure at Signal Point 1.', ta: 'திறன் சோதனை நிலையங்கள்: பிடி வலிமை, உட்கார்ந்து எழுதல், சமநிலை; Signal Point 1 இல் இரத்த அழுத்தம்.', hi: 'क्षमता परीक्षण स्टेशन: पकड़, बैठकर उठना, संतुलन; Signal Point 1 पर ब्लड प्रेशर।' }, where: { en: 'Studio', ta: 'ஸ்டுடியோ', hi: 'स्टूडियो' } },
+  P: { title: { en: 'Purpose Zone', ta: 'நோக்க மண்டலம்', hi: 'उद्देश्य ज़ोन' }, what: { en: 'The Ikigai wall; write your Tomorrow Question on a card and keep it.', ta: 'இக்கிகாய் சுவர்; உங்கள் நாளைக் கேள்வியை ஒரு அட்டையில் எழுதி வைத்துக்கொள்ளுங்கள்.', hi: 'इकिगाई दीवार; अपना कल का सवाल एक कार्ड पर लिखें और रख लें।' }, where: { en: 'Main hall foyer', ta: 'பிரதான அரங்க முகப்பு', hi: 'मुख्य हॉल की लॉबी' } },
+  R: { title: { en: 'People Zone', ta: 'மனிதர்கள் மண்டலம்', hi: 'लोग ज़ोन' }, what: { en: 'The Connections table; the Couples Check booth, each partner privately.', ta: 'இணைப்பு மேசை; தம்பதியர் செக் அறை, ஒவ்வொரு துணையும் தனியாக.', hi: 'मेल-जोल की मेज़; Couples Check बूथ, हर साथी अकेले में।' }, where: { en: 'Garden', ta: 'தோட்டம்', hi: 'बगीचा' } },
+  F: { title: { en: 'Freedom Zone', ta: 'சுதந்திர மண்டலம்', hi: 'स्वतंत्रता ज़ोन' }, what: { en: 'The time-audit lab and the No list. Never financial advice.', ta: 'நேரக் கணக்காய்வு ஆய்வகமும் வேண்டாம் பட்டியலும். நிதி ஆலோசனை ஒருபோதும் இல்லை.', hi: 'समय के हिसाब की लैब और ना की सूची। पैसे की सलाह कभी नहीं।' }, where: { en: 'Library', ta: 'நூலகம்', hi: 'लाइब्रेरी' } },
+  D: { title: { en: 'Pleasure Zone', ta: 'மகிழ்ச்சி மண்டலம்', hi: 'आनंद ज़ोन' }, what: { en: 'Tasting, music and the Joy Ledger. Ten seconds, three times a day.', ta: 'சுவைத்தல், இசை, ஜாய் லெட்ஜர். பத்து விநாடிகள், நாளுக்கு மூன்று முறை.', hi: 'स्वाद, संगीत और जॉय लेजर। दस सेकंड, दिन में तीन बार।' }, where: { en: 'Courtyard', ta: 'முற்றம்', hi: 'आँगन' } },
+  B: { title: { en: 'Ease Zone', ta: 'நிம்மதி மண்டலம்', hi: 'सहजता ज़ोन' }, what: { en: 'Sleep pods, the quiet room and a psychologist present all day.', ta: 'உறக்க அறைகள், அமைதி அறை, நாள் முழுவதும் ஒரு உளவியலாளர்.', hi: 'स्लीप पॉड, शांत कमरा और पूरे दिन एक मनोवैज्ञानिक।' }, where: { en: 'Quiet room', ta: 'அமைதி அறை', hi: 'शांत कमरा' } },
+}
+export const SESSION_OPEN_TEXT: Record<string, { where: L3; price: L3 }> = {
+  ev4: { where: { en: 'Dubai (GCC region)', ta: 'துபாய் (GCC பகுதி)', hi: 'दुबई (GCC क्षेत्र)' }, price: { en: 'Included · Circle', ta: 'அடங்கும் · Circle', hi: 'शामिल · Circle' } },
+  ev5: { where: { en: 'Bengaluru', ta: 'பெங்களூரு', hi: 'बेंगलुरु' }, price: { en: 'Included · Circle', ta: 'அடங்கும் · Circle', hi: 'शामिल · Circle' } },
+  ev6: { where: { en: 'Coimbatore', ta: 'கோயம்புத்தூர்', hi: 'कोयंबटूर' }, price: { en: 'Included · Circle', ta: 'அடங்கும் · Circle', hi: 'शामिल · Circle' } },
+}

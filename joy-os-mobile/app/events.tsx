@@ -4,11 +4,13 @@ import { View } from 'react-native'
 import { ArrowLink, Body, Button, Card, DaybreakButton, Eyebrow, Icon, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Serif, Sheet, TermChip, TermDot, Title, Toggle, fmtDate } from '@/components'
 import { INDEX_HISTORY, MEMBER } from '@/shared/member'
 import { EVENTS } from '@/shared/platform'
-import { termByKey } from '@/shared/terms'
 import { useTheme } from '@/theme/ThemeProvider'
 import { PASSES, SESSIONS_OPEN, SESSION_SCHEDULE, ZONES } from '@/screens/b/journeyData'
 import { accountStore, refCode, useStore } from '@/screens/b/bStore'
 import { Done, KeyValue, SpecimenQR, TimelineStep, memberOnly } from '@/screens/b/parts'
+import { useDict, useTermText } from '@/lib/i18n'
+import { EVENTS_T, PASS_STATUS, EVENT_KIND, PASS_TEXT, SCHEDULE_TEXT, ZONE_TEXT, SESSION_OPEN_TEXT } from '@/screens/b/i18n/journey'
+import { useCommon, useTx } from '@/screens/b/i18n/common'
 
 // EVENTS AND PASSES (Memo p.22): your passes with a QR, the day's schedule, Experience Zones
 // by term, the Index issued on site, your Day-90 date, and Sessions open to book.
@@ -26,6 +28,12 @@ function Events() {
   const [book, setBook] = useState<Open | null>(null)
   const [bookedRef, setBookedRef] = useState<string | null>(null)
   const latest = INDEX_HISTORY[0]
+  const t = useDict(EVENTS_T)
+  const tc = useCommon()
+  const tx = useTx()
+  const tt = useTermText()
+  const openWhere = (s: Open) => tx(SESSION_OPEN_TEXT[s.id]?.where, s.where)
+  const openPrice = (s: Open) => tx(SESSION_OPEN_TEXT[s.id]?.price, s.price)
   const day90 = new Date(new Date(MEMBER.loopStarted).getTime() + 89 * 86400000).toISOString().slice(0, 10)
   const firstOpen = SESSIONS_OPEN.find((s) => !acct.bookings.some((b) => b.id === s.id))
   const toggleCal = (key: string, on: boolean) => setAcct((a) => ({ ...a, calendar: on ? [...a.calendar, key] : a.calendar.filter((k) => k !== key) }))
@@ -41,18 +49,18 @@ function Events() {
     <Screen>
       <ScreenHeader
         back
-        eyebrow="Events · passes"
+        eyebrow={t('eyebrow')}
         title={
           <>
-            The same Index, in a <Serif>room</Serif> full of people.
+            {t('titleA')}<Serif>{t('titleSerif')}</Serif>{t('titleB')}
           </>
         }
-        lead="Sessions, salons and the flagship. Your pass opens the door; the venue sees a name and a booking, never health data."
+        lead={t('lead')}
       />
 
       {/* Passes */}
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>Your passes</SectionTitle>
+        <SectionTitle>{t('yourPasses')}</SectionTitle>
         {PASSES.map((p) => {
           const ev = EVENTS.find((e) => e.id === p.id)!
           const valid = p.status === 'Valid'
@@ -60,45 +68,45 @@ function Events() {
             <Card key={p.code} tone={valid ? 'raised' : 'sunk'} style={{ gap: space.s2 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: space.s1 }}>
                 <View style={{ flex: 1, gap: 4 }}>
-                  <Eyebrow>{ev.kind}</Eyebrow>
+                  <Eyebrow>{tx(EVENT_KIND[ev.kind], ev.kind)}</Eyebrow>
                   <Title size={22}>{ev.name}</Title>
                   <Mono tone="ink2">{ev.when}</Mono>
                   <Meta>{ev.where}</Meta>
                 </View>
-                <Pill tone={valid ? 'ink' : 'neutral'}>{p.status}</Pill>
+                <Pill tone={valid ? 'ink' : 'neutral'}>{tx(PASS_STATUS[p.status], p.status)}</Pill>
               </View>
               {valid ? (
                 <View style={{ alignItems: 'center', gap: space.s1 }}>
-                  <SpecimenQR seed={p.code} size={176} label={`Pass QR code for ${ev.name}, reference ${p.code}. Specimen.`} />
+                  <SpecimenQR seed={p.code} size={176} label={t('qrA11y', { name: ev.name, code: p.code })} />
                   <Mono tone="ink">{p.code}</Mono>
                 </View>
               ) : null}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s3, rowGap: 4 }}>
                 <View style={{ gap: 2 }}>
-                  <Eyebrow>Gate</Eyebrow>
-                  <Meta tone="ink">{p.gate}</Meta>
+                  <Eyebrow>{t('gate')}</Eyebrow>
+                  <Meta tone="ink">{tx(PASS_TEXT[p.id]?.gate, p.gate)}</Meta>
                 </View>
                 <View style={{ gap: 2 }}>
-                  <Eyebrow>Seat</Eyebrow>
-                  <Meta tone="ink">{p.seat}</Meta>
+                  <Eyebrow>{t('seat')}</Eyebrow>
+                  <Meta tone="ink">{tx(PASS_TEXT[p.id]?.seat, p.seat)}</Meta>
                 </View>
                 <View style={{ gap: 2 }}>
-                  <Eyebrow>Holder</Eyebrow>
+                  <Eyebrow>{t('holder')}</Eyebrow>
                   <Meta tone="ink">{p.holder}</Meta>
                 </View>
               </View>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <Icon name="eye-off" size={14} color={c.ink3} />
                 <Meta size={14} tone="ink3" style={{ flex: 1 }}>
-                  Venue sees name and booking only.
+                  {t('venueSees')}
                 </Meta>
               </View>
               {valid ? (
                 walletAdded.includes(p.code) ? (
-                  <Done>In your wallet · specimen</Done>
+                  <Done>{t('inWallet')}</Done>
                 ) : (
                   <Button variant="secondary" size="sm" icon="credit-card" onPress={() => setWalletFor(p.code)}>
-                    Add to wallet (specimen)
+                    {t('addWallet')}
                   </Button>
                 )
               ) : null}
@@ -109,8 +117,8 @@ function Events() {
 
       {/* Schedule */}
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>Your schedule · Sat 20 Feb</SectionTitle>
-        <Body tone="ink2">Joyspan House Chennai. Items marked yours are held for you; add any to your calendar.</Body>
+        <SectionTitle>{t('schedule')}</SectionTitle>
+        <Body tone="ink2">{t('scheduleBody')}</Body>
         <Card tone="raised">
           {SESSION_SCHEDULE.map((s, i) => {
             const key = `ev2-${i}`
@@ -120,11 +128,11 @@ function Events() {
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <Mono tone="ink">{s.time}</Mono>
                     {s.term ? <TermChip term={s.term} /> : null}
-                    {s.mine ? <Pill tone="daybreak">Yours</Pill> : null}
+                    {s.mine ? <Pill tone="daybreak">{t('yours')}</Pill> : null}
                   </View>
-                  <Body>{s.title}</Body>
-                  <Meta size={14}>{s.where}</Meta>
-                  <Toggle checked={acct.calendar.includes(key)} onChange={(v) => toggleCal(key, v)} label="Add to calendar" />
+                  <Body>{tx(SCHEDULE_TEXT[i]?.title, s.title)}</Body>
+                  <Meta size={14}>{tx(SCHEDULE_TEXT[i]?.where, s.where)}</Meta>
+                  <Toggle checked={acct.calendar.includes(key)} onChange={(v) => toggleCal(key, v)} label={t('addCal')} />
                 </View>
               </TimelineStep>
             )
@@ -134,50 +142,54 @@ function Events() {
 
       {/* Zones */}
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>Experience Zones · by term</SectionTitle>
-        {ZONES.map((z) => (
-          <Card key={z.term} tone="raised" style={{ gap: 6 }} accessibilityLabel={`${termByKey(z.term).space}: ${z.title}`}>
+        <SectionTitle>{t('zones')}</SectionTitle>
+        {ZONES.map((z) => {
+          const zt = ZONE_TEXT[z.term]
+          const title = tx(zt?.title, z.title)
+          return (
+          <Card key={z.term} tone="raised" style={{ gap: 6 }} accessibilityLabel={`${tt.space(z.term)}: ${title}`}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <TermDot term={z.term} />
-              <Body weight="medium">{z.title}</Body>
-              <Meta size={14}>{`· ${termByKey(z.term).name}`}</Meta>
+              <Body weight="medium">{title}</Body>
+              <Meta size={14}>{`· ${tt.name(z.term)}`}</Meta>
             </View>
-            <Meta>{z.what}</Meta>
-            <Meta size={14} tone="ink3">{z.where}</Meta>
+            <Meta>{tx(zt?.what, z.what)}</Meta>
+            <Meta size={14} tone="ink3">{tx(zt?.where, z.where)}</Meta>
           </Card>
-        ))}
+          )
+        })}
       </View>
 
       {/* Index on site */}
       <Card tone="sunk" style={{ gap: space.s1 }}>
-        <Eyebrow>Index issued on site</Eyebrow>
-        <Body>{`Your Index was taken on ${fmtDate(latest.takenOn)} at the flagship and handed to you on a card. At a Session, a short re-check happens at the Body Zone, like for like.`}</Body>
+        <Eyebrow>{t('onSite')}</Eyebrow>
+        <Body>{t('onSiteBody', { date: fmtDate(latest.takenOn) })}</Body>
         <Meta>
-          {'Your Day 90 is '}
+          {t('day90A')}
           <Mono tone="ink">{fmtDate(day90)}</Mono>
-          {`. Today is Day ${MEMBER.dayOfLoop}.`}
+          {t('day90B', { n: MEMBER.dayOfLoop })}
         </Meta>
-        <ArrowLink onPress={() => router.push('/passport')}>Your Joy Passport</ArrowLink>
+        <ArrowLink onPress={() => router.push('/passport')}>{t('passport')}</ArrowLink>
       </Card>
 
       {/* Book */}
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>Sessions open to book</SectionTitle>
+        <SectionTitle>{t('open')}</SectionTitle>
         {SESSIONS_OPEN.map((s) => {
           const b = acct.bookings.find((x) => x.id === s.id)
           return (
             <Card key={s.id} tone="raised" style={{ gap: 6 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s1, flexWrap: 'wrap' }}>
-                <Title size={20}>{`Joyspan Session · ${s.city}`}</Title>
-                {b ? <Pill tone="ink">Booked</Pill> : null}
+                <Title size={20} style={{ flexShrink: 1 }}>{t('sessionCity', { city: s.city })}</Title>
+                {b ? <Pill tone="ink">{t('booked')}</Pill> : null}
               </View>
               <Mono tone="ink2">{s.when}</Mono>
-              <Meta>{`${s.where} · ${s.price}`}</Meta>
+              <Meta>{`${openWhere(s)} · ${openPrice(s)}`}</Meta>
               {b ? (
-                <Done>{`Pass ${b.ref} · it appears here and in your Passport`}</Done>
+                <Done>{t('passAppears', { ref: b.ref })}</Done>
               ) : (
                 <Button variant="secondary" size="sm" onPress={() => { setBookedRef(null); setBook(s) }}>
-                  Book a pass
+                  {t('book')}
                 </Button>
               )}
             </Card>
@@ -185,17 +197,17 @@ function Events() {
         })}
         {firstOpen ? (
           <DaybreakButton icon="calendar" onPress={() => { setBookedRef(null); setBook(firstOpen) }}>
-            Book a pass
+            {t('book')}
           </DaybreakButton>
         ) : (
-          <Done>Every open Session is booked. New dates appear here first.</Done>
+          <Done>{t('allBooked')}</Done>
         )}
       </View>
 
       <Sheet
         open={!!walletFor}
         onClose={() => setWalletFor(null)}
-        title="Add to wallet"
+        title={t('walletTitle')}
         footer={
           <Button
             variant="ink"
@@ -206,26 +218,26 @@ function Events() {
               setWalletFor(null)
             }}
           >
-            Add pass (specimen)
+            {t('addPass')}
           </Button>
         }
       >
-        <Body>The pass shows on your lock screen on the day, with the QR and gate. It holds your name and the booking only.</Body>
+        <Body>{t('walletBody')}</Body>
         <Mono tone="ink">{walletFor ?? ''}</Mono>
       </Sheet>
 
       <Sheet
         open={!!book}
         onClose={() => setBook(null)}
-        title={bookedRef ? 'Booked' : 'Book a pass'}
+        title={bookedRef ? t('bookedTitle') : t('book')}
         footer={
           bookedRef ? (
             <Button variant="secondary" block onPress={() => setBook(null)}>
-              Close
+              {tc('close')}
             </Button>
           ) : (
             <Button variant="ink" block onPress={confirmBook}>
-              Confirm booking
+              {t('confirm')}
             </Button>
           )
         }
@@ -234,26 +246,26 @@ function Events() {
           bookedRef ? (
             <>
               <Title size={24}>
-                Your seat is <Serif>held</Serif>.
+                {t('heldA')}<Serif>{t('heldSerif')}</Serif>{t('heldB')}
               </Title>
-              <KeyValue k="Session">{`Joyspan Session · ${book.city}`}</KeyValue>
-              <KeyValue k="When">
+              <KeyValue k={t('kSession')}>{t('sessionCity', { city: book.city })}</KeyValue>
+              <KeyValue k={t('kWhen')}>
                 <Mono tone="ink">{book.when}</Mono>
               </KeyValue>
-              <KeyValue k="Pass" last>
+              <KeyValue k={t('kPass')} last>
                 <Mono tone="ink">{bookedRef}</Mono>
               </KeyValue>
-              <Meta>Ravi will write with the venue and travel notes. Included in your Circle membership; nothing is charged.</Meta>
+              <Meta>{t('raviWrite')}</Meta>
             </>
           ) : (
             <>
-              <KeyValue k="Session">{`Joyspan Session · ${book.city}`}</KeyValue>
-              <KeyValue k="When">
+              <KeyValue k={t('kSession')}>{t('sessionCity', { city: book.city })}</KeyValue>
+              <KeyValue k={t('kWhen')}>
                 <Mono tone="ink">{book.when}</Mono>
               </KeyValue>
-              <KeyValue k="Where">{book.where}</KeyValue>
-              <KeyValue k="Price" last>{book.price}</KeyValue>
-              <Meta>One seat for you. To bring Kavya or your mother, message Ravi after booking.</Meta>
+              <KeyValue k={t('kWhere')}>{openWhere(book)}</KeyValue>
+              <KeyValue k={t('kPrice')} last>{openPrice(book)}</KeyValue>
+              <Meta>{t('oneSeat')}</Meta>
             </>
           )
         ) : null}

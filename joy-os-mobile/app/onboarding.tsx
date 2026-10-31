@@ -4,9 +4,10 @@ import { Pressable, ScrollView, View } from 'react-native'
 import type { ScrollViewInstance } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Body, Button, Card, DaybreakButton, Eyebrow, Icon, Meta, Mono, Pill, Segmented, Serif, Sheet, TermDot, Toggle, Title } from '@/components'
-import { LANGS } from '@/lib/i18n'
+import { LANGS, useDict, useTermText } from '@/lib/i18n'
+import { ONB, INTENT_TEXT, CONSENT_TEXT, DEVICE_TEXT } from '@/screens/b/i18n/onboarding'
+import { LANG_LABEL, useCommon, useTx, usePrefsError, perDayKey } from '@/screens/b/i18n/common'
 import { useApp } from '@/lib/store'
-import { termByKey } from '@/shared/terms'
 import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { DEVICES, INTENTS, type DeviceId } from '@/screens/b/entryData'
@@ -19,7 +20,9 @@ import { CheckLine, ChoiceCard, Done, KeyValue, StepHead, StepProgress, TimeStep
 // Quiet hours and channels are the same preferences Settings and Notifications show.
 // One Daybreak per step.
 
-const STEPS = ['Intent', 'Language', 'Consents', 'Device', 'Quiet hours', 'Begin'] as const
+// Language comes first, so everything after it reads in the member's language.
+const STEPS = ['Language', 'Intent', 'Consents', 'Device', 'Quiet hours', 'Begin'] as const
+const STEP_KEY = { Intent: 'sIntent', Language: 'sLanguage', Consents: 'sConsents', Device: 'sDevice', 'Quiet hours': 'sQuiet', Begin: 'sBegin' } as const
 type Consents = { care: boolean; data: boolean; publishing: boolean }
 
 const SAMPLE = {
@@ -47,6 +50,13 @@ export default function Onboarding() {
   const [tomorrowOpen, setTomorrowOpen] = useState(false)
   const [resumed, setResumed] = useState<string | null>(null)
   const resumeChecked = useRef(false)
+  const t = useDict(ONB)
+  const tc = useCommon()
+  const tx = useTx()
+  const tt = useTermText()
+  const prefsErr = usePrefsError()
+  const stepLabel = (s: (typeof STEPS)[number]) => t(STEP_KEY[s])
+  const stepLabels = STEPS.map(stepLabel)
 
   // Saved as you go: every answer writes through to the phone.
   type Upd<T> = T | ((p: T) => T)
@@ -79,22 +89,22 @@ export default function Onboarding() {
   useEffect(() => {
     if (resumeChecked.current || !onboardingStore.hydrated()) return
     resumeChecked.current = true
-    if (draft.started && draft.step > 0 && !draft.completedAt) setResumed(`Picked up where you left off · ${STEPS[step]}`)
-  }, [draft, step])
+    if (draft.started && draft.step > 0 && !draft.completedAt) setResumed(t('resumed', { step: stepLabel(STEPS[step]) }))
+  }, [draft, step]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const name = STEPS[step]
 
   const validate = (): string | null => {
     switch (name) {
       case 'Intent':
-        return intents.length ? null : 'Choose at least one. You can change it later.'
+        return intents.length ? null : t('errIntent')
       case 'Consents':
-        if (!consents.care && !consents.data) return 'Care and Data are both needed to measure your Index and look after you.'
-        if (!consents.care) return 'Care is needed so a named person can respond if your scores need attention.'
-        if (!consents.data) return 'Data is needed to keep your record and compute your Index.'
+        if (!consents.care && !consents.data) return t('errBoth')
+        if (!consents.care) return t('errCare')
+        if (!consents.data) return t('errData')
         return null
       case 'Quiet hours':
-        return validatePrefs({ quiet, perDay, channels })
+        return prefsErr(validatePrefs({ quiet, perDay, channels }))
       default:
         return null
     }
@@ -118,7 +128,7 @@ export default function Onboarding() {
   const exit = () => (router.canGoBack() ? router.back() : router.replace('/'))
   const saveAndExit = () => {
     setDraft((d) => ({ ...d, started: true }))
-    setToast(`Saved · pick up at ${STEPS[step]}`)
+    setToast(t('savedExit', { step: stepLabel(STEPS[step]) }))
     setTimeout(exit, 1200)
   }
   const complete = () => {
@@ -135,66 +145,69 @@ export default function Onboarding() {
     setTimeout(() => setLinked((l) => ({ ...l, [device]: 'linked' })), 1200)
   }
 
-  const nextLabel = name === 'Device' && device !== 'none' && linked[device] !== 'linked' ? 'Link it later' : 'Continue'
+  const nextLabel = name === 'Device' && device !== 'none' && linked[device] !== 'linked' ? t('linkLater') : tc('continue')
   const dev = DEVICES.find((d) => d.id === device)!
+  const devName = tx(DEVICE_TEXT[dev.id]?.name, dev.name)
 
   return (
     <View style={{ flex: 1, backgroundColor: c.paper, paddingTop: insets.top }}>
       {/* Top bar */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.gutter - 8, minHeight: 52, width: '100%', maxWidth: 640, alignSelf: 'center' }}>
-        <Pressable onPress={back} accessibilityRole="button" accessibilityLabel={step === 0 ? 'Close' : 'Back'} hitSlop={6} style={({ pressed }) => ({ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: pressed ? c.paperSunk : undefined })}>
+        <Pressable onPress={back} accessibilityRole="button" accessibilityLabel={step === 0 ? t('close') : tc('back')} hitSlop={6} style={({ pressed }) => ({ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: pressed ? c.paperSunk : undefined })}>
           <Icon name={step === 0 ? 'x' : 'chevron-left'} size={22} color={c.ink} />
         </Pressable>
-        <Eyebrow tone="ink2">Setting up · about 3 min</Eyebrow>
-        <Pressable onPress={saveAndExit} accessibilityRole="button" accessibilityLabel="Save and exit" hitSlop={6} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 }}>
-          <Meta style={{ textDecorationLine: 'underline' }}>Save & exit</Meta>
+        <Eyebrow tone="ink2" style={{ flexShrink: 1, textAlign: 'center' }}>{t('settingUp')}</Eyebrow>
+        <Pressable onPress={saveAndExit} accessibilityRole="button" accessibilityLabel={t('saveExit')} hitSlop={6} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 }}>
+          <Meta style={{ textDecorationLine: 'underline' }}>{t('saveExitShort')}</Meta>
         </Pressable>
       </View>
 
       <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: space.gutter, paddingTop: space.s1, paddingBottom: space.s4, gap: space.s3, width: '100%', maxWidth: 640, alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
-        <StepProgress step={step} steps={STEPS} />
+        <StepProgress step={step} steps={stepLabels} />
         {resumed ? <Done>{resumed}</Done> : null}
         {toast ? <Done>{toast}</Done> : null}
 
         {name === 'Intent' ? (
           <>
             <StepHead
-              eyebrow="Welcome to Joy OS · Intent"
+              eyebrow={t('intentEyebrow')}
               title={
                 <>
-                  What would raise your life <Serif>right now</Serif>?
+                  {t('intentA')}<Serif>{t('intentSerif')}</Serif>{t('intentB')}
                 </>
               }
-              lead="Choose one or two. It shapes your first actions until your Index names your lowest term."
+              lead={t('intentLead')}
             />
-            <View style={{ gap: space.s1 + 2 }} accessibilityLabel="Choose up to two">
+            <View style={{ gap: space.s1 + 2 }} accessibilityLabel={t('upToTwo')}>
               {INTENTS.map((it) => {
                 const on = intents.includes(it.term)
-                const t = termByKey(it.term)
+                const sp = tt.space(it.term)
+                const title = tx(INTENT_TEXT[it.term].title, it.title)
+                const line = tx(INTENT_TEXT[it.term].line, it.line)
                 return (
                   <ChoiceCard
                     key={it.term}
                     kind="checkbox"
                     selected={on}
                     onPress={() => toggleIntent(it.term)}
-                    accessibilityLabel={`${t.space}: ${it.title}. ${it.line}`}
+                    accessibilityLabel={`${sp}: ${title}. ${line}`}
                     tint={on ? c[`term${it.term}Soft` as const] : undefined}
                     title={
                       <View style={{ gap: 4 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <TermDot term={it.term} />
-                          <Eyebrow tone="ink2">{t.space}</Eyebrow>
+                          <Eyebrow tone="ink2">{sp}</Eyebrow>
                         </View>
-                        <Body weight="medium">{it.title}</Body>
+                        <Body weight="medium">{title}</Body>
                       </View>
                     }
-                    sub={it.line}
+                    sub={line}
                   />
                 )
               })}
             </View>
             <Meta accessibilityLiveRegion="polite">
-              {intents.length === 0 ? 'Nothing chosen yet.' : `Chosen: ${intents.map((k) => termByKey(k).space).join(' and ')}.${intents.length === 2 ? ' Choosing another replaces the first.' : ''}`}
+              {intents.length === 0 ? t('nothingYet') : `${t('chosen', { list: intents.map((k) => tt.space(k)).join(tc('and')) })}${intents.length === 2 ? t('replaces') : ''}`}
             </Meta>
           </>
         ) : null}
@@ -202,27 +215,27 @@ export default function Onboarding() {
         {name === 'Language' ? (
           <>
             <StepHead
-              eyebrow="Language"
+              eyebrow={tc('language')}
               title={
                 <>
-                  Which language feels like <Serif>home</Serif>?
+                  {t('langA')}<Serif>{t('langSerif')}</Serif>{t('langB')}
                 </>
               }
-              lead="You can change it any time in Settings."
+              lead={t('langLead')}
             />
-            <View style={{ gap: space.s1 + 2 }} accessibilityRole="radiogroup" accessibilityLabel="Language">
+            <View style={{ gap: space.s1 + 2 }} accessibilityRole="radiogroup" accessibilityLabel={tc('language')}>
               {LANGS.map((l) => (
                 <ChoiceCard
                   key={l.value}
                   selected={lang === l.value}
                   onPress={() => setLang(l.value)}
-                  accessibilityLabel={`${l.label}, ${l.native}`}
+                  accessibilityLabel={`${LANG_LABEL[lang][l.value]}, ${l.native}`}
                   title={
                     <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
                       <Body size={22} weight="medium">
                         {l.native}
                       </Body>
-                      {l.native !== l.label ? <Meta>{l.label}</Meta> : null}
+                      {l.native !== LANG_LABEL[lang][l.value] ? <Meta>{LANG_LABEL[lang][l.value]}</Meta> : null}
                     </View>
                   }
                   sub={<Meta tone="ink3">{`“${SAMPLE[l.value]}”`}</Meta>}
@@ -230,7 +243,7 @@ export default function Onboarding() {
               ))}
             </View>
             <Card tone="sunk" padding={16}>
-              <Meta>Menus, daily prompts and the Joy Ledger are ready in all three. Validated Index questions in Tamil and Hindi go through forward and back translation first; until each is approved, those items appear in English with the meaning beside them.</Meta>
+              <Meta>{t('langNote')}</Meta>
             </Card>
           </>
         ) : null}
@@ -238,15 +251,19 @@ export default function Onboarding() {
         {name === 'Consents' ? (
           <>
             <StepHead
-              eyebrow="Three consents"
+              eyebrow={t('consEyebrow')}
               title={
                 <>
-                  Three separate yeses, in <Serif>plain</Serif> words.
+                  {t('consA')}<Serif>{t('consSerif')}</Serif>{t('consB')}
                 </>
               }
-              lead="Each is its own choice. Nothing is ticked for you. Care and Data are needed to run your Index; Publishing is yours to give or not."
+              lead={t('consLead')}
             />
-            {CONSENT_ITEMS.map((ci) => (
+            {CONSENT_ITEMS.map((ci) => {
+              const ct = CONSENT_TEXT[ci.key]
+              const cName = tx(ct.name, ci.name)
+              const cPlain = tx(ct.plain, ci.plain)
+              return (
               <ChoiceCard
                 key={ci.key}
                 kind="checkbox"
@@ -255,98 +272,105 @@ export default function Onboarding() {
                   setConsents((v) => ({ ...v, [ci.key]: !v[ci.key] }))
                   setError(null)
                 }}
-                accessibilityLabel={`${ci.name}: ${ci.plain} ${ci.required ? 'Needed for your Index.' : 'Optional.'}`}
+                accessibilityLabel={`${cName}: ${cPlain} ${ci.required ? t('neededDot') : t('optionalDot')}`}
                 title={
                   <View style={{ gap: 4 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <Body weight="semibold">{ci.name}</Body>
-                      <Pill tone={ci.required ? 'neutral' : 'daybreak'}>{ci.required ? 'Needed for your Index' : 'Optional'}</Pill>
+                      <Body weight="semibold">{cName}</Body>
+                      <Pill tone={ci.required ? 'neutral' : 'daybreak'}>{ci.required ? t('needed') : t('optional')}</Pill>
                     </View>
-                    <Body>{ci.plain}</Body>
+                    <Body>{cPlain}</Body>
                   </View>
                 }
                 detail={
                   <View style={{ gap: 6, marginTop: 6 }}>
-                    {ci.allows.map((a) => (
-                      <CheckLine key={a}>{a}</CheckLine>
+                    {ci.allows.map((a, ai) => (
+                      <CheckLine key={a}>{tx(ct.allows[ai], a)}</CheckLine>
                     ))}
                     <Meta size={14} tone="ink3">
-                      {ci.never}
+                      {tx(ct.never, ci.never)}
                     </Meta>
                   </View>
                 }
               />
-            ))}
-            <Meta size={14}>Withdraw any consent in one tap from the Trust centre; it is honoured within 24 hours. Device, calendar and WhatsApp permissions are asked separately, when you first use them.</Meta>
+              )
+            })}
+            <Meta size={14}>{t('consNote')}</Meta>
           </>
         ) : null}
 
         {name === 'Device' ? (
           <>
             <StepHead
-              eyebrow="Device"
+              eyebrow={t('sDevice')}
               title={
                 <>
-                  Do you wear <Serif>anything</Serif>?
+                  {t('devA')}<Serif>{t('devSerif')}</Serif>{t('devB')}
                 </>
               }
-              lead="Devices add sleep, heart and movement signals to Body, Pleasure and Ease. Joy OS uses the raw signals, never the vendor’s own scores."
+              lead={t('devLead')}
             />
-            <View style={{ gap: space.s1 + 2 }} accessibilityRole="radiogroup" accessibilityLabel="Device">
-              {DEVICES.map((x) => (
+            <View style={{ gap: space.s1 + 2 }} accessibilityRole="radiogroup" accessibilityLabel={t('sDevice')}>
+              {DEVICES.map((x) => {
+                const dt = DEVICE_TEXT[x.id]
+                const xName = tx(dt?.name, x.name)
+                const xVia = tx(dt?.via, x.via)
+                const xNote = 'note' in x ? tx(dt?.note, x.note) : null
+                return (
                 <ChoiceCard
                   key={x.id}
                   selected={device === x.id}
                   onPress={() => setDevice(x.id)}
-                  accessibilityLabel={`${x.name}, ${x.via}${'note' in x ? `, ${x.note}` : ''}${linked[x.id] === 'linked' ? ', linked' : ''}`}
+                  accessibilityLabel={`${xName}, ${xVia}${xNote ? `, ${xNote}` : ''}${linked[x.id] === 'linked' ? t('linkedA11y') : ''}`}
                   leading={<Icon name={x.id === 'none' ? 'slash' : x.id === 'apple' || x.id === 'hc' ? 'smartphone' : 'watch'} size={18} color={c.ink2} />}
                   title={
                     <View style={{ gap: 2 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <Body weight="medium">{x.name}</Body>
-                        {'note' in x ? <Pill tone="daybreak">{x.note}</Pill> : null}
-                        {linked[x.id] === 'linked' ? <Pill tone="ink">Linked</Pill> : null}
+                        <Body weight="medium">{xName}</Body>
+                        {xNote ? <Pill tone="daybreak">{xNote}</Pill> : null}
+                        {linked[x.id] === 'linked' ? <Pill tone="ink">{t('linked')}</Pill> : null}
                       </View>
-                      <Meta size={14}>{x.via}</Meta>
+                      <Meta size={14}>{xVia}</Meta>
                     </View>
                   }
                 />
-              ))}
+                )
+              })}
             </View>
             <Card tone="sunk" style={{ gap: space.s1 + 4 }}>
-              <Eyebrow>{dev.id === 'none' ? 'No device' : `What ${dev.name} shares`}</Eyebrow>
-              <Body>{dev.reads}</Body>
+              <Eyebrow>{dev.id === 'none' ? t('noDevice') : t('whatShares', { name: devName })}</Eyebrow>
+              <Body>{tx(DEVICE_TEXT[dev.id]?.reads, dev.reads)}</Body>
               {dev.id !== 'none' ? (
                 <Button variant={linked[device] === 'linked' ? 'secondary' : 'ink'} icon={linked[device] === 'linked' ? 'check' : 'link'} onPress={link} disabled={!!linked[device]}>
-                  {linked[device] === 'linking' ? 'Linking…' : linked[device] === 'linked' ? 'Linked · specimen' : `Link ${dev.name}`}
+                  {linked[device] === 'linking' ? t('linking') : linked[device] === 'linked' ? t('linkedSpec') : t('linkName', { name: devName })}
                 </Button>
               ) : null}
             </Card>
-            <Meta size={14}>Each type of reading is a separate permission you can switch off. A vendor’s readiness, strain or age score never enters your Index.</Meta>
+            <Meta size={14}>{t('devNote')}</Meta>
           </>
         ) : null}
 
         {name === 'Quiet hours' ? (
           <>
             <StepHead
-              eyebrow="Quiet hours"
+              eyebrow={tc('quietHours')}
               title={
                 <>
-                  When should we stay <Serif>quiet</Serif>?
+                  {t('quietA')}<Serif>{t('quietSerif')}</Serif>{t('quietB')}
                 </>
               }
-              lead="At most three messages a day, never during your quiet hours. No streaks, no countdowns, no “you’re falling behind”."
+              lead={t('quietLead')}
             />
             <Card tone="raised" style={{ gap: space.s2 }}>
-              <Eyebrow>Quiet hours</Eyebrow>
+              <Eyebrow>{tc('quietHours')}</Eyebrow>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s2 }}>
-                <TimeStepper label="From" value={quiet.from} onChange={(v) => { setQuiet((q) => ({ ...q, from: v })); setError(null) }} />
-                <TimeStepper label="Until" value={quiet.to} onChange={(v) => { setQuiet((q) => ({ ...q, to: v })); setError(null) }} />
+                <TimeStepper label={tc('from')} value={quiet.from} onChange={(v) => { setQuiet((q) => ({ ...q, from: v })); setError(null) }} />
+                <TimeStepper label={tc('until')} value={quiet.to} onChange={(v) => { setQuiet((q) => ({ ...q, to: v })); setError(null) }} />
               </View>
-              <Meta size={14}>The only exception: if you ever ask for help, a person can reach you at any hour.</Meta>
+              <Meta size={14}>{tc('quietException')}</Meta>
             </Card>
             <Card tone="raised" style={{ gap: space.s2 }}>
-              <Eyebrow>Reminders a day</Eyebrow>
+              <Eyebrow>{tc('remindersADay')}</Eyebrow>
               <Segmented<string>
                 value={String(perDay)}
                 onChange={(v) => {
@@ -355,67 +379,67 @@ export default function Onboarding() {
                 }}
                 items={['0', '1', '2', '3'].map((n) => ({ value: n, label: n }))}
               />
-              <Meta>{perDay === 0 ? 'None. You open Joy OS when you choose.' : perDay === 1 ? 'One: today’s action, in the morning.' : perDay === 2 ? 'Two: today’s action, and one Joy Ledger prompt.' : 'Three: today’s action and two Ledger prompts. Never more.'}</Meta>
+              <Meta>{tc(perDayKey(perDay))}</Meta>
             </Card>
             <Card tone="raised" style={{ gap: space.s2 }}>
-              <Eyebrow>How to reach you</Eyebrow>
-              <Toggle checked={channels.app} onChange={(v) => { setChannels((x) => ({ ...x, app: v })); setError(null) }} label="App notifications" description="Today’s action and Ledger prompts." />
-              <Toggle checked={channels.whatsapp} onChange={(v) => { setChannels((x) => ({ ...x, whatsapp: v })); setError(null) }} label="WhatsApp" description="Ledger prompts and reminders only. Never clinical content." />
-              <Toggle checked={channels.email} onChange={(v) => { setChannels((x) => ({ ...x, email: v })); setError(null) }} label="Email" description="The quarterly Joyspan Letter and receipts." />
+              <Eyebrow>{tc('howToReach')}</Eyebrow>
+              <Toggle checked={channels.app} onChange={(v) => { setChannels((x) => ({ ...x, app: v })); setError(null) }} label={tc('chApp')} description={tc('chAppD')} />
+              <Toggle checked={channels.whatsapp} onChange={(v) => { setChannels((x) => ({ ...x, whatsapp: v })); setError(null) }} label={tc('chWa')} description={tc('chWaD')} />
+              <Toggle checked={channels.email} onChange={(v) => { setChannels((x) => ({ ...x, email: v })); setError(null) }} label={tc('chEmail')} description={tc('chEmailD')} />
             </Card>
-            <Meta size={14}>A fall in your Index is never pushed to your phone. It is told to you by a person.</Meta>
+            <Meta size={14}>{t('fallNote')}</Meta>
           </>
         ) : null}
 
         {name === 'Begin' ? (
           <>
             <StepHead
-              eyebrow="Ready"
+              eyebrow={t('ready')}
               title={
                 <>
-                  Your ninety days <Serif>begin</Serif>.
+                  {t('beginA')}<Serif>{t('beginSerif')}</Serif>{t('beginB')}
                 </>
               }
-              lead="First, your baseline Index: about twenty minutes, in two sittings, saved as you go. It names your lowest term, and tomorrow brings your first action."
+              lead={t('beginLead')}
             />
             <Card tone="raised" style={{ gap: space.s2 }}>
-              <Eyebrow>The loop</Eyebrow>
-              <View accessibilityLabel="Your ninety-day loop">
+              <Eyebrow>{t('loop')}</Eyebrow>
+              <View accessibilityLabel={t('loopA11y')}>
                 {(
                   [
-                    ['0', 'Baseline Index'],
-                    ['15', 'First review'],
-                    ['45', 'Review'],
-                    ['60', 'Next step'],
-                    ['76', 'Re-measure'],
-                    ['90', 'Signed delta'],
+                    ['0', t('l0')],
+                    ['15', t('l15')],
+                    ['45', t('l45')],
+                    ['60', t('l60')],
+                    ['76', t('l76')],
+                    ['90', t('l90')],
                   ] as const
                 ).map(([d, l], i, arr) => (
                   <TimelineStep key={d} index={i} state={i === 0 ? 'now' : 'next'} last={i === arr.length - 1}>
-                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10 }} accessible accessibilityLabel={`Day ${d}, ${l}`}>
-                      <Mono tone="ink" style={{ width: 56 }}>{`Day ${d}`}</Mono>
-                      <Body tone={i === 0 ? 'ink' : 'ink2'}>{l}</Body>
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10 }} accessible accessibilityLabel={t('dayA11y', { d, l })}>
+                      <Mono tone="ink" style={{ minWidth: 56 }}>{t('dayN', { d })}</Mono>
+                      <Body tone={i === 0 ? 'ink' : 'ink2'} style={{ flexShrink: 1 }}>{l}</Body>
                     </View>
                   </TimelineStep>
                 ))}
               </View>
             </Card>
             <Card tone="sunk" style={{ gap: 0 }}>
-              <KeyValue k="Focus">
+              <KeyValue k={t('focus')}>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s2 }}>
                   {intents.map((k) => (
                     <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <TermDot term={k} />
-                      <Body>{termByKey(k).space}</Body>
+                      <Body>{tt.space(k)}</Body>
                     </View>
                   ))}
                 </View>
               </KeyValue>
-              <KeyValue k="Language">{LANGS.find((l) => l.value === lang)!.native}</KeyValue>
-              <KeyValue k="Consents">{`Care · Data${consents.publishing ? ' · Publishing' : ' · Publishing not given'}`}</KeyValue>
-              <KeyValue k="Device">{device === 'none' ? 'None for now' : `${dev.name}${linked[device] === 'linked' ? ' · linked' : ' · link later from Devices'}`}</KeyValue>
-              <KeyValue k="Quiet hours" last>
-                <Mono tone="ink" size={17}>{`${quiet.from} – ${quiet.to} · ${perDay} a day`}</Mono>
+              <KeyValue k={tc('language')}>{LANGS.find((l) => l.value === lang)!.native}</KeyValue>
+              <KeyValue k={t('kConsents')}>{`${t('consSum')}${consents.publishing ? t('consPub') : t('consNoPub')}`}</KeyValue>
+              <KeyValue k={t('kDevice')}>{device === 'none' ? t('noneForNow') : `${devName}${linked[device] === 'linked' ? t('devLinked') : t('devLater')}`}</KeyValue>
+              <KeyValue k={tc('quietHours')} last>
+                <Mono tone="ink" size={17}>{`${quiet.from} – ${quiet.to} · ${t('aDay', { n: perDay })}`}</Mono>
               </KeyValue>
             </Card>
           </>
@@ -442,21 +466,21 @@ export default function Onboarding() {
                 router.replace('/index-take')
               }}
             >
-              Take your baseline Index
+              {t('takeBaseline')}
             </DaybreakButton>
             <Button variant="ghost" onPress={() => setTomorrowOpen(true)} style={{ alignSelf: 'center' }}>
-              Start tomorrow instead
+              {t('tomorrowInstead')}
             </Button>
           </>
         ) : (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1 }}>
             {step > 0 ? (
               <Button variant="ghost" icon="arrow-left" onPress={back}>
-                Back
+                {tc('back')}
               </Button>
             ) : (
               <Button variant="ghost" onPress={() => router.push('/signin')}>
-                I have an AIWO ID
+                {t('haveId')}
               </Button>
             )}
             <View style={{ flex: 1 }}>
@@ -468,7 +492,7 @@ export default function Onboarding() {
       <Sheet
         open={tomorrowOpen}
         onClose={() => setTomorrowOpen(false)}
-        title="Tomorrow, then"
+        title={t('tomorrowTitle')}
         footer={
           <View style={{ gap: 8 }}>
             <Button
@@ -480,27 +504,27 @@ export default function Onboarding() {
                 router.replace('/')
               }}
             >
-              Keep my plan · go to Today
+              {t('keepPlan')}
             </Button>
             <Button variant="secondary" block onPress={() => setTomorrowOpen(false)}>
-              Take it now instead
+              {t('takeNow')}
             </Button>
           </View>
         }
       >
         <Title size={24}>
-          Your plan is <Serif>saved</Serif>.
+          {t('planA')}<Serif>{t('planSerif')}</Serif>{t('planB')}
         </Title>
-        <KeyValue k="Tomorrow">
+        <KeyValue k={t('kTomorrow')}>
           {perDay > 0 && (channels.app || channels.whatsapp || channels.email)
-            ? `One reminder at ${quiet.to}, after your quiet hours, to take the baseline Index.`
-            : 'No reminder, as you chose. The baseline Index waits on Today whenever you open Joy OS.'}
+            ? t('oneReminder', { time: quiet.to })
+            : t('noReminder')}
         </KeyValue>
-        <KeyValue k="Focus until then">{intents.length ? intents.map((k) => termByKey(k).space).join(' and ') : 'All six terms'}</KeyValue>
-        <KeyValue k="Reminders" last>
-          <Mono tone="ink" size={17}>{`${perDay} a day · quiet ${quiet.from} – ${quiet.to}`}</Mono>
+        <KeyValue k={t('focusUntil')}>{intents.length ? intents.map((k) => tt.space(k)).join(tc('and')) : tc('allSix')}</KeyValue>
+        <KeyValue k={t('kReminders')} last>
+          <Mono tone="ink" size={17}>{t('remSum', { n: perDay, from: quiet.from, to: quiet.to })}</Mono>
         </KeyValue>
-        <Meta>Until your Index names your lowest term, Today offers actions for what you chose.</Meta>
+        <Meta>{t('untilNote')}</Meta>
       </Sheet>
     </View>
   )

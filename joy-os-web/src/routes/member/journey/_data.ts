@@ -211,7 +211,8 @@ export const CATION_DETAIL: Record<string, CationDetailData> = {
   },
 }
 
-export interface ItinDay { day: number; title: string; items: { time: string; title: string; where: string; kind: ItemKind; term?: TermKey }[] }
+/** `titleFrom`: the full session the day is named after (shown shortened). `tpl`/`vars`: a title with a name filled in. */
+export interface ItinDay { day: number; title: string; titleFrom?: string; items: { time: string; title: string; tpl?: string; vars?: Record<string, string>; where: string; kind: ItemKind; term?: TermKey }[] }
 
 /** Builds the day-by-day room and treatment schedule from the template. */
 export function buildItinerary(slug: string): ItinDay[] {
@@ -225,7 +226,7 @@ export function buildItinerary(slug: string): ItinDay[] {
     title: 'Arrival',
     items: [
       { time: '12:00', title: 'Welcome, your card handed over in person', where: 'Arrival lounge', kind: 'Room' },
-      { time: '14:00', title: `Intake with ${d.clinician.name}`, where: 'Clinic suite', kind: 'Talk', term: c.primary === 'ALL' ? undefined : c.primary },
+      { time: '14:00', title: `Intake with ${d.clinician.name}`, tpl: 'Intake with {name}', vars: { name: d.clinician.name }, where: 'Clinic suite', kind: 'Talk', term: c.primary === 'ALL' ? undefined : c.primary },
       { time: '16:00', title: 'Baseline readings at the Signal Points', where: 'Signal Points 1–3', kind: 'Measure' },
       { time: '19:30', title: 'First dinner with your cohort', where: 'Terrace', kind: 'Meal', term: 'R' },
     ],
@@ -237,6 +238,7 @@ export function buildItinerary(slug: string): ItinDay[] {
     days.push({
       day: n,
       title: a.title.split(':')[0].split(',')[0],
+      titleFrom: a.title,
       items: [
         { time: '06:45', title: n % 2 ? 'Morning movement, at your pace' : 'Sunrise breath and stretch', where: 'Lawn', kind: 'Movement', term: 'H' },
         { time: '09:30', title: a.title, where: a.where, kind: a.kind, term: a.term },

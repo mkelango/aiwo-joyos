@@ -70,6 +70,21 @@
   color-scheme: light;
 }
 
+/* Tamil and Hindi: the brand Latin faces stay first, so Latin words, numbers and names
+   render exactly as in English; Tamil and Devanagari glyphs fall through to Mukta
+   Malar / Mukta, then Noto Sans Tamil / Devanagari. */
+:root:lang(ta) {
+  --font-sans: 'Avenir Next', 'Nunito Sans', 'Mukta Malar', 'Noto Sans Tamil', system-ui, sans-serif;
+  --font-serif: 'Newsreader', 'Mukta Malar', 'Noto Sans Tamil', Georgia, serif;
+  --font-mono: 'IBM Plex Mono', 'Mukta Malar', 'Noto Sans Tamil', ui-monospace, monospace;
+}
+:root:lang(hi) {
+  --font-sans: 'Avenir Next', 'Nunito Sans', 'Mukta', 'Noto Sans Devanagari', system-ui, sans-serif;
+  --font-serif: 'Newsreader', 'Mukta', 'Noto Sans Devanagari', Georgia, serif;
+  --font-mono: 'IBM Plex Mono', 'Mukta', 'Noto Sans Devanagari', ui-monospace, monospace;
+}
+
+
 /* Warm Ink dark mode (Playbook p39) */
 :root[data-theme='dark'] {
   --paper: #1c1314;

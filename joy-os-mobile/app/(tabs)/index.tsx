@@ -38,21 +38,20 @@ import { useTheme } from '@/theme/ThemeProvider'
 import { actionsFor } from '@/screens/a/spacesData'
 import { isSpecimenToday, usePlanned } from '@/screens/a/local'
 import type { TermKey } from '@/shared/types'
+import { Rich, useA } from '@/screens/a/i18n'
 
 // TODAY (Memo p.14, p.17, p.18; Playbook p62): the Index and Wheel, the lowest term, one
 // action, the circle's next call, Day N of 90 and the next measure date. One Daybreak button.
 // Mobile port of joy-os-web/src/routes/member/core/Today.tsx — the exemplar for every screen.
 
-const WEEK = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
-const WEEK_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 /** Monday to Wednesday from the specimen; Thursday (today) comes from the Ledger itself. */
 const LEDGER_PAST = [true, true, true]
 const TODAY_INDEX = 3
-const MILESTONE_LINK: Record<number, { route: string; hint: string }> = {
+const MILESTONE_LINK: Record<number, { route: string; hint: 'Opens the re-measure' | 'Opens the Day 90 result' }> = {
   76: { route: '/index-take', hint: 'Opens the re-measure' },
   90: { route: '/day-90', hint: 'Opens the Day 90 result' },
 }
-const MILESTONES: [number, string][] = [
+const MILESTONES: [number, 'Measured' | 'Review' | 'Next step' | 'Re-measure' | 'Signed delta'][] = [
   [0, 'Measured'],
   [15, 'Review'],
   [45, 'Review'],
@@ -63,6 +62,7 @@ const MILESTONES: [number, string][] = [
 
 export default function Today() {
   const t = useT()
+  const { t: ta, tx, lang, name, space: spaceName, week: WEEK, weekFull: WEEK_FULL } = useA()
   const th = useTheme()
   const { c, space } = th
   const { actionState, setActionState, ledger } = useApp()
@@ -97,14 +97,14 @@ export default function Today() {
         <Pressable
           onPress={() => router.push('/index-result')}
           accessibilityRole="link"
-          accessibilityLabel={`${describeWheel(latest.terms, latest.value)} Opens your Index.`}
+          accessibilityLabel={ta('{wheel} Opens your Index.', { wheel: describeWheel(latest.terms, latest.value, lang) })}
           style={({ pressed }) => ({ alignItems: 'center', opacity: pressed ? 0.85 : 1, marginVertical: space.half })}
         >
           <JoyspanWheel terms={latest.terms} size={236} />
         </Pressable>
 
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.s2 }}>
-          <Numeral size={96} accessibilityLabel={`Joyspan Index ${latest.value} of 100`}>
+          <Numeral size={96} accessibilityLabel={ta('Joyspan Index {n} of 100', { n: latest.value })}>
             {latest.value}
           </Numeral>
           <View style={{ paddingBottom: 14, gap: 4 }}>
@@ -113,7 +113,7 @@ export default function Today() {
           </View>
         </View>
         <Body tone="ink2">
-          Up from {previous.value}. Lowest term: <Body>{lowest.name}</Body>.
+          {ta('Up from {n}. Lowest term:', { n: previous.value })} <Body>{name(lowest.key)}</Body>{lang === 'hi' ? '।' : '.'}
         </Body>
 
         <Divider />
@@ -126,12 +126,12 @@ export default function Today() {
                 key={s.key}
                 onPress={() => router.push(`/spaces/${term.slug}`)}
                 accessibilityRole="link"
-                accessibilityLabel={`${term.space}, ${term.name} ${s.key === 'B' ? 'minus ' : ''}${s.value}, ${s.band}`}
+                accessibilityLabel={ta('{space}, {name} {minus}{value}, {band}', { space: spaceName(s.key), name: name(s.key), minus: s.key === 'B' ? ta('minus ') : '', value: String(s.value), band: tx(s.band) })}
                 style={({ pressed }) => ({ width: '45%', flexGrow: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, opacity: pressed ? 0.6 : 1 })}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
                   <TermDot term={s.key} />
-                  <Meta>{term.space}</Meta>
+                  <Meta style={{ flexShrink: 1 }}>{spaceName(s.key)}</Meta>
                 </View>
                 <Mono tone="ink">{shown}</Mono>
               </Pressable>
@@ -150,11 +150,11 @@ export default function Today() {
       {/* The one action */}
       <Card tone="sunk" style={{ gap: space.s2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s1, flexWrap: 'wrap' }}>
-          <Eyebrow tone="daybreak">Today · {lowest.name}</Eyebrow>
+          <Eyebrow tone="daybreak" style={{ flexShrink: 1 }}>{`${t('today')} · ${name(lowest.key)}`}</Eyebrow>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Icon name="clock" size={14} color={c.ink3} />
             <Meta tone="ink3" size={14}>
-              {action.minutes} min · {action.shared ? 'with Kavya' : 'solo'}
+              {ta(action.shared ? '{n} min · with Kavya' : '{n} min · solo', { n: action.minutes })}
             </Meta>
           </View>
         </View>
@@ -162,20 +162,20 @@ export default function Today() {
         {actionState === 'todo' ? (
           <>
             <Title size={26}>
-              {action.title.replace('.', '')}. <Serif>Notice</Serif> three things.
+              <Rich text={tx(`${action.title.replace('.', '')}. *Notice* three things.`)} wrap={(w) => <Serif>{w}</Serif>} />
             </Title>
             <Pressable
               onPress={() => setWhyOpen(true)}
               accessibilityRole="button"
-              accessibilityLabel="Why this, today?"
+              accessibilityLabel={ta('Why this, today?')}
               hitSlop={6}
               style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, alignSelf: 'flex-start', opacity: pressed ? 0.6 : 1 })}
             >
               <Icon name="info" size={16} color={c.ink2} />
-              <Meta style={{ textDecorationLine: 'underline' }}>Why this, today?</Meta>
+              <Meta style={{ textDecorationLine: 'underline', flexShrink: 1 }}>{ta('Why this, today?')}</Meta>
             </Pressable>
             <View style={{ gap: space.s1, marginTop: space.s1 }}>
-              <DaybreakButton onPress={() => setActionState('done')} accessibilityHint="Marks today’s action as done. You can undo it.">
+              <DaybreakButton onPress={() => setActionState('done')} accessibilityHint={ta('Marks today’s action as done. You can undo it.')}>
                 {t('doneForToday')}
               </DaybreakButton>
               <Button variant="ghost" onPress={() => setActionState('skipped')} style={{ alignSelf: 'center' }}>
@@ -187,20 +187,18 @@ export default function Today() {
           <View style={{ gap: space.s1 }} accessibilityLiveRegion="polite">
             <Title size={24}>
               {actionState === 'skipped' ? (
-                'That’s fine. Tomorrow will bring another.'
+                ta('That’s fine. Tomorrow will bring another.')
               ) : (
-                <>
-                  Done, with the family. <Serif>Thank you.</Serif>
-                </>
+                <Rich text={ta('Done, with the family. *Thank you.*')} wrap={(w) => <Serif>{w}</Serif>} />
               )}
             </Title>
             <Meta>
               {actionState === 'skipped'
-                ? '“Not today” is always allowed, and never counted against you.'
-                : 'Mindful minutes written back to Apple Health, as you allowed.'}
+                ? ta('“Not today” is always allowed, and never counted against you.')
+                : ta('Mindful minutes written back to Apple Health, as you allowed.')}
             </Meta>
             <Button variant="link" onPress={() => setActionState('todo')}>
-              Undo
+              {ta('Undo')}
             </Button>
           </View>
         )}
@@ -210,15 +208,15 @@ export default function Today() {
               <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1, minHeight: 44 }}>
                 <View style={{ flex: 1, gap: 2 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <Eyebrow>Also planned ·</Eyebrow>
+                    <Eyebrow>{ta('Also planned ·')}</Eyebrow>
                     <TermChip term={k} />
                   </View>
-                  <Pressable onPress={() => router.push(`/spaces/${termByKey(k).slug}`)} accessibilityRole="link" accessibilityLabel={`Also planned: ${a.title} Opens the ${termByKey(k).space} space.`}>
-                    <Body>{a.title}</Body>
+                  <Pressable onPress={() => router.push(`/spaces/${termByKey(k).slug}`)} accessibilityRole="link" accessibilityLabel={ta('Also planned: {title} Opens the {space} space.', { title: tx(a.title), space: spaceName(k) })}>
+                    <Body>{tx(a.title)}</Body>
                   </Pressable>
                 </View>
-                <Button variant="link" size="sm" onPress={() => plan(k, null)} accessibilityLabel={`Undo: remove ${a.title} from today`}>
-                  Undo
+                <Button variant="link" size="sm" onPress={() => plan(k, null)} accessibilityLabel={ta('Undo: remove {title} from today', { title: tx(a.title) })}>
+                  {ta('Undo')}
                 </Button>
               </View>
             ))}
@@ -228,8 +226,8 @@ export default function Today() {
 
       {/* Your circle */}
       <Card tone="raised" style={{ gap: space.s2 }}>
-        <Eyebrow>Your circle · {CIRCLE.when}</Eyebrow>
-        <Body>Coach Priya and seven others</Body>
+        <Eyebrow>{ta('Your circle · {when}', { when: tx(CIRCLE.when) })}</Eyebrow>
+        <Body>{ta('Coach Priya and seven others')}</Body>
         <Meta>{CIRCLE.members.join(', ')}</Meta>
         <View style={{ flexDirection: 'row' }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           {CIRCLE.members.map((m, i) => (
@@ -254,15 +252,15 @@ export default function Today() {
           ))}
         </View>
         <ArrowLink icon="users" onPress={() => router.push('/circles')}>
-          {`Week ${CIRCLE.week} of the Practice`}
+          {ta('Week {n} of the Practice', { n: CIRCLE.week })}
         </ArrowLink>
       </Card>
 
       {/* This week */}
       <Card tone="raised" style={{ gap: space.s2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-          <View style={{ gap: 6 }}>
-            <Eyebrow>This week · Joy Ledger</Eyebrow>
+          <View style={{ gap: 6, flex: 1 }}>
+            <Eyebrow>{ta('This week · Joy Ledger')}</Eyebrow>
             <TermChip term="D" />
           </View>
           <LoopRing day={day} size={44} />
@@ -270,7 +268,12 @@ export default function Today() {
         <View
           style={{ flexDirection: 'row', justifyContent: 'space-between' }}
           accessible
-          accessibilityLabel={`Joy Ledger, Daily Pleasure: ${ledgerCount} of 7 days so far this week, ${WEEK_FULL.filter((_, i) => ledgerDays[i]).join(', ')}. Today is ${WEEK_FULL[TODAY_INDEX]}${ledgerToday ? `, with ${ledgerToday} ${ledgerToday === 1 ? 'moment' : 'moments'}` : ''}.`}
+          accessibilityLabel={ta('Joy Ledger, Daily Pleasure: {n} of 7 days so far this week, {days}. Today is {today}{extra}.', {
+            n: ledgerCount,
+            days: WEEK_FULL.filter((_, i) => ledgerDays[i]).join(', '),
+            today: WEEK_FULL[TODAY_INDEX],
+            extra: ledgerToday ? ta(ledgerToday === 1 ? ', with {n} moment' : ', with {n} moments', { n: ledgerToday }) : '',
+          })}
         >
           {WEEK.map((d, i) => (
             <View key={i} style={{ alignItems: 'center', gap: 6 }}>
@@ -290,18 +293,22 @@ export default function Today() {
           ))}
         </View>
         <Meta>
-          Joy came most from <Meta tone="ink">{LEDGER_WEEK[0].tag.toLowerCase()}</Meta> and <Meta tone="ink">{LEDGER_WEEK[1].tag.toLowerCase()}</Meta>.
+          <Rich
+            text={ta('Joy came most from *{a}* and *{b}*.', {
+              a: lang === 'en' ? LEDGER_WEEK[0].tag.toLowerCase() : tx(LEDGER_WEEK[0].tag),
+              b: lang === 'en' ? LEDGER_WEEK[1].tag.toLowerCase() : tx(LEDGER_WEEK[1].tag),
+            })}
+            wrap={(w) => <Meta tone="ink">{w}</Meta>}
+          />
         </Meta>
-        <ArrowLink onPress={() => router.push('/ledger')}>Add to the Ledger</ArrowLink>
+        <ArrowLink onPress={() => router.push('/ledger')}>{ta('Add to the Ledger')}</ArrowLink>
       </Card>
 
       {/* The ninety days */}
       <Card tone="outline" style={{ gap: space.s2 }}>
-        <Eyebrow>The ninety days</Eyebrow>
-        <Body>
-          Day {day}. Your next review with Priya is on Day 45; the re-measure opens on Day 76.
-        </Body>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.s1 }} accessibilityLabel="Loop milestones" accessibilityRole="list">
+        <Eyebrow>{ta('The ninety days')}</Eyebrow>
+        <Body>{ta('Day {n}. Your next review with Priya is on Day 45; the re-measure opens on Day 76.', { n: day })}</Body>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.s1 }} accessibilityLabel={ta('Loop milestones')} accessibilityRole="list">
           {MILESTONES.map(([d, label]) => {
             const past = d <= day
             const link = MILESTONE_LINK[d]
@@ -309,7 +316,7 @@ export default function Today() {
               <View
                 key={d}
                 accessible={!link}
-                accessibilityLabel={`Day ${d}, ${label}${past ? ', passed' : ''}`}
+                accessibilityLabel={ta('Day {d}, {label}{passed}', { d, label: ta(label), passed: past ? ta(', passed') : '' })}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -324,7 +331,7 @@ export default function Today() {
               >
                 <Mono size={14} color={past ? c.paper : c.ink2}>{`D${d}`}</Mono>
                 <Meta size={14} color={past ? c.paper : c.ink2}>
-                  {label}
+                  {ta(label)}
                 </Meta>
                 {link ? <Icon name="arrow-up-right" size={13} color={c.ink2} /> : null}
               </View>
@@ -335,7 +342,7 @@ export default function Today() {
                 key={d}
                 onPress={() => router.push(link.route)}
                 accessibilityRole="link"
-                accessibilityLabel={`Day ${d}, ${label}. ${link.hint}.`}
+                accessibilityLabel={ta('Day {d}, {label}. {hint}.', { d, label: ta(label), hint: ta(link.hint) })}
                 hitSlop={6}
                 style={({ pressed }) => ({ minHeight: 44, flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', opacity: pressed ? 0.6 : 1 })}
               >
@@ -345,24 +352,24 @@ export default function Today() {
           })}
         </View>
         <Divider />
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }} accessible accessibilityLabel={`${t('nextMeasure')}, ${fmtDateDots(MEMBER.nextMeasure)}`}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }} accessible accessibilityLabel={`${t('nextMeasure')}, ${fmtDateDots(MEMBER.nextMeasure)}`}>
           <Eyebrow>{t('nextMeasure')}</Eyebrow>
           <Mono tone="ink">{fmtDateDots(MEMBER.nextMeasure)}</Mono>
         </View>
       </Card>
 
-      <Sheet open={whyOpen} onClose={() => setWhyOpen(false)} title="Why this, today">
+      <Sheet open={whyOpen} onClose={() => setWhyOpen(false)} title={ta('Why this, today')}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1, flexWrap: 'wrap' }}>
           <TermChip term={action.term} withSpace />
           <Eyebrow>next_best_action · rules v1.0</Eyebrow>
         </View>
-        <Body>{action.why}</Body>
+        <Body>{tx(action.why)}</Body>
         <View style={{ gap: space.s2 }} accessibilityRole="list">
           {[
-            ['Term.', `The lowest term on your latest Index is ${lowest.name} (${lowestScore}). No ’cation protocol or safety flag is open.`],
-            ['Candidates.', `40 curated ${lowest.space} actions, each claims-gated and tagged with evidence.`],
-            ['Fit.', 'Calendar clear after 7 pm (consented), Kavya linked, sunset 18:12.'],
-            ['One.', 'Shown with one reason. “Not today” is never punished.'],
+            [ta('Term.'), ta('The lowest term on your latest Index is {name} ({score}). No ’cation protocol or safety flag is open.', { name: name(lowest.key), score: String(lowestScore) })],
+            [ta('Candidates.'), ta('40 curated {space} actions, each claims-gated and tagged with evidence.', { space: spaceName(lowest.key) })],
+            [ta('Fit.'), ta('Calendar clear after 7 pm (consented), Kavya linked, sunset 18:12.')],
+            [ta('One.'), ta('Shown with one reason. “Not today” is never punished.')],
           ].map(([head, text], i) => (
             <View key={head} style={{ flexDirection: 'row', gap: 12 }}>
               <Mono tone="ink3">{String(i + 1)}</Mono>
@@ -378,9 +385,9 @@ export default function Today() {
         <Card tone="sunk" padding={16}>
           <Meta>
             <Meta tone="ink" weight="semibold">
-              Evidence.
+              {ta('Evidence.')}
             </Meta>{' '}
-            {action.evidence}
+            {tx(action.evidence)}
           </Meta>
         </Card>
         <ArrowLink
@@ -390,7 +397,7 @@ export default function Today() {
             router.push('/viva')
           }}
         >
-          Ask VIVA about this
+          {ta('Ask VIVA about this')}
         </ArrowLink>
       </Sheet>
     </Screen>

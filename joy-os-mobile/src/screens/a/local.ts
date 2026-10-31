@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { LedgerEntry, TermKey } from '@/shared/types'
+import type { Lang } from '@/lib/store'
+import { localDate } from './i18n'
 import { SPACE_TODAY } from './spacesData'
 
 // Lane A: small offline-first helpers kept on the phone (AsyncStorage), so plans, drafts
@@ -124,12 +126,12 @@ export function ledgerStamp(e: Pick<LedgerEntry, 'id' | 'at'>) {
   return `${SPACE_TODAY}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-/** "28 Jan 16:15" from a local ISO-like stamp, without timezone drift. */
-export function ledgerWhen(stamp: string) {
+/** "28 Jan 16:15" from a local ISO-like stamp, without timezone drift; month in the member's language. */
+export function ledgerWhen(stamp: string, lang: Lang = 'en') {
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(stamp)
   if (!m) return stamp
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  return `${m[3]} ${months[Number(m[2]) - 1]} ${m[4]}:${m[5]}`
+  return localDate(`${m[3]} ${months[Number(m[2]) - 1]} ${m[4]}:${m[5]}`, lang)
 }
 
 /** Entries on the specimen's today. */

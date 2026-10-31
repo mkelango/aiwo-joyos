@@ -1,4 +1,7 @@
 import type { Band, Role, TermKey } from '@/domain/types'
+import { fill } from '@/lib/i18n'
+import type { Lang } from '@/lib/store'
+import { COUNTRY_KEY, E } from './_i18n'
 
 // ─── The Joyspan Check ─────────────────────────────────────────────────────
 // 18 statements, three per term, each on a five-point scale (Memo p.10).
@@ -204,15 +207,23 @@ export type CountryCode = (typeof COUNTRIES)[number]['code']
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 
 /** Plain, grammatical validation copy for a mobile number. Returns null when valid. */
-export function phoneError(code: CountryCode, raw: string): string | null {
+export function phoneError(code: CountryCode, raw: string, lang: Lang = 'en'): string | null {
   const c = COUNTRIES.find((x) => x.code === code)!
   const digits = raw.replace(/\D/g, '')
-  if (!digits) return 'Enter your mobile number.'
+  if (!digits) return E.phoneEmpty[lang]
   if (!c.re.test(digits)) {
     const article = /^[aeiou]/i.test(c.adj) && c.adj !== 'UAE' && c.adj !== 'UK' ? 'an' : 'a'
-    return `That does not look like ${article} ${c.adj} mobile number. It should be ${c.len} digits.`
+    const adj = lang === 'en' ? c.adj : E[`adj_${COUNTRY_KEY[c.code]}`][lang]
+    return fill(E.phoneBad[lang], { article, adj, len: c.len })
   }
   return null
+}
+
+/** Country name in the member's language, for the dialling-code pickers. */
+export function countryName(code: string, lang: Lang) {
+  const c = COUNTRIES.find((x) => x.code === code)
+  if (!c) return code
+  return lang === 'en' ? c.name : E[`c_${COUNTRY_KEY[c.code]}`][lang]
 }
 
 // ─── Onboarding ─────────────────────────────────────────────────────────────
@@ -238,8 +249,8 @@ export const DEVICES = [
 export type DeviceId = (typeof DEVICES)[number]['id']
 
 // ─── Onboarding chrome in the three launch languages ───────────────────────
-// Only the chrome switches during setup (step names and footer buttons); the
-// rest of setup stays in English and the app follows the choice on finishing.
+// Step names and footer buttons; the rest of setup reads from OB in _i18n.ts.
+// Translations of the data below (intents, devices, next steps, notes) live in _i18n.ts.
 
 export const ONBOARDING_STEPS = ['Welcome', 'Account', 'Intent', 'Language', 'Consents', 'Device', 'Household', 'Quiet hours', 'Begin'] as const
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number]

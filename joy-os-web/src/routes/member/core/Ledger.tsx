@@ -13,6 +13,8 @@ import { useT } from '@/lib/i18n'
 import { LEDGER_CALENDAR, LEDGER_SCHEDULE, LEDGER_STORY } from './_data'
 import { Provenance, Switch, TICK } from './_parts'
 import { SPECIMEN_TODAY, addDays, isSeed, liveLedger, useLedgerRemoved, useLocal, weekCounts, type ScheduleRow } from './_store'
+import { SCHEDULE_LABEL, STORY_TEXT, fmtLocal, rich, useCore } from './_i18n'
+import type { Lang } from '@/lib/store'
 
 // THE JOY LEDGER (Memo p.17 screen 03, p.19 Pleasure; Plan §4B).
 // Three ten-second prompts a day on a Daybreak-soft ground; tags, an optional word or
@@ -29,7 +31,7 @@ const inQuiet = (hhmm: string) => {
 }
 const dayKey = (iso: string) => iso.slice(0, 10)
 const asDate = (day: string) => new Date(`${day}T12:00:00`)
-const fmtDay = (d: Date) => d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+const fmtDay = (d: Date, lang: Lang = 'en') => fmtLocal(d, lang, { weekday: 'short', day: 'numeric', month: 'short' })
 const fmtTime = (iso: string) => iso.slice(11, 16)
 const nowHHMM = () => {
   const d = new Date()
@@ -77,16 +79,17 @@ export default function Ledger() {
   const d = latest.terms.find((t) => t.key === 'D')!
   const { active, current, next } = promptState(rows)
   const prompt: 1 | 2 | 3 = current?.prompt ?? 1
+  const { t: c, name, space } = useCore()
 
   return (
     <div>
       <PageHeader
-        eyebrow="Daily Pleasure · The Joy Ledger"
-        title={<>Anything good, <em>kept</em> in ten seconds.</>}
-        lead="Three short prompts a day. Tap what it was, add a word if you like, and move on. Over a week, it shows you where joy came from."
+        eyebrow={`${name('D')} · ${c('lgName')}`}
+        title={rich(c('lgTitle'))}
+        lead={c('lgLead')}
         actions={
           <Pill tone="neutral">
-            {active.length === 0 ? 'Prompts off · you can still keep a moment' : <>Prompt <span className="num">{prompt}</span> of <span className="num">3</span> today</>}
+            {active.length === 0 ? c('lgPromptsOff') : rich(c('lgPromptToday'), { p: <span className="num">{prompt}</span>, n: <span className="num">3</span> })}
           </Pill>
         }
       />
@@ -110,10 +113,10 @@ export default function Ledger() {
               <span className="num text-[2rem] font-light text-ink">{d.value}</span>
             </div>
             <p className="mt-3 text-[15px] text-ink-2">
-              The Ledger feeds Daily Pleasure: <span className="num text-ink">D = 0.5·SPANE-B + 0.3·Joy moments + 0.2·Savouring</span>. Joy moments are counted, never judged.
+              {rich(c('lgFeeds'), { term: name('D'), f: <span className="num text-ink">D = 0.5·SPANE-B + 0.3·Joy moments + 0.2·Savouring</span> })}
             </p>
             <MethodLine className="mt-4" method={latest.method} grade={latest.grade} next={latest.nextMeasure} />
-            <Link to="/app/spaces/pleasure" className="mt-3 inline-block text-[14px] text-ink underline-offset-4 hover:underline focus-ring">Open the Pleasure space</Link>
+            <Link to="/app/spaces/pleasure" className="mt-3 inline-block text-[14px] text-ink underline-offset-4 hover:underline focus-ring">{c('openSpace', { space: space('D') })}</Link>
           </Card>
           <PrivacyCard />
         </div>
@@ -125,6 +128,7 @@ export default function Ledger() {
 // ─── The prompt card (Daybreak soft ground) ─────────────────────────────────
 function PromptCard({ prompt, time, next, live }: { prompt: 1 | 2 | 3; time?: string; next: ScheduleRow | null; live: LedgerEntry[] }) {
   const t = useT()
+  const { t: c, lang, name, tag: tagText } = useCore()
   const { ledger, addLedger, setCrisisOpen } = useApp()
   const [photos, setPhotos] = useLocal<Record<string, string>>('ledger-photos', {})
   const wordId = useId()
@@ -134,7 +138,7 @@ function PromptCard({ prompt, time, next, live }: { prompt: 1 | 2 | 3; time?: st
   const [showExtra, setShowExtra] = useState(false)
   const [word, setWord] = useState('')
   const [photo, setPhoto] = useState<string | null>(null)
-  const [photoError, setPhotoError] = useState('')
+  const [photoError, setPhotoError] = useState<'' | 'lgNotPhoto' | 'lgUnreadable'>('')
   const [state, setState] = useState<'ask' | 'saved' | 'later' | 'held'>('ask')
   const [touched, setTouched] = useState(false)
   const todayCount = live.filter((e) => dayKey(e.at) === SPECIMEN_TODAY).length
@@ -163,12 +167,12 @@ function PromptCard({ prompt, time, next, live }: { prompt: 1 | 2 | 3; time?: st
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
-    if (!file.type.startsWith('image/')) return setPhotoError('That file is not a photo. Choose a JPEG, PNG or HEIC image.')
+    if (!file.type.startsWith('image/')) return setPhotoError('lgNotPhoto')
     try {
       setPhoto(await toThumb(file))
       setPhotoError('')
     } catch {
-      setPhotoError('That photo could not be read on this device. Try another.')
+      setPhotoError('lgUnreadable')
     }
   }
   const save = () => {
@@ -187,8 +191,8 @@ function PromptCard({ prompt, time, next, live }: { prompt: 1 | 2 | 3; time?: st
 
   return (
     <Card tone="soft" className="flex flex-col" aria-labelledby="ledger-prompt">
-      <div className="flex items-center justify-between gap-3">
-        <Eyebrow tone="daybreak">Daily Pleasure · Prompt {prompt} of 3</Eyebrow>
+      <div className="flex items-start justify-between gap-3">
+        <Eyebrow tone="daybreak">{name('D')} · {c('lgPromptOf', { p: prompt, n: 3 })}</Eyebrow>
         {time && <span className="num text-[13px] text-ink-3">{time}</span>}
       </div>
       <AnimatePresence mode="wait">
@@ -196,7 +200,7 @@ function PromptCard({ prompt, time, next, live }: { prompt: 1 | 2 | 3; time?: st
           <motion.div key="ask" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-1 flex-col">
             <h2 id="ledger-prompt" className="mt-4 text-[2rem] font-light leading-tight text-ink md:text-[2.4rem]">{t('ledgerPrompt')}</h2>
             <fieldset className="mt-6">
-              <legend className="sr-only">What was it? Choose any that fit.</legend>
+              <legend className="sr-only">{c('lgLegend')}</legend>
               <div className="flex flex-wrap gap-2">
                 {LEDGER_TAGS.map((tag) => {
                   const on = tags.includes(tag)
@@ -211,7 +215,7 @@ function PromptCard({ prompt, time, next, live }: { prompt: 1 | 2 | 3; time?: st
                       )}
                     >
                       {on && <Check size={15} aria-hidden />}
-                      {tag}
+                      {tagText(tag)}
                     </button>
                   )
                 })}
@@ -220,74 +224,74 @@ function PromptCard({ prompt, time, next, live }: { prompt: 1 | 2 | 3; time?: st
 
             {!showExtra ? (
               <button onClick={() => setShowExtra(true)} className="mt-5 inline-flex min-h-[24px] items-center gap-1.5 self-start py-1 text-[15px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring">
-                <Plus size={15} /> Add a word or a photo (optional)
+                <Plus size={15} /> {c('lgAddExtra')}
               </button>
             ) : (
               <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-                <div>
-                  <label htmlFor={wordId} className="text-[14px] text-ink-2">A word or two</label>
+                <div className="min-w-0">
+                  <label htmlFor={wordId} className="text-[14px] text-ink-2">{c('lgWordLabel')}</label>
                   <input
                     id={wordId}
                     value={word}
                     onChange={(e) => setWord(e.target.value)}
                     maxLength={80}
-                    placeholder="Lunch with Kavya"
+                    placeholder={c('lgPlaceholder')}
                     className="mt-1 h-12 w-full rounded-lg border border-line-strong bg-paper-raised px-3 text-[17px] text-ink placeholder:text-ink-3 focus-ring"
                   />
                 </div>
                 <input ref={fileRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden onChange={onFile} />
                 {photo ? (
                   <span className="inline-flex h-14 items-center gap-2.5 rounded-lg border border-line-strong bg-paper-raised py-1 pl-1 pr-2 text-[14px] text-ink">
-                    <img src={photo} alt="Your photo, kept on this phone" className="h-12 w-12 rounded-md object-cover" />
-                    Photo added
-                    <button onClick={() => setPhoto(null)} aria-label="Remove photo" className="rounded-full p-1 text-ink-3 hover:text-ink focus-ring"><X size={14} /></button>
+                    <img src={photo} alt={c('lgPhotoAlt')} className="h-12 w-12 rounded-md object-cover" />
+                    {c('lgPhotoAdded')}
+                    <button onClick={() => setPhoto(null)} aria-label={c('lgRemovePhoto')} className="rounded-full p-1 text-ink-3 hover:text-ink focus-ring"><X size={14} /></button>
                   </span>
                 ) : (
-                  <Button variant="secondary" onClick={() => fileRef.current?.click()} className="h-12"><Camera size={16} /> Add a photo</Button>
+                  <Button variant="secondary" onClick={() => fileRef.current?.click()} className="h-12"><Camera size={16} /> {c('lgAddPhoto')}</Button>
                 )}
                 {photoError ? (
-                  <p role="alert" className="text-[13px] text-error sm:col-span-2">{photoError}</p>
+                  <p role="alert" className="text-[13px] text-error sm:col-span-2">{c(photoError)}</p>
                 ) : (
-                  <p className="text-[13px] text-ink-3 sm:col-span-2">Photos stay on this phone and are never read by AI.</p>
+                  <p className="text-[13px] text-ink-3 sm:col-span-2">{c('lgPhotosStay')}</p>
                 )}
               </div>
             )}
 
-            {touched && empty && <p role="alert" className="mt-4 text-[14px] text-error">Choose a tag, or add a word, to keep this moment.</p>}
+            {touched && empty && <p role="alert" className="mt-4 text-[14px] text-error">{c('lgEmpty')}</p>}
 
             <div className="mt-auto flex flex-col gap-2 pt-7 sm:flex-row sm:items-center">
-              <DaybreakButton onClick={save} className="w-full sm:flex-1">Save · 10 seconds</DaybreakButton>
-              <Button variant="ghost" onClick={() => setState('later')} className="sm:px-6">Not now</Button>
+              <DaybreakButton onClick={save} className="w-full sm:flex-1">{c('lgSave')}</DaybreakButton>
+              <Button variant="ghost" onClick={() => setState('later')} className="sm:px-6">{c('lgNotNow')}</Button>
             </div>
           </motion.div>
         ) : state === 'saved' ? (
           <motion.div key="saved" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex flex-1 flex-col" role="status">
-            <p className="mt-4 text-[2rem] font-light leading-tight text-ink">Kept. <em>Thank you.</em></p>
+            <p className="mt-4 text-[2rem] font-light leading-tight text-ink">{rich(c('lgKept'))}</p>
             <div className="mt-3 flex items-center gap-3">
               {photo && <img src={photo} alt="" className="h-14 w-14 shrink-0 rounded-md object-cover" />}
-              <p className="text-[17px] text-ink-2">
-                {tags.length > 0 ? tags.join(' and ') : 'A moment'}{word.trim() ? `: “${word.trim()}”` : ''}. That is <span className="num text-ink">{todayCount}</span> {todayCount === 1 ? 'moment' : 'moments'} today.
+              <p className="min-w-0 break-words text-[17px] text-ink-2">
+                {rich(c(todayCount === 1 ? 'lgSaved1' : 'lgSavedN'), { what: tags.length > 0 ? tags.map((x) => (lang === 'en' ? x : tagText(x))).join(c('lgAnd')) : c('lgAMoment'), word: word.trim() ? `: “${word.trim()}”` : '', n: <span className="num text-ink">{todayCount}</span> })}
               </p>
             </div>
             <p className="mt-2 text-[15px] text-ink-3">
-              {next ? <>Next prompt at <span className="num">{next.time}</span>, if you want it.</> : 'That was the last prompt for today.'} It now shows in this week’s view and the calendar.
+              {next ? rich(c('lgNextAt'), { t: <span className="num">{next.time}</span> }) : c('lgLastToday')}{c('lgNowShows')}
             </p>
-            <Button variant="link" className="mt-auto self-start pt-6" onClick={reset}>Add another moment</Button>
+            <Button variant="link" className="mt-auto self-start pt-6" onClick={reset}>{c('lgAddAnother')}</Button>
           </motion.div>
         ) : state === 'held' ? (
           <motion.div key="held" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex flex-1 flex-col" role="status">
-            <p className="mt-4 text-[1.6rem] font-light leading-snug text-ink">We paused here, so a person can reach you first.</p>
-            <p className="mt-3 text-[15px] text-ink-2">Your words were not saved and were not sent to any AI. Tele-MANAS is free on 14416, any time.</p>
+            <p className="mt-4 text-[1.6rem] font-light leading-snug text-ink">{c('lgHeld')}</p>
+            <p className="mt-3 text-[15px] text-ink-2">{c('lgHeldNote')}</p>
             <div className="mt-auto flex flex-wrap gap-2 pt-6">
-              <Button variant="secondary" onClick={() => setCrisisOpen(true)}>Talk to someone now</Button>
-              <Button variant="ghost" onClick={reset}>Back to the Ledger</Button>
+              <Button variant="secondary" onClick={() => setCrisisOpen(true)}>{c('lgTalkNow')}</Button>
+              <Button variant="ghost" onClick={reset}>{c('lgBackLedger')}</Button>
             </div>
           </motion.div>
         ) : (
           <motion.div key="later" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex flex-1 flex-col" role="status">
-            <p className="mt-4 text-[1.8rem] font-light leading-snug text-ink">That’s fine. <em>Nothing</em> is counted against you.</p>
-            <p className="mt-3 text-[15px] text-ink-2">{next ? <>The next prompt is at <span className="num">{next.time}</span>.</> : 'That was the last prompt for today. Sleep well.'}</p>
-            <Button variant="link" className="mt-auto self-start pt-6" onClick={reset}>Actually, add one</Button>
+            <p className="mt-4 text-[1.8rem] font-light leading-snug text-ink">{rich(c('lgLater'))}</p>
+            <p className="mt-3 text-[15px] text-ink-2">{next ? rich(c('lgNextIs'), { t: <span className="num">{next.time}</span> }) : c('lgSleepWell')}</p>
+            <Button variant="link" className="mt-auto self-start pt-6" onClick={reset}>{c('lgActually')}</Button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -297,33 +301,28 @@ function PromptCard({ prompt, time, next, live }: { prompt: 1 | 2 | 3; time?: st
 
 // ─── Prompt schedule and quiet hours ────────────────────────────────────────
 function ScheduleCard({ rows, setRows }: { rows: ScheduleRow[]; setRows: (next: ScheduleRow[] | ((p: ScheduleRow[]) => ScheduleRow[])) => void }) {
-  const [status, setStatus] = useState('')
+  const { t: c, pick } = useCore()
+  const [status, setStatus] = useState<{ k: 'scOff' | 'scQuiet' | 'scAt' | 'scUsual'; p?: number; t?: string } | null>(null)
   const active = rows.filter((r) => r.on).length
   const update = (i: number, patch: Partial<ScheduleRow>) => {
     const r = { ...rows[i], ...patch }
     setRows((rs) => rs.map((x, j) => (j === i ? r : x)))
-    setStatus(
-      !r.on
-        ? `Saved · prompt ${r.prompt} is off`
-        : inQuiet(r.time)
-          ? `Saved · prompt ${r.prompt} at ${r.time} sits inside quiet hours, so it is paused until you move it`
-          : `Saved · prompt ${r.prompt} at ${r.time}`,
-    )
+    setStatus({ k: !r.on ? 'scOff' : inQuiet(r.time) ? 'scQuiet' : 'scAt', p: r.prompt, t: r.time })
   }
   const changed = rows.some((r, i) => r.on !== DEFAULT_SCHEDULE[i].on || r.time !== DEFAULT_SCHEDULE[i].time)
 
   return (
     <Card tone="raised" className="min-w-0">
-      <SectionTitle aside={<span className="num text-[13px] text-ink-3">{active} of 3 on</span>}>Prompts and quiet hours</SectionTitle>
+      <SectionTitle aside={<span className="num text-[13px] text-ink-3">{c('scOnCount', { n: active })}</span>}>{c('scTitle')}</SectionTitle>
       <ul className="space-y-5">
         {rows.map((r, i) => {
           const bad = r.on && inQuiet(r.time)
           const errId = `quiet-${r.prompt}`
           return (
             <li key={r.prompt}>
-              <Switch checked={r.on} onChange={(v) => update(i, { on: v })} label={<>Prompt <span className="num">{r.prompt}</span> · {r.label}</>} />
+              <Switch checked={r.on} onChange={(v) => update(i, { on: v })} label={rich(c('scRow'), { p: <span className="num">{r.prompt}</span>, label: pick(SCHEDULE_LABEL[r.prompt], r.label) })} />
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                <label className="sr-only" htmlFor={`time-${r.prompt}`}>Time for prompt {r.prompt}</label>
+                <label className="sr-only" htmlFor={`time-${r.prompt}`}>{c('scTimeFor', { p: r.prompt })}</label>
                 <input
                   id={`time-${r.prompt}`}
                   type="time"
@@ -335,9 +334,9 @@ function ScheduleCard({ rows, setRows }: { rows: ScheduleRow[]; setRows: (next: 
                   className={clsx('num h-10 rounded-lg border bg-paper-raised px-3 text-[15px] text-ink focus-ring disabled:opacity-50', bad ? 'border-error' : 'border-line-strong')}
                 />
                 {bad ? (
-                  <span id={errId} className="text-[13px] text-error">Inside your quiet hours. Choose a time before {QUIET_FROM}.</span>
+                  <span id={errId} className="min-w-0 text-[13px] text-error">{c('scInside', { q: QUIET_FROM })}</span>
                 ) : (
-                  <span className="text-[13px] text-ink-3">{r.on ? 'In the app' : 'Off'}</span>
+                  <span className="text-[13px] text-ink-3">{r.on ? c('scInApp') : c('scOffShort')}</span>
                 )}
               </div>
             </li>
@@ -345,16 +344,16 @@ function ScheduleCard({ rows, setRows }: { rows: ScheduleRow[]; setRows: (next: 
         })}
       </ul>
       <div className="mt-4 flex min-h-[1.5rem] flex-wrap items-center justify-between gap-2">
-        <p role="status" className="text-[13px] text-ink-2">{status}</p>
+        <p role="status" className="min-w-0 text-[13px] text-ink-2">{status ? c(status.k, { p: status.p ?? '', t: status.t ?? '' }) : ''}</p>
         {changed && (
-          <Button variant="link" className="min-h-[24px] text-[13px]" onClick={() => { setRows(DEFAULT_SCHEDULE); setStatus('Saved · back to the usual three prompts') }}>
-            Restore the usual times
+          <Button variant="link" className="min-h-[24px] text-[13px]" onClick={() => { setRows(DEFAULT_SCHEDULE); setStatus({ k: 'scUsual' }) }}>
+            {c('scRestore')}
           </Button>
         )}
       </div>
       <div className="mt-4 space-y-3 border-t border-line pt-5 text-[14px] text-ink-2">
-        <p className="flex items-start gap-2.5"><BellOff size={16} className="mt-0.5 shrink-0 text-ink-3" /> <span>Quiet hours <span className="num text-ink">{MEMBER.quietHours}</span>. Nothing arrives inside them, and never more than three a day.</span></p>
-        <p className="flex items-start gap-2.5"><MessageCircle size={16} className="mt-0.5 shrink-0 text-ink-3" /> <span>WhatsApp prompts are off. <Link to="/app/whatsapp" className="underline underline-offset-4 hover:text-ink">Turn them on</Link></span></p>
+        <p className="flex items-start gap-2.5"><BellOff size={16} className="mt-0.5 shrink-0 text-ink-3" /> <span>{rich(c('scQuietLine'), { q: <span className="num text-ink">{MEMBER.quietHours}</span> })}</span></p>
+        <p className="flex items-start gap-2.5"><MessageCircle size={16} className="mt-0.5 shrink-0 text-ink-3" /> <span>{rich(c('scWhatsApp'), { link: <Link to="/app/whatsapp" className="underline underline-offset-4 hover:text-ink">{c('scTurnOn')}</Link> })}</span></p>
       </div>
     </Card>
   )
@@ -366,19 +365,21 @@ function WeekCard({ ledger, removed }: { ledger: LedgerEntry[]; removed: string[
   const week = useMemo(() => weekCounts(ledger, removed), [ledger, removed])
   const total = week.reduce((a, r) => a + r.count, 0)
   const [first, second] = week
+  const { t: c, lang, pick, tag } = useCore()
+  const tagWord = (s: string) => (lang === 'en' ? s.toLowerCase() : tag(s))
   return (
     <Card tone="raised" className="min-w-0">
-      <SectionTitle aside={<SpecimenTag />}>This week · where joy came from</SectionTitle>
+      <SectionTitle aside={<SpecimenTag />}>{c('wkTitle')}</SectionTitle>
       <p className="text-[17px] text-ink">
-        <span className="num">{total}</span> {total === 1 ? 'moment' : 'moments'} this week.
-        {first && <> Joy came most from <span className="text-ink">{first.tag.toLowerCase()}</span>{second && <> and <span className="text-ink">{second.tag.toLowerCase()}</span></>}.</>}
+        {rich(c(total === 1 ? 'wkCount1' : 'wkCountN'), { n: <span className="num">{total}</span> })}
+        {first && <> {second ? rich(c('joyFromTwo'), { a: <span className="text-ink">{tagWord(first.tag)}</span>, b: <span className="text-ink">{tagWord(second.tag)}</span> }) : rich(c('joyFromOne'), { a: <span className="text-ink">{tagWord(first.tag)}</span> })}</>}
       </p>
       {week.length > 0 ? (
         <div className="mt-4" style={{ height: Math.max(120, week.length * 32) }} aria-hidden>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart accessibilityLayer={false} data={week} layout="vertical" margin={{ top: 0, right: 32, bottom: 0, left: 0 }} barCategoryGap={6}>
               <XAxis type="number" hide domain={[0, 'dataMax']} />
-              <YAxis type="category" dataKey="tag" tick={{ ...TICK, fontSize: 12, fill: 'var(--ink-2)' }} axisLine={false} tickLine={false} width={72} />
+              <YAxis type="category" dataKey="tag" tick={{ ...TICK, fontSize: 12, fill: 'var(--ink-2)' }} tickFormatter={(v: string) => tag(v)} axisLine={false} tickLine={false} width={lang === 'en' ? 72 : 104} />
               <Bar dataKey="count" fill="var(--term-d)" radius={[0, 6, 6, 0]} isAnimationActive={false}>
                 <LabelList dataKey="count" position="right" style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fill: 'var(--ink)' }} />
               </Bar>
@@ -386,26 +387,26 @@ function WeekCard({ ledger, removed }: { ledger: LedgerEntry[]; removed: string[
           </ResponsiveContainer>
         </div>
       ) : (
-        <div className="mt-4"><EmptyState title="Nothing kept this week yet." body="Quiet weeks are fine; they are not counted against you." /></div>
+        <div className="mt-4"><EmptyState title={c('wkEmptyTitle')} body={c('wkEmptyBody')} /></div>
       )}
       <ul className="sr-only">
-        {week.map((r) => <li key={r.tag}>{r.tag}: {r.count} moments</li>)}
+        {week.map((r) => <li key={r.tag}>{c('wkSr', { tag: tag(r.tag), n: r.count })}</li>)}
       </ul>
 
       <div className="mt-5 border-t border-line pt-5">
         {hidden ? (
           <p className="flex items-center justify-between gap-3 text-[14px] text-ink-3">
-            The weekly story is hidden. <Button variant="link" className="min-h-[24px] text-[14px]" onClick={() => setHidden(false)}>Show it</Button>
+            {c('wkHidden')} <Button variant="link" className="min-h-[24px] text-[14px]" onClick={() => setHidden(false)}>{c('wkShow')}</Button>
           </p>
         ) : (
           <>
-            <p className="eyebrow text-ink-3">The week, in two sentences</p>
-            <p className="mt-2 font-serif text-[1.2rem] italic leading-relaxed text-ink">{LEDGER_STORY.sentences}</p>
+            <p className="eyebrow text-ink-3">{c('wkTwo')}</p>
+            <p className="mt-2 font-serif text-[1.2rem] italic leading-relaxed text-ink">{pick(STORY_TEXT, LEDGER_STORY.sentences)}</p>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
               <Provenance tool={LEDGER_STORY.tool} prompt={LEDGER_STORY.prompt} />
-              <Button variant="ghost" size="sm" onClick={() => setHidden(true)}><EyeOff size={14} /> Hide</Button>
+              <Button variant="ghost" size="sm" onClick={() => setHidden(true)}><EyeOff size={14} /> {c('hide')}</Button>
             </div>
-            <p className="mt-2 text-[13px] text-ink-3">Drafted on Sunday from your tags and words only. Photos are never read. Moments kept since then appear in the chart, not in the story.</p>
+            <p className="mt-2 text-[13px] text-ink-3">{c('wkDrafted')}</p>
           </>
         )}
       </div>
@@ -426,16 +427,17 @@ function CalendarCard({ live }: { live: LedgerEntry[] }) {
     })
   }, [live])
   const withEntries = days.filter((x) => x.count > 0).length
-  const weekdays = days.slice(0, 7).map((x) => x.d.toLocaleDateString('en-GB', { weekday: 'narrow' }))
+  const { t: c, lang } = useCore()
+  const weekdays = days.slice(0, 7).map((x) => fmtLocal(x.d, lang, { weekday: 'narrow' }))
   const shade = (n: number) => (n === 0 ? 'var(--paper-sunk)' : `color-mix(in srgb, var(--term-d) ${n === 1 ? 35 : n === 2 ? 65 : 100}%, var(--paper-sunk))`)
 
   return (
     <Card tone="raised" className="min-w-0">
-      <SectionTitle aside={<span className="num text-[13px] text-ink-3">4 weeks</span>}>The last four weeks</SectionTitle>
+      <SectionTitle aside={<span className="num text-[13px] text-ink-3">{c('calWeeks')}</span>}>{c('calTitle')}</SectionTitle>
       <p className="text-[17px] text-ink">
-        Something kept on <span className="num">{withEntries}</span> of <span className="num">28</span> days. Quiet days are fine; they are not counted against you.
+        {rich(c('calLine'), { a: <span className="num">{withEntries}</span>, b: <span className="num">28</span> })}
       </p>
-      <div className="mt-5 grid grid-cols-7 gap-1.5 sm:gap-2" role="list" aria-label="Joy Ledger entries per day, last 28 days">
+      <div className="mt-5 grid grid-cols-7 gap-1.5 sm:gap-2" role="list" aria-label={c('calAria')}>
         {weekdays.map((w, i) => (
           <span key={`h${i}`} className="eyebrow text-center text-ink-3" aria-hidden>{w}</span>
         ))}
@@ -443,8 +445,8 @@ function CalendarCard({ live }: { live: LedgerEntry[] }) {
           <span
             key={day}
             role="listitem"
-            aria-label={`${fmtDay(d)}: ${count} ${count === 1 ? 'entry' : 'entries'}${isToday ? ', today' : ''}`}
-            title={`${fmtDay(d)} · ${count}`}
+            aria-label={`${c(count === 1 ? 'calCell1' : 'calCellN', { day: fmtDay(d, lang), n: count })}${isToday ? c('calToday') : ''}`}
+            title={`${fmtDay(d, lang)} · ${count}`}
             className={clsx('flex aspect-square items-end justify-end rounded-md p-1', isToday && 'ring-2 ring-ink ring-offset-2 ring-offset-paper-raised')}
             style={{ background: shade(Math.min(3, count)) }}
           >
@@ -456,9 +458,9 @@ function CalendarCard({ live }: { live: LedgerEntry[] }) {
         ))}
       </div>
       <div className="mt-4 flex items-center justify-end gap-2 text-[12px] text-ink-3">
-        <span>Fewer</span>
+        <span>{c('calFewer')}</span>
         {[0, 1, 2, 3].map((n) => <span key={n} className="h-3.5 w-3.5 rounded" style={{ background: shade(n) }} aria-hidden />)}
-        <span>3 a day</span>
+        <span>{c('calThree')}</span>
       </div>
     </Card>
   )
@@ -481,26 +483,28 @@ function EntriesCard({ live, onRemove, onRestore }: { live: LedgerEntry[]; onRem
     return [...m.entries()]
   }, [rows])
   const usedTags = LEDGER_TAGS.filter((t) => live.some((e) => e.tags.includes(t)))
+  const { t: c, lang, tag } = useCore()
+  const tr = useT()
   const remove = (e: LedgerEntry) => {
     onRemove(e.id)
-    setUndo({ id: e.id, label: `${fmtDay(asDate(dayKey(e.at)))}, ${fmtTime(e.at)}` })
+    setUndo({ id: e.id, label: `${fmtDay(asDate(dayKey(e.at)), lang)}, ${fmtTime(e.at)}` })
     window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => setUndo(null), 8000)
   }
 
   return (
     <Card tone="raised" className="min-w-0">
-      <SectionTitle aside={<span className="num text-[13px] text-ink-3">{rows.length} entries</span>}>Your entries</SectionTitle>
-      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" role="group" aria-label="Filter by tag">
-        <button onClick={() => setFilter(null)} aria-pressed={filter === null} className={clsx('shrink-0 rounded-full px-3 py-1.5 text-[14px] focus-ring', filter === null ? 'bg-ink text-paper' : 'bg-paper-sunk text-ink-2 hover:text-ink')}>All</button>
+      <SectionTitle aside={<span className="num text-[13px] text-ink-3">{c('enCount', { n: rows.length })}</span>}>{c('enTitle')}</SectionTitle>
+      <div className={clsx('-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1', lang !== 'en' && 'sm:flex-wrap')} role="group" aria-label={c('enFilter')}>
+        <button onClick={() => setFilter(null)} aria-pressed={filter === null} className={clsx('shrink-0 rounded-full px-3 py-1.5 text-[14px] focus-ring', filter === null ? 'bg-ink text-paper' : 'bg-paper-sunk text-ink-2 hover:text-ink')}>{c('enAll')}</button>
         {usedTags.map((t) => (
-          <button key={t} onClick={() => setFilter(t)} aria-pressed={filter === t} className={clsx('shrink-0 rounded-full px-3 py-1.5 text-[14px] focus-ring', filter === t ? 'bg-ink text-paper' : 'bg-paper-sunk text-ink-2 hover:text-ink')}>{t}</button>
+          <button key={t} onClick={() => setFilter(t)} aria-pressed={filter === t} className={clsx('shrink-0 rounded-full px-3 py-1.5 text-[14px] focus-ring', filter === t ? 'bg-ink text-paper' : 'bg-paper-sunk text-ink-2 hover:text-ink')}>{tag(t)}</button>
         ))}
       </div>
       <p role="status" className={clsx('text-[14px] text-ink-2', undo ? 'mt-3' : 'sr-only')}>
         {undo && (
           <>
-            Removed the entry from {undo.label}.{' '}
+            {c('enRemoved', { label: undo.label })}{' '}
             <button
               onClick={() => {
                 onRestore(undo.id)
@@ -508,7 +512,7 @@ function EntriesCard({ live, onRemove, onRestore }: { live: LedgerEntry[]; onRem
               }}
               className="font-medium text-ink underline underline-offset-4 focus-ring"
             >
-              Undo
+              {c('undo')}
             </button>
           </>
         )}
@@ -516,35 +520,35 @@ function EntriesCard({ live, onRemove, onRestore }: { live: LedgerEntry[]; onRem
       {groups.length === 0 ? (
         <div className="mt-5">
           <EmptyState
-            title={filter ? `Nothing tagged ${filter} yet.` : 'Nothing kept yet.'}
-            body={filter ? 'It will come. Joy rarely arrives on schedule.' : 'The next prompt will ask. Or keep a moment now, above.'}
+            title={filter ? c('enNoneTag', { tag: tag(filter) }) : c('enNone')}
+            body={filter ? c('enNoneTagBody') : c('enNoneBody')}
           />
         </div>
       ) : (
         <div className="mt-5 space-y-6">
           {groups.map(([day, entries]) => (
-            <section key={day} aria-label={fmtDay(asDate(day))}>
-              <p className="eyebrow mb-2 text-ink-3">{day === SPECIMEN_TODAY ? 'Today · ' : ''}{fmtDay(asDate(day))}</p>
+            <section key={day} aria-label={fmtDay(asDate(day), lang)}>
+              <p className="eyebrow mb-2 text-ink-3">{day === SPECIMEN_TODAY ? `${tr('today')} · ` : ''}{fmtDay(asDate(day), lang)}</p>
               <ul className="divide-y divide-line rounded-card border border-line">
                 {entries.map((e) => (
                   <li key={e.id} className="flex items-start gap-3 px-4 py-3 sm:gap-4">
                     <span className="num w-11 shrink-0 pt-0.5 text-[14px] text-ink-3">{fmtTime(e.at)}</span>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap gap-1.5">
-                        {e.tags.map((t) => <span key={t} className="rounded-full px-2.5 py-0.5 text-[13px] text-ink" style={{ background: 'var(--term-d-soft)' }}>{t}</span>)}
+                        {e.tags.map((t) => <span key={t} className="rounded-full px-2.5 py-0.5 text-[13px] text-ink" style={{ background: 'var(--term-d-soft)' }}>{tag(t)}</span>)}
                       </div>
                       {e.word && <p className="mt-1.5 text-[16px] text-ink">“{e.word}”</p>}
                       {photos[e.id] ? (
-                        <img src={photos[e.id]} alt={e.word ? `Photo: ${e.word}` : 'Your photo, kept on this phone'} className="mt-2 h-14 w-14 rounded-md object-cover" />
+                        <img src={photos[e.id]} alt={e.word ? c('enPhotoOf', { word: e.word }) : c('lgPhotoAlt')} className="mt-2 h-14 w-14 rounded-md object-cover" />
                       ) : (
-                        e.photo && <p className="mt-1 flex items-center gap-1.5 text-[13px] text-ink-3"><Camera size={13} aria-hidden /> Photo · on this phone only</p>
+                        e.photo && <p className="mt-1 flex items-center gap-1.5 text-[13px] text-ink-3"><Camera size={13} aria-hidden /> {c('enPhotoOnly')}</p>
                       )}
                     </div>
                     <span className="eyebrow shrink-0 pt-1 text-ink-3">P{e.prompt}</span>
                     <button
                       onClick={() => remove(e)}
-                      aria-label={`Remove entry from ${fmtTime(e.at)}`}
-                      title="Remove"
+                      aria-label={c('enRemoveAria', { t: fmtTime(e.at) })}
+                      title={c('enRemove')}
                       className="-mr-1 -mt-0.5 shrink-0 rounded-full p-1.5 text-ink-3 hover:bg-paper-sunk hover:text-ink focus-ring"
                     >
                       <Trash2 size={14} />
@@ -561,19 +565,21 @@ function EntriesCard({ live, onRemove, onRestore }: { live: LedgerEntry[]; onRem
 }
 
 function PrivacyCard() {
+  const { t: c } = useCore()
+  const tr = useT()
   return (
     <Card tone="sunk">
       <div className="flex items-center gap-2">
         <Lock size={15} className="text-ink-3" aria-hidden />
-        <Eyebrow>Private by default</Eyebrow>
+        <Eyebrow>{c('pvTitle')}</Eyebrow>
       </div>
       <ul className="mt-3 space-y-2 text-[15px] text-ink-2">
-        <li>Photos stay on this phone. They are excluded from AI, always.</li>
-        <li>Tags are suggested on the device; words leave it only for your weekly story.</li>
-        <li>Priya sees counts per week, never your words. Kavya sees nothing unless you share.</li>
-        <li>Remove any entry here with its bin icon. A full export or deletion lives in the Trust centre.</li>
+        <li>{c('pv1')}</li>
+        <li>{c('pv2')}</li>
+        <li>{c('pv3')}</li>
+        <li>{c('pv4')}</li>
       </ul>
-      <Link to="/app/trust" className="eyebrow mt-4 inline-block text-ink-3 underline-offset-4 hover:text-ink hover:underline focus-ring">Who has seen my data · Export · Delete</Link>
+      <Link to="/app/trust" className="eyebrow mt-4 inline-block text-ink-3 underline-offset-4 hover:text-ink hover:underline focus-ring">{tr('trust')}</Link>
     </Card>
   )
 }

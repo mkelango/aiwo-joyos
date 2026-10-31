@@ -9,9 +9,11 @@ import { Button, Card, Tabs } from '@/components/ui'
 import { INDEX_HISTORY } from '@/data/member'
 import { TERMS } from '@/data/terms'
 import { METHODS } from '@/domain/indexEngine'
+import { useDict, useLang, useTermText } from '@/lib/i18n'
 import { useApp } from '@/lib/store'
-import { COUNTRIES, DEMO_ACCOUNTS, EMAIL_RE, OPS_ACCOUNT, phoneError, type CountryCode, type DemoAccount } from './_data'
-import { FlowTopBar } from './_parts'
+import { COUNTRIES, DEMO_ACCOUNTS, EMAIL_RE, OPS_ACCOUNT, countryName, phoneError, type CountryCode, type DemoAccount } from './_data'
+import { E, SI } from './_i18n'
+import { FlowTopBar, rich } from './_parts'
 
 // AIWO ID SIGN IN (Architecture: one identity across LifeOS and Joy OS).
 // Passkey first, then phone OTP, then email link. No real authentication:
@@ -26,6 +28,8 @@ export default function SignIn() {
   const nav = useNavigate()
   const { setRole } = useApp()
   const [method, setMethod] = useState<Method>('passkey')
+  const t = useDict(SI)
+  const te = useDict(E)
 
   const enter = (a: DemoAccount) => {
     setRole(a.role)
@@ -42,12 +46,12 @@ export default function SignIn() {
         <div className="mt-12 grid gap-10 border-t border-line pt-10 lg:grid-cols-[minmax(0,30rem)_1fr] lg:gap-16 md:mt-14 md:pt-14">
           {/* Sign in */}
           <div className="min-w-0">
-            <Eyebrow tone="daybreak">AIWO ID · one sign-in for LifeOS and Joy OS</Eyebrow>
+            <Eyebrow tone="daybreak">{t('eyebrow')}</Eyebrow>
             <h2 className="mt-4 text-[1.75rem] font-light leading-tight tracking-tight text-ink md:text-[2rem]">
-              Sign in with your AIWO ID
+              {t('h2')}
             </h2>
             <p className="mt-3 text-[17px] leading-relaxed text-ink-2">
-              One AIWO ID for everything AIWO. LifeOS members use the same sign-in, so your care team, your records and your Index stay in one place.
+              {t('lead')}
             </p>
 
             <Card className="mt-8">
@@ -56,9 +60,9 @@ export default function SignIn() {
                 onChange={setMethod}
                 className="flex w-full"
                 items={[
-                  { value: 'passkey', label: <span className="flex items-center gap-1.5"><Fingerprint size={15} aria-hidden /> Passkey</span> },
-                  { value: 'phone', label: <span className="flex items-center gap-1.5"><Smartphone size={15} aria-hidden /> Phone</span> },
-                  { value: 'email', label: <span className="flex items-center gap-1.5"><Mail size={15} aria-hidden /> Email</span> },
+                  { value: 'passkey', label: <span className="flex items-center gap-1.5"><Fingerprint size={15} aria-hidden /> {t('tabPasskey')}</span> },
+                  { value: 'phone', label: <span className="flex items-center gap-1.5"><Smartphone size={15} aria-hidden /> {t('tabPhone')}</span> },
+                  { value: 'email', label: <span className="flex items-center gap-1.5"><Mail size={15} aria-hidden /> {te('email')}</span> },
                 ]}
               />
               <div className="mt-6">
@@ -74,25 +78,25 @@ export default function SignIn() {
 
             <div className="mt-6 flex flex-col gap-3 text-[15px] text-ink-2">
               <p>
-                New to Joy OS? <Link to="/onboarding" className="link">Create your AIWO ID</Link> in about two minutes.
+                {rich(t('newTo'), { link: <Link to="/onboarding" className="link">{t('newToLink')}</Link> })}
               </p>
               <p>
-                Not ready for an account? <Link to="/check" className="link">Take the free Check</Link>, no login needed.
+                {rich(t('notReady'), { link: <Link to="/check" className="link">{te('takeCheck')}</Link> })}
               </p>
             </div>
 
-            <nav aria-label="See Joy OS without signing in" className="mt-6 rounded-card border border-line p-4">
-              <p className="eyebrow text-ink-3">See the whole platform first</p>
+            <nav aria-label={t('navAria')} className="mt-6 rounded-card border border-line p-4">
+              <p className="eyebrow text-ink-3">{t('seeWhole')}</p>
               <ul className="mt-3 flex flex-col gap-2.5 text-[15px] sm:flex-row sm:flex-wrap sm:gap-x-5">
-                <li><Link to="/creds" className="link inline-flex items-center gap-1.5"><Presentation size={15} aria-hidden /> See the credentials deck</Link></li>
-                <li><Link to="/platform-map" className="link inline-flex items-center gap-1.5"><Map size={15} aria-hidden /> Platform map</Link></li>
-                <li><Link to="/journeys" className="link inline-flex items-center gap-1.5"><RouteIcon size={15} aria-hidden /> Journeys</Link></li>
+                <li><Link to="/creds" className="link inline-flex items-center gap-1.5"><Presentation size={15} aria-hidden /> {t('seeDeck')}</Link></li>
+                <li><Link to="/platform-map" className="link inline-flex items-center gap-1.5"><Map size={15} aria-hidden /> {te('platformMap')}</Link></li>
+                <li><Link to="/journeys" className="link inline-flex items-center gap-1.5"><RouteIcon size={15} aria-hidden /> {te('journeys')}</Link></li>
               </ul>
             </nav>
 
             <p className="mt-8 flex items-start gap-2 border-t border-line pt-5 text-[13px] leading-relaxed text-ink-3">
               <ShieldCheck size={15} className="mt-0.5 shrink-0" aria-hidden />
-              AIWO never asks for a password and never sends a link you did not request. Codes expire after ten minutes. Your data stays in India unless you choose a different region.
+              {t('safety')}
             </p>
           </div>
 
@@ -108,26 +112,28 @@ export default function SignIn() {
 
 function ProductPromise() {
   const lambda = METHODS['v1.0'].lambda
+  const t = useDict(SI)
+  const tt = useTermText()
   return (
     <section aria-labelledby="promise-h" className="grid items-center gap-8 md:grid-cols-[1fr_auto] md:gap-12">
       <div className="min-w-0 max-w-3xl">
-        <p className="eyebrow mb-4 text-daybreak-ink">Joy OS by AIWO</p>
+        <p className="eyebrow mb-4 text-daybreak-ink">{t('brand')}</p>
         <h1 id="promise-h" className="text-[2.4rem] font-light leading-[1.08] tracking-tight text-ink md:text-[3.4rem]">
-          One number for a <em>whole</em> life.
+          {rich(t('h1'), { em: <em>{t('h1em')}</em> })}
         </h1>
         <p className="mt-5 max-w-2xl text-[18px] leading-relaxed text-ink-2 md:text-[19px]">
-          Joyspan measures your body, purpose, people, freedom and daily pleasure, less what weighs on you, and raises your lowest term one action a day.
+          {t('promise')}
         </p>
         <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
-          <p className="num rounded-full bg-paper-sunk px-4 py-2 text-[15px] text-ink md:text-[16px]" aria-label={`Joyspan Index equals the geometric mean of H, P, R, F and D, minus ${lambda} times B`}>
+          <p className="num rounded-full bg-paper-sunk px-4 py-2 text-[15px] text-ink md:text-[16px]" aria-label={t('formulaAria', { l: lambda })}>
             JI = GM(H,P,R,F,D) − {lambda}·B
           </p>
-          <span className="eyebrow text-ink-3">Method v1.0 · published</span>
+          <span className="eyebrow text-ink-3">{t('methodPublished')}</span>
         </div>
-        <ul className="mt-5 flex flex-wrap gap-x-4 gap-y-2" aria-label="The six spaces">
-          {TERMS.map((t) => (
-            <li key={t.key} className="flex items-center gap-1.5 text-[14px] text-ink-2">
-              <TermDot term={t.key} size={9} /> {t.space}
+        <ul className="mt-5 flex flex-wrap gap-x-4 gap-y-2" aria-label={t('sixSpaces')}>
+          {TERMS.map((x) => (
+            <li key={x.key} className="flex items-center gap-1.5 text-[14px] text-ink-2">
+              <TermDot term={x.key} size={9} /> {tt.space(x.key)}
             </li>
           ))}
         </ul>
@@ -136,7 +142,7 @@ function ProductPromise() {
         <div aria-hidden>
           <JoyspanWheel terms={SPECIMEN.terms} size={150} animate={false} />
         </div>
-        <figcaption className="eyebrow rounded-full border border-dashed border-line px-2 py-0.5 text-ink-3">The Wheel · specimen</figcaption>
+        <figcaption className="eyebrow rounded-full border border-dashed border-line px-2 py-0.5 text-ink-3">{t('wheelSpecimen')}</figcaption>
       </figure>
     </section>
   )
@@ -146,6 +152,8 @@ function ProductPromise() {
 
 function PasskeyPanel({ onDone, onFallback }: { onDone: () => void; onFallback: () => void }) {
   const [state, setState] = useState<'idle' | 'waiting' | 'done'>('idle')
+  const t = useDict(SI)
+  const te = useDict(E)
   const timers = useRef<number[]>([])
   useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), [])
 
@@ -163,22 +171,22 @@ function PasskeyPanel({ onDone, onFallback }: { onDone: () => void; onFallback: 
         </span>
         <div aria-live="polite">
           <p className="text-[17px] text-ink">
-            {state === 'idle' && 'Use your face, fingerprint or screen lock.'}
-            {state === 'waiting' && 'Waiting for your device…'}
-            {state === 'done' && 'Signed in. Taking you to Today.'}
+            {state === 'idle' && t('pkIdle')}
+            {state === 'waiting' && te('waitingDevice')}
+            {state === 'done' && t('pkDone')}
           </p>
           <p className="mt-1 text-[14px] text-ink-2">
-            {state === 'idle' && 'A passkey lives on your phone or computer. Nothing to remember, nothing to steal.'}
-            {state === 'waiting' && 'Confirm on this device, or on your phone if it asks you to scan a code.'}
-            {state === 'done' && 'Specimen: signed in as Arjun Rao, member.'}
+            {state === 'idle' && t('pkIdleSub')}
+            {state === 'waiting' && te('confirmDevice')}
+            {state === 'done' && t('pkDoneSub')}
           </p>
         </div>
       </div>
       <DaybreakButton onClick={start} disabled={state !== 'idle'} className="mt-6 w-full">
-        <KeyRound size={20} aria-hidden /> Continue with a passkey
+        <KeyRound size={20} aria-hidden /> {t('pkBtn')}
       </DaybreakButton>
       <button onClick={onFallback} className="mt-4 w-full text-center text-[14px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring">
-        No passkey on this device? Use your phone number
+        {t('pkFallback')}
       </button>
     </div>
   )
@@ -197,6 +205,9 @@ function PhonePanel({ onDone }: { onDone: () => void }) {
   const boxes = useRef<(HTMLInputElement | null)[]>([])
   const verifyTimer = useRef<number | null>(null)
   const c = COUNTRIES.find((x) => x.code === country)!
+  const lang = useLang()
+  const t = useDict(SI)
+  const te = useDict(E)
   useEffect(() => () => { if (verifyTimer.current !== null) window.clearTimeout(verifyTimer.current) }, [])
 
   useEffect(() => {
@@ -211,7 +222,7 @@ function PhonePanel({ onDone }: { onDone: () => void }) {
 
   const send = (e: FormEvent) => {
     e.preventDefault()
-    const err = phoneError(country, phone)
+    const err = phoneError(country, phone, lang)
     if (err) return setError(err)
     setError(null)
     setStage('code')
@@ -236,7 +247,7 @@ function PhonePanel({ onDone }: { onDone: () => void }) {
   }
   const verify = (e: FormEvent) => {
     e.preventDefault()
-    if (code.join('').length < 6) return setError('Enter all six digits of the code.')
+    if (code.join('').length < 6) return setError(te('allSix'))
     setVerifying(true)
     verifyTimer.current = window.setTimeout(onDone, 900)
   }
@@ -244,11 +255,11 @@ function PhonePanel({ onDone }: { onDone: () => void }) {
   if (stage === 'number') {
     return (
       <form onSubmit={send} noValidate>
-        <label htmlFor="phone" className="text-[14px] text-ink-2">Mobile number</label>
+        <label htmlFor="phone" className="text-[14px] text-ink-2">{te('mobileNumber')}</label>
         <div className="mt-1.5 flex gap-2">
-          <label htmlFor="cc" className="sr-only">Country code</label>
+          <label htmlFor="cc" className="sr-only">{te('countryCode')}</label>
           <select id="cc" value={country} onChange={(e) => { setCountry(e.target.value as typeof country); setError(null) }} className="num h-12 w-[7.5rem] shrink-0 rounded-full border border-line-strong bg-paper px-3 text-[15px] text-ink focus-ring sm:w-auto">
-            {COUNTRIES.map((x) => <option key={x.code} value={x.code}>{x.code} {x.name}</option>)}
+            {COUNTRIES.map((x) => <option key={x.code} value={x.code}>{x.code} {countryName(x.code, lang)}</option>)}
           </select>
           <input
             id="phone"
@@ -263,8 +274,8 @@ function PhonePanel({ onDone }: { onDone: () => void }) {
             className={clsx('num h-12 min-w-0 flex-1 rounded-full border bg-paper px-4 text-[16px] text-ink placeholder:text-ink-3 focus-ring', error ? 'border-error' : 'border-line-strong')}
           />
         </div>
-        {error ? <p id="phone-err" role="alert" className="mt-2 text-[14px] text-error">{error}</p> : <p id="phone-help" className="mt-2 text-[13px] text-ink-3">We send a six-digit code by SMS, or on WhatsApp if you have allowed it.</p>}
-        <DaybreakButton type="submit" className="mt-6 w-full">Send the code</DaybreakButton>
+        {error ? <p id="phone-err" role="alert" className="mt-2 text-[14px] text-error">{error}</p> : <p id="phone-help" className="mt-2 text-[13px] text-ink-3">{t('phHelp')}</p>}
+        <DaybreakButton type="submit" className="mt-6 w-full">{t('phSend')}</DaybreakButton>
       </form>
     )
   }
@@ -272,11 +283,11 @@ function PhonePanel({ onDone }: { onDone: () => void }) {
   return (
     <form onSubmit={verify} noValidate>
       <button type="button" disabled={verifying} onClick={() => { setStage('number'); setCode(Array(6).fill('')); setError(null) }} className="mb-4 inline-flex items-center gap-1.5 text-[14px] text-ink-2 hover:text-ink focus-ring">
-        <ArrowLeft size={14} aria-hidden /> Change number
+        <ArrowLeft size={14} aria-hidden /> {t('phChange')}
       </button>
-      <p className="text-[17px] text-ink">Enter the code sent to <span className="num">{country} {phone}</span></p>
+      <p className="text-[17px] text-ink">{rich(te('enterCodeSent'), { c: <span className="num">{country} {phone}</span> })}</p>
       <fieldset className="mt-4">
-        <legend className="sr-only">Six-digit code</legend>
+        <legend className="sr-only">{te('sixDigit')}</legend>
         <div className="flex justify-between gap-2">
           {code.map((d, i) => (
             <input
@@ -289,19 +300,19 @@ function PhonePanel({ onDone }: { onDone: () => void }) {
               inputMode="numeric"
               autoComplete={i === 0 ? 'one-time-code' : 'off'}
               maxLength={1}
-              aria-label={`Digit ${i + 1}`}
+              aria-label={te('digit', { n: i + 1 })}
               aria-invalid={!!error}
               className={clsx('num h-14 w-full min-w-0 rounded-xl border bg-paper text-center text-[22px] text-ink focus-ring', error && !d ? 'border-error' : 'border-line-strong')}
             />
           ))}
         </div>
       </fieldset>
-      {error ? <p role="alert" className="mt-2 text-[14px] text-error">{error}</p> : <p className="mt-2 text-[13px] text-ink-3">Specimen: any six digits will do.</p>}
+      {error ? <p role="alert" className="mt-2 text-[14px] text-error">{error}</p> : <p className="mt-2 text-[13px] text-ink-3">{te('anySix')}</p>}
       <DaybreakButton type="submit" disabled={verifying} className="mt-6 w-full">
-        {verifying ? <><Loader2 size={20} className="animate-spin" aria-hidden /> Checking</> : 'Verify and sign in'}
+        {verifying ? <><Loader2 size={20} className="animate-spin" aria-hidden /> {t('phChecking')}</> : t('phVerify')}
       </DaybreakButton>
       <p className="mt-4 text-center text-[14px] text-ink-2" aria-live="polite">
-        {resendIn > 0 ? <>Resend in <span className="num">0:{String(resendIn).padStart(2, '0')}</span></> : <button type="button" onClick={() => setResendIn(30)} className="underline underline-offset-4 hover:text-ink focus-ring">Send a new code</button>}
+        {resendIn > 0 ? <>{rich(t('phResendIn'), { t: <span className="num">0:{String(resendIn).padStart(2, '0')}</span> })}</> : <button type="button" onClick={() => setResendIn(30)} className="underline underline-offset-4 hover:text-ink focus-ring">{t('phNew')}</button>}
       </p>
     </form>
   )
@@ -313,11 +324,13 @@ function EmailPanel({ onDone }: { onDone: () => void }) {
   const [email, setEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [sent, setSent] = useState(false)
+  const t = useDict(SI)
+  const te = useDict(E)
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (!email.trim()) return setError('Enter the email on your AIWO ID.')
-    if (!EMAIL_RE.test(email.trim())) return setError('That email does not look quite right. Please check it.')
+    if (!email.trim()) return setError(t('emEmpty'))
+    if (!EMAIL_RE.test(email.trim())) return setError(te('emailBad'))
     setError(null)
     setSent(true)
   }
@@ -326,16 +339,16 @@ function EmailPanel({ onDone }: { onDone: () => void }) {
     return (
       <div>
         <span className="flex h-12 w-12 items-center justify-center rounded-full border border-line-strong"><Mail size={22} aria-hidden /></span>
-        <p className="mt-4 text-[17px] text-ink">Check your inbox</p>
-        <p className="mt-1 text-[15px] text-ink-2">We sent a sign-in link to <span className="break-all text-ink">{email.trim()}</span>. It works once, for ten minutes, on this device.</p>
-        <DaybreakButton onClick={onDone} className="mt-6 w-full">Open the specimen link <ArrowRight size={20} aria-hidden /></DaybreakButton>
-        <Button variant="link" className="mt-4" onClick={() => setSent(false)}>Use a different email</Button>
+        <p className="mt-4 text-[17px] text-ink">{t('emInbox')}</p>
+        <p className="mt-1 text-[15px] text-ink-2">{rich(t('emSent'), { email: <span className="break-all text-ink">{email.trim()}</span> })}</p>
+        <DaybreakButton onClick={onDone} className="mt-6 w-full">{t('emOpen')} <ArrowRight size={20} aria-hidden /></DaybreakButton>
+        <Button variant="link" className="mt-4" onClick={() => setSent(false)}>{te('diffEmail')}</Button>
       </div>
     )
   }
   return (
     <form onSubmit={submit} noValidate>
-      <label htmlFor="si-email" className="text-[14px] text-ink-2">Email</label>
+      <label htmlFor="si-email" className="text-[14px] text-ink-2">{te('email')}</label>
       <input
         id="si-email"
         type="email"
@@ -349,7 +362,7 @@ function EmailPanel({ onDone }: { onDone: () => void }) {
         className={clsx('mt-1.5 h-12 w-full rounded-full border bg-paper px-4 text-[16px] text-ink placeholder:text-ink-3 focus-ring', error ? 'border-error' : 'border-line-strong')}
       />
       {error && <p id="si-email-err" role="alert" className="mt-2 text-[14px] text-error">{error}</p>}
-      <DaybreakButton type="submit" className="mt-6 w-full">Email me a sign-in link</DaybreakButton>
+      <DaybreakButton type="submit" className="mt-6 w-full">{t('emSend')}</DaybreakButton>
     </form>
   )
 }
@@ -358,42 +371,47 @@ function EmailPanel({ onDone }: { onDone: () => void }) {
 
 function DemoAccounts({ onEnter }: { onEnter: (a: DemoAccount) => void }) {
   const { role } = useApp()
+  const t = useDict(SI)
+  const te = useDict(E)
   return (
     <aside aria-labelledby="demo-h" className="min-w-0">
       <Card tone="sunk" className="md:p-7">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <Eyebrow>Demo accounts</Eyebrow>
-            <h2 id="demo-h" className="mt-2 text-[1.5rem] font-light text-ink">Explore Joy OS as any role</h2>
+            <Eyebrow>{t('demoEyebrow')}</Eyebrow>
+            <h2 id="demo-h" className="mt-2 text-[1.5rem] font-light text-ink">{t('demoH')}</h2>
           </div>
-          <span className="eyebrow rounded-full border border-dashed border-line-strong px-2.5 py-1 text-ink-3">Specimen · no real auth</span>
+          <span className="eyebrow rounded-full border border-dashed border-line-strong px-2.5 py-1 text-ink-3">{t('demoTag')}</span>
         </div>
         <p className="mt-2 max-w-xl text-[15px] text-ink-2">
-          These specimen accounts are not real people. One click sets the role and opens that surface. Members land in the app; everyone else lands in their console.
+          {t('demoLead')}
         </p>
         <ul className="mt-6 divide-y divide-line overflow-hidden rounded-card border border-line bg-paper-raised">
           {ACCOUNTS.map((a) => {
             const current = role === a.role
+            const k = a.key as 'member' | 'coach' | 'clinician' | 'partner' | 'tenant' | 'science' | 'exec' | 'ops'
+            const title = t(`acc_${k}_title`)
+            const who = t(`acc_${k}_who`)
             return (
               <li key={a.key} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                  <p className="flex items-center gap-2 text-[16px] text-ink">
-                    {a.title}
-                    {current && <span className="eyebrow rounded-full bg-paper-sunk px-2 py-0.5 text-ink-2">current</span>}
+                  <p className="flex flex-wrap items-center gap-2 text-[16px] text-ink">
+                    {title}
+                    {current && <span className="eyebrow rounded-full bg-paper-sunk px-2 py-0.5 text-ink-2">{t('current')}</span>}
                   </p>
-                  <p className="text-[14px] text-ink-2">{a.who}</p>
+                  <p className="text-[14px] text-ink-2">{who}</p>
                   <p className="num mt-1 break-all text-[13px] text-ink-3">{a.email} <span aria-hidden>→</span> {a.to}</p>
                 </div>
-                <Button variant={a.key === 'member' ? 'ink' : 'secondary'} size="sm" onClick={() => onEnter(a)} className="shrink-0 self-start sm:self-center" aria-label={`Enter as ${a.title}, ${a.who}`}>
-                  Enter as {a.short} <ArrowRight size={14} aria-hidden />
+                <Button variant={a.key === 'member' ? 'ink' : 'secondary'} size="sm" onClick={() => onEnter(a)} className="shrink-0 self-start sm:self-center" aria-label={t('enterAria', { title, who })}>
+                  {t(`acc_${k}_enter`)} <ArrowRight size={14} aria-hidden />
                 </Button>
               </li>
             )
           })}
         </ul>
         <div className="mt-5 flex flex-col gap-3 border-t border-line pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-[13px] text-ink-3">Switch roles any time from the Demo button. Consoles are role-gated in the real platform.</p>
-          <Link to="/console" className="link shrink-0 text-[14px]">All consoles</Link>
+          <p className="text-[13px] text-ink-3">{t('demoSwitch')}</p>
+          <Link to="/console" className="link shrink-0 text-[14px]">{te('allConsoles')}</Link>
         </div>
       </Card>
     </aside>

@@ -35,6 +35,9 @@ import { termByKey } from '@/shared/terms'
 import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { memberOnly } from '@/screens/b/parts'
+import { useDict, useLang, useTermText } from '@/lib/i18n'
+import { RESULT } from '@/screens/b/i18n/indexResult'
+import { txFor } from '@/screens/a/i18n'
 
 // INDEX DETAIL (Memo p.10–11, p.18; Plan §4B): the number, how it is made, each petal on
 // tap (survey vs signals, what moved), three measures of history, and how a gap is shown.
@@ -56,28 +59,33 @@ function IndexResult() {
   const [openMeasure, setOpenMeasure] = useState<string | null>(null)
   const [cardOpen, setCardOpen] = useState(false)
   const [cardSaved, setCardSaved] = useState<null | 'photos' | 'print'>(null)
+  const t = useDict(RESULT)
+  const tt = useTermText()
+  const lang = useLang()
+  const locale = lang === 'ta' ? 'ta-IN' : lang === 'hi' ? 'hi-IN' : 'en-GB'
+  const ax = (x: string) => txFor(lang, x)
 
   return (
     <Screen>
       <ScreenHeader
         back
-        eyebrow="Joyspan Index · method v1.0"
+        eyebrow={t('eyebrow')}
         title={
           <>
-            Your Index, <Serif>explained</Serif>.
+            {t('titleA')}<Serif>{t('titleSerif')}</Serif>{t('titleB')}
           </>
         }
-        lead="One number for the whole of a life going well, with the method on show. Tap a petal to see what is inside it."
+        lead={t('lead')}
       />
 
       {/* The number */}
       <Card tone="raised" style={{ gap: space.s2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: space.s1 }}>
-          <Eyebrow>Measured {fmtDate(latest.takenOn)}</Eyebrow>
+          <Eyebrow>{t('measured', { date: fmtDate(latest.takenOn) })}</Eyebrow>
           <SpecimenTag />
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.s2 }}>
-          <Numeral size={96} accessibilityLabel={`Joyspan Index ${latest.value} of 100`}>
+          <Numeral size={96} accessibilityLabel={t('idxA11y', { v: latest.value })}>
             {latest.value}
           </Numeral>
           <View style={{ paddingBottom: 14, gap: 4 }}>
@@ -86,11 +94,11 @@ function IndexResult() {
           </View>
         </View>
         <Body tone="ink2">
-          {`${latest.value > previous.value ? 'Up from' : latest.value < previous.value ? 'Down from' : 'The same as'} ${previous.value} in ${new Date(previous.takenOn).toLocaleDateString('en-GB', { month: 'long' })}. ${termByKey(latest.lowestTerm).name} is the lowest term, so it holds the Index back most.`}
+          {t(latest.value > previous.value ? 'upFrom' : latest.value < previous.value ? 'downFrom' : 'sameAs', { prev: previous.value, month: new Date(previous.takenOn).toLocaleDateString(locale, { month: 'long' }), name: tt.name(latest.lowestTerm) })}
         </Body>
         <Divider />
-        <View style={{ gap: 8 }} accessible accessibilityLabel={`How it is made: geometric mean of the five positive terms, ${calc.gm}, minus a quarter of Burden, ${calc.burden}, gives ${latest.value}.`}>
-          <Eyebrow>How it is made</Eyebrow>
+        <View style={{ gap: 8 }} accessible accessibilityLabel={t('howA11y', { gm: calc.gm, burden: calc.burden, v: latest.value })}>
+          <Eyebrow>{t('how')}</Eyebrow>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 8, rowGap: 4 }}>
             <Mono tone="ink" size={17}>{`GM ${calc.gm.toFixed(1)}`}</Mono>
             <Mono tone="ink3" size={17}>−</Mono>
@@ -99,7 +107,7 @@ function IndexResult() {
             <Mono tone="ink" size={17} weight="medium">{`${(calc.gm - calc.burden).toFixed(1)} → ${calc.value}`}</Mono>
           </View>
           <Meta size={14}>
-            The geometric mean of Body, Purpose, People, Freedom and Pleasure rewards balance. Burden is subtracted at a quarter of its weight.
+            {t('howBody')}
           </Meta>
         </View>
         <MethodLine method={latest.method} grade={latest.grade} next={latest.nextMeasure} />
@@ -107,14 +115,13 @@ function IndexResult() {
 
       {/* Petals */}
       <Card tone="raised" style={{ gap: space.s2 }}>
-        <Eyebrow {...H2}>Tap a petal</Eyebrow>
+        <Eyebrow {...H2}>{t('tapPetal')}</Eyebrow>
         <View style={{ alignItems: 'center' }}>
           <JoyspanWheel terms={latest.terms} size={232} highlight={sel} onSelect={setSel} value={latest.value} />
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }} accessibilityRole="tablist">
           {latest.terms.map((x) => {
             const on = x.key === sel
-            const t = termByKey(x.key)
             return (
               <Pressable
                 key={x.key}
@@ -122,12 +129,12 @@ function IndexResult() {
                 accessibilityRole="tab"
                 accessibilityState={{ selected: on }}
                 aria-selected={on}
-                accessibilityLabel={`${t.space}, ${t.name} ${x.key === 'B' ? 'minus ' : ''}${x.value}`}
+                accessibilityLabel={`${tt.space(x.key)}, ${tt.name(x.key)} ${x.key === 'B' ? t('minus') : ''}${x.value}`}
                 style={({ pressed }) => ({ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderRadius: 999, borderWidth: on ? 2 : 1, borderColor: on ? c.ink : c.line, backgroundColor: pressed ? c.paperSunk : undefined })}
               >
                 <TermDot term={x.key} />
                 <Meta size={14} tone="ink">
-                  {t.space}
+                  {tt.space(x.key)}
                 </Meta>
                 <Mono size={14} tone="ink2">{`${x.key === 'B' ? '−' : ''}${x.value}`}</Mono>
               </Pressable>
@@ -145,49 +152,49 @@ function IndexResult() {
               <Delta value={s.delta} inverse={inverse} />
             </View>
           </View>
-          <Body>{detail.sentence}</Body>
+          <Body>{ax(detail.sentence)}</Body>
 
           <View style={{ gap: 8 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
-              <Eyebrow>Where it comes from</Eyebrow>
-              <Eyebrow tone="ink2">{detail.confidence}</Eyebrow>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+              <Eyebrow>{t('from')}</Eyebrow>
+              <Eyebrow tone="ink2">{ax(detail.confidence)}</Eyebrow>
             </View>
             <View
               style={{ flexDirection: 'row', height: 10, borderRadius: 5, overflow: 'hidden', backgroundColor: c.paperSunk }}
               accessible
-              accessibilityLabel={`${detail.survey} percent from questionnaires, ${detail.signals} percent from signals`}
+              accessibilityLabel={t('sourceA11y', { s: detail.survey, g: detail.signals })}
             >
               <View style={{ width: `${detail.survey}%`, backgroundColor: c.ink }} />
               <View style={{ width: `${detail.signals}%`, backgroundColor: th.term(sel).main }} />
             </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
               <Meta size={14}>
-                Questionnaires <Mono size={14} tone="ink">{`${detail.survey}%`}</Mono>
+                {t('questionnaires')}<Mono size={14} tone="ink">{`${detail.survey}%`}</Mono>
               </Meta>
               <Meta size={14}>
-                Signals <Mono size={14} tone="ink">{`${detail.signals}%`}</Mono>
+                {t('signals')}<Mono size={14} tone="ink">{`${detail.signals}%`}</Mono>
               </Meta>
             </View>
             {detail.signalSources.length ? (
               <Meta size={14} tone="ink3">
-                {detail.signalSources.join(' · ')}
+                {detail.signalSources.map(ax).join(' · ')}
               </Meta>
             ) : (
               <Meta size={14} tone="ink3">
-                Answers only. No device reads this term.
+                {t('answersOnly')}
               </Meta>
             )}
           </View>
 
           <View style={{ gap: 8 }}>
-            <Eyebrow>What moved this quarter</Eyebrow>
+            <Eyebrow>{t('moved')}</Eyebrow>
             {detail.moved.map((m) => (
               <View key={m} style={{ flexDirection: 'row', gap: 10 }}>
                 <View style={{ marginTop: 9 }}>
                   <TermDot term={sel} size={6} />
                 </View>
                 <Body tone="ink2" style={{ flex: 1 }}>
-                  {m}
+                  {ax(m)}
                 </Body>
               </View>
             ))}
@@ -196,16 +203,16 @@ function IndexResult() {
             {term.instruments.join(' · ')}
           </Meta>
         </View>
-        <DaybreakButton onPress={() => router.push(`/spaces/${term.slug}`)} accessibilityHint={`Opens the ${term.space} space`}>
-          {`Open the ${term.space} space`}
+        <DaybreakButton onPress={() => router.push(`/spaces/${term.slug}`)} accessibilityHint={t('opensSpace', { space: tt.space(sel) })}>
+          {t('openSpace', { space: tt.space(sel) })}
         </DaybreakButton>
       </Card>
 
       {/* History */}
       <Card tone="raised" style={{ gap: space.s2 }}>
-        <Eyebrow {...H2}>Three measures</Eyebrow>
+        <Eyebrow {...H2}>{t('threeMeasures')}</Eyebrow>
         <Meta>
-          Your Index at each full measure since July, from <Mono tone="ink">{String(history[0].value)}</Mono> to <Mono tone="ink">{String(latest.value)}</Mono>.
+          {t('historyA')}<Mono tone="ink">{String(history[0].value)}</Mono>{t('historyB')}<Mono tone="ink">{String(latest.value)}</Mono>{t('historyC')}
         </Meta>
         <Sparkline
           values={history.map((h) => h.value)}
@@ -215,7 +222,7 @@ function IndexResult() {
           max={70}
           showDots
           height={110}
-          label={`Joyspan Index history: ${history.map((h) => `${fmtDate(h.takenOn)} ${h.value}`).join(', ')}.`}
+          label={t('historyA11y', { list: history.map((h) => `${fmtDate(h.takenOn)} ${h.value}`).join(', ') })}
         />
         <View>
           {INDEX_HISTORY.map((h, i) => {
@@ -227,13 +234,13 @@ function IndexResult() {
                   accessibilityRole="button"
                   accessibilityState={{ expanded: isOpen }}
                   aria-expanded={isOpen}
-                  accessibilityLabel={`${fmtDate(h.takenOn)}, Index ${h.value}. ${isOpen ? 'Hide' : 'Show'} the six terms.`}
+                  accessibilityLabel={t('measureA11y', { date: fmtDate(h.takenOn), v: h.value, action: isOpen ? t('hide') : t('show') })}
                   style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, minHeight: 56, opacity: pressed ? 0.7 : 1 })}
                 >
                   <View style={{ flex: 1, gap: 2 }}>
                     <Body>{fmtDate(h.takenOn)}</Body>
                     <Meta size={14} tone="ink3">
-                      {h.grade === 'clinical' ? `Clinical grade · signed by ${h.signedBy}` : 'Index grade'} · {h.engineBuild}
+                      {h.grade === 'clinical' ? t('clinicalSigned', { by: h.signedBy ?? '' }) : t('indexGrade')} · {h.engineBuild}
                     </Meta>
                   </View>
                   <Mono size={22} weight="light" tone="ink">
@@ -247,7 +254,7 @@ function IndexResult() {
                       <View key={x.key} style={{ width: '45%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 32, gap: 8 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                           <TermDot term={x.key} />
-                          <Meta>{termByKey(x.key).space}</Meta>
+                          <Meta>{tt.space(x.key)}</Meta>
                         </View>
                         <Mono tone="ink">{x.value === null ? '—' : `${x.key === 'B' ? '−' : ''}${x.value}`}</Mono>
                       </View>
@@ -259,22 +266,22 @@ function IndexResult() {
           })}
         </View>
         <ArrowLink icon="moon" onPress={() => router.push('/day-90')}>
-          See the Day 90 re-measure
+          {t('seeDay90')}
         </ArrowLink>
       </Card>
 
       {/* Next measure and the printable card */}
       <Card tone="outline" style={{ gap: space.s2 }}>
-        <Eyebrow {...H2}>Next measure</Eyebrow>
+        <Eyebrow {...H2}>{t('nextMeasure')}</Eyebrow>
         <Body>
-          Day {MEMBER.dayOfLoop} of 90. The re-measure opens on Day 76 and closes with a signed delta on <Mono tone="ink">{fmtDate(latest.nextMeasure)}</Mono>. Like for like, about twenty minutes.
+          {t('nextA', { d: MEMBER.dayOfLoop })}<Mono tone="ink">{fmtDate(latest.nextMeasure)}</Mono>{t('nextB')}
         </Body>
         <View style={{ gap: space.s1 }}>
-          <Button variant="secondary" icon="refresh-cw" block onPress={() => router.push('/index-take')} accessibilityHint="Opens the two sittings; answers are kept on this phone">
-            Re-measure (opens Day 76)
+          <Button variant="secondary" icon="refresh-cw" block onPress={() => router.push('/index-take')} accessibilityHint={t('reHint')}>
+            {t('remeasure')}
           </Button>
           <Button variant="secondary" icon="share" block onPress={() => setCardOpen(true)}>
-            Share or print your Index card
+            {t('shareCard')}
           </Button>
         </View>
       </Card>
@@ -283,18 +290,18 @@ function IndexResult() {
       <Card tone="sunk" style={{ gap: space.s2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Icon name="help-circle" size={16} color={c.ink2} />
-          <Eyebrow>When a term is not yet measured</Eyebrow>
+          <Eyebrow style={{ flexShrink: 1 }}>{t('notYet')}</Eyebrow>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s2 }}>
           <JoyspanWheel terms={NOT_YET_EXAMPLE} size={96} animate={false} />
           <Meta style={{ flex: 1 }}>
-            If Freedom had no answers yet, its petal stays empty and no Index is shown. A missing term is never guessed.
+            {t('notYetBody')}
           </Meta>
         </View>
       </Card>
 
       <ArrowLink icon="shield" onPress={() => router.push('/trust')}>
-        Who has seen this score
+        {t('whoSeen')}
       </ArrowLink>
 
       <Sheet
@@ -303,44 +310,44 @@ function IndexResult() {
           setCardOpen(false)
           setCardSaved(null)
         }}
-        title="Your Index card"
+        title={t('cardTitle')}
         footer={
           cardSaved ? (
             <View accessibilityLiveRegion="polite" style={{ gap: 4, alignItems: 'center' }}>
               <Body weight="medium" align="center">
-                {cardSaved === 'photos' ? 'Saved to Photos (specimen).' : Platform.OS === 'web' ? 'Print dialog opened.' : 'Sent to the printer.'}
+                {cardSaved === 'photos' ? t('savedPhotos') : Platform.OS === 'web' ? t('printOpened') : t('sentPrinter')}
               </Body>
-              <Meta align="center">The card carries the method, so whoever sees it can read it properly.</Meta>
+              <Meta align="center">{t('cardCarries')}</Meta>
               <Button variant="link" onPress={() => setCardSaved(null)}>
-                Save it another way
+                {t('anotherWay')}
               </Button>
             </View>
           ) : (
-            <View style={{ flexDirection: 'row', gap: space.s1 }}>
-              <Button variant="ink" icon="download" onPress={() => setCardSaved('photos')} style={{ flex: 1 }}>
-                Save to Photos
+            <View style={{ flexDirection: 'row', gap: space.s1, flexWrap: 'wrap' }}>
+              <Button variant="ink" icon="download" onPress={() => setCardSaved('photos')} style={{ flexGrow: 1 }}>
+                {t('savePhotos')}
               </Button>
               <Button variant="secondary" icon="printer" onPress={() => {
                   setCardSaved('print')
                   // The web build opens the browser's print dialog; a phone hands it to the system print sheet.
                   if (Platform.OS === 'web' && typeof window !== 'undefined') setTimeout(() => window.print(), 50)
-                }} style={{ flex: 1 }}>
-                Print
+                }} style={{ flexGrow: 1 }}>
+                {t('print')}
               </Button>
             </View>
           )
         }
       >
-        <Meta>A one-page card for your physician, your coach or the fridge door. It shows terms and the method, never your answers.</Meta>
+        <Meta>{t('cardBody')}</Meta>
         <Card tone="raised" style={{ gap: space.s2, borderWidth: 1, borderColor: c.line }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-            <Eyebrow>Joyspan Index · {fmtDate(latest.takenOn)}</Eyebrow>
+            <Eyebrow>{t('cardEyebrow', { date: fmtDate(latest.takenOn) })}</Eyebrow>
             <SpecimenTag />
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s2 }}>
             <JoyspanWheel terms={latest.terms} size={120} animate={false} />
             <View style={{ flex: 1, gap: 4 }}>
-              <Numeral size={56} accessibilityLabel={`Joyspan Index ${latest.value} of 100`}>
+              <Numeral size={56} accessibilityLabel={t('idxA11y', { v: latest.value })}>
                 {latest.value}
               </Numeral>
               <BandLabel band={latest.band} />
@@ -351,7 +358,7 @@ function IndexResult() {
               <View key={x.key} style={{ width: '45%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <TermDot term={x.key} size={8} />
-                  <Meta size={14}>{termByKey(x.key).space}</Meta>
+                  <Meta size={14}>{tt.space(x.key)}</Meta>
                 </View>
                 <Mono size={14} tone="ink">{`${x.key === 'B' ? '−' : ''}${x.value}`}</Mono>
               </View>

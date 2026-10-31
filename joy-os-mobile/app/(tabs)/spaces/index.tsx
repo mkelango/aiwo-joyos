@@ -21,6 +21,7 @@ import {
   SpecimenTag,
   TermDot,
 } from '@/components'
+import { Rich, useA } from '@/screens/a/i18n'
 import { H2 } from '@/screens/a/local'
 import { ROOM_PLAIN, ROOM_VERDICT } from '@/screens/a/spacesData'
 import { INDEX_HISTORY } from '@/shared/member'
@@ -35,6 +36,7 @@ const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 
 export default function SpacesHome() {
   const { c, space } = useTheme()
+  const { t, tx, name, space: spaceName } = useA()
   const latest = INDEX_HISTORY[0]
   const [focus, setFocus] = useState<TermKey>(latest.lowestTerm)
   const focusTerm = termByKey(focus)
@@ -43,18 +45,14 @@ export default function SpacesHome() {
   return (
     <Screen inTabs top={<AppBar />}>
       <ScreenHeader
-        eyebrow="Six spaces · one per term"
-        title={
-          <>
-            Where your <Serif>Joyspan</Serif> lives.
-          </>
-        }
-        lead="Each space is a room for one part of the equation: what it measures, what moved, and three small things to try."
+        eyebrow={t('Six spaces · one per term')}
+        title={<Rich text={t('Where your *Joyspan* lives.')} wrap={(w) => <Serif>{w}</Serif>} />}
+        lead={t('Each space is a room for one part of the equation: what it measures, what moved, and three small things to try.')}
       />
 
       <Card tone="raised" style={{ gap: space.s2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: space.s1 }}>
-          <Eyebrow>Tap a petal</Eyebrow>
+          <Eyebrow>{t('Tap a petal')}</Eyebrow>
           <SpecimenTag />
         </View>
         <View style={{ alignItems: 'center' }}>
@@ -63,11 +61,11 @@ export default function SpacesHome() {
         <View style={{ gap: space.s1 }} accessibilityLiveRegion="polite">
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <TermDot term={focus} size={12} />
-            <Body weight="semibold">{focusTerm.space}</Body>
-            {focusTerm.name !== focusTerm.space ? <Meta>· {focusTerm.name}</Meta> : null}
+            <Body weight="semibold">{spaceName(focus)}</Body>
+            {focusTerm.name !== focusTerm.space ? <Meta>· {name(focus)}</Meta> : null}
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.s2 }}>
-            <Mono size={48} weight="light" tone="ink" accessibilityLabel={`${focusTerm.name} ${focus === 'B' ? 'minus ' : ''}${focusScore.value}`}>
+            <Mono size={48} weight="light" tone="ink" accessibilityLabel={`${name(focus)} ${focus === 'B' ? t('minus ') : ''}${focusScore.value}`}>
               {focus === 'B' ? `−${focusScore.value}` : String(focusScore.value)}
             </Mono>
             <View style={{ paddingBottom: 8, gap: 2 }}>
@@ -75,16 +73,16 @@ export default function SpacesHome() {
               <BandLabel band={focusScore.band} />
             </View>
           </View>
-          <Body tone="ink2">{ROOM_VERDICT[focus]}</Body>
+          <Body tone="ink2">{tx(ROOM_VERDICT[focus])}</Body>
         </View>
-        <DaybreakButton onPress={() => router.push(`/spaces/${focusTerm.slug}`)} accessibilityHint={`Opens the ${focusTerm.space} space`}>
-          {`Open ${focusTerm.space}`}
+        <DaybreakButton onPress={() => router.push(`/spaces/${focusTerm.slug}`)} accessibilityHint={t('Opens the {space} space', { space: spaceName(focus) })}>
+          {t('Open {space}', { space: spaceName(focus) })}
         </DaybreakButton>
         <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />
       </Card>
 
       <View style={{ gap: space.s2 }}>
-        <Eyebrow {...H2}>All six rooms</Eyebrow>
+        <Eyebrow {...H2}>{t('All six rooms')}</Eyebrow>
         {ORDER.map((k) => {
           const term = termByKey(k)
           const s = latest.terms.find((x) => x.key === k)!
@@ -95,7 +93,7 @@ export default function SpacesHome() {
               key={k}
               onPress={() => router.push(`/spaces/${term.slug}`)}
               accessibilityRole="link"
-              accessibilityLabel={`${term.space}, ${term.name} ${k === 'B' ? 'minus ' : ''}${s.value}, ${s.band}${lowest ? ', lowest term, start here' : ''}. ${ROOM_PLAIN[k]}.`}
+              accessibilityLabel={`${t('{space}, {name} {minus}{value}, {band}', { space: spaceName(k), name: name(k), minus: k === 'B' ? t('minus ') : '', value: String(s.value), band: tx(s.band) })}${lowest ? t(', lowest term, start here') : ''}. ${tx(ROOM_PLAIN[k])}.`}
               style={({ pressed }) => ({
                 borderRadius: 12,
                 borderWidth: 1,
@@ -110,11 +108,11 @@ export default function SpacesHome() {
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <TermDot term={k} size={12} />
                     <Body size={19} weight="semibold">
-                      {term.space}
+                      {spaceName(k)}
                     </Body>
-                    {term.name !== term.space ? <Meta tone="ink3">{term.name}</Meta> : null}
+                    {term.name !== term.space ? <Meta tone="ink3">{name(k)}</Meta> : null}
                   </View>
-                  <Meta>{ROOM_PLAIN[k]}</Meta>
+                  <Meta>{tx(ROOM_PLAIN[k])}</Meta>
                 </View>
                 <View style={{ alignItems: 'flex-end', gap: 2 }}>
                   <Mono size={28} weight="light" tone="ink">
@@ -124,11 +122,11 @@ export default function SpacesHome() {
                 </View>
               </View>
               <Divider />
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                 <BandLabel band={s.band} />
                 {lowest ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Eyebrow tone="daybreak">Start here</Eyebrow>
+                    <Eyebrow tone="daybreak">{t('Start here')}</Eyebrow>
                     <Icon name="arrow-right" size={14} color={c.daybreakInk} />
                   </View>
                 ) : (
@@ -141,12 +139,12 @@ export default function SpacesHome() {
       </View>
 
       <Card tone="sunk" style={{ gap: space.s1 }}>
-        <Eyebrow>How the six add up</Eyebrow>
+        <Eyebrow>{t('How the six add up')}</Eyebrow>
         <Mono tone="ink" size={15}>
           JI = GM(H, P, R, F, D) − 0.25·B
         </Mono>
         <Meta>
-          The geometric mean rewards balance, so the lowest room holds the Index back most. Ease is Burden: less is better, and it is shown with a minus.
+          {t('The geometric mean rewards balance, so the lowest room holds the Index back most. Ease is Burden: less is better, and it is shown with a minus.')}
         </Meta>
       </Card>
     </Screen>

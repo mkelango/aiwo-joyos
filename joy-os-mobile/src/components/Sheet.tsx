@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
 import { Modal, Pressable, ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useDict } from '../lib/i18n'
 import { useTheme } from '../theme/ThemeProvider'
+import { KIT } from './_i18n'
 import { Icon } from './Icon'
 import { Body } from './Text'
 
@@ -12,10 +14,11 @@ import { Body } from './Text'
 export function Sheet({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode }) {
   const { c, radius, space } = useTheme()
   const insets = useSafeAreaInsets()
+  const t = useDict(KIT)
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-        <Pressable style={{ position: 'absolute', inset: 0, backgroundColor: c.scrim }} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" />
+        <Pressable style={{ position: 'absolute', inset: 0, backgroundColor: c.scrim }} onPress={onClose} accessibilityRole="button" accessibilityLabel={t('close')} />
         <View
           accessibilityViewIsModal
           style={{
@@ -36,7 +39,7 @@ export function Sheet({ open, onClose, title, children, footer }: { open: boolea
             <Body size={19} weight="medium" accessibilityRole="header" style={{ flex: 1 }}>
               {title}
             </Body>
-            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8} style={({ pressed }) => ({ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: pressed ? c.paperSunk : undefined })}>
+            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={t('close')} hitSlop={8} style={({ pressed }) => ({ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: pressed ? c.paperSunk : undefined })}>
               <Icon name="x" size={20} color={c.ink2} />
             </Pressable>
           </View>

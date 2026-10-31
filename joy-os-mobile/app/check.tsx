@@ -9,6 +9,9 @@ import type { Band, TermKey, TermScore } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { BAND_PETAL, BAND_PETAL_BURDEN, BAND_WORDS, CHECK_NEXT_STEP, CHECK_STATEMENTS, SCALE, SCALE_BURDEN, checkBand, checkStanding } from '@/screens/b/entryData'
 import { Field, ORDER, useCrisisGuard } from '@/screens/b/parts'
+import { INSTRUMENT_NOTE, useDict, useLang, useTermText } from '@/lib/i18n'
+import { CHECK, NEXT_STEP_TEXT, BAND_WORDS_TEXT } from '@/screens/b/i18n/check'
+import { BAND, COMMON, useTx } from '@/screens/b/i18n/common'
 
 // THE JOYSPAN CHECK (Memo p.10, Grade 1): 18 statements, free, five minutes, no login.
 // Bands only (steady · uneven · thin), never a number. The lowest term is named with one
@@ -67,14 +70,15 @@ export default function Check() {
     top()
   }
   const exit = () => (router.canGoBack() ? router.back() : router.replace('/welcome'))
+  const t = useDict(CHECK)
 
   return (
     <View style={{ flex: 1, backgroundColor: c.paper, paddingTop: insets.top }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.gutter - 8, minHeight: 52, width: '100%', maxWidth: 640, alignSelf: 'center' }}>
-        <Pressable onPress={exit} accessibilityRole="button" accessibilityLabel="Exit the Check" hitSlop={6} style={({ pressed }) => ({ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: pressed ? c.paperSunk : undefined })}>
+        <Pressable onPress={exit} accessibilityRole="button" accessibilityLabel={t('exit')} hitSlop={6} style={({ pressed }) => ({ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: pressed ? c.paperSunk : undefined })}>
           <Icon name="x" size={22} color={c.ink} />
         </Pressable>
-        <Eyebrow tone="ink2">The Joyspan Check</Eyebrow>
+        <Eyebrow tone="ink2" style={{ flexShrink: 1, textAlign: 'center' }}>{t('name')}</Eyebrow>
         <View style={{ width: 44 }} />
       </View>
 
@@ -92,49 +96,50 @@ export default function Check() {
 function Intro({ onBegin }: { onBegin: () => void }) {
   const { c, space } = useTheme()
   const ghost: TermScore[] = ORDER.map((k) => ({ key: k, value: null, band: 'not-yet-measured' }))
+  const t = useDict(CHECK)
   return (
     <>
       <View style={{ gap: space.s1 }}>
-        <Eyebrow tone="daybreak">Free · five minutes · no login</Eyebrow>
+        <Eyebrow tone="daybreak">{t('introEyebrow')}</Eyebrow>
         <Title size={40} accessibilityRole="header">
-          The Joyspan <Serif>Check</Serif>
+          {t('titleA')}<Serif>{t('titleSerif')}</Serif>
         </Title>
-        <Body tone="ink2">Eighteen short statements about your body, your purpose, your people, your time, your pleasures and what weighs on you. Answer for the last two weeks. At the end you see where your life is steady, uneven or thin.</Body>
+        <Body tone="ink2">{t('introBody')}</Body>
       </View>
       <View style={{ alignItems: 'center' }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         <JoyspanWheel terms={ghost} size={220} showLabels animate={false} />
       </View>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.s1 }}>
         {[
-          ['18', 'statements'],
-          ['5', 'minutes'],
-          ['0', 'numbers shown'],
+          ['18', t('nStatements')],
+          ['5', t('nMinutes')],
+          ['0', t('nNumbers')],
         ].map(([n, l]) => (
-          <View key={l} style={{ alignItems: 'flex-start', gap: 2 }} accessible accessibilityLabel={`${n} ${l}`}>
+          <View key={n} style={{ alignItems: 'flex-start', gap: 2, flexShrink: 1 }} accessible accessibilityLabel={`${n} ${l}`}>
             <Numeral size={44}>{n}</Numeral>
             <Eyebrow>{l}</Eyebrow>
           </View>
         ))}
       </View>
       <DaybreakButton icon="arrow-right" onPress={onBegin}>
-        Begin the Check
+        {t('begin')}
       </DaybreakButton>
       <Card tone="sunk" style={{ gap: 6 }}>
-        <Eyebrow>Bands, never a number</Eyebrow>
-        <Body>Eighteen statements are enough to see where you stand. They are not enough for an honest number. So the Check shows steady, uneven or thin, in the same bands the full Index uses.</Body>
+        <Eyebrow>{t('bandsNever')}</Eyebrow>
+        <Body>{t('bandsBody')}</Body>
       </Card>
       <Card tone="sunk" style={{ gap: 6 }}>
-        <Eyebrow>Your answers stay with you</Eyebrow>
-        <Body>Nothing is sent anywhere while you answer. No account, no phone number. If you want the Joyspan Letter afterwards, you choose to share an email.</Body>
+        <Eyebrow>{t('staysTitle')}</Eyebrow>
+        <Body>{t('staysBody')}</Body>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Icon name="lock" size={14} color={c.ink3} />
           <Meta size={14} tone="ink3">
-            Kept on this phone only
+            {t('phoneOnly')}
           </Meta>
         </View>
       </Card>
       <Meta size={14}>
-        The Check is a reflection, not a diagnosis. If you are struggling right now, you do not have to wait for a result: Tele-MANAS <Mono size={14} tone="ink">14416</Mono> is free, 24 hours, in your language.
+        {t('reflectionA')}<Mono size={14} tone="ink">14416</Mono>{t('reflectionB')}
       </Meta>
     </>
   )
@@ -146,6 +151,9 @@ function Question({ i, answers, onAnswer, onBack, onNext }: { i: number; answers
   const { c, space, radius } = useTheme()
   const s = CHECK_STATEMENTS[i]
   const term = termByKey(s.term)
+  const t = useDict(CHECK)
+  const tt = useTermText()
+  const lang = useLang()
   const scale = s.burden ? SCALE_BURDEN : SCALE
   const chosen = answers[s.id]
   const answered = Object.keys(answers).length
@@ -153,29 +161,30 @@ function Question({ i, answers, onAnswer, onBack, onNext }: { i: number; answers
   return (
     <>
       <View style={{ gap: space.s1 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
           <Meta>
-            Statement <Mono tone="ink">{String(i + 1)}</Mono> of <Mono tone="ink">{String(TOTAL)}</Mono>
+            {t('stmtA')}<Mono tone="ink">{String(i + 1)}</Mono>{t('stmtOf')}<Mono tone="ink">{String(TOTAL)}</Mono>
           </Meta>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <Icon name="clock" size={14} color={c.ink3} />
             <Meta size={14} tone="ink3">
-              about <Mono size={14} tone="ink3">{String(minutesLeft)}</Mono> min left
+              {t('aboutA')}<Mono size={14} tone="ink3">{String(minutesLeft)}</Mono>{t('aboutB')}
             </Meta>
           </View>
         </View>
-        <Progress value={i + (chosen ? 1 : 0)} max={TOTAL} color={c.ink} label={`${answered} of ${TOTAL} answered`} />
+        <Progress value={i + (chosen ? 1 : 0)} max={TOTAL} color={c.ink} label={t('answeredOf', { n: answered, total: TOTAL })} />
       </View>
 
       <View style={{ gap: space.s2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1, flexWrap: 'wrap' }}>
           <TermChip term={s.term} withSpace />
-          <Eyebrow>Over the last two weeks</Eyebrow>
+          <Eyebrow>{t('lastTwoWeeks')}</Eyebrow>
         </View>
+        {lang !== 'en' ? <Meta size={14} tone="ink3">{INSTRUMENT_NOTE[lang]}</Meta> : null}
         <Title size={28} accessibilityRole="header">
           {s.text}
         </Title>
-        {s.burden ? <Meta>This one is about what weighs on you. Here, “not at all” is the lighter answer.</Meta> : null}
+        {s.burden ? <Meta>{t('burdenNote')}</Meta> : null}
       </View>
 
       <View style={{ gap: space.s1 }} accessibilityRole="radiogroup" accessibilityLabel={s.text}>
@@ -213,16 +222,16 @@ function Question({ i, answers, onAnswer, onBack, onNext }: { i: number; answers
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <TermDot term={s.term} size={8} />
         <Meta size={14} tone="ink3" style={{ flex: 1 }}>
-          {`${term.space} measures ${term.name.toLowerCase()} · statement ${Math.floor(i / 6) + 1} of 3 for this term`}
+          {t('measures', { space: tt.space(s.term), name: lang === 'en' ? term.name.toLowerCase() : tt.name(s.term), n: Math.floor(i / 6) + 1 })}
         </Meta>
       </View>
 
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.s1 }}>
         <Button variant="ghost" icon="arrow-left" onPress={onBack}>
-          {i === 0 ? 'Back to start' : 'Back'}
+          {i === 0 ? t('backStart') : COMMON.back[lang]}
         </Button>
         <Button variant="secondary" iconRight="arrow-right" onPress={onNext} disabled={!chosen}>
-          {i === TOTAL - 1 ? 'See my bands' : 'Next'}
+          {i === TOTAL - 1 ? t('seeBands') : COMMON.next[lang]}
         </Button>
       </View>
     </>
@@ -237,6 +246,10 @@ function Result({ answers, onRestart }: { answers: Record<string, number>; onRes
   const [email, setEmail] = useState('')
   const [emailErr, setEmailErr] = useState<string | null>(null)
   const [letterSent, setLetterSent] = useState(false)
+  const t = useDict(CHECK)
+  const tt = useTermText()
+  const tx = useTx()
+  const lang = useLang()
 
   const result = useMemo(() => {
     const rows = ORDER.map((k) => {
@@ -255,15 +268,18 @@ function Result({ answers, onRestart }: { answers: Record<string, number>; onRes
   }, [answers])
 
   const lowest = termByKey(result.lowest)
+  const lowName = lang === 'en' ? lowest.name.toLowerCase() : tt.name(result.lowest)
   const next = CHECK_NEXT_STEP[result.lowest]
+  const nextT = NEXT_STEP_TEXT[result.lowest]
+  const bandWord = (b: Band) => (b === 'not-yet-measured' ? b : tx(BAND[b], b))
   const easeThin = result.rows.find((r) => r.key === 'B')?.band === 'thin'
   const count = (b: Band) => result.rows.filter((r) => r.band === b).length
   const today = new Date().toISOString().slice(0, 10)
-  const description = result.rows.map((r) => `${termByKey(r.key).space}: ${r.band}`).join('; ')
+  const description = result.rows.map((r) => `${tt.space(r.key)}: ${bandWord(r.band)}`).join('; ')
 
   const sendLetter = () => {
     if (!guard(email)) return
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) return setEmailErr('Enter an email address, like name@example.com.')
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) return setEmailErr(t('errEmail'))
     setEmailErr(null)
     setLetterSent(true)
   }
@@ -271,34 +287,34 @@ function Result({ answers, onRestart }: { answers: Record<string, number>; onRes
   return (
     <>
       <View style={{ gap: space.s1 }}>
-        <Eyebrow tone="daybreak">Your Joyspan Check · bands only</Eyebrow>
+        <Eyebrow tone="daybreak">{t('resEyebrow')}</Eyebrow>
         <Title size={32} accessibilityRole="header">
-          Your lowest term is <Serif>{lowest.name.toLowerCase()}</Serif>.
+          {t('lowestA')}<Serif>{lowName}</Serif>{t('lowestB')}
         </Title>
-        <Body tone="ink2">{`${count('steady')} of 6 terms are steady, ${count('uneven')} uneven and ${count('thin')} thin. That is a picture, not a verdict, and it will change. Start where it is thinnest.`}</Body>
+        <Body tone="ink2">{t('summary', { s: count('steady'), u: count('uneven'), t: count('thin') })}</Body>
       </View>
 
       <Card tone="raised" style={{ gap: space.s2 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Eyebrow>Your Wheel · today</Eyebrow>
-          <Eyebrow tone="ink2">No number</Eyebrow>
+          <Eyebrow>{t('wheelToday')}</Eyebrow>
+          <Eyebrow tone="ink2">{t('noNumber')}</Eyebrow>
         </View>
-        <View accessible accessibilityRole="image" accessibilityLabel={`Your Joyspan Wheel, in bands. ${description}.`} style={{ alignItems: 'center' }}>
+        <View accessible accessibilityRole="image" accessibilityLabel={t('wheelA11y', { d: description })} style={{ alignItems: 'center' }}>
           <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
             <JoyspanWheel terms={result.wheel} size={232} />
           </View>
         </View>
         <View>
           {result.rows.map((r) => {
-            const t = termByKey(r.key)
+            const tm = termByKey(r.key)
             const isLowest = r.key === result.lowest
             return (
               <View key={r.key} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderTopWidth: 1, borderTopColor: c.line }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
                   <TermDot term={r.key} />
-                  <View>
-                    <Body weight={isLowest ? 'semibold' : 'regular'}>{t.space}</Body>
-                    {r.key === 'B' ? <Meta size={13}>Less preventable suffering</Meta> : t.name !== t.space ? <Meta size={13}>{t.name}</Meta> : null}
+                  <View style={{ flexShrink: 1 }}>
+                    <Body weight={isLowest ? 'semibold' : 'regular'}>{tt.space(r.key)}</Body>
+                    {r.key === 'B' ? <Meta size={13}>{t('lessSuffering')}</Meta> : tm.name !== tm.space ? <Meta size={13}>{tt.name(r.key)}</Meta> : null}
                   </View>
                 </View>
                 <BandLabel band={r.band} />
@@ -307,94 +323,94 @@ function Result({ answers, onRestart }: { answers: Record<string, number>; onRes
           })}
         </View>
         <MethodLine method="v1.0" grade="check" takenOn={today} />
-        <Meta size={13} tone="ink3">Ease is read the kind way round: steady means little is weighing on you.</Meta>
+        <Meta size={13} tone="ink3">{t('easeKind')}</Meta>
       </Card>
 
       <Card tone="sunk" style={{ gap: space.s1 + 4 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: space.s1 }}>
-          <Eyebrow tone="daybreak">One next step</Eyebrow>
+          <Eyebrow tone="daybreak">{t('oneNext')}</Eyebrow>
           <TermChip term={result.lowest} withSpace />
         </View>
-        <Title size={24}>{next.step}</Title>
-        <Body tone="ink2">{next.why}</Body>
+        <Title size={24}>{tx(nextT.step, next.step)}</Title>
+        <Body tone="ink2">{tx(nextT.why, next.why)}</Body>
       </Card>
 
       {easeThin ? (
         <Card tone="outline" style={{ gap: space.s1 + 4 }}>
-          <Eyebrow>A word about Ease</Eyebrow>
-          <Body>Your answers say a lot has been weighing on you. You do not have to carry that alone, and you do not have to wait for an Index. Talking to someone today is a good next step.</Body>
-          <Button variant="ink" icon="phone" onPress={() => Linking.openURL('tel:14416').catch(() => {})} accessibilityLabel="Call Tele-MANAS 14416, free, 24 hours">
+          <Eyebrow>{t('easeWord')}</Eyebrow>
+          <Body>{t('easeBody')}</Body>
+          <Button variant="ink" icon="phone" onPress={() => Linking.openURL('tel:14416').catch(() => {})} accessibilityLabel={t('callA11y')}>
             Tele-MANAS · 14416
           </Button>
-          <Meta size={14}>Free · 24 hours · in your language</Meta>
+          <Meta size={14}>{t('free24')}</Meta>
         </Card>
       ) : null}
 
       <Card tone="outline" style={{ gap: space.s1 }}>
-        <Eyebrow>Why bands, never a number</Eyebrow>
-        <Body tone="ink2">Three statements per term can tell steady from thin. They cannot tell 58 from 62, and we would rather not pretend they can. A number comes from the full Index.</Body>
+        <Eyebrow>{t('whyBands')}</Eyebrow>
+        <Body tone="ink2">{t('whyBody')}</Body>
         {(['steady', 'uneven', 'thin'] as const).map((b) => (
           <View key={b} style={{ flexDirection: 'row', gap: 10, alignItems: 'baseline' }}>
-            <Eyebrow tone="ink" style={{ width: 64 }}>
-              {b}
+            <Eyebrow tone="ink" style={{ minWidth: 64, maxWidth: 110 }}>
+              {bandWord(b)}
             </Eyebrow>
-            <Meta style={{ flex: 1 }}>{BAND_WORDS[b]}</Meta>
+            <Meta style={{ flex: 1 }}>{tx(BAND_WORDS_TEXT[b], BAND_WORDS[b])}</Meta>
           </View>
         ))}
       </Card>
 
       {/* Three doors */}
       <View style={{ gap: space.s2 }}>
-        <Eyebrow>Where next · three doors</Eyebrow>
-        <Title size={26}>Keep the picture, get the number, or carry it with you.</Title>
+        <Eyebrow>{t('doorsEyebrow')}</Eyebrow>
+        <Title size={26}>{t('doorsTitle')}</Title>
 
         <Card tone="raised" style={{ gap: space.s1 + 4 }}>
-          <Eyebrow>Door 1 · the Joyspan Letter</Eyebrow>
+          <Eyebrow>{t('door1')}</Eyebrow>
           {letterSent ? (
             <View accessibilityLiveRegion="polite" style={{ gap: 4 }}>
-              <Body weight="medium">On its way.</Body>
-              <Meta>{`Your bands and one short letter about ${lowest.name.toLowerCase()}, once a quarter. Unsubscribe in one tap.`}</Meta>
+              <Body weight="medium">{t('onWay')}</Body>
+              <Meta>{t('letterSent', { name: lowName })}</Meta>
             </View>
           ) : (
             <>
-              <Body tone="ink2">{`Your bands by email, and a quarterly letter about ${lowest.name.toLowerCase()}. Nothing else.`}</Body>
-              <Field label="Email" value={email} onChangeText={(t) => { setEmail(t); setEmailErr(null) }} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} placeholder="name@example.com" error={emailErr} />
+              <Body tone="ink2">{t('letterAsk', { name: lowName })}</Body>
+              <Field label={COMMON.email[lang]} value={email} onChangeText={(t) => { setEmail(t); setEmailErr(null) }} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} placeholder="name@example.com" error={emailErr} />
               <Button variant="secondary" icon="mail" onPress={sendLetter}>
-                Send me the Letter
+                {t('sendLetter')}
               </Button>
             </>
           )}
         </Card>
 
         <Card tone="raised" style={{ gap: space.s1 + 4 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Eyebrow tone="daybreak">Door 2 · a baseline Index</Eyebrow>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
+            <Eyebrow tone="daybreak" style={{ flexShrink: 1 }}>{t('door2')}</Eyebrow>
             <Meta size={14}>
-              ≈ <Mono size={14} tone="ink2">20</Mono> min
+              ≈ <Mono size={14} tone="ink2">20</Mono>{t('min')}
             </Meta>
           </View>
-          <Title size={22}>Get your number, and your ninety days.</Title>
-          <Body tone="ink2">The full Joyspan Index: about sixty validated items in two sittings, a 0–100 Index with six term scores, your lowest term and one action a day. Re-measured on Day 90.</Body>
-          <DaybreakButton icon="arrow-right" onPress={() => router.push('/signin?next=onboarding')} accessibilityHint="Sign in or create your AIWO ID, give your consents, then take the Index">
-            Get my number
+          <Title size={22}>{t('door2Title')}</Title>
+          <Body tone="ink2">{t('door2Body')}</Body>
+          <DaybreakButton icon="arrow-right" onPress={() => router.push('/signin?next=onboarding')} accessibilityHint={t('getNumberHint')}>
+            {t('getNumber')}
           </DaybreakButton>
           <Meta size={14} align="center">
-            Free with an AIWO ID · consents first, then the Index
+            {t('freeWithId')}
           </Meta>
         </Card>
 
 
         <Card tone="sunk" style={{ gap: space.s1 }}>
-          <Eyebrow>Door 3 · the app</Eyebrow>
-          <Body>Free Index, Joy Ledger and one practice, with your lowest term already named.</Body>
+          <Eyebrow>{t('door3')}</Eyebrow>
+          <Body>{t('door3Body')}</Body>
           <Button variant="link" onPress={() => router.push('/onboarding')}>
-            Set up Joy OS
+            {t('setUp')}
           </Button>
         </Card>
       </View>
 
       <Button variant="ghost" icon="rotate-ccw" onPress={onRestart} style={{ alignSelf: 'center' }}>
-        Take the Check again
+        {t('again')}
       </Button>
     </>
   )

@@ -3,10 +3,10 @@ import { Pressable, ScrollView, TextInput, View, type StyleProp, type TextInputP
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, Defs, Line, Path, Rect } from 'react-native-svg'
 import { Body, Eyebrow, HatchPattern, Icon, InkSurface, Meta, Mono, TermDot, useSvgId, type IconName } from '@/components'
-import { termByKey } from '@/shared/terms'
 import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { palettes } from '@/theme/tokens'
+import { useA } from './i18n'
 
 // Lane A helpers: sparkline, chips, text field, provenance, Ink ground screen.
 
@@ -138,20 +138,19 @@ export function TextField({ label, hideLabel, style, multiline, ...rest }: TextI
 /** Provenance on every AI draft (Memo p.27: every output attributable). */
 export function Provenance({ tool, prompt = 'prompt v3', method = 'v1.0' }: { tool: string; prompt?: string; method?: string }) {
   const { c } = useTheme()
+  const { t } = useA()
   return (
     <View
       accessible
-      accessibilityLabel={`Drafted by VIVA, tool ${tool}, ${prompt}, method ${method}`}
+      accessibilityLabel={t('Drafted by VIVA, tool {tool}, {prompt}, method {method}', { tool, prompt, method })}
       style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, alignSelf: 'flex-start', borderWidth: 1, borderColor: c.line, backgroundColor: c.paperSunk, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}
     >
       <Icon name="feather" size={11} color={c.ink3} />
-      <Eyebrow size={11}>Drafted by VIVA ·</Eyebrow>
+      <Eyebrow size={11}>{t('Drafted by VIVA ·')}</Eyebrow>
       <Eyebrow size={11} tone="ink2">
         {tool}
       </Eyebrow>
-      <Eyebrow size={11}>
-        · {prompt} · method {method}
-      </Eyebrow>
+      <Eyebrow size={11}>{t('· {prompt} · method {method}', { prompt, method })}</Eyebrow>
     </View>
   )
 }
@@ -159,20 +158,21 @@ export function Provenance({ tool, prompt = 'prompt v3', method = 'v1.0' }: { to
 /** Marks pre-approved, human-written copy (Ease results never carry AI text). */
 export function HumanWritten({ by }: { by: string }) {
   const { c } = useTheme()
+  const { t } = useA()
   return (
-    <View style={{ alignSelf: 'flex-start', borderWidth: 1, borderColor: c.line, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
-      <Eyebrow size={11}>Not written by AI · pre-approved · {by}</Eyebrow>
+    <View style={{ alignSelf: 'flex-start', maxWidth: '100%', borderWidth: 1, borderColor: c.line, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
+      <Eyebrow size={11}>{t('Not written by AI · pre-approved · {by}', { by })}</Eyebrow>
     </View>
   )
 }
 
 /** Term name with its dot — a Spectrum colour never appears without the name. */
 export function TermName({ term, withSpace = true, size }: { term: TermKey; withSpace?: boolean; size?: number }) {
-  const t = termByKey(term)
+  const { name, space } = useA()
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
       <TermDot term={term} size={size ? Math.round(size * 0.6) : 10} />
-      <Body size={size}>{withSpace ? `${t.space} · ${t.name}` : t.name}</Body>
+      <Body size={size} style={{ flexShrink: 1 }}>{withSpace ? `${space(term)} · ${name(term)}` : name(term)}</Body>
     </View>
   )
 }

@@ -2,13 +2,15 @@ import clsx from 'clsx'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { ArrowLeft, BadgeCheck, Ban, Check, CheckCheck, Clock, MessageCircle, MoreVertical, RotateCcw, Send, ShieldCheck } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { DaybreakButton } from '@/components/joy/primitives'
+import { DaybreakButton, useBandText } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill, Sheet, Tabs } from '@/components/ui'
 import { CONSENTS, INDEX_HISTORY, LEDGER_WEEK, MEMBER } from '@/data/member'
 import { termByKey } from '@/data/terms'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { Checkbox, Section } from './_parts'
-import { readNotifPrefs, syncWhatsAppChannel, usePersisted, useToast } from './_util'
+import { readNotifPrefs, rich, syncWhatsAppChannel, usePersisted, useToast } from './_util'
+import { INSTRUMENT_NOTE, fill, useDict, useLang, useTermText } from '@/lib/i18n'
+import { WA, useLookup } from './_i18n'
 
 // WHATSAPP (Memo p.17, p.22, J5): a simulated WhatsApp Business chat for the Check,
 // Joy Ledger prompts and reminders — consented, at most three a day, quiet hours,
@@ -28,11 +30,11 @@ const SCRIPTS: Record<Scenario, { start: string; time: string; nodes: Record<str
     start: 'l0',
     time: '12:40',
     nodes: {
-      l0: { bot: [`Good afternoon, ${MEMBER.firstName}. Anything good in the last few hours?`], replies: [{ label: 'Yes, something', next: 'l1' }, { label: 'Not really', next: 'lno' }, { label: 'Pause for today', next: 'lpause' }] },
+      l0: { bot: ['Good afternoon, {name}. Anything good in the last few hours?'], replies: [{ label: 'Yes, something', next: 'l1' }, { label: 'Not really', next: 'lno' }, { label: 'Pause for today', next: 'lpause' }] },
       l1: { bot: ['Lovely. Which of these was it closest to?'], replies: ['People', 'Food', 'Nature', 'Rest'].map((t) => ({ label: t, next: 'l2', tag: t })) },
       l2: { bot: ['Noted under {tag}. Add one word to remember it by? Tap one, or skip.'], replies: [{ label: 'Lunch with Kavya', next: 'l3' }, { label: 'Skip', next: 'l3' }] },
       l3: { bot: ['Saved to your Joy Ledger. Ten seconds, well spent.', 'Next prompt around 16:15. Quiet hours begin at 21:45.'], replies: [{ label: 'This week so far', next: 'l4' }, { label: 'Thanks', next: 'lend' }] },
-      l4: { bot: [`This week, joy came most from ${LEDGER_WEEK[0].tag.toLowerCase()} and ${LEDGER_WEEK[1].tag.toLowerCase()}. The full picture is in the app, under Joy Ledger.`], replies: [{ label: 'Thanks', next: 'lend' }] },
+      l4: { bot: ['This week, joy came most from {w1} and {w2}. The full picture is in the app, under Joy Ledger.'], replies: [{ label: 'Thanks', next: 'lend' }] },
       lno: { bot: ['That’s fine — nothing is counted against you. I’ll ask again around 16:15.'], replies: [{ label: 'OK', next: 'lend' }] },
       lpause: { bot: ['Paused until tomorrow, 07:30. Reply RESUME any time, or STOP to end WhatsApp prompts.'], replies: [{ label: 'RESUME', next: 'l0' }] },
       lend: { bot: ['Have a good afternoon.'] },
@@ -46,7 +48,7 @@ const SCRIPTS: Record<Scenario, { start: string; time: string; nodes: Record<str
       c1: { bot: ['1 of 18 · Most days I have something to look forward to.'], replies: LIKERT.map((l) => ({ label: l, next: 'c2' })) },
       c2: { bot: ['2 of 18 · There are people I could call at two in the morning.'], replies: LIKERT.map((l) => ({ label: l, next: 'c3' })) },
       c3: { bot: ['3 of 18 · I have time in the week that is truly my own.'], replies: LIKERT.map((l) => ({ label: l, next: 'c4' })) },
-      c4: { bot: ['(Specimen: skipping to the end.)', `Thank you. Your bands: ${bandsLine}.`, 'Three doors from here: the Letter, a baseline, or the app.'], replies: [{ label: 'Send me the Letter', next: 'c5' }, { label: 'Open the app', next: 'c5' }] },
+      c4: { bot: ['(Specimen: skipping to the end.)', 'Thank you. Your bands: {bands}.', 'Three doors from here: the Letter, a baseline, or the app.'], replies: [{ label: 'Send me the Letter', next: 'c5' }, { label: 'Open the app', next: 'c5' }] },
       c5: { bot: ['Done. Your bands are saved to your AIWO ID. If you never sign in, they are deleted after 30 days.'] },
       clater: { bot: ['No hurry. Reply CHECK whenever you like.'] },
     },
@@ -65,7 +67,7 @@ const SCRIPTS: Record<Scenario, { start: string; time: string; nodes: Record<str
   },
 }
 
-interface ChatMsg { id: number; from: 'bot' | 'me'; text: string; time: string; replies?: Reply[]; answered?: boolean }
+interface ChatMsg { id: number; from: 'bot' | 'me'; text: string; time: string; replies?: Reply[]; answered?: boolean; vars?: Record<string, string> }
 
 function addMinutes(t: string, m: number) {
   const [h, mm] = t.split(':').map(Number)
@@ -76,7 +78,12 @@ function addMinutes(t: string, m: number) {
 const CLINICAL = /\b(result|results|doctor|medicine|tablet|dose|blood|lab|prescription|symptom|pain|diagnos\w*)\b/i
 
 export default function WhatsApp() {
+  const tw = useDict(WA)
   const { setCrisisOpen } = useApp()
+  const lang = useLang()
+  const lk = useLookup(WA)
+  const tt = useTermText()
+  const bandText = useBandText()
   const reduce = useReducedMotion()
   const [toast, showToast] = useToast()
   const [scenario, setScenario] = useState<Scenario>('ledger')
@@ -96,14 +103,14 @@ export default function WhatsApp() {
 
   const clear = () => { timers.current.forEach((t) => window.clearTimeout(t)); timers.current = [] }
 
-  const botSay = (lines: string[], replies?: Reply[], tagNow = tag) => {
+  const botSay = (lines: string[], replies?: Reply[], tagNow = tag, vars: Record<string, string> = {}) => {
     setTyping(true)
     lines.forEach((line, i) => {
       timers.current.push(
         window.setTimeout(() => {
           const last = i === lines.length - 1
           clock.current = addMinutes(clock.current, i === 0 ? 1 : 0)
-          setMsgs((m) => [...m, { id: ++seq.current, from: 'bot', text: line.replace('{tag}', tagNow.toLowerCase()), time: clock.current, replies: last ? replies : undefined }])
+          setMsgs((m) => [...m, { id: ++seq.current, from: 'bot', text: line, vars: { ...vars, tag: tagNow }, time: clock.current, replies: last ? replies : undefined }])
           if (last) setTyping(false)
         }, (reduce ? 150 : 650) * (i + 1)),
       )
@@ -126,7 +133,7 @@ export default function WhatsApp() {
   const pick = (msgId: number, r: Reply) => {
     const newTag = r.tag ?? tag
     if (r.tag) setTag(r.tag)
-    setMsgs((m) => [...m.map((x) => (x.id === msgId ? { ...x, answered: true } : x)), { id: ++seq.current, from: 'me', text: r.label, time: clock.current }])
+    setMsgs((m) => [...m.map((x) => (x.id === msgId ? { ...x, answered: true } : x)), { id: ++seq.current, from: 'me', text: r.label, time: clock.current, vars: { reply: '1' } }])
     const node = SCRIPTS[scenario].nodes[r.next]
     botSay(node.bot, node.replies, newTag)
   }
@@ -148,7 +155,7 @@ export default function WhatsApp() {
     if (/^stop$/i.test(t)) {
       if (consented) {
         setConsented(false)
-        showToast('You replied STOP. WhatsApp prompts are off everywhere within 24 h.')
+        showToast(tw('stopToast'))
         botSay(['WhatsApp prompts are off. Nothing more will arrive here.', 'You can turn them on again in the app, under WhatsApp or Settings.'])
       } else {
         botSay(['Prompts are already off — nothing is being sent to this number.'])
@@ -172,25 +179,34 @@ export default function WhatsApp() {
       return
     }
     if (scenario === 'ledger' && !t.includes('?') && t.length <= 80) {
-      botSay([`Saved to your Joy Ledger: “${t}”. Ten seconds, well spent.`, 'Next prompt around 16:15.'], [{ label: 'This week so far', next: 'l4' }, { label: 'Thanks', next: 'lend' }])
+      botSay(['Saved to your Joy Ledger: “{text}”. Ten seconds, well spent.', 'Next prompt around 16:15.'], [{ label: 'This week so far', next: 'l4' }, { label: 'Thanks', next: 'lend' }], tag, { text: t })
       return
     }
     botSay(['I can only help with your Joy Ledger, the Check and reminders here. For anything else, open the app or message Priya.'], [{ label: 'Anything good today?', next: SCRIPTS.ledger.start }].filter(() => scenario === 'ledger'))
   }
 
+  /** Chat lines are kept in English and read in the member's language; the Check statements stay English. */
+  const word = (w: string) => (lang === 'en' ? w.toLowerCase() : lk(w))
+  const lineText = (m: ChatMsg) => {
+    if (m.from === 'me') return m.vars?.reply ? lk(m.text) : m.text
+    const bands = lang === 'en' ? bandsLine : latest.terms.map((x) => `${tt.space(x.key)} ${bandText(x.band)}`).join(' · ')
+    return fill(lk(m.text), { name: MEMBER.firstName, bands, w1: word(LEDGER_WEEK[0].tag), w2: word(LEDGER_WEEK[1].tag), ...m.vars, tag: word(m.vars?.tag ?? tag) })
+  }
+
   return (
     <div>
       <PageHeader
-        eyebrow="WhatsApp · only by consent"
-        title={<>Ten seconds, in the app you <em className="font-serif">already</em> open</>}
-        lead="The Check, Joy Ledger prompts and gentle reminders — on WhatsApp if you want them. Never anything clinical, never more than three a day."
+        eyebrow={tw('eyebrow')}
+        title={rich(tw('title'), { em: <em className="font-serif">{tw('titleEm')}</em> })}
+        lead={tw('lead')}
       />
 
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-[400px_minmax(0,1fr)] lg:gap-12">
         {/* Phone */}
         <div className="flex flex-col items-center">
-          <Tabs className="mb-5" value={scenario} onChange={setScenario} items={[{ value: 'ledger', label: 'Ledger' }, { value: 'check', label: 'The Check' }, { value: 'reminders', label: 'Reminders' }]} />
-          <div className="relative w-full max-w-[360px] rounded-[2.6rem] border-[10px] border-ink-ground bg-ink-ground shadow-lift ring-1 ring-line-strong" aria-label="Simulated WhatsApp conversation">
+          <Tabs className="mb-5" value={scenario} onChange={setScenario} items={[{ value: 'ledger', label: tw('tabLedger') }, { value: 'check', label: tw('tabCheck') }, { value: 'reminders', label: tw('tabReminders') }]} />
+          {scenario === 'check' && lang !== 'en' && <p className="mb-4 max-w-[360px] text-center text-[13px] leading-snug text-ink-3">{INSTRUMENT_NOTE[lang]}</p>}
+          <div className="relative w-full max-w-[360px] rounded-[2.6rem] border-[10px] border-ink-ground bg-ink-ground shadow-lift ring-1 ring-line-strong" aria-label={tw('simAria')}>
             <div className="flex h-[640px] flex-col overflow-hidden rounded-[2rem] bg-paper-sunk">
               {/* Status + header */}
               <div className="bg-ink px-4 pb-3 pt-3 text-paper">
@@ -199,8 +215,8 @@ export default function WhatsApp() {
                   <ArrowLeft size={18} className="opacity-80" aria-hidden />
                   <span className="flex h-9 w-9 items-center justify-center rounded-full bg-daybreak font-mono text-[11px] font-medium text-paper" aria-hidden>JO</span>
                   <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-1 text-[15px] font-medium">Joy OS by AIWO <BadgeCheck size={14} aria-label="Verified business" /></p>
-                    <p className="text-[12px] opacity-70">{typing ? 'typing…' : 'Business account'}</p>
+                    <p className="flex items-center gap-1 text-[15px] font-medium">Joy OS by AIWO <BadgeCheck size={14} aria-label={tw('verified')} /></p>
+                    <p className="text-[12px] opacity-70">{typing ? tw('typing') : tw('business')}</p>
                   </div>
                   <MoreVertical size={18} className="opacity-70" aria-hidden />
                 </div>
@@ -209,15 +225,15 @@ export default function WhatsApp() {
               {/* Chat */}
               <div ref={scroller} className="flex-1 space-y-2 overflow-y-auto px-3 py-4" role="log" aria-live="polite">
                 {consented ? (
-                  <p className="mx-auto mb-3 w-fit rounded-md bg-paper-raised px-3 py-1 text-center text-[11px] text-ink-3 shadow-card">Messages are end-to-end encrypted. You chose to receive these.</p>
+                  <p className="mx-auto mb-3 w-fit rounded-md bg-paper-raised px-3 py-1 text-center text-[11px] text-ink-3 shadow-card">{tw('e2e')}</p>
                 ) : (
-                  <p className="sticky top-0 z-10 mx-auto mb-3 w-fit max-w-[92%] rounded-md border border-dashed border-line-strong bg-paper-raised px-3 py-1.5 text-center text-[12px] leading-snug text-ink-2 shadow-card" role="note">This is what you would receive. Nothing is sent until you turn prompts on.</p>
+                  <p className="sticky top-0 z-10 mx-auto mb-3 w-fit max-w-[92%] rounded-md border border-dashed border-line-strong bg-paper-raised px-3 py-1.5 text-center text-[12px] leading-snug text-ink-2 shadow-card" role="note">{tw('preview')}</p>
                 )}
                 <AnimatePresence initial={false}>
                   {msgs.map((m) => (
                     <motion.div key={`${scenario}-${m.id}`} initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }} className={clsx('flex flex-col', m.from === 'me' ? 'items-end' : 'items-start')}>
                       <div className={clsx('max-w-[82%] rounded-xl px-3 py-2 text-[14.5px] leading-snug shadow-card', m.from === 'me' ? 'rounded-tr-sm bg-ink text-paper' : 'rounded-tl-sm bg-paper-raised text-ink')}>
-                        {m.text}
+                        {lineText(m)}
                         <span className={clsx('num ml-2 inline-flex translate-y-0.5 items-center gap-0.5 whitespace-nowrap text-[10px]', m.from === 'me' ? 'opacity-70' : 'text-ink-3')}>
                           {m.time}{m.from === 'me' && <CheckCheck size={12} />}
                         </span>
@@ -231,7 +247,7 @@ export default function WhatsApp() {
                               onClick={() => pick(m.id, r)}
                               className="rounded-lg bg-paper-raised px-3 py-2 text-[14px] font-medium text-daybreak-ink shadow-card transition-opacity hover:bg-paper focus-ring disabled:opacity-45"
                             >
-                              {r.label}
+                              {lk(r.label)}
                             </button>
                           ))}
                         </div>
@@ -240,7 +256,7 @@ export default function WhatsApp() {
                   ))}
                 </AnimatePresence>
                 {typing && (
-                  <div className="flex w-fit gap-1 rounded-xl rounded-tl-sm bg-paper-raised px-3 py-3 shadow-card" aria-label="Joy OS is typing">
+                  <div className="flex w-fit gap-1 rounded-xl rounded-tl-sm bg-paper-raised px-3 py-3 shadow-card" aria-label={tw('typingAria')}>
                     {[0, 1, 2].map((i) => <span key={i} className="h-1.5 w-1.5 animate-pulse rounded-full bg-ink-3 motion-reduce:animate-none" style={{ animationDelay: `${i * 150}ms` }} />)}
                   </div>
                 )}
@@ -248,19 +264,19 @@ export default function WhatsApp() {
 
               {/* Composer */}
               <form className="flex items-center gap-2 bg-paper-sunk px-2 pb-3 pt-1" onSubmit={(e) => { e.preventDefault(); sendFree() }}>
-                <label htmlFor="wa-text" className="sr-only">Message</label>
-                <input id="wa-text" value={text} onChange={(e) => setText(e.target.value)} placeholder="Message" autoComplete="off" className="h-10 min-w-0 flex-1 rounded-full bg-paper-raised px-4 text-[14px] text-ink shadow-card placeholder:text-ink-3 focus:outline-none focus-ring" />
-                <button type="submit" aria-label="Send" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ink text-paper focus-ring"><Send size={16} /></button>
+                <label htmlFor="wa-text" className="sr-only">{tw('message')}</label>
+                <input id="wa-text" value={text} onChange={(e) => setText(e.target.value)} placeholder={tw('message')} autoComplete="off" className="h-10 min-w-0 flex-1 rounded-full bg-paper-raised px-4 text-[14px] text-ink shadow-card placeholder:text-ink-3 focus:outline-none focus-ring" />
+                <button type="submit" aria-label={tw('send')} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ink text-paper focus-ring"><Send size={16} /></button>
               </form>
             </div>
           </div>
           <div className="mt-4 flex items-center gap-3">
-            <Button size="sm" variant="ghost" onClick={() => start(scenario)}><RotateCcw size={14} /> Restart</Button>
-            <span className="eyebrow text-ink-3">Simulation · not a live chat</span>
+            <Button size="sm" variant="ghost" onClick={() => start(scenario)}><RotateCcw size={14} /> {tw('restart')}</Button>
+            <span className="eyebrow text-ink-3">{tw('simulation')}</span>
           </div>
-          <div className="mt-2 flex flex-wrap justify-center gap-1.5" aria-label="Try typing">
+          <div className="mt-2 flex flex-wrap justify-center gap-1.5" aria-label={tw('tryTyping')}>
             {['STOP', 'my blood results?', 'Lunch with Kavya'].map((x) => (
-              <button key={x} type="button" onClick={() => setText(x)} className="rounded-full border border-line px-2.5 py-1 text-[12px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring">Try “{x}”</button>
+              <button key={x} type="button" onClick={() => setText(x)} className="rounded-full border border-line px-2.5 py-1 text-[12px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring">{tw('tryX', { x })}</button>
             ))}
           </div>
         </div>
@@ -268,48 +284,48 @@ export default function WhatsApp() {
         {/* Explainer */}
         <div className="space-y-10">
           <Card >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="eyebrow text-ink-3">Your WhatsApp consent</p>
-                <p className="mt-2 text-[1.3rem] font-light text-ink">{consented ? 'On — Ledger prompts and reminders' : 'Off — nothing is sent to WhatsApp'}</p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="eyebrow text-ink-3">{tw('yourConsent')}</p>
+                <p className="mt-2 text-[1.3rem] font-light text-ink">{consented ? tw('consentOn') : tw('consentOff')}</p>
               </div>
-              <Pill className="shrink-0 whitespace-nowrap" tone={consented ? 'positive' : 'neutral'}>{consented ? <><Check size={12} /> Given</> : 'Not given'}</Pill>
+              <Pill className="shrink-0 whitespace-nowrap" tone={consented ? 'positive' : 'neutral'}>{consented ? <><Check size={12} /> {tw('given')}</> : tw('notGiven')}</Pill>
             </div>
             <p className="mt-3 text-[15px] text-ink-2">
-              To <span className="num text-ink">+91 98••• ••417</span>. A separate consent from Care and Data; withdraw it here, in the Trust centre, or by replying STOP.
+              {rich(tw('toNumber'), { num: <span className="num text-ink">+91 98••• ••417</span> })}
             </p>
             <div className="mt-5">
               {consented ? (
-                <Button variant="secondary" onClick={() => { setConsented(false); showToast('WhatsApp prompts off. Takes effect everywhere within 24 h.') }}>Turn off</Button>
+                <Button variant="secondary" onClick={() => { setConsented(false); showToast(tw('offToast')) }}>{tw('turnOff')}</Button>
               ) : (
-                <DaybreakButton onClick={() => setConsentOpen(true)}>Turn on prompts</DaybreakButton>
+                <DaybreakButton onClick={() => setConsentOpen(true)}>{tw('turnOn')}</DaybreakButton>
               )}
             </div>
           </Card>
 
-          <Section id="what" eyebrow="What comes, and what never does" title="Light things only">
+          <Section id="what" eyebrow={tw('whatEyebrow')} title={tw('whatTitle')}>
             <div className="grid gap-4 sm:grid-cols-2">
               <Card tone="sunk">
-                <p className="flex items-center gap-2 text-[16px] text-ink"><MessageCircle size={17} /> On WhatsApp</p>
+                <p className="flex items-center gap-2 text-[16px] text-ink"><MessageCircle size={17} /> {tw('onWa')}</p>
                 <ul className="mt-3 space-y-2 text-[15px] text-ink-2">
-                  {['The Joyspan Check — bands, never a number', 'Joy Ledger prompts, three a day at most', 'Circle and review reminders', 'Booking confirmations from Ravi'].map((x) => <li key={x} className="flex gap-2"><Check size={15} className="mt-1 shrink-0 text-ink-3" /> {x}</li>)}
+                  {[tw('on1'), tw('on2'), tw('on3'), tw('on4')].map((x) => <li key={x} className="flex gap-2"><Check size={15} className="mt-1 shrink-0 text-ink-3" /> {x}</li>)}
                 </ul>
               </Card>
               <Card tone="outline">
-                <p className="flex items-center gap-2 text-[16px] text-ink"><Ban size={17} /> Never on WhatsApp</p>
+                <p className="flex items-center gap-2 text-[16px] text-ink"><Ban size={17} /> {tw('neverWa')}</p>
                 <ul className="mt-3 space-y-2 text-[15px] text-ink-2">
-                  {['Results, prescriptions or clinical notes', 'Your Index number, or a fall in it', 'Ease screens or anything about suffering', 'Offers, urgency or “last chance”'].map((x) => <li key={x} className="flex gap-2"><span aria-hidden className="mt-0.5 shrink-0 text-ink-3">—</span> {x}</li>)}
+                  {[tw('never1'), tw('never2'), tw('never3'), tw('never4')].map((x) => <li key={x} className="flex gap-2"><span aria-hidden className="mt-0.5 shrink-0 text-ink-3">—</span> {x}</li>)}
                 </ul>
               </Card>
             </div>
           </Section>
 
-          <Section id="rules" eyebrow="The rules it follows" title="Quiet by design">
+          <Section id="rules" eyebrow={tw('rulesEyebrow')} title={tw('rulesTitle')}>
             <dl className="grid gap-4 sm:grid-cols-3">
               {[
-                { icon: Clock, k: 'Quiet hours', v: quiet, s: 'Nothing arrives at night', mono: true },
-                { icon: MessageCircle, k: 'At most', v: <><span className="num">3</span> a day</>, s: 'Across every channel together' },
-                { icon: ShieldCheck, k: 'Free text', v: 'Person first', s: 'Crisis words are intercepted and reach a person, not a bot' },
+                { icon: Clock, k: tw('quietHours'), v: quiet, s: tw('quietSub'), mono: true },
+                { icon: MessageCircle, k: tw('atMost'), v: rich(tw('aDay'), { n: <span className="num">3</span> }), s: tw('acrossChannels') },
+                { icon: ShieldCheck, k: tw('freeText'), v: tw('personFirst'), s: tw('crisisWords') },
               ].map(({ icon: Icon, k, v, s, mono }: { icon: typeof Clock; k: string; v: React.ReactNode; s: string; mono?: boolean }) => (
                 <div key={k} className="rounded-card border border-line p-4">
                   <dt className="eyebrow flex items-center gap-1.5 text-ink-3"><Icon size={13} /> {k}</dt>
@@ -318,15 +334,15 @@ export default function WhatsApp() {
                 </div>
               ))}
             </dl>
-            <p className="mt-4 text-[14px] text-ink-3">Try typing in the phone: a question about a result is turned away kindly; anything that sounds like a crisis opens the crisis path at once.</p>
+            <p className="mt-4 text-[14px] text-ink-3">{tw('tryNote')}</p>
           </Section>
         </div>
       </div>
 
-      <Sheet open={consentOpen} onClose={() => setConsentOpen(false)} title="WhatsApp prompts" side="center">
+      <Sheet open={consentOpen} onClose={() => setConsentOpen(false)} title={tw('consentTitle')} side="center">
         <ConsentForm
           onCancel={() => setConsentOpen(false)}
-          onAgree={() => { setConsented(true); setConsentOpen(false); showToast('WhatsApp prompts on. The first arrives around 12:40 tomorrow.') }}
+          onAgree={() => { setConsented(true); setConsentOpen(false); showToast(tw('onToast')) }}
         />
       </Sheet>
       {toast}
@@ -335,18 +351,19 @@ export default function WhatsApp() {
 }
 
 function ConsentForm({ onAgree, onCancel }: { onAgree: () => void; onCancel: () => void }) {
+  const tw = useDict(WA)
   const [ok, setOk] = useState(false)
   const [tried, setTried] = useState(false)
   return (
     <div className="space-y-4">
-      <p className="text-[17px] text-ink-2">Joy OS will send Ledger prompts, the Check and reminders to <span className="num text-ink">+91 98••• ••417</span> through WhatsApp Business. Meta sees that a message was sent; it never sees your Index or anything clinical.</p>
+      <p className="text-[17px] text-ink-2">{rich(tw('consentBody'), { num: <span className="num text-ink">+91 98••• ••417</span> })}</p>
       <div className="rounded-card bg-paper-sunk p-4">
-        <Checkbox checked={ok} onChange={(v) => { setOk(v); setTried(false) }}>I agree to receive these on WhatsApp. I can reply STOP at any time.</Checkbox>
-        {tried && !ok && <p role="alert" className="mt-2 text-[14px] text-error">Tick the box to give this consent.</p>}
+        <Checkbox checked={ok} onChange={(v) => { setOk(v); setTried(false) }}>{tw('agree')}</Checkbox>
+        {tried && !ok && <p role="alert" className="mt-2 text-[14px] text-error">{tw('tick')}</p>}
       </div>
       <div className="flex justify-end gap-2">
-        <Button variant="ghost" onClick={onCancel}>Not now</Button>
-        <Button variant="ink" onClick={() => { setTried(true); if (ok) onAgree() }}>Give consent</Button>
+        <Button variant="ghost" onClick={onCancel}>{tw('notNow')}</Button>
+        <Button variant="ink" onClick={() => { setTried(true); if (ok) onAgree() }}>{tw('giveConsent')}</Button>
       </div>
     </div>
   )

@@ -1,0 +1,102 @@
+import type { Dict } from '@/lib/i18n'
+import type { L3 } from './common'
+
+export const MEMBERSHIP = {
+  eyebrow: { en: 'Membership', ta: 'உறுப்பினர் திட்டம்', hi: 'सदस्यता' },
+  titleA: { en: 'What you have, and what it ', ta: 'உங்களிடம் இருப்பதும், அதன் ', hi: 'आपके पास क्या है, और उसकी ' },
+  titleSerif: { en: 'costs', ta: 'விலையும்', hi: 'क़ीमत' },
+  titleB: { en: '.', ta: '.', hi: '।' },
+  lead: { en: 'Prices in rupees, GST at 18% included and shown on every invoice. Change or pause any time; your data is never held hostage.', ta: 'விலைகள் ரூபாயில், 18% GST சேர்த்து, ஒவ்வொரு ரசீதிலும் காட்டப்படும். எப்போது வேண்டுமானாலும் மாற்றலாம் அல்லது நிறுத்திவைக்கலாம்; உங்கள் தரவு ஒருபோதும் பிணையாக வைக்கப்படாது.', hi: 'क़ीमतें रुपयों में, 18% GST शामिल और हर इनवॉइस पर दिखाया गया। कभी भी बदलें या रोकें; आपका डेटा कभी बंधक नहीं रखा जाता।' },
+  yourPlan: { en: 'Your plan', ta: 'உங்கள் திட்டம்', hi: 'आपका प्लान' },
+  active: { en: 'Active', ta: 'செயலில்', hi: 'चालू' },
+  inclGst: { en: 'incl. GST {gst} · renews ', ta: 'GST {gst} உட்பட · புதுப்பிப்பு ', hi: 'GST {gst} सहित · नवीनीकरण ' },
+  noCharge: { en: 'No charge · renews ', ta: 'கட்டணம் இல்லை · புதுப்பிப்பு ', hi: 'कोई शुल्क नहीं · नवीनीकरण ' },
+  circleMem: { en: 'Circle membership ', ta: 'Circle உறுப்பினர் கட்டணம் ', hi: 'Circle सदस्यता ' },
+  perYear: { en: ' / year · renews ', ta: ' / ஆண்டு · புதுப்பிப்பு ', hi: ' / साल · नवीनीकरण ' },
+  changedTo: { en: 'Changed to', ta: 'மாற்றப்பட்டது:', hi: 'बदला गया:' },
+  movingTo: { en: 'Moving to', ta: 'மாறுகிறது:', hi: 'बदल रहा है:' },
+  pendingLine: { en: '{verb} {name} · effective {date} · {ref}', ta: '{verb} {name} · நடைமுறைக்கு வரும் நாள் {date} · {ref}', hi: '{verb} {name} · लागू {date} · {ref}' },
+  cancelHint: { en: 'Cancels the move at renewal; nothing changes', ta: 'புதுப்பிப்பின்போதான மாற்றத்தை ரத்துசெய்யும்; எதுவும் மாறாது', hi: 'नवीनीकरण पर होने वाला बदलाव रद्द करता है; कुछ नहीं बदलता' },
+  keepInstead: { en: 'Keep {name} instead', ta: 'அதற்குப் பதில் {name}-ஐயே வை', hi: 'इसकी जगह {name} ही रखें' },
+  included: { en: 'Included', ta: 'அடங்கியவை', hi: 'शामिल' },
+  plans: { en: 'The plans', ta: 'திட்டங்கள்', hi: 'प्लान' },
+  free: { en: 'Free', ta: 'இலவசம்', hi: 'मुफ़्त' },
+  inclGstShort: { en: ' · incl. GST', ta: ' · GST உட்பட', hi: ' · GST सहित' },
+  moveFree: { en: 'Move to Free', ta: 'இலவசத் திட்டத்துக்கு மாறு', hi: 'मुफ़्त प्लान पर जाएँ' },
+  changeTo: { en: 'Change to {name}', ta: '{name}-க்கு மாறு', hi: '{name} पर बदलें' },
+  upgrade: { en: 'Upgrade to Patron', ta: 'Patron-க்கு உயர்த்து', hi: 'Patron में अपग्रेड करें' },
+  payment: { en: 'Payment', ta: 'கட்டணம்', hi: 'भुगतान' },
+  autopay: { en: 'Autopay mandate · specimen', ta: 'தானியங்கு கட்டண அனுமதி · மாதிரி', hi: 'ऑटोपे मैंडेट · नमूना' },
+  razorpay: { en: 'Cards and UPI are entered only on Razorpay’s own page. Joy OS never sees or stores the numbers.', ta: 'கார்டுகளும் UPI-யும் Razorpay-இன் சொந்தப் பக்கத்தில் மட்டுமே உள்ளிடப்படும். Joy OS அந்த எண்களை ஒருபோதும் பார்ப்பதோ சேமிப்பதோ இல்லை.', hi: 'कार्ड और UPI सिर्फ़ Razorpay के अपने पेज पर डाले जाते हैं। Joy OS ये नंबर कभी नहीं देखता, न रखता है।' },
+  grace: { en: 'If a payment is missed, you get fourteen days of grace with everything working. After that the plan steps down to Joy OS (free). Your record, Ledger and Index are never locked or deleted.', ta: 'கட்டணம் தவறினால், எல்லாம் இயங்கியபடியே பதினான்கு நாட்கள் அவகாசம் கிடைக்கும். அதன் பிறகு திட்டம் Joy OS (இலவசம்) ஆக மாறும். உங்கள் பதிவு, லெட்ஜர், குறியீடு ஒருபோதும் பூட்டப்படவோ நீக்கப்படவோ மாட்டாது.', hi: 'अगर कोई भुगतान छूट जाए, तो सब कुछ चालू रखते हुए चौदह दिन की मोहलत मिलती है। उसके बाद प्लान Joy OS (मुफ़्त) पर आ जाता है। आपका रिकॉर्ड, लेजर और इंडेक्स कभी लॉक या डिलीट नहीं होते।' },
+  invoicesGst: { en: 'Invoices · GST', ta: 'ரசீதுகள் · GST', hi: 'इनवॉइस · GST' },
+  household: { en: 'Your household', ta: 'உங்கள் குடும்பம்', hi: 'आपका परिवार' },
+  changePlan: { en: 'Change plan', ta: 'திட்டத்தை மாற்று', hi: 'प्लान बदलें' },
+  confirm: { en: 'Confirm · {name}', ta: 'உறுதிசெய் · {name}', hi: 'पक्का करें · {name}' },
+  changedA: { en: 'Changed. ', ta: 'மாற்றப்பட்டது. ', hi: 'बदल गया। ' },
+  thanks: { en: 'Thank you.', ta: 'நன்றி.', hi: 'शुक्रिया।' },
+  newPlan: { en: 'New plan', ta: 'புதிய திட்டம்', hi: 'नया प्लान' },
+  effective: { en: 'Effective', ta: 'நடைமுறைக்கு வரும் நாள்', hi: 'लागू' },
+  reference: { en: 'Reference', ta: 'குறிப்பு எண்', hi: 'संदर्भ' },
+  raviLink: { en: 'Ravi will send a Razorpay link with the GST invoice for any difference. Nothing has been charged yet.', ta: 'வித்தியாசத் தொகைக்கு GST ரசீதுடன் Ravi ஒரு Razorpay இணைப்பை அனுப்புவார். இதுவரை எதுவும் வசூலிக்கப்படவில்லை.', hi: 'किसी भी अंतर के लिए Ravi GST इनवॉइस के साथ Razorpay लिंक भेजेंगे। अभी कुछ नहीं लिया गया।' },
+  plan: { en: 'Plan', ta: 'திட்டம்', hi: 'प्लान' },
+  planA11y: { en: '{name}, {price}', ta: '{name}, {price}', hi: '{name}, {price}' },
+  freeLower: { en: 'free', ta: 'இலவசம்', hi: 'मुफ़्त' },
+  upgradeNote: { en: 'An upgrade starts today. You pay the difference for the rest of this period.', ta: 'உயர்த்துதல் இன்றே தொடங்கும். இந்தக் காலத்தின் மீதிக்கு வித்தியாசத் தொகையைச் செலுத்துவீர்கள்.', hi: 'अपग्रेड आज से शुरू होता है। इस अवधि के बाक़ी समय का अंतर आप चुकाएँगे।' },
+  downNote: { en: 'A move down starts at renewal, {date}. Everything you have stays until then.', ta: 'குறைந்த திட்டத்துக்கான மாற்றம் புதுப்பிப்பின்போது, {date} அன்று தொடங்கும். அதுவரை உங்களிடம் உள்ள அனைத்தும் அப்படியே இருக்கும்.', hi: 'छोटे प्लान पर जाना नवीनीकरण, {date}, से शुरू होगा। तब तक आपके पास सब कुछ रहेगा।' },
+  taxInvoice: { en: 'Tax invoice', ta: 'வரி ரசீது', hi: 'टैक्स इनवॉइस' },
+  kInvoice: { en: 'Invoice', ta: 'ரசீது', hi: 'इनवॉइस' },
+  kDate: { en: 'Date', ta: 'தேதி', hi: 'तारीख़' },
+  kItem: { en: 'Item', ta: 'பொருள்', hi: 'विवरण' },
+  kTaxable: { en: 'Taxable value', ta: 'வரிக்குரிய மதிப்பு', hi: 'कर-योग्य मूल्य' },
+  kTotal: { en: 'Total', ta: 'மொத்தம்', hi: 'कुल' },
+  kPaidBy: { en: 'Paid by', ta: 'செலுத்திய முறை', hi: 'भुगतान का तरीका' },
+} satisfies Dict
+
+export const CADENCE: Record<string, L3> = {
+  free: { en: 'free', ta: 'இலவசம்', hi: 'मुफ़्त' },
+  '/ month': { en: '/ month', ta: '/ மாதம்', hi: '/ महीना' },
+  '/ year': { en: '/ year', ta: '/ ஆண்டு', hi: '/ साल' },
+}
+
+export const PLAN_POINT: Record<string, L3> = {
+  'Self-assessed Index': { en: 'Self-assessed Index', ta: 'சுய மதிப்பீட்டு குறியீடு', hi: 'ख़ुद से भरा इंडेक्स' },
+  'Joy Ledger': { en: 'Joy Ledger', ta: 'ஜாய் லெட்ஜர்', hi: 'जॉय लेजर' },
+  'One practice': { en: 'One practice', ta: 'ஒரு பயிற்சி', hi: 'एक अभ्यास' },
+  'Trust centre': { en: 'Trust centre', ta: 'நம்பிக்கை மையம்', hi: 'ट्रस्ट सेंटर' },
+  'All six spaces in full': { en: 'All six spaces in full', ta: 'ஆறு இடங்களும் முழுமையாக', hi: 'सभी छह स्पेस पूरे' },
+  'Devices and signals': { en: 'Devices and signals', ta: 'சாதனங்களும் சமிக்ஞைகளும்', hi: 'डिवाइस और संकेत' },
+  'The Joyspiration Practice': { en: 'The Joyspiration Practice', ta: 'ஜாய்ஸ்பிரேஷன் பயிற்சி', hi: 'जॉयस्पिरेशन अभ्यास' },
+  'Circle of eight': { en: 'Circle of eight', ta: 'எட்டுப் பேர் வட்டம்', hi: 'आठ लोगों का सर्कल' },
+  'Household of up to six': { en: 'Household of up to six', ta: 'ஆறு பேர் வரையிலான குடும்பம்', hi: 'छह लोगों तक का परिवार' },
+  'Annual ’cation': { en: 'Annual ’cation', ta: 'ஆண்டு ’கேஷன்', hi: 'सालाना ’केशन' },
+  'Family Joy Charter': { en: 'Family Joy Charter', ta: 'குடும்ப மகிழ்ச்சிச் சாசனம்', hi: 'पारिवारिक ख़ुशी चार्टर' },
+  'Priority Houses and Residences': { en: 'Priority Houses and Residences', ta: 'Houses, Residences-இல் முன்னுரிமை', hi: 'Houses और Residences में प्राथमिकता' },
+  'Named coach and concierge': { en: 'Named coach and concierge', ta: 'குறிப்பிட்ட பயிற்சியாளரும் கான்சியர்ஜும்', hi: 'तय कोच और कंसीयर्ज' },
+  'Quarterly Index': { en: 'Quarterly Index', ta: 'காலாண்டு குறியீடு', hi: 'तिमाही इंडेक्स' },
+  'Joyspan Sessions': { en: 'Joyspan Sessions', ta: 'ஜாய்ஸ்பான் Sessions', hi: 'जॉयस्पैन Sessions' },
+  'The ninety days, continued': { en: 'The ninety days, continued', ta: 'தொண்ணூறு நாட்கள், தொடர்ச்சியாக', hi: 'नब्बे दिन, जारी' },
+}
+
+export const ENTITLEMENT_USE: Record<string, L3> = {
+  Included: { en: 'Included', ta: 'அடங்கும்', hi: 'शामिल' },
+  'Oura · Apple Health linked': { en: 'Oura · Apple Health linked', ta: 'Oura · Apple Health இணைக்கப்பட்டுள்ளன', hi: 'Oura · Apple Health जुड़े हैं' },
+  'Week 4 of 8': { en: 'Week 4 of 8', ta: '8 இல் வாரம் 4', hi: '8 में से हफ़्ता 4' },
+  'Mondays 19:00 with Priya': { en: 'Mondays 19:00 with Priya', ta: 'திங்கள்தோறும் 19:00, Priya உடன்', hi: 'हर सोमवार 19:00, Priya के साथ' },
+  'Next: 2 Apr 2027': { en: 'Next: 2 Apr 2027', ta: 'அடுத்து: 2 ஏப்ரல் 2027', hi: 'अगला: 2 अप्रैल 2027' },
+  'Two seats held · 20 Feb, Chennai': { en: 'Two seats held · 20 Feb, Chennai', ta: 'இரண்டு இருக்கைகள் ஒதுக்கப்பட்டுள்ளன · 20 பிப், சென்னை', hi: 'दो सीटें रखी गईं · 20 फ़र, चेन्नई' },
+  'Day 23 of 90': { en: 'Day 23 of 90', ta: '90 இல் நாள் 23', hi: '90 में से दिन 23' },
+}
+
+export const INVOICE_ITEM: Record<string, L3> = {
+  'INV-2027-000418': { en: 'Joy OS Plus · January', ta: 'Joy OS Plus · ஜனவரி', hi: 'Joy OS Plus · जनवरी' },
+  'INV-2026-011872': { en: 'Circle membership · 2027', ta: 'Circle உறுப்பினர் கட்டணம் · 2027', hi: 'Circle सदस्यता · 2027' },
+  'INV-2026-011203': { en: 'Joy OS Plus · December', ta: 'Joy OS Plus · டிசம்பர்', hi: 'Joy OS Plus · दिसंबर' },
+  'INV-2026-010554': { en: 'Joy OS Plus · November', ta: 'Joy OS Plus · நவம்பர்', hi: 'Joy OS Plus · नवंबर' },
+  'INV-2026-009912': { en: 'Joy OS Plus · October', ta: 'Joy OS Plus · அக்டோபர்', hi: 'Joy OS Plus · अक्टूबर' },
+}
+export const PAY_WORD: Record<string, L3> = {
+  Paid: { en: 'Paid', ta: 'செலுத்தப்பட்டது', hi: 'भुगतान हो गया' },
+  Card: { en: 'Card', ta: 'கார்டு', hi: 'कार्ड' },
+  UPI: { en: 'UPI', ta: 'UPI', hi: 'UPI' },
+}

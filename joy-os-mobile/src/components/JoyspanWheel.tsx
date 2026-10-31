@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { AccessibilityInfo, Pressable, View } from 'react-native'
 import Svg, { Circle, ClipPath, Defs, G, Path, Text as SvgText } from 'react-native-svg'
-import { termByKey } from '../shared/terms'
+import { TERM_TEXT, useLang } from '../lib/i18n'
+import type { Lang } from '../lib/store'
 import type { TermKey, TermScore } from '../shared/types'
 import { useTheme } from '../theme/ThemeProvider'
 import { HatchPattern, useSvgId } from './Term'
+import { kit, type KitKey } from './_i18n'
 
 // The Joyspan Wheel (Brand Identity Playbook p45, p62, p65) — react-native-svg port of
 // joy-os-web/src/components/joy/JoyspanWheel.tsx.
@@ -60,20 +62,25 @@ function useBloom(enabled: boolean) {
   return p
 }
 
-export function describeWheel(terms: TermScore[], value?: number | null) {
-  const parts = WHEEL_ORDER.map((k) => {
-    const t = terms.find((x) => x.key === k)
-    const term = termByKey(k)
-    if (!t || t.value === null) return `${term.space}, ${term.name}, not yet measured`
-    return `${term.space}, ${term.name} ${k === 'B' ? 'minus ' : ''}${t.value}, ${t.band}`
-  })
-  return `Joyspan Wheel${value != null ? `, Index ${value}` : ''}. ${parts.join('; ')}.`
+const BAND_KEY: Record<string, KitKey> = { steady: 'bandSteady', uneven: 'bandUneven', thin: 'bandThin', 'not-yet-measured': 'bandNone' }
+
+function petalLabel(lang: Lang, k: TermKey, tv: TermScore | undefined, nullSep = ', ') {
+  const head = `${TERM_TEXT[k].space[lang]}, ${TERM_TEXT[k].name[lang]}`
+  if (!tv || tv.value === null) return `${head}${nullSep}${kit(lang, 'notYetMeasured')}`
+  const band = BAND_KEY[tv.band] ? kit(lang, BAND_KEY[tv.band]) : tv.band
+  return `${head} ${k === 'B' ? kit(lang, 'minus') : ''}${tv.value}, ${band}`
+}
+
+export function describeWheel(terms: TermScore[], value?: number | null, lang: Lang = 'en') {
+  const parts = WHEEL_ORDER.map((k) => petalLabel(lang, k, terms.find((x) => x.key === k)))
+  return `${kit(lang, 'wheel')}${value != null ? kit(lang, 'wheelIndex', { v: value }) : ''}. ${parts.join('; ')}.`
 }
 
 export function JoyspanWheel({ terms, size = 240, value, showLabels = false, highlight = null, onSelect, animate = true, guide = true }: Props) {
   const t = useTheme()
   const { c, fonts } = t
   const uid = useSvgId('wheel')
+  const lang = useLang()
   const progress = useBloom(animate)
   const pad = showLabels ? 56 : 4
   const box = size + pad * 2
@@ -97,7 +104,7 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
     <View
       accessible={!interactive}
       accessibilityRole={interactive ? undefined : 'image'}
-      accessibilityLabel={interactive ? undefined : describeWheel(terms, value)}
+      accessibilityLabel={interactive ? undefined : describeWheel(terms, value, lang)}
       style={{ width: box, height: box, maxWidth: '100%' }}
     >
       <Svg width={box} height={box} viewBox={`0 0 ${box} ${box}`}>
@@ -146,11 +153,10 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
             const a = ((i * 60 - 90) * Math.PI) / 180
             const x = cx + Math.cos(a) * (outer + 30)
             const y = cx + Math.sin(a) * (outer + 30)
-            const term = termByKey(k)
             return (
               <G key={`l-${k}`}>
                 <SvgText x={x} y={y - 4} textAnchor="middle" fontFamily={fonts.sans} fontSize={13} fill={c.ink}>
-                  {term.space}
+                  {TERM_TEXT[k].space[lang]}
                 </SvgText>
                 <SvgText x={x} y={y + 12} textAnchor="middle" fontFamily={fonts.mono} fontSize={12} fill={c.ink3}>
                   {tv?.value == null ? '—' : k === 'B' ? `−${tv.value}` : String(tv.value)}
@@ -162,17 +168,15 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
       {interactive &&
         WHEEL_ORDER.map((k, i) => {
           const tv = terms.find((x) => x.key === k)
-          const term = termByKey(k)
           const a = ((i * 60 - 90) * Math.PI) / 180
           const rr = inner + len * 0.55
           const hit = Math.max(44, len * 0.62)
-          const v = tv?.value ?? null
           return (
             <Pressable
               key={`hit-${k}`}
               onPress={() => onSelect!(k)}
               accessibilityRole="button"
-              accessibilityLabel={`${term.space}, ${term.name} ${v === null ? 'not yet measured' : `${k === 'B' ? 'minus ' : ''}${v}, ${tv?.band}`}`}
+              accessibilityLabel={petalLabel(lang, k, tv, ' ')}
               accessibilityState={{ selected: highlight === k }}
               aria-selected={highlight === k}
               style={{ position: 'absolute', left: cx + Math.cos(a) * rr - hit / 2, top: cx + Math.sin(a) * rr - hit / 2, width: hit, height: hit, borderRadius: hit / 2 }}

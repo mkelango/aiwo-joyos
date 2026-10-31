@@ -2,7 +2,9 @@ import { router } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { View } from 'react-native'
 import { Body, Button, Card, DaybreakButton, Divider, Eyebrow, ListRow, Meta, Mono, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, Toggle, Title } from '@/components'
-import { LANGS, useT } from '@/lib/i18n'
+import { LANGS, useDict, useT } from '@/lib/i18n'
+import { SETTINGS } from '@/screens/b/i18n/account'
+import { LANG_LABEL, perDayKey, useCommon, usePrefsError } from '@/screens/b/i18n/common'
 import { useApp, type TextSize, type ThemePref } from '@/lib/store'
 import { MEMBER } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
@@ -25,6 +27,10 @@ export default memberOnly(Settings)
 function Settings() {
   const { space, scheme } = useTheme()
   const t = useT()
+  const ts = useDict(SETTINGS)
+  const tc = useCommon()
+  const prefsErr = usePrefsError()
+  const householdName = MEMBER.household === SETTINGS.householdName.en ? ts('householdName') : MEMBER.household
   const { lang, setLang, themePref, setThemePref, textSize, setTextSize, offline, setOffline } = useApp()
   const [acct] = useStore(accountStore)
   // The same preferences onboarding and Notifications use, kept on this phone.
@@ -54,7 +60,7 @@ function Settings() {
     setError(null)
   }
   const save = () => {
-    const err = validatePrefs({ quiet, perDay, channels })
+    const err = prefsErr(validatePrefs({ quiet, perDay, channels }))
     if (err) return setError(err)
     setPrefs({ quiet, perDay, channels, kinds, savedAt: new Date().toISOString() })
     setError(null)
@@ -71,115 +77,117 @@ function Settings() {
     <Screen>
       <ScreenHeader
         back
-        eyebrow="Settings"
+        eyebrow={ts('eyebrow')}
         title={
           <>
-            Make it feel like <Serif>yours</Serif>.
+            {ts('titleA')}<Serif>{ts('titleSerif')}</Serif>{ts('titleB')}
           </>
         }
-        lead="Language, look and the way we reach you. Changes to language, theme and text size apply at once and are kept on this phone."
+        lead={ts('lead')}
       />
 
       {/* Account */}
       <View style={{ gap: space.s1 }}>
-        <SectionTitle>Account</SectionTitle>
+        <SectionTitle>{ts('account')}</SectionTitle>
         <Card tone="raised" padding={8} style={{ paddingHorizontal: 16 }}>
-          <ListRow icon="user" title="Profile" sub={`${MEMBER.firstName} ${MEMBER.lastName} · AIWO ID, details, emergency contact`} onPress={() => router.push('/profile')} />
+          <ListRow icon="user" title={ts('profile')} sub={ts('profileSub', { name: `${MEMBER.firstName} ${MEMBER.lastName}` })} onPress={() => router.push('/profile')} />
           <Divider />
-          <ListRow icon="star" title="Membership" sub={`${PLANS.find((p) => p.key === acct.plan)?.name ?? MEMBER.plan} + ${MEMBER.membership} · invoices`} onPress={() => router.push('/membership')} />
+          <ListRow icon="star" title={ts('membership')} sub={ts('invoices', { plan: `${PLANS.find((p) => p.key === acct.plan)?.name ?? MEMBER.plan} + ${MEMBER.membership}` })} onPress={() => router.push('/membership')} />
           <Divider />
-          <ListRow icon="bell" title="Notifications" sub="Recent, quiet hours, channels" onPress={() => router.push('/notifications')} />
+          <ListRow icon="bell" title={ts('notifications')} sub={ts('notificationsSub')} onPress={() => router.push('/notifications')} />
           <Divider />
-          <ListRow icon="message-circle" title="Messages" sub="Your coach, clinicians and concierge" onPress={() => router.push('/messages')} />
+          <ListRow icon="message-circle" title={ts('messages')} sub={ts('messagesSub')} onPress={() => router.push('/messages')} />
           <Divider />
-          <ListRow icon="credit-card" title="Joy Passport" sub="One card for every ’cation and House" onPress={() => router.push('/passport')} />
+          <ListRow icon="credit-card" title={ts('passport')} sub={ts('passportSub')} onPress={() => router.push('/passport')} />
           <Divider />
-          <ListRow icon="home" title="Household" sub={MEMBER.household} onPress={() => router.push('/household')} />
+          <ListRow icon="home" title={ts('household')} sub={householdName} onPress={() => router.push('/household')} />
           <Divider />
-          <ListRow icon="users" title="Your circle" sub="Circle of eight · Monday 7 pm" onPress={() => router.push('/circles')} />
+          <ListRow icon="users" title={ts('circle')} sub={ts('circleSub')} onPress={() => router.push('/circles')} />
           <Divider />
-          <ListRow icon="book-open" title="The method" sub="How the Index is made · v1.0" onPress={() => router.push('/method')} />
+          <ListRow icon="book-open" title={ts('method')} sub={ts('methodSub')} onPress={() => router.push('/method')} />
         </Card>
       </View>
 
       {/* Language */}
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>Language</SectionTitle>
-        <View style={{ gap: space.s1 }} accessibilityRole="radiogroup" accessibilityLabel="Language">
+        <SectionTitle>{tc('language')}</SectionTitle>
+        <View style={{ gap: space.s1 }} accessibilityRole="radiogroup" accessibilityLabel={tc('language')}>
           {LANGS.map((l) => (
             <ChoiceCard
               key={l.value}
               selected={lang === l.value}
               onPress={() => setLang(l.value)}
-              accessibilityLabel={`${l.label}, ${l.native}`}
+              accessibilityLabel={`${LANG_LABEL[lang][l.value]}, ${l.native}`}
               title={
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
                   <Body size={20} weight="medium">
                     {l.native}
                   </Body>
-                  {l.native !== l.label ? <Meta>{l.label}</Meta> : null}
+                  {l.native !== LANG_LABEL[lang][l.value] ? <Meta>{LANG_LABEL[lang][l.value]}</Meta> : null}
                 </View>
               }
               sub={<Meta tone="ink3">{`“${SAMPLE[l.value]}”`}</Meta>}
             />
           ))}
         </View>
-        <Meta size={14} tone="ink3">{`Menus and daily prompts change now (the tab bar reads “${t('today')}”). Validated Index questions in Tamil and Hindi go through forward and back translation before they are used.`}</Meta>
+        <Meta size={14} tone="ink3">{ts('langNote', { today: t('today') })}</Meta>
       </View>
 
       {/* Appearance */}
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>Appearance</SectionTitle>
+        <SectionTitle>{ts('appearance')}</SectionTitle>
         <Card tone="raised" style={{ gap: space.s2 }}>
-          <Eyebrow>Theme</Eyebrow>
+          <Eyebrow>{ts('theme')}</Eyebrow>
           <Segmented<ThemePref>
             value={themePref}
             onChange={setThemePref}
             items={[
-              { value: 'system', label: 'System' },
-              { value: 'light', label: 'Paper' },
-              { value: 'dark', label: 'Ink' },
+              { value: 'system', label: ts('system') },
+              { value: 'light', label: ts('paper') },
+              { value: 'dark', label: ts('ink') },
             ]}
+            style={{ flexWrap: 'wrap' }}
           />
-          <Meta>{themePref === 'system' ? `Following your phone · ${scheme === 'dark' ? 'Ink (dark)' : 'Paper (light)'} now.` : themePref === 'light' ? 'Paper, always.' : 'Warm Ink, always. Easier in the evening.'}</Meta>
+          <Meta>{themePref === 'system' ? ts('following', { mode: scheme === 'dark' ? ts('inkDark') : ts('paperLight') }) : themePref === 'light' ? ts('paperAlways') : ts('inkAlways')}</Meta>
           <Divider />
-          <Eyebrow>Text size</Eyebrow>
+          <Eyebrow>{ts('textSize')}</Eyebrow>
           <Segmented<TextSize>
             value={textSize}
             onChange={setTextSize}
             items={[
-              { value: 'default', label: 'Default' },
-              { value: 'large', label: 'Large' },
-              { value: 'xlarge', label: 'Larger' },
+              { value: 'default', label: ts('sDefault') },
+              { value: 'large', label: ts('sLarge') },
+              { value: 'xlarge', label: ts('sLarger') },
             ]}
+            style={{ flexWrap: 'wrap' }}
           />
           <Card tone="sunk" padding={16} style={{ gap: 4 }}>
-            <Eyebrow>Preview</Eyebrow>
-            <Body>Ten minutes on the verandah with tea. Notice three things.</Body>
+            <Eyebrow>{ts('preview')}</Eyebrow>
+            <Body>{ts('previewText')}</Body>
           </Card>
-          <Meta size={14} tone="ink3">Works on top of your phone’s own text size (Dynamic Type). Elder mode in a household uses Larger.</Meta>
+          <Meta size={14} tone="ink3">{ts('dynamicType')}</Meta>
         </Card>
       </View>
 
       {/* Notifications */}
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>Notifications</SectionTitle>
+        <SectionTitle>{ts('notifications')}</SectionTitle>
         <Title size={24}>
-          At most three a day, never in your <Serif>quiet</Serif> hours.
+          {ts('notifA')}<Serif>{ts('notifSerif')}</Serif>{ts('notifB')}
         </Title>
-        <Body tone="ink2">No streaks, no countdowns, no “you’re falling behind”. A fall in your Index is never pushed to your phone; a person tells you.</Body>
+        <Body tone="ink2">{ts('notifBody')}</Body>
 
         <Card tone="raised" style={{ gap: space.s2 }}>
-          <Eyebrow>Quiet hours</Eyebrow>
+          <Eyebrow>{tc('quietHours')}</Eyebrow>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s2 }}>
-            <TimeStepper label="From" value={quiet.from} onChange={(v) => { setQuiet((q) => ({ ...q, from: v })); touch() }} />
-            <TimeStepper label="Until" value={quiet.to} onChange={(v) => { setQuiet((q) => ({ ...q, to: v })); touch() }} />
+            <TimeStepper label={tc('from')} value={quiet.from} onChange={(v) => { setQuiet((q) => ({ ...q, from: v })); touch() }} />
+            <TimeStepper label={tc('until')} value={quiet.to} onChange={(v) => { setQuiet((q) => ({ ...q, to: v })); touch() }} />
           </View>
-          <Meta size={14}>The only exception: if you ever ask for help, a person can reach you at any hour.</Meta>
+          <Meta size={14}>{tc('quietException')}</Meta>
         </Card>
 
         <Card tone="raised" style={{ gap: space.s2 }}>
-          <Eyebrow>Reminders a day</Eyebrow>
+          <Eyebrow>{tc('remindersADay')}</Eyebrow>
           <Segmented<string>
             value={String(perDay)}
             onChange={(v) => {
@@ -188,19 +196,19 @@ function Settings() {
             }}
             items={['0', '1', '2', '3'].map((n) => ({ value: n, label: n }))}
           />
-          <Meta>{perDay === 0 ? 'None. You open Joy OS when you choose.' : perDay === 1 ? 'One: today’s action, in the morning.' : perDay === 2 ? 'Two: today’s action, and one Joy Ledger prompt.' : 'Three: today’s action and two Ledger prompts. Never more.'}</Meta>
+          <Meta>{tc(perDayKey(perDay))}</Meta>
           <Divider />
-          <Toggle checked={kinds.action} onChange={(v) => { setKinds((k) => ({ ...k, action: v })); touch() }} label="Today’s action" description="One a day, at a time that fits your calendar." />
-          <Toggle checked={kinds.ledger} onChange={(v) => { setKinds((k) => ({ ...k, ledger: v })); touch() }} label="Joy Ledger prompts" description="Ten seconds: anything good in the last few hours?" />
-          <Toggle checked={kinds.circle} onChange={(v) => { setKinds((k) => ({ ...k, circle: v })); touch() }} label="Circle reminder" description="Monday, an hour before the call." />
-          <Toggle checked={kinds.letter} onChange={(v) => { setKinds((k) => ({ ...k, letter: v })); touch() }} label="The Joyspan Letter" description="Quarterly, by email." />
+          <Toggle checked={kinds.action} onChange={(v) => { setKinds((k) => ({ ...k, action: v })); touch() }} label={tc('kAction')} description={tc('kActionD')} />
+          <Toggle checked={kinds.ledger} onChange={(v) => { setKinds((k) => ({ ...k, ledger: v })); touch() }} label={tc('kLedger')} description={tc('kLedgerD')} />
+          <Toggle checked={kinds.circle} onChange={(v) => { setKinds((k) => ({ ...k, circle: v })); touch() }} label={tc('kCircle')} description={tc('kCircleD')} />
+          <Toggle checked={kinds.letter} onChange={(v) => { setKinds((k) => ({ ...k, letter: v })); touch() }} label={tc('kLetter')} description={tc('kLetterD')} />
         </Card>
 
         <Card tone="raised" style={{ gap: space.s2 }}>
-          <Eyebrow>How to reach you</Eyebrow>
-          <Toggle checked={channels.app} onChange={(v) => { setChannels((x) => ({ ...x, app: v })); touch() }} label="App notifications" description="Today’s action and Ledger prompts." />
-          <Toggle checked={channels.whatsapp} onChange={(v) => { setChannels((x) => ({ ...x, whatsapp: v })); touch() }} label="WhatsApp" description="Ledger prompts and reminders only. Never clinical content." />
-          <Toggle checked={channels.email} onChange={(v) => { setChannels((x) => ({ ...x, email: v })); touch() }} label="Email" description="The quarterly Joyspan Letter and receipts." />
+          <Eyebrow>{tc('howToReach')}</Eyebrow>
+          <Toggle checked={channels.app} onChange={(v) => { setChannels((x) => ({ ...x, app: v })); touch() }} label={tc('chApp')} description={tc('chAppD')} />
+          <Toggle checked={channels.whatsapp} onChange={(v) => { setChannels((x) => ({ ...x, whatsapp: v })); touch() }} label={tc('chWa')} description={tc('chWaD')} />
+          <Toggle checked={channels.email} onChange={(v) => { setChannels((x) => ({ ...x, email: v })); touch() }} label={tc('chEmail')} description={tc('chEmailD')} />
         </Card>
 
         {error ? (
@@ -208,50 +216,50 @@ function Settings() {
             {error}
           </Meta>
         ) : null}
-        <DaybreakButton onPress={save}>{saved ? 'Saved' : 'Save notification settings'}</DaybreakButton>
+        <DaybreakButton onPress={save}>{saved ? tc('saved') : ts('saveNotif')}</DaybreakButton>
         {saved ? (
           <Meta align="center" accessibilityLiveRegion="polite">
-            {`Quiet from ${quiet.from} until ${quiet.to} · ${perDay} a day. Kept on this phone; Notifications shows the same.`}
+            {ts('savedLine', { from: quiet.from, to: quiet.to, n: perDay })}
           </Meta>
         ) : null}
       </View>
 
       {/* Offline */}
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>Offline</SectionTitle>
+        <SectionTitle>{ts('offline')}</SectionTitle>
         <Card tone="raised" style={{ gap: space.s1 }}>
           <Toggle
             checked={offline}
             onChange={setOffline}
-            label="Work offline"
-            description={offline ? 'Offline. Your Ledger, actions and reflections are kept on this phone and sent when you are back.' : 'Joy OS works without a signal; this shows you how it behaves on a flight.'}
+            label={ts('workOffline')}
+            description={offline ? ts('offlineOn') : ts('offlineOff')}
           />
         </Card>
       </View>
 
       {/* Start again */}
       <View style={{ gap: space.s1 }}>
-        <SectionTitle>Start again</SectionTitle>
+        <SectionTitle>{ts('startAgain')}</SectionTitle>
         <Card tone="raised" padding={8} style={{ paddingHorizontal: 16 }}>
           <ListRow
             icon="play-circle"
-            title="Replay onboarding"
-            sub="Intent, language, consents, device, quiet hours"
+            title={ts('replay')}
+            sub={ts('replaySub')}
             onPress={() => {
               onboardingStore.set((d) => ({ ...d, step: 0 }))
               router.push('/onboarding')
             }}
           />
           <Divider />
-          <ListRow icon="sun" title="See the welcome screen" sub="The first screen a new member sees" onPress={() => router.push('/welcome')} />
+          <ListRow icon="sun" title={ts('welcome')} sub={ts('welcomeSub')} onPress={() => router.push('/welcome')} />
           <Divider />
-          <ListRow icon="check-circle" title="Take the free Check" sub="18 statements · bands only · 5 minutes" onPress={() => router.push('/check')} />
+          <ListRow icon="check-circle" title={ts('check')} sub={ts('checkSub')} onPress={() => router.push('/check')} />
           <Divider />
-          <ListRow icon="log-in" title="See the sign-in screen" sub="AIWO ID · passkey, phone or email" onPress={() => router.push('/signin')} />
+          <ListRow icon="log-in" title={ts('signin')} sub={ts('signinSub')} onPress={() => router.push('/signin')} />
           <Divider />
-          <ListRow icon="shield" title="Trust centre" sub="Consents, export, delete" onPress={() => router.push('/trust')} />
+          <ListRow icon="shield" title={ts('trust')} sub={ts('trustSub')} onPress={() => router.push('/trust')} />
           <Divider />
-          <ListRow icon="watch" title="Devices" sub="Oura Ring · Apple Health" onPress={() => router.push('/devices')} />
+          <ListRow icon="watch" title={ts('devices')} sub={ts('devicesSub')} onPress={() => router.push('/devices')} />
         </Card>
       </View>
 
@@ -260,29 +268,29 @@ function Settings() {
           AIWO ID <Mono size={13} tone="ink3">{MEMBER.aiwoId}</Mono>
         </Meta>
         <Meta size={13} tone="ink3">
-          Joy OS <Mono size={13} tone="ink3">1.0.0</Mono> · Index method <Mono size={13} tone="ink3">v1.0</Mono>
+          Joy OS <Mono size={13} tone="ink3">1.0.0</Mono>{ts('indexMethod')}<Mono size={13} tone="ink3">v1.0</Mono>
         </Meta>
         <Button variant="ghost" size="sm" icon="log-out" onPress={() => setOutOpen(true)} style={{ alignSelf: 'center' }}>
-          Sign out
+          {tc('signOut')}
         </Button>
       </View>
 
       <Sheet
         open={outOpen}
         onClose={() => setOutOpen(false)}
-        title="Sign out?"
+        title={tc('signOutQ')}
         footer={
           <View style={{ gap: 8 }}>
             <Button variant="ink" block icon="log-out" onPress={signOut}>
-              Sign out
+              {tc('signOut')}
             </Button>
             <Button variant="secondary" block onPress={() => setOutOpen(false)}>
-              Stay signed in
+              {tc('staySignedIn')}
             </Button>
           </View>
         }
       >
-        <Body>Anything not yet synced stays on this phone and is sent when you sign back in with your AIWO ID.</Body>
+        <Body>{ts('outBody')}</Body>
       </Sheet>
     </Screen>
   )
