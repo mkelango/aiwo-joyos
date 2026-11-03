@@ -12,6 +12,8 @@ import { DEFAULT_NOTIF_PREFS, LEDGER_TIMES, NOTIF_TYPES, pushesPerDay, type Chan
 import { Field, LinkButton, Section, Segmented, Select, Toggle } from './_parts'
 import { applyReducedMotion, inputCls, rich, usePersisted, useToast } from './_util'
 import { SET, useData } from './_i18n'
+import { A11Y_DEFAULTS } from './_prefs'
+import { ReadAloud, SpeakAnswer, useSpeech } from './_voice'
 
 // SETTINGS (Memo p.17, p.22): language (EN · தமிழ் · हिन्दी), Paper or warm Ink,
 // text size, notifications (≤3 a day, each type off in one tap, quiet hours
@@ -43,8 +45,10 @@ export default function Settings() {
 
   // Name as edited on the Profile page; WhatsApp consent as given on the WhatsApp page or in the Trust centre.
   const [details] = usePersisted('profile', { firstName: MEMBER.firstName, lastName: MEMBER.lastName, city: MEMBER.city })
-  const [wa] = usePersisted('wa', { consented: false })
-  const [prefs, setPrefs] = usePersisted('prefs', { biometric: true, lockAfter: '5', reduceMotion: false, voice: false, captions: true })
+  const [wa] = usePersisted('wa', { consented: false, requested: false })
+  const [prefs, setPrefs] = usePersisted('prefs', A11Y_DEFAULTS)
+  const { speak } = useSpeech()
+  const [heard, setHeard] = useState<string | null>(null)
   const setPref = <K extends keyof typeof prefs>(k: K, v: (typeof prefs)[K], msg: string) => { setPrefs((p) => ({ ...p, [k]: v })); showToast(msg) }
   useEffect(() => { applyReducedMotion(prefs.reduceMotion) }, [prefs.reduceMotion])
   const [signOut, setSignOut] = useState(false)
@@ -192,6 +196,12 @@ export default function Settings() {
                     <Link to="/app/whatsapp" className="text-ink underline underline-offset-4 focus-ring">{t('waGive')}</Link>
                   </p>
                 )}
+                {!n.channels.whatsapp && !wa.consented && wa.requested && (
+                  <p className="mt-3 text-[13px] text-ink-2">
+                    {t('waSetup')}{' '}
+                    <Link to="/app/whatsapp" className="text-ink underline underline-offset-4 focus-ring">{t('waGive')}</Link>
+                  </p>
+                )}
                 {wa.consented && <p className="mt-3 text-[13px] text-ink-3">{t('waGiven')}</p>}
               </div>
             </Card>
@@ -244,7 +254,21 @@ export default function Settings() {
           <Section id="a11y" eyebrow={t('a11y')} title={t('a11yTitle')}>
             <Card className="space-y-5">
               <Toggle checked={prefs.reduceMotion} onChange={(v) => setPref('reduceMotion', v, v ? t('rmOn') : t('rmOff'))} label={t('rmLabel')} description={t('rmDesc')} />
-              <Toggle checked={prefs.voice} onChange={(v) => setPref('voice', v, v ? t('voiceOn') : t('voiceOff'))} label={t('voiceLabel')} description={t('voiceDesc')} />
+              <Toggle checked={prefs.voice} onChange={(v) => { setPref('voice', v, v ? t('voiceOn') : t('voiceOff')); setHeard(null); if (v) speak(t('voiceOn')) }} label={t('voiceLabel')} description={t('voiceDesc')} />
+              {prefs.voice ? (
+                <div className="rounded-card bg-paper-sunk p-4">
+                  <p className="eyebrow text-ink-3">{t('vtTry')}</p>
+                  <p className="mt-2 text-[17px] text-ink">{tt('ledgerPrompt')}</p>
+                  <div className="mt-3 flex flex-wrap items-start gap-3">
+                    <ReadAloud on text={tt('ledgerPrompt')} className="min-w-0 flex-1" />
+                    <SpeakAnswer on sample="Tea on the verandah with Kavya" onText={(x) => setHeard(x)} />
+                  </div>
+                  {heard && <p aria-live="polite" className="mt-3 text-[14px] text-ink-2">{t('vtHeard', { text: heard })}</p>}
+                  <p className="mt-3 text-[13px] text-ink-3">{t('vtWhere')}</p>
+                </div>
+              ) : (
+                <p className="-mt-2 text-[13px] text-ink-3">{t('vtOffHint')}</p>
+              )}
               <Toggle checked={prefs.captions} onChange={(v) => setPref('captions', v, v ? t('capOn') : t('capOff'))} label={t('capLabel')} description={t('capDesc')} />
             </Card>
           </Section>

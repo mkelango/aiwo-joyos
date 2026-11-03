@@ -7,8 +7,16 @@ import { DaybreakButton, Eyebrow, SpecimenTag, TermDot } from '@/components/joy/
 import { Card, PageHeader, Pill, Tabs } from '@/components/ui'
 import { TERMS, termColor } from '@/data/terms'
 import type { TermKey } from '@/domain/types'
-import { ARCH_LAYERS, MODULES, OUTCOMES, SURFACES, TWO_APPS, type Module, type OutcomeKey } from './_data'
-import { LinkButton, StorySection, TermLabel, useEnterAs } from './_parts'
+import { ARCH_LAYERS, MODULES, OUTCOMES, SURFACES, TWO_APPS, type Module, type OutcomeKey, type SurfaceKey } from './_data'
+import { LinkButton, StorySection, TermTraceButton, useEnterAs } from './_parts'
+
+/** A pinned trace: a term back to the modules that raise it, or a surface to the modules it carries. */
+type Trace = { kind: 'term'; key: TermKey } | { kind: 'surface'; key: SurfaceKey } | null
+const sameTrace = (a: Trace, b: Trace) => !!a && !!b && a.kind === b.kind && a.key === b.key
+const isLg = () => window.matchMedia('(min-width: 1024px)').matches
+const termName = (k: TermKey) => TERMS.find((t) => t.key === k)!.name
+const surfaceName = (k: SurfaceKey) => SURFACES.find((s) => s.key === k)!.name
+const modulesFor = (tr: NonNullable<Trace>) => MODULES.filter((m) => (tr.kind === 'term' ? m.terms.includes(tr.key) : m.surfaces.includes(tr.key)))
 
 // PLATFORM MAP (Plan §4D; Memo p.8, p.16, p.28, p.6): fourteen modules, each answerable
 // to a term; the surfaces that carry them; the outcomes they move; the architecture
@@ -17,6 +25,16 @@ export default function PlatformMap() {
   const [sel, setSel] = useState('01')
   const mod = MODULES.find((m) => m.n === sel)!
   const select = useCallback((n: string) => setSel(n), [])
+  const [trace, setTrace] = useState<Trace>(null)
+  // pressing the pinned trace again clears it
+  const toggleTrace = useCallback((t: Trace) => setTrace((cur) => (sameTrace(cur, t) ? null : t)), [])
+  // from the detail card: pin the term, then show the trace where it is drawn at this width
+  const traceFromDetail = useCallback((k: TermKey) => {
+    const next: Trace = { kind: 'term', key: k }
+    const clearing = sameTrace(trace, next)
+    toggleTrace(next)
+    if (!clearing) document.getElementById(isLg() ? 'map' : 'module-trace')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [trace, toggleTrace])
 
   return (
     <div className="pb-8 pt-2 md:pt-6">
@@ -44,12 +62,12 @@ export default function PlatformMap() {
           <Card className="overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <Eyebrow>Surfaces ↔ modules ↔ terms ↔ outcomes</Eyebrow>
-              <p className="text-[14px] text-ink-3"><span className="lg:hidden">Choose a module</span><span className="hidden lg:inline">Choose a module · hover or click a term to trace it back</span></p>
+              <p className="text-[14px] text-ink-3"><span className="lg:hidden">Choose a module, or trace a term or a surface</span><span className="hidden lg:inline">Choose a module · hover or click a term or a surface to trace it</span></p>
             </div>
-            <ConnectionMap sel={sel} onSelect={select} />
-            <MobileModulePicker sel={sel} onSelect={select} />
+            <ConnectionMap sel={sel} onSelect={select} trace={trace} onTrace={toggleTrace} />
+            <MobileModulePicker sel={sel} onSelect={select} trace={trace} onTrace={toggleTrace} />
           </Card>
-          <ModuleDetail mod={mod} />
+          <ModuleDetail mod={mod} trace={trace} onTraceTerm={traceFromDetail} />
         </div>
       </section>
 
@@ -59,7 +77,7 @@ export default function PlatformMap() {
         onSelect={(n) => {
           select(n)
           // desktop shows the traced map; below lg the map is a long picker, so go straight to the module's card
-          const target = window.matchMedia('(min-width: 1024px)').matches ? 'map' : 'module-detail'
+          const target = isLg() ? 'map' : 'module-detail'
           document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
         }}
         sel={sel}
@@ -71,16 +89,21 @@ export default function PlatformMap() {
 // ─── The connection map (desktop) ────────────────────────────────────────────
 type Pt = { l: { x: number; y: number }; r: { x: number; y: number } }
 
-function ConnectionMap({ sel, onSelect }: { sel: string; onSelect: (n: string) => void }) {
+function ConnectionMap({ sel, onSelect, trace, onTrace }: { sel: string; onSelect: (n: string) => void; trace: Trace; onTrace: (t: Trace) => void }) {
   const wrap = useRef<HTMLDivElement>(null)
   const nodes = useRef(new Map<string, HTMLElement>())
   const [pos, setPos] = useState<Record<string, Pt>>({})
   const [box, setBox] = useState({ w: 0, h: 0 })
   const [hovered, setHovered] = useState<TermKey | null>(null)
-  const [pinned, setPinned] = useState<TermKey | null>(null)
+  const [hoveredSurface, setHoveredSurface] = useState<SurfaceKey | null>(null)
   const enterAs = useEnterAs()
-  const hoverTerm = hovered ?? pinned
+  const pinned = trace?.kind === 'term' ? trace.key : null
+  const pinnedSurface = trace?.kind === 'surface' ? trace.key : null
+  // a hover previews over the pin; a term hover wins over a surface hover
+  const hoverTerm = hovered ?? (hoveredSurface ? null : pinned)
+  const hoverSurface = hovered ? null : hoveredSurface ?? pinnedSurface
   const mod = MODULES.find((m) => m.n === sel)!
+  const carried = hoverSurface ? MODULES.filter((m) => m.surfaces.includes(hoverSurface)) : []
 
   const reg = (id: string) => (el: HTMLElement | null) => {
     if (el) nodes.current.set(id, el)
@@ -123,12 +146,21 @@ function ConnectionMap({ sel, onSelect }: { sel: string; onSelect: (n: string) =
         const on = m.n === sel
         const traced = hoverTerm === t
         if (on) return
-        lines.push({ key: `mt-${m.n}-${t}`, d: curve(mp.r, tp.l), stroke: traced ? termColor[t] : 'var(--line-strong)', w: traced ? 1.4 : 1, o: traced ? 0.9 : hoverTerm ? 0.12 : 0.45 })
+        const faded = hoverTerm ? !traced : hoverSurface ? !m.surfaces.includes(hoverSurface) : false
+        lines.push({ key: `mt-${m.n}-${t}`, d: curve(mp.r, tp.l), stroke: traced ? termColor[t] : 'var(--line-strong)', w: traced ? 1.4 : 1, o: traced ? 0.9 : faded ? 0.12 : 0.45 })
       })
     })
+    // surface → module: every module the traced surface carries, or the selected module's surfaces
+    const sp0 = hoverSurface ? pos[`s-${hoverSurface}`] : undefined
+    if (sp0) {
+      carried.forEach((m) => {
+        const cp = pos[`m-${m.n}`]
+        if (cp) lines.push({ key: `sc-${m.n}`, d: curve(sp0.r, cp.l), stroke: 'var(--ink)', w: 1.4, o: 0.75 })
+      })
+    }
     const mp = pos[`m-${mod.n}`]
     if (mp) {
-      mod.surfaces.forEach((s) => {
+      if (!sp0) mod.surfaces.forEach((s) => {
         const sp = pos[`s-${s}`]
         if (sp) lines.push({ key: `sm-${s}`, d: curve(sp.r, mp.l), stroke: 'var(--ink)', w: 1.4, o: 0.75 })
       })
@@ -151,8 +183,9 @@ function ConnectionMap({ sel, onSelect }: { sel: string; onSelect: (n: string) =
     }
   }
 
-  const termOn = (t: TermKey) => (hoverTerm ? hoverTerm === t : mod.terms.includes(t))
-  const moduleOn = (m: Module) => (hoverTerm ? m.terms.includes(hoverTerm) : true)
+  const termOn = (t: TermKey) => (hoverTerm ? hoverTerm === t : hoverSurface ? carried.some((m) => m.terms.includes(t)) : mod.terms.includes(t))
+  const moduleOn = (m: Module) => (hoverTerm ? m.terms.includes(hoverTerm) : hoverSurface ? m.surfaces.includes(hoverSurface) : true)
+  const surfaceOn = (k: SurfaceKey) => (hoverSurface ? hoverSurface === k : mod.surfaces.includes(k))
 
   return (
     <div ref={wrap} className="relative mt-6 hidden lg:block">
@@ -167,20 +200,34 @@ function ConnectionMap({ sel, onSelect }: { sel: string; onSelect: (n: string) =
           <p className="eyebrow mb-3 text-ink-3">Surfaces</p>
           <ul className="flex flex-1 flex-col justify-between gap-2">
             {SURFACES.map((s) => {
-              const on = mod.surfaces.includes(s.key)
+              const on = surfaceOn(s.key)
+              const isPinned = pinnedSurface === s.key
+              const n = MODULES.filter((m) => m.surfaces.includes(s.key)).length
               return (
-                <li key={s.key} ref={reg(`s-${s.key}`)}>
+                <li key={s.key} ref={reg(`s-${s.key}`)} className={clsx('flex items-stretch rounded-lg border bg-paper-raised transition-all duration-200', on || isPinned ? 'border-ink' : 'border-line')}>
+                  {/* the box traces the surface; the arrow beside it opens the surface */}
+                  <button
+                    type="button"
+                    onMouseEnter={() => setHoveredSurface(s.key)}
+                    onMouseLeave={() => setHoveredSurface(null)}
+                    onFocus={() => setHoveredSurface(s.key)}
+                    onBlur={() => setHoveredSurface(null)}
+                    onClick={() => { onTrace({ kind: 'surface', key: s.key }); setHoveredSurface(null) }}
+                    aria-pressed={isPinned}
+                    aria-label={`${s.name}: carries ${n} modules. ${isPinned ? 'Click to clear the trace.' : 'Click to pin the trace.'}`}
+                    className={clsx('min-w-0 flex-1 rounded-l-lg px-3 py-2 text-left transition-opacity duration-200 focus-ring', !on && !isPinned && 'opacity-55', isPinned && 'bg-paper-sunk')}
+                  >
+                    <span className="block text-[14px] leading-tight text-ink">{s.name}</span>
+                    <span className="mt-0.5 block text-[12px] leading-tight text-ink-3">{s.sub}</span>
+                  </button>
                   <Link
                     to={s.to}
                     onClick={() => enterAs(s.to)}
                     title={`Open ${s.name}`}
-                    className={clsx('group block rounded-lg border px-3 py-2 transition-all duration-200 hover:border-ink hover:opacity-100 focus-ring', on ? 'border-ink bg-paper-raised' : 'border-line opacity-55')}
+                    aria-label={`Open ${s.name}`}
+                    className="flex w-7 shrink-0 items-center justify-center rounded-r-lg text-ink-3 transition-colors hover:bg-paper-sunk hover:text-ink focus-ring"
                   >
-                    <span className="flex items-center justify-between gap-2 text-[14px] leading-tight text-ink">
-                      {s.name}
-                      <ArrowUpRight size={13} className="shrink-0 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" aria-hidden />
-                    </span>
-                    <span className="mt-0.5 block text-[12px] leading-tight text-ink-3">{s.sub}</span>
+                    <ArrowUpRight size={13} aria-hidden />
                   </Link>
                 </li>
               )
@@ -224,7 +271,7 @@ function ConnectionMap({ sel, onSelect }: { sel: string; onSelect: (n: string) =
                   onMouseLeave={() => setHovered(null)}
                   onFocus={() => setHovered(t.key)}
                   onBlur={() => setHovered(null)}
-                  onClick={() => { setPinned((p) => (p === t.key ? null : t.key)); setHovered(null) }}
+                  onClick={() => { onTrace({ kind: 'term', key: t.key }); setHovered(null) }}
                   aria-pressed={pinned === t.key}
                   aria-label={`${t.name}: ${MODULES.filter((m) => m.terms.includes(t.key)).length} modules raise it. ${pinned === t.key ? 'Click to clear the trace.' : 'Click to pin the trace.'}`}
                   // always an opaque box, so a line routed across the column (Commerce, Trust centre) passes behind it;
@@ -262,17 +309,68 @@ function ConnectionMap({ sel, onSelect }: { sel: string; onSelect: (n: string) =
         </div>
       </div>
       <p className="mt-6 border-t border-line pt-4 text-[13px] text-ink-3">
-        Lines show what each module raises. {pinned ? <>Tracing <span className="text-ink">{TERMS.find((t) => t.key === pinned)!.name}</span>: click it again to clear. </> : null}Commerce and the trust centre raise no term: they fund the loop and earn the right to measure it, so they connect straight to their outcome. Outcome figures are specimen, from the scoreboard.
+        Lines show what each module raises. {pinned ? <>Tracing <span className="text-ink">{termName(pinned)}</span> back to the <span className="num">{MODULES.filter((m) => m.terms.includes(pinned)).length}</span> modules that raise it: click it again to clear. </> : null}{pinnedSurface ? <>Tracing <span className="text-ink">{surfaceName(pinnedSurface)}</span> to the <span className="num">{MODULES.filter((m) => m.surfaces.includes(pinnedSurface)).length}</span> modules it carries: click it again to clear, or the arrow to open it. </> : null}Commerce and the trust centre raise no term: they fund the loop and earn the right to measure it, so they connect straight to their outcome. Outcome figures are specimen, from the scoreboard.
       </p>
     </div>
   )
 }
 
 // ─── Mobile: a compact picker instead of the line map ────────────────────────
-function MobileModulePicker({ sel, onSelect }: { sel: string; onSelect: (n: string) => void }) {
+// Below lg the line map is hidden, so the picker carries both traces: a term back to the
+// modules that raise it, and a surface or console to the modules it carries.
+function MobileModulePicker({ sel, onSelect, trace, onTrace }: { sel: string; onSelect: (n: string) => void; trace: Trace; onTrace: (t: Trace) => void }) {
+  const hits = trace ? modulesFor(trace) : null
+  const lit = (m: Module) => !hits || hits.includes(m)
   return (
     <div className="mt-5 lg:hidden">
-      <p id="module-pick-h" className="eyebrow text-ink-3">Fourteen modules</p>
+      <div id="module-trace" className="scroll-mt-24 rounded-card border border-line p-4">
+        <p id="trace-term-h" className="eyebrow text-ink-3">Trace a term back to its modules</p>
+        <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-labelledby="trace-term-h">
+          {TERMS.map((t) => {
+            const on = trace?.kind === 'term' && trace.key === t.key
+            const n = MODULES.filter((m) => m.terms.includes(t.key)).length
+            return <TermTraceButton key={t.key} term={t.key} pressed={on} onClick={() => onTrace({ kind: 'term', key: t.key })} label={`${t.name}: ${n} modules raise it. ${on ? 'Press to clear the trace.' : 'Press to trace it.'}`} />
+          })}
+        </div>
+        <p id="trace-surface-h" className="eyebrow mt-4 text-ink-3">Or a surface to the modules it carries</p>
+        <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-labelledby="trace-surface-h">
+          {SURFACES.map((sf) => {
+            const on = trace?.kind === 'surface' && trace.key === sf.key
+            return (
+              <button
+                key={sf.key}
+                type="button"
+                aria-pressed={on}
+                onClick={() => onTrace({ kind: 'surface', key: sf.key })}
+                className={clsx('rounded-full border px-2.5 py-1 text-[13px] text-ink transition-colors focus-ring', on ? 'border-ink bg-paper-sunk' : 'border-line bg-paper-raised hover:border-line-strong')}
+              >
+                {sf.name}
+              </button>
+            )
+          })}
+        </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line pt-3" aria-live="polite">
+          <p className="text-[14px] text-ink-2">
+            {!trace || !hits ? (
+              'Nothing traced: every module shows.'
+            ) : trace.kind === 'term' ? (
+              <><span className="text-ink">{termName(trace.key)}</span> is raised by <span className="num">{hits.length}</span> of <span className="num">14</span> modules.</>
+            ) : (
+              <><span className="text-ink">{surfaceName(trace.key)}</span> carries <span className="num">{hits.length}</span> of <span className="num">14</span> modules.</>
+            )}
+          </p>
+          {trace && (
+            <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              {trace.kind === 'surface' && (() => {
+                const sf = SURFACES.find((x) => x.key === trace.key)!
+                return <OpenSurface to={sf.to} name={sf.name} />
+              })()}
+              <button type="button" onClick={() => onTrace(trace)} className="link whitespace-nowrap text-[14px] focus-ring">Clear the trace</button>
+            </span>
+          )}
+        </div>
+      </div>
+      <p id="module-pick-h" className="eyebrow mt-5 text-ink-3">Fourteen modules</p>
       <ul className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2" aria-labelledby="module-pick-h">
         {MODULES.map((m) => {
           const on = m.n === sel
@@ -284,10 +382,14 @@ function MobileModulePicker({ sel, onSelect }: { sel: string; onSelect: (n: stri
                   onSelect(m.n)
                   document.getElementById('module-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
                 }}
-                className={clsx('flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left text-[15px] focus-ring', on ? 'border-ink bg-ink text-paper' : 'border-line text-ink')}
+                className={clsx('flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left text-[15px] transition-opacity duration-200 focus-ring', on ? 'border-ink bg-ink text-paper' : lit(m) && hits ? 'border-ink text-ink' : 'border-line text-ink', !lit(m) && !on && 'opacity-40')}
               >
                 <span className={clsx('num text-[12px]', on ? 'text-paper/70' : 'text-ink-3')}>{m.n}</span>
-                <span className="flex-1">{m.name}</span>
+                <span className="flex-1">
+                  {m.name}
+                  {hits && <span className="sr-only">{lit(m) ? ' · in the trace' : ' · not in the trace'}</span>}
+                  <span className="sr-only">{m.terms.length === 0 ? ' · raises no term' : ` · raises ${m.terms.map(termName).join(', ')}`}</span>
+                </span>
                 <span className="flex gap-0.5" aria-hidden>{m.terms.length === 0 ? <span className={clsx('eyebrow !text-[10px]', on ? 'text-paper/70' : 'text-ink-3')}>No term</span> : m.terms.slice(0, 6).map((t) => <TermDot key={t} term={t} size={7} />)}</span>
               </button>
             </li>
@@ -298,10 +400,18 @@ function MobileModulePicker({ sel, onSelect }: { sel: string; onSelect: (n: stri
   )
 }
 
-// ─── The module's detail card ────────────────────────────────────────────────
-function ModuleDetail({ mod }: { mod: Module }) {
+function OpenSurface({ to, name }: { to: string; name: string }) {
   const enterAs = useEnterAs()
-  const allSix = mod.terms.length === 6
+  return (
+    <Link to={to} onClick={() => enterAs(to)} className="inline-flex items-center gap-1 whitespace-nowrap text-[14px] text-ink underline-offset-4 hover:underline focus-ring">
+      Open {name} <ArrowUpRight size={14} aria-hidden />
+    </Link>
+  )
+}
+
+// ─── The module's detail card ────────────────────────────────────────────────
+function ModuleDetail({ mod, trace, onTraceTerm }: { mod: Module; trace: Trace; onTraceTerm: (k: TermKey) => void }) {
+  const enterAs = useEnterAs()
   return (
     <div id="module-detail" className="scroll-mt-24" aria-live="polite">
       <AnimatePresence mode="wait">
@@ -318,8 +428,13 @@ function ModuleDetail({ mod }: { mod: Module }) {
                 <p className="eyebrow text-ink-3">Terms it answers to · {mod.termNote}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {mod.terms.length === 0 && <span className="text-[15px] text-ink-2">None directly.</span>}
-                  {allSix ? <TermLabel term="ALL" /> : mod.terms.map((t) => <TermLabel key={t} term={t} />)}
+                  {/* each term is a control: it traces the term back to every module that raises it */}
+                  {mod.terms.map((t) => {
+                    const on = trace?.kind === 'term' && trace.key === t
+                    return <TermTraceButton key={t} term={t} pressed={on} onClick={() => onTraceTerm(t)} label={`${termName(t)}: ${on ? 'clear the trace' : 'trace it back to every module that raises it'}`} />
+                  })}
                 </div>
+                {mod.terms.length > 0 && <p className="mt-2 text-[13px] text-ink-3">Choose a term to trace it back to every module that raises it.</p>}
               </div>
             </div>
 

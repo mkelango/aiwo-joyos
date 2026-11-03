@@ -2,6 +2,7 @@ import { router } from 'expo-router'
 import { useMemo, useState } from 'react'
 import { Linking, Pressable, View } from 'react-native'
 import {
+  BandLabel,
   Body,
   Button,
   Card,
@@ -11,6 +12,7 @@ import {
   Icon,
   Meta,
   Mono,
+  Numeral,
   Progress,
   Screen,
   ScreenHeader,
@@ -19,13 +21,16 @@ import {
   Title,
 } from '@/components'
 import { useApp } from '@/lib/store'
-import { SITTINGS, type InstrumentBlock, type SampleItem } from '@/screens/a/coreData'
+import { ALL_ITEMS, SITTINGS, scaleOf, type FlatItem } from '@/shared/indexItems'
+import { scoreAnswers, toMeasured, type MeasuredIndex, type SittingResult } from '@/shared/indexScoring'
+import { bandFor } from '@/shared/indexEngine'
+import { SPACE_TODAY } from '@/screens/a/spacesData'
 import { H2, useLocal } from '@/screens/a/local'
 import { OptionRow } from '@/screens/a/parts'
 import { termByKey } from '@/shared/terms'
 import { useTheme } from '@/theme/ThemeProvider'
 import { memberOnly } from '@/screens/b/parts'
-import { INSTRUMENT_NOTE, useDict, useLang } from '@/lib/i18n'
+import { INSTRUMENT_NOTE, useDict, useLang, useTermText } from '@/lib/i18n'
 import { TAKE } from '@/screens/b/i18n/indexTake'
 import { useCommon } from '@/screens/b/i18n/common'
 import { txFor } from '@/screens/a/i18n'
@@ -33,7 +38,9 @@ import { txFor } from '@/screens/a/i18n'
 // TAKE THE INDEX (Memo p.10–11; Plan §4B): two sittings of about ten minutes, organised by
 // instrument (a short intro before each one), one item per screen, progress always visible,
 // pause any time (kept on the phone, offline-first, survives a reload), a care threshold on
-// the PHQ-4 items, and a review before sending.
+// the PHQ-4 items, and a review before sending. The full bank (62 items, every instrument
+// complete) is administered and scored on the phone by the same engine as the result screen;
+// the result is kept as useLocal('measuredIndex') for Index result and Practice.
 
 type Step =
   | { kind: 'intro' }
@@ -43,12 +50,7 @@ type Step =
   | { kind: 'review' }
   | { kind: 'paused' }
   | { kind: 'done' }
-interface Flat {
-  sitting: 1 | 2
-  sittingTitle: string
-  block: InstrumentBlock
-  item: SampleItem
-}
+type Flat = FlatItem
 interface Saved {
   answers: Record<string, number>
   /** Instruments whose intro has been seen. */
@@ -57,22 +59,23 @@ interface Saved {
   at: number | null
 }
 const EMPTY: Saved = { answers: {}, seen: [], at: null }
-const PHQ_IDS = ['phq-26', 'phq-27']
+/** PHQ-4 care threshold: either two-item subscale (anxiety 24–25, mood 26–27) at 3 or more. */
+const phqOver = (a: Record<string, number>) => (a['phq-24'] ?? 0) + (a['phq-25'] ?? 0) >= 3 || (a['phq-26'] ?? 0) + (a['phq-27'] ?? 0) >= 3
 
 export default memberOnly(TakeIndex)
 
 function TakeIndex() {
   const { c, space } = useTheme()
-  const { offline, setCrisisOpen } = useApp()
+  const { offline, setCrisisOpen, queueSync } = useApp()
+  const tt = useTermText()
+  const [, setMeasured] = useLocal<MeasuredIndex>('measuredIndex', null)
+  const [result, setResult] = useState<SittingResult | null>(null)
   const t = useDict(TAKE)
   const tc = useCommon()
   const lang = useLang()
   const ax = (x: string) => txFor(lang, x)
   const note = lang !== 'en' ? <Meta size={14} tone="ink3">{INSTRUMENT_NOTE[lang]}</Meta> : null
-  const items = useMemo<Flat[]>(
-    () => SITTINGS.flatMap((s) => s.blocks.flatMap((b) => b.sample.map((item) => ({ sitting: s.n, sittingTitle: s.title, block: b, item })))),
-    [],
-  )
+  const items = useMemo<Flat[]>(() => ALL_ITEMS, [])
   const totalItems = SITTINGS.reduce((a, s) => a + s.total, 0)
   const firstOf2 = items.findIndex((x) => x.sitting === 2)
   const [step, setStep] = useState<Step>({ kind: 'intro' })
@@ -81,8 +84,8 @@ function TakeIndex() {
   const [sentCare, setSentCare] = useState(false)
   const { answers, seen } = saved
   const answered = items.filter((x) => answers[x.item.id] !== undefined).length
-  // Care threshold: both PHQ-4 items at "more than half the days" or worse.
-  const phqHigh = PHQ_IDS.every((id) => (answers[id] ?? 0) >= 2)
+  // Care threshold on the PHQ-4 answers so far.
+  const phqHigh = phqOver(answers)
 
   const setAnswer = (id: string, v: number, at: number) => setSaved((s) => ({ ...s, answers: { ...s.answers, [id]: v }, at }))
   const keepAt = (at: number | null) => setSaved((s) => ({ ...s, at }))
@@ -189,7 +192,7 @@ function TakeIndex() {
             <Meta style={{ flex: 1 }}>{t('threshold')}</Meta>
           </View>
         </Card>
-        <Meta tone="ink3">{t('specimenShows', { n: items.length, total: totalItems })}</Meta>
+        <Meta tone="ink3">{t('allItems', { total: totalItems })}</Meta>
         <View style={{ gap: space.s1 }}>
           <DaybreakButton onPress={() => goTo(resuming ? resumeAt() : 0)}>{resuming ? t('pickUp') : t('begin1')}</DaybreakButton>
           {resuming ? (
@@ -249,7 +252,7 @@ function TakeIndex() {
           <Divider />
           {[
             [t('kTimeframe'), b.timeframe],
-            [t('kItems'), t('itemsVal', { items: b.items, here })],
+            [t('kItems'), here === b.items ? t('itemsFull', { items: b.items }) : t('itemsVal', { items: b.items, here })],
             [t('kTime'), t('timeVal', { min: b.minutes })],
             [t('kSource'), b.attribution],
           ].map(([k, v]) => (
@@ -322,7 +325,7 @@ function TakeIndex() {
         </View>
 
         <View accessibilityRole="radiogroup" accessibilityLabel={f.item.text} style={{ gap: space.s1 }}>
-          {f.block.scale.map((o) => (
+          {scaleOf(f.block, f.item).map((o) => (
             <OptionRow key={o.value} label={o.label} selected={value === o.value} onPress={() => setAnswer(f.item.id, o.value, i)} />
           ))}
         </View>
@@ -431,7 +434,7 @@ function TakeIndex() {
               .filter(({ f }) => f.sitting === s.n)
               .map(({ f, idx }, j) => {
                 const v = answers[f.item.id]
-                const label = f.block.scale.find((o) => o.value === v)?.label ?? t('notAnswered')
+                const label = scaleOf(f.block, f.item).find((o) => o.value === v)?.label ?? t('notAnswered')
                 return (
                   <View key={f.item.id}>
                     {j > 0 ? <Divider /> : null}
@@ -465,7 +468,13 @@ function TakeIndex() {
         <View style={{ gap: space.s1 }}>
           <DaybreakButton
             onPress={() => {
-              setSentCare(phqHigh)
+              // Scored here by the engine and kept on the phone: the newest entry on Index result.
+              const r = scoreAnswers(answers)
+              setMeasured(toMeasured(r, SPACE_TODAY))
+              setResult(r)
+              // Offline: the sitting waits in the sync queue (the app-wide banner counts it).
+              queueSync({ id: `index-${SPACE_TODAY}`, kind: 'index' })
+              setSentCare(r.phqFlag || phqHigh)
               setStep({ kind: 'done' })
               setSaved(EMPTY)
             }}
@@ -505,6 +514,20 @@ function TakeIndex() {
           {t('whatNextBody')}
         </Meta>
       </Card>
+      {result ? (
+        <Card tone="raised" style={{ gap: space.s1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.s2 }}>
+            <Numeral size={64} accessibilityLabel={t('resultIdxA11y', { v: result.engine.value })}>
+              {result.engine.value}
+            </Numeral>
+            <View style={{ paddingBottom: 8 }}>
+              <BandLabel band={bandFor(result.engine.value)} />
+            </View>
+          </View>
+          <Meta>{t('resultLine', { v: result.engine.value, name: tt.name(result.lowest) })}</Meta>
+          {offline ? <Meta size={14} tone="ink3">{t('queuedOffline')}</Meta> : null}
+        </Card>
+      ) : null}
       {sentCare ? careCard : null}
       <View style={{ gap: space.s1 }}>
         <DaybreakButton onPress={() => router.replace('/index-result')}>{t('seeIndex')}</DaybreakButton>

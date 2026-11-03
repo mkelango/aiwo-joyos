@@ -64,6 +64,26 @@ export const DEV = {
   disconnected: { en: '{name} disconnected.', ta: '{name} துண்டிக்கப்பட்டது.', hi: '{name} डिस्कनेक्ट हो गया।' },
   stopReading: { en: 'We stop reading new data within a minute. What we already have stays in your record unless you ask us to erase it in the Trust centre.', ta: 'ஒரு நிமிடத்துக்குள் புதிய தரவைப் படிப்பதை நிறுத்துவோம். ஏற்கெனவே உள்ளவை, நம்பிக்கை மையத்தில் நீங்கள் அழிக்கச் சொல்லும் வரை உங்கள் பதிவில் இருக்கும்.', hi: 'हम एक मिनट में नया डेटा पढ़ना बंद कर देंगे। जो पहले से है, वह आपके रिकॉर्ड में रहेगा, जब तक आप ट्रस्ट सेंटर से उसे मिटाने को न कहें।' },
   devices: { en: 'Devices', ta: 'சாதனங்கள்', hi: 'डिवाइस' },
+  // The watch: a Joy Ledger complication with a quick add (simulated watch)
+  watchTitle: { en: 'On your watch', ta: 'உங்கள் கைக்கடிகாரத்தில்', hi: 'आपकी घड़ी पर' },
+  watchBody: { en: 'A Joy Ledger complication on the watch face: tap it, choose where the moment came from, done. It goes into the same Ledger as the phone.', ta: 'கடிகார முகப்பில் ஒரு ஜாய் லெட்ஜர் குறுக்குவழி: தட்டுங்கள், அந்தத் தருணம் எங்கிருந்து வந்தது என்று தேர்ந்தெடுங்கள், முடிந்தது. அது தொலைபேசியின் அதே லெட்ஜரில் சேரும்.', hi: 'घड़ी के चेहरे पर जॉय लेजर का शॉर्टकट: टैप करें, चुनें कि पल कहाँ से आया, हो गया। यह फ़ोन वाले उसी लेजर में जाता है।' },
+  watchSpecimen: { en: 'Simulated watch · specimen', ta: 'உருவகப்படுத்தப்பட்ட கடிகாரம் · மாதிரி', hi: 'नक़ली घड़ी · नमूना' },
+  complication: { en: 'Joy Ledger on the watch face', ta: 'கடிகார முகப்பில் ஜாய் லெட்ஜர்', hi: 'घड़ी के चेहरे पर जॉय लेजर' },
+  complicationD: { en: 'Shows today’s moments and adds one with a tap. Nothing else from Joy OS appears on the watch.', ta: 'இன்றைய தருணங்களைக் காட்டி, ஒரு தட்டலில் ஒன்றைச் சேர்க்கும். Joy OS-இலிருந்து வேறு எதுவும் கடிகாரத்தில் தோன்றாது.', hi: 'आज के पल दिखाता है और एक टैप में एक जोड़ता है। Joy OS का और कुछ घड़ी पर नहीं दिखता।' },
+  watchLedger: { en: 'Joy Ledger', ta: 'ஜாய் லெட்ஜர்', hi: 'जॉय लेजर' },
+  watchToday1: { en: 'one today', ta: 'இன்று ஒன்று', hi: 'आज एक' },
+  watchTodayN: { en: '{n} today', ta: 'இன்று {n}', hi: 'आज {n}' },
+  watchToday0: { en: 'none yet today', ta: 'இன்று இன்னும் இல்லை', hi: 'आज अभी कोई नहीं' },
+  watchAsk: { en: 'Anything good?', ta: 'ஏதாவது நல்லது?', hi: 'कुछ अच्छा?' },
+  watchTap: { en: 'Tap to add', ta: 'சேர்க்கத் தட்டுங்கள்', hi: 'जोड़ने के लिए टैप करें' },
+  watchKept: { en: 'Kept · {tag}', ta: 'வைக்கப்பட்டது · {tag}', hi: 'रख लिया · {tag}' },
+  watchOff: { en: 'The complication is off. Turn it on to add moments from the wrist.', ta: 'குறுக்குவழி அணைக்கப்பட்டுள்ளது. மணிக்கட்டிலிருந்து தருணங்களைச் சேர்க்க இயக்குங்கள்.', hi: 'शॉर्टकट बंद है। कलाई से पल जोड़ने के लिए इसे चालू करें।' },
+  watchA11y: { en: 'Simulated watch face. Joy Ledger, {count}.', ta: 'உருவகப்படுத்தப்பட்ட கடிகார முகப்பு. ஜாய் லெட்ஜர், {count}.', hi: 'नक़ली घड़ी का चेहरा। जॉय लेजर, {count}।' },
+  watchOpen: { en: 'Add a moment from the watch', ta: 'கடிகாரத்திலிருந்து ஒரு தருணத்தைச் சேர்', hi: 'घड़ी से एक पल जोड़ें' },
+  watchAddTag: { en: 'Add a Ledger moment: {tag}', ta: 'லெட்ஜர் தருணம் சேர்: {tag}', hi: 'लेजर में पल जोड़ें: {tag}' },
+  watchCancel: { en: 'Back to the watch face', ta: 'கடிகார முகப்புக்குத் திரும்பு', hi: 'घड़ी के चेहरे पर लौटें' },
+  watchSaved: { en: 'Added to your Ledger: {tag}. It is on the phone too.', ta: 'உங்கள் லெட்ஜரில் சேர்க்கப்பட்டது: {tag}. தொலைபேசியிலும் உள்ளது.', hi: 'आपके लेजर में जुड़ा: {tag}। यह फ़ोन पर भी है।' },
+  openLedger: { en: 'Open the Ledger', ta: 'லெட்ஜரைத் திற', hi: 'लेजर खोलें' },
 } satisfies Dict
 
 export const DEVICE_NOTE: Record<string, { via?: L3; note: L3; lastSync?: L3 }> = {

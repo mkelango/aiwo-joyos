@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, BookOpen, Check, Clock, MapPin, ShieldCheck, Sparkles } from 'lucide-react'
-import { useId, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { BandLabel, Delta, Eyebrow, MethodLine, SpecimenTag, TermDot } from '@/components/joy/primitives'
@@ -11,9 +11,9 @@ import { interceptsCrisis, useApp } from '@/lib/store'
 import { CATIONS, PRACTICE_WEEKS } from '@/data/platform'
 import { termByKey, termColor } from '@/data/terms'
 import type { TermKey } from '@/domain/types'
-import { ROOM_VERDICT, VIVA_DRAFT, actionsFor, termHistory } from './_data'
+import { LE8, LE8_KEY, LE8_LOG_START, ROOM_VERDICT, VIVA_DRAFT, VIVA_MATCH, VIVA_MORE, actionsFor, le8Latest, le8Score, termHistory, type Le8Key } from './_data'
 import { useSpaceText } from './_i18n'
-import { useSpaceState } from './_state'
+import { readSpaceState, useSpaceState } from './_state'
 
 // Shared shell for the six spaces (Memo p.19): the term, its score with method,
 // its 90-day history, what moves it, three actions, the VIVA tool, the lead
@@ -262,6 +262,7 @@ function ThreeActions({ term }: { term: TermKey }) {
   const { t: tx, tt, d } = useSpaceText()
   const [added, setAdded] = useSpaceState<Record<string, boolean>>(`actions.${term}.added.v1`, {})
   const [open, setOpen] = useState<string | null>(null)
+  const addedCount = actions.filter((a) => added[a.id]).length
   return (
     <ToolCard eyebrow={tx('sh.threeActions', { name: tt.name(term) })} sub={tx('sh.threeSub')}>
       <ul className="divide-y divide-line">
@@ -294,42 +295,104 @@ function ThreeActions({ term }: { term: TermKey }) {
           </li>
         ))}
       </ul>
+      {addedCount > 0 && (
+        // Added actions join Today's pool (Today reads this same record); the card says so and links there.
+        <p role="status" className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-4 text-[14px] text-ink-2">
+          <span className="inline-flex items-center gap-1.5"><Check size={14} aria-hidden /> {tx('sh.inToday', { n: addedCount })}</span>
+          <Link to="/app" className="inline-flex items-center gap-1 rounded text-ink underline-offset-4 hover:underline focus-ring">{tx('sh.seeToday')} <ArrowRight size={14} /></Link>
+        </p>
+      )}
     </ToolCard>
   )
 }
 
+type VivaDraft = { tool: string; ask: string; draft: string; reviewer: string }
+/** One turn in the space's VIVA card: what was asked (the member's own words or a canned prompt) and the draft. */
+type VivaTurn = { ask: string; text: string; by: string }
+
 function VivaTool({ term }: { term: TermKey }) {
   const t = termByKey(term)
   const { t: tx, d: dx } = useSpaceText()
-  const d = VIVA_DRAFT[term]
+  const guard = useCrisisGuard()
+  // Every named tool that can be asked here: the space's first draft, then its second tool.
+  const drafts = [VIVA_DRAFT[term], ...VIVA_MORE[term]].filter(Boolean) as VivaDraft[]
   const [state, setState] = useState<'idle' | 'drafting' | 'shown'>('idle')
-  const ask = () => {
-    setState('drafting')
-    window.setTimeout(() => setState('shown'), 700)
+  const [turn, setTurn] = useState<VivaTurn | null>(null)
+  const [q, setQ] = useState('')
+  const [err, setErr] = useState(false)
+  const timer = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+
+  /** The draft's words. le8_coach reads the LE8 log Body saved, so it names the two lowest of the eight. */
+  const draftText = (dr: VivaDraft) => {
+    if (dr.tool !== 'le8_coach') return dx(dr.draft)
+    const latest = le8Latest(readSpaceState(LE8_KEY, { log: LE8_LOG_START }).log)
+    const ranked = LE8.map((m) => ({ name: m.name, r: latest[m.key as Le8Key] }))
+      .filter((x) => x.r)
+      .map((x) => ({ name: x.name, score: le8Score(x.r!.key, x.r!.v) }))
+      .sort((a, b) => a.score - b.score)
+    const [a, b] = ranked
+    return tx('sh.viva.le8', { a: dx(a.name), sa: a.score, b: dx(b.name), sb: b.score })
   }
+  const run = (next: VivaTurn) => {
+    setTurn(next)
+    setState('drafting')
+    window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => setState('shown'), 700)
+  }
+  const askTool = (dr: VivaDraft) => run({ ask: dx(dr.ask), text: draftText(dr), by: tx('sh.draftedBy', { tool: dr.tool, reviewer: dx(dr.reviewer) }) })
+  const askOwn = () => {
+    const v = q.trim()
+    if (!v) return setErr(true)
+    // The emergency intercept reads the question before VIVA does.
+    if (guard(v)) return
+    const hit = drafts.find((dr) => VIVA_MATCH[dr.tool]?.test(v))
+    run(hit
+      ? { ask: v, text: draftText(hit), by: tx('sh.draftedBy', { tool: hit.tool, reviewer: dx(hit.reviewer) }) }
+      : { ask: v, text: tx('sh.viva.generic', { tools: t.viva.map(dx).join(', ') }), by: tx('sh.viva.genericBy') })
+    setQ(''); setErr(false)
+  }
+  const reset = () => { window.clearTimeout(timer.current); setState('idle'); setTurn(null) }
   return (
     <ToolCard eyebrow={tx('sh.viva')} tone="sunk" aside={<Sparkles size={16} className="text-ink-3" aria-hidden />}>
       <div className="flex flex-wrap gap-1.5">
         {t.viva.map((v) => <span key={v} className="rounded-full bg-paper-raised px-2.5 py-1 font-mono text-[12px] text-ink-2">{dx(v)}</span>)}
       </div>
-      {d ? (
+      {drafts.length ? (
         <>
           {state === 'idle' && (
-            <button onClick={ask} className="mt-4 rounded-2xl border border-line bg-paper-raised px-4 py-3 text-left text-[15px] text-ink hover:border-line-strong focus-ring">
-              “{dx(d.ask)}”
-              <span className="eyebrow mt-1 block text-ink-3">{tx('sh.tapToAsk', { tool: d.tool })}</span>
-            </button>
+            <div className="mt-4 space-y-2">
+              {drafts.map((dr) => (
+                <button key={dr.tool} onClick={() => askTool(dr)} className="block w-full rounded-2xl border border-line bg-paper-raised px-4 py-3 text-left text-[15px] text-ink hover:border-line-strong focus-ring">
+                  “{dx(dr.ask)}”
+                  <span className="eyebrow mt-1 block text-ink-3">{tx('sh.tapToAsk', { tool: dr.tool })}</span>
+                </button>
+              ))}
+              <form onSubmit={(e) => { e.preventDefault(); askOwn() }} className="pt-2">
+                <label className="block">
+                  <span className="text-[13px] text-ink-2">{tx('sh.viva.askOwn')}</span>
+                  <span className="mt-1.5 flex gap-2">
+                    <input value={q} onChange={(e) => { setQ(e.target.value); setErr(false) }} placeholder={tx('sh.viva.placeholder')} aria-invalid={err} aria-describedby={err ? `viva-err-${term}` : undefined} className="h-11 min-w-0 flex-1 rounded-xl border border-line-strong bg-paper-raised px-3.5 text-[15px] text-ink placeholder:text-ink-3 focus-ring" />
+                    <Button type="submit" size="sm" variant="secondary" className="h-11 shrink-0">{tx('sh.viva.send')}</Button>
+                  </span>
+                </label>
+                {err && <p id={`viva-err-${term}`} role="alert" className="mt-1.5 text-[13px] text-error">{tx('sh.viva.empty')}</p>}
+              </form>
+            </div>
           )}
-          {state !== 'idle' && (
+          {state !== 'idle' && turn && (
             <div className="mt-4 space-y-3" aria-live="polite">
-              <p className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-ink px-4 py-2.5 text-[15px] text-paper">{dx(d.ask)}</p>
+              <p className="ml-auto max-w-[85%] break-words rounded-2xl rounded-br-md bg-ink px-4 py-2.5 text-[15px] text-paper">{turn.ask}</p>
               {state === 'drafting' ? (
                 <p className="eyebrow text-ink-3">{tx('sh.drafting')}</p>
               ) : (
-                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24 }} className="rounded-2xl rounded-bl-md bg-paper-raised p-4">
-                  <p className="text-[15px] leading-relaxed text-ink">{dx(d.draft)}</p>
-                  <p className="eyebrow mt-3 break-words text-ink-3">{tx('sh.draftedBy', { tool: d.tool, reviewer: dx(d.reviewer) })}</p>
-                </motion.div>
+                <>
+                  <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24 }} className="rounded-2xl rounded-bl-md bg-paper-raised p-4">
+                    <p className="text-[15px] leading-relaxed text-ink">{turn.text}</p>
+                    <p className="eyebrow mt-3 break-words text-ink-3">{turn.by}</p>
+                  </motion.div>
+                  <Button size="sm" variant="ghost" onClick={reset}>{tx('sh.viva.again')}</Button>
+                </>
               )}
             </div>
           )}

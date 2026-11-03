@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDict } from '../lib/i18n'
+import { useReduceMotion } from '../lib/store'
 import { useTheme } from '../theme/ThemeProvider'
 import { KIT } from './_i18n'
 import { Icon } from './Icon'
@@ -15,8 +16,9 @@ export function Sheet({ open, onClose, title, children, footer }: { open: boolea
   const { c, radius, space } = useTheme()
   const insets = useSafeAreaInsets()
   const t = useDict(KIT)
+  const reduce = useReduceMotion()
   return (
-    <Modal visible={open} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible={open} transparent animationType={reduce ? 'none' : 'fade'} onRequestClose={onClose} statusBarTranslucent>
       {/* The keyboard must not cover a Field in the sheet or its footer button. iOS needs the padding;
           on Android the Modal window already resizes for the keyboard. */}
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>

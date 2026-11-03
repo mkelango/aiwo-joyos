@@ -8,7 +8,9 @@ import { Button, Card, EmptyState, PageHeader, Pill, SectionTitle } from '@/comp
 import { CIRCLE, PRACTICE_WEEKS } from '@/data/platform'
 import { INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
 import { PRACTICE_CONTENT } from './_data'
-import { AudioPlayer, PrimaryChip, Quote, fade } from './_parts'
+import { AudioPlayer, PrimaryChip, Quote, fade, useAfterIndex } from './_parts'
+// One shared emergency intercept for every member free-text field (Memo p.24).
+import { useCrisisGuard } from '@/routes/member/spaces/_SpaceShell'
 import { addDays, isoDate, practisedToday, saveReflection, setWeekPractised, togglePractisedToday, useJourney, weekPractised } from './_store'
 import { useJ, type JourneyKey } from './_i18n'
 
@@ -33,6 +35,9 @@ function WeekView({ n }: { n: string }) {
   const [savedAt, setSavedAt] = useState<string | null>(saved?.savedAt ?? null)
   const coachFirst = TEAM.find((p) => p.role === 'Coach')!.name.split(' ')[0]
   const [error, setError] = useState<'' | JourneyKey>('')
+  const [held, setHeld] = useState(false)
+  const guard = useCrisisGuard()
+  const after = useAfterIndex()
   const { t, r, tx, term, en } = useJ()
   const fmtDate = useFmtDate()
 
@@ -59,6 +64,9 @@ function WeekView({ n }: { n: string }) {
   const remeasureOpens = addDays(MEMBER.loopStarted, 76)
 
   const save = () => {
+    // Emergency intercept first: nothing is saved until support has been offered.
+    if (guard(reflection)) { setError(''); setHeld(true); return }
+    setHeld(false)
     if (reflection.trim().length < 3) { setError('errFewWords'); return }
     setError('')
     const at = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
@@ -110,7 +118,7 @@ function WeekView({ n }: { n: string }) {
                 rows={5}
                 maxLength={MAX}
                 value={reflection}
-                onChange={(e) => { setReflection(e.target.value); setSavedAt(null); setError('') }}
+                onChange={(e) => { setReflection(e.target.value); setSavedAt(null); setError(''); setHeld(false) }}
                 placeholder={t('reflPh')}
                 aria-describedby={`${id}-hint`}
                 className="mt-4 w-full resize-y rounded-card border border-line-strong bg-paper-raised px-4 py-3 text-[17px] leading-relaxed text-ink placeholder:text-ink-3 focus-ring"
@@ -120,6 +128,7 @@ function WeekView({ n }: { n: string }) {
                 <span className="num text-[12px] text-ink-3">{reflection.length}/{MAX}</span>
               </div>
               {error && <p className="mt-2 text-[13px] text-error" role="alert">{t(error)}</p>}
+              {held && <p className="mt-2 text-[14px] text-ink-2" role="status">{t('heldForSupport')}</p>}
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <Button variant="secondary" onClick={save}>{t('saveReflection')}</Button>
                 {savedAt && <span className="flex items-center gap-1.5 text-[14px] text-ink-2" role="status"><Check size={15} /> {r('savedAt', { t: { n: savedAt } })}</span>}
@@ -173,24 +182,27 @@ function WeekView({ n }: { n: string }) {
                 <span className="eyebrow text-right text-ink-3">{t('after')}</span>
                 <span className="text-ink">{t('joyspanIndex')}</span>
                 <span className="num text-right text-[1.4rem] font-light leading-none text-ink">{before.value}</span>
-                <span className="num text-right text-[1.4rem] font-light leading-none text-ink-3">—</span>
+                <span className={clsx('num text-right text-[1.4rem] font-light leading-none', after.measured ? 'text-ink' : 'text-ink-3')}>{after.ji}</span>
                 {before.terms.map((x) => (
                   <div key={x.key} className="contents">
                     <span className="flex items-center gap-2 border-t border-line pt-2 text-ink-2"><TermDot term={x.key} /> {term.name(x.key)}</span>
                     <span className="num border-t border-line pt-2 text-right text-ink">{x.key === 'B' ? `−${x.value}` : x.value}</span>
-                    <span className="num border-t border-line pt-2 text-right text-ink-3">—</span>
+                    <span className={clsx('num border-t border-line pt-2 text-right', after.value(x.key) === null ? 'text-ink-3' : 'text-ink')}>{after.cell(x.key)}</span>
                   </div>
                 ))}
               </div>
-              <p className="mt-3 text-[13px] text-ink-2">{r('afterFills8', { n: 76, d: day(remeasureOpens) })}</p>
+              {after.measured
+                ? <p className="mt-3 text-[13px] text-ink-2">{t('afterTaken', { d: day(after.measured.takenOn) })}{after.measured.preview && ` ${t('afterPreview')}`}</p>
+                : <p className="mt-3 text-[13px] text-ink-2">{r('afterFills8', { n: 76, d: day(remeasureOpens) })}</p>}
+              {status === 'next' && <p className="mt-2 text-[13px] text-ink-2">{t('retakeEarly', { d: day(opens) })}</p>}
               <MethodLine className="mt-2" method={before.method} grade={before.grade} takenOn={before.takenOn} next={before.nextMeasure} />
               <div className="mt-5 flex flex-col gap-2">
-                {/* One Daybreak: only once today's practice is marked does Re-take become the primary action. */}
-                {status === 'next'
-                  ? <Button variant="secondary" disabled className="w-full"><Lock size={15} /> {t('retakeOpens', { d: day(opens) })}</Button>
-                  : status === 'now' && practised
-                  ? <Link to="/app/index/take" className="btn-daybreak w-full"><RotateCcw size={16} /> {t('retake')}</Link>
-                  : <Link to="/app/index/take" className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-line-strong bg-paper-raised px-4 text-[15px] text-ink hover:bg-paper-sunk focus-ring"><RotateCcw size={16} /> {t('retake')}</Link>}
+                {/* One Daybreak: Re-take is the primary action when the practice card has none
+                    (the week has not opened, so its mark is locked) or once today's practice is marked.
+                    It is never locked: the Index can be re-taken early, and the After column shows the newest sitting. */}
+                {status === 'next' || (status === 'now' && practised)
+                  ? <Link to="/app/index/take" className="btn-daybreak w-full"><RotateCcw size={16} /> {t(after.measured ? 'retakeAgain' : 'retake')}</Link>
+                  : <Link to="/app/index/take" className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-line-strong bg-paper-raised px-4 text-[15px] text-ink hover:bg-paper-sunk focus-ring"><RotateCcw size={16} /> {t(after.measured ? 'retakeAgain' : 'retake')}</Link>}
                 <Link to="/app/care/messages" className="inline-flex h-11 items-center justify-center gap-2 rounded-full px-4 text-[15px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring"><MessageCircle size={16} className="shrink-0" /> {t('planNext', { c: coachFirst })}</Link>
               </div>
             </Card>

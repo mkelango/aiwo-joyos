@@ -6,17 +6,18 @@ import { Link, useNavigate } from 'react-router-dom'
 import { AiwoMark } from '@/components/joy/Brand'
 import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
 import { BandLabel, DaybreakButton, Delta, Eyebrow, MethodLine, SpecimenTag, TermChip, TermDot } from '@/components/joy/primitives'
-import { Button, Card, Progress } from '@/components/ui'
+import { Button, Card, Pill, Progress } from '@/components/ui'
 import { INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
 import { termByKey, termColor } from '@/data/terms'
 import { bandFor } from '@/domain/indexEngine'
 import type { TermKey } from '@/domain/types'
 import { SIGNAL_READINGS, SITTINGS, TERM_DETAIL, type InstrumentBlock, type SampleItem } from './_data'
 import { HumanWritten, Switch } from './_parts'
-import { ORDER, scaleOf, scoreAnswers, signalId, signalSources } from './_scoring'
-import { IN_REMEASURE_WINDOW, REMEASURE_OPENS, SPECIMEN_TODAY, addDays, useMeasured } from './_store'
+import { ALL_SIGNAL_IDS, ORDER, WEARABLE_SIGNAL_IDS, isWearableSignal, scaleOf, scoreAnswers, signalId, signalSources } from './_scoring'
+import { IN_REMEASURE_WINDOW, REMEASURE_OPENS, SPECIMEN_TODAY, addDays, useMeasured, useSignalsDown } from './_store'
 import { BLOCK_TEXT, SIGNAL_READING_TEXT, SIGNAL_SOURCE_TEXT, SITTING_TITLE, fmtLocal, rich, useCore } from './_i18n'
 import { INSTRUMENT_NOTE, useT } from '@/lib/i18n'
+import { useApp } from '@/lib/store'
 
 // TAKE THE INDEX (Memo p.11 "≈60 validated items over two sittings"; Plan §4B).
 // Immersive: MemberLayout hides the chrome on this route. One item per screen,
@@ -85,6 +86,15 @@ export default function TakeIndex() {
   const [cursor, setCursor] = useState(draft?.cursor ?? 0)
   const [answers, setAnswers] = useState<Record<string, number>>(draft?.answers ?? {})
   const [signalsOff, setSignalsOff] = useState<string[]>(draft?.signalsOff ?? [])
+  // Signals down (no device connected on /app/devices): no wearable can be read, so every
+  // wearable signal counts as off and the result is survey-only, whatever its switch said.
+  // Signals logged in the app (Ledger, calendar audit, prompts) keep the member's choice.
+  const signalsDown = useSignalsDown()
+  const effectiveOff = useMemo(
+    () => (signalsDown ? [...new Set([...signalsOff, ...WEARABLE_SIGNAL_IDS])] : signalsOff),
+    [signalsDown, signalsOff],
+  )
+  const { offline, queueSync } = useApp()
   const [confirmed, setConfirmed] = useState<number[]>(draft?.confirmed ?? [])
   const [fromReview, setFromReview] = useState(false)
   const [savedStage, setSavedStage] = useState<'step' | 'review'>('step')
@@ -240,7 +250,8 @@ export default function TakeIndex() {
             {stage === 'step' && step?.type === 'signals' && (
               <SignalsStep
                 sitting={step.s}
-                off={signalsOff}
+                off={effectiveOff}
+                down={signalsDown}
                 fromReview={fromReview}
                 onToggle={(id, on) => setSignalsOff((o) => (on ? o.filter((x) => x !== id) : [...new Set([...o, id])]))}
                 onConfirm={() => {
@@ -255,7 +266,7 @@ export default function TakeIndex() {
               <Review
                 answers={answers}
                 answered={answeredCount}
-                signalsOff={signalsOff}
+                signalsOff={effectiveOff}
                 confirmed={confirmed}
                 onEdit={(id) => {
                   const i = steps.findIndex((s) => s.type === 'item' && s.item.id === id)
@@ -270,8 +281,10 @@ export default function TakeIndex() {
                 onSubmit={() => {
                   // Score and keep the result before the draft is cleared, so leaving
                   // during the scoring animation never loses a finished sitting.
-                  const r = scoreAnswers(answers, signalsOff)
-                  setMeasured({ takenOn: SPECIMEN_TODAY, value: r.engine.value, gm: r.engine.gm, burden: r.engine.burden, terms: r.terms, lowestTerm: r.lowest, preview: !IN_REMEASURE_WINDOW, phqFlag: r.phqFlag })
+                  const r = scoreAnswers(answers, effectiveOff)
+                  setMeasured({ takenOn: SPECIMEN_TODAY, value: r.engine.value, gm: r.engine.gm, burden: r.engine.burden, terms: r.terms, lowestTerm: r.lowest, preview: !IN_REMEASURE_WINDOW, phqFlag: r.phqFlag, surveyOnly: r.surveyOnly })
+                  // Offline: the result is kept here and joins the sync queue the banner counts.
+                  queueSync({ id: `index:${SPECIMEN_TODAY}`, kind: 'index' })
                   writeDraft(null)
                   setDraftSnapshot(null)
                   setStage('scoring')
@@ -282,7 +295,8 @@ export default function TakeIndex() {
             {stage === 'scoring' && (
               <Scoring
                 answers={answers}
-                signalsOff={signalsOff}
+                signalsOff={effectiveOff}
+                offline={offline}
                 onSee={() => navigate(IN_REMEASURE_WINDOW ? '/app/index/day-90' : '/app/index')}
               />
             )}
@@ -486,9 +500,11 @@ function ItemScreen({ block, item, value, fromReview, onAnswer, onNext, onAutoAd
 }
 
 // ─── The signals beside the answers (one per sitting) ───────────────────────
-function SignalsStep({ sitting, off, fromReview, onToggle, onConfirm, onBack }: { sitting: number; off: string[]; fromReview: boolean; onToggle: (id: string, on: boolean) => void; onConfirm: () => void; onBack: () => void }) {
+function SignalsStep({ sitting, off, down, fromReview, onToggle, onConfirm, onBack }: { sitting: number; off: string[]; down: boolean; fromReview: boolean; onToggle: (id: string, on: boolean) => void; onConfirm: () => void; onBack: () => void }) {
   const terms = SITTING_TERMS[sitting]
   const { t: c, name, pick } = useCore()
+  const allOff = ALL_SIGNAL_IDS.every((id) => off.includes(id))
+  const wearableOff = WEARABLE_SIGNAL_IDS.every((id) => off.includes(id))
   return (
     <div className="flex flex-1 flex-col">
       <Eyebrow tone="daybreak">{c('sgEyebrow', { n: sitting + 1 })}</Eyebrow>
@@ -498,6 +514,13 @@ function SignalsStep({ sitting, off, fromReview, onToggle, onConfirm, onBack }: 
       <p className="mt-4 text-[17px] leading-relaxed text-ink-2">
         {c('sgBody')}
       </p>
+      {(down || wearableOff) && (
+        <div role="status" className="mt-5 rounded-card border border-line bg-paper-sunk px-4 py-3">
+          <Pill tone="neutral">{c('soPill')}</Pill>
+          <p className="mt-2 text-[15px] text-ink-2">{c(allOff ? 'soAllOff' : down ? 'soSignalsStep' : 'soWearableOff')}</p>
+          {down && <Link to="/app/devices" className="mt-2 inline-flex items-center gap-1.5 text-[14px] text-ink underline-offset-4 hover:underline focus-ring">{c('soOpenDevices')} <ArrowRight size={14} /></Link>}
+        </div>
+      )}
       <ul className="mt-6 space-y-4">
         {terms.map((k) => {
           const sources = signalSources(k)
@@ -519,6 +542,7 @@ function SignalsStep({ sitting, off, fromReview, onToggle, onConfirm, onBack }: 
                         <li key={id}>
                           <Switch
                             checked={!off.includes(id)}
+                            disabled={down && isWearableSignal(id)}
                             onChange={(v) => onToggle(id, v)}
                             label={pick(SIGNAL_SOURCE_TEXT[src], src)}
                             description={<span className="num">{SIGNAL_READINGS[src] ? pick(SIGNAL_READING_TEXT[src], SIGNAL_READINGS[src]) : c('sgReading')}</span>}
@@ -664,7 +688,7 @@ function Saved({ where, answered, onResume }: { where: string; answered: number;
 }
 
 // ─── Scoring with method v1.0, from the answers, then hand-off to the result ──
-function Scoring({ answers, signalsOff, onSee }: { answers: Record<string, number>; signalsOff: string[]; onSee: () => void }) {
+function Scoring({ answers, signalsOff, offline, onSee }: { answers: Record<string, number>; signalsOff: string[]; offline: boolean; onSee: () => void }) {
   const reduce = useReducedMotion()
   const latest = INDEX_HISTORY[0]
   const result = useMemo(() => scoreAnswers(answers, signalsOff), [answers, signalsOff])
@@ -739,6 +763,13 @@ function Scoring({ answers, signalsOff, onSee }: { answers: Record<string, numbe
                 <MethodLine method={latest.method} grade="index" takenOn={SPECIMEN_TODAY} next={next} />
                 <SpecimenTag />
               </div>
+              {result.surveyOnly && (
+                <div className="mt-4 rounded-card bg-paper-sunk px-4 py-3">
+                  <Pill tone="neutral">{c('soPill')}</Pill>
+                  <p className="mt-2 text-[14px] text-ink-2">{c('soScoring')}</p>
+                </div>
+              )}
+              {offline && <p role="status" className="mt-3 flex items-center gap-2 text-[14px] text-ink-2"><CloudOff size={14} aria-hidden className="shrink-0" /> {c('oqIndex')}</p>}
               {!IN_REMEASURE_WINDOW && (
                 <p className="mt-3 text-[14px] text-ink-2">{rich(c('scPreviewDay'), { d: <span className="num">{MEMBER.dayOfLoop}</span>, v: <span className="num">{latest.value}</span> })}</p>
               )}

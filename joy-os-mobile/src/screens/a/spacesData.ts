@@ -102,16 +102,35 @@ export const DEVICES = [
 ]
 
 export type Le8Status = 'ideal' | 'good' | 'watch'
-export const LE8 = [
-  { key: 'diet', name: 'Diet', score: 70, status: 'good' as Le8Status, reading: 'MEPA 11 of 16', source: 'Self-report' },
-  { key: 'activity', name: 'Physical activity', score: 90, status: 'ideal' as Le8Status, reading: '165 min / week', source: 'Apple Health' },
-  { key: 'nicotine', name: 'Nicotine exposure', score: 100, status: 'ideal' as Le8Status, reading: 'Never', source: 'Self-report' },
-  { key: 'sleep', name: 'Sleep health', score: 70, status: 'good' as Le8Status, reading: '6 h 40 m average', source: 'Oura' },
-  { key: 'bmi', name: 'Body mass index', score: 70, status: 'good' as Le8Status, reading: '26.1 kg/m²', source: 'Clinic' },
-  { key: 'lipids', name: 'Blood lipids', score: 60, status: 'watch' as Le8Status, reading: 'Non-HDL 146 mg/dL', source: 'Panel · Jan' },
-  { key: 'glucose', name: 'Blood glucose', score: 60, status: 'watch' as Le8Status, reading: 'HbA1c 5.8%', source: 'Panel · Jan' },
-  { key: 'bp', name: 'Blood pressure', score: 75, status: 'good' as Le8Status, reading: '128 / 82 mmHg', source: 'Home cuff' },
+export type Le8Key = 'diet' | 'activity' | 'nicotine' | 'sleep' | 'bmi' | 'lipids' | 'glucose' | 'bp'
+/** Scored on AHA Life's Essential 8 (2022), as on the web: MEPA 12–14 → 80; ≥150 min → 100; 120–129 / <80 → 75. */
+export const LE8: { key: Le8Key; name: string; score: number; status: Le8Status; reading: string; source: string }[] = [
+  { key: 'diet', name: 'Diet', score: 80, status: 'good', reading: 'MEPA 12 of 16', source: 'Self-report' },
+  { key: 'activity', name: 'Physical activity', score: 100, status: 'ideal', reading: '165 min / week', source: 'Apple Health' },
+  { key: 'nicotine', name: 'Nicotine exposure', score: 100, status: 'ideal', reading: 'Never', source: 'Self-report' },
+  { key: 'sleep', name: 'Sleep health', score: 70, status: 'good', reading: '6 h 40 m average', source: 'Oura' },
+  { key: 'bmi', name: 'Body mass index', score: 70, status: 'good', reading: '26.1 kg/m²', source: 'Clinic' },
+  { key: 'lipids', name: 'Blood lipids', score: 60, status: 'watch', reading: 'Non-HDL 146 mg/dL', source: 'Panel · Jan' },
+  { key: 'glucose', name: 'Blood glucose', score: 60, status: 'watch', reading: 'HbA1c 5.8%', source: 'Panel · Jan' },
+  { key: 'bp', name: 'Blood pressure', score: 75, status: 'good', reading: '128 / 78 mmHg', source: 'Home cuff' },
 ]
+
+/**
+ * The readings behind each LE8 score, oldest first: the October panel visit, then January.
+ * v is the measure itself (MEPA points, minutes a week, hours a night, kg/m², mg/dL, %, systolic);
+ * v2 is the diastolic for blood pressure. Nicotine: 0 never, 1 quit 5+ years, 2 quit 1–5 years,
+ * 3 quit within a year, 4 current. The last point of each matches LE8 above.
+ */
+export const LE8_SERIES: Record<Le8Key, { at: string; v: number; v2?: number }[]> = {
+  diet: [{ at: '2026-10-03', v: 13 }, { at: '2027-01-02', v: 12 }],
+  activity: [{ at: '2026-10-03', v: 120 }, { at: '2027-01-27', v: 165 }],
+  nicotine: [{ at: '2026-10-03', v: 0 }, { at: '2027-01-02', v: 0 }],
+  sleep: [{ at: '2026-10-03', v: 6.33 }, { at: '2027-01-27', v: 6.67 }],
+  bmi: [{ at: '2026-10-03', v: 26.6 }, { at: '2027-01-21', v: 26.1 }],
+  lipids: [{ at: '2026-10-03', v: 158 }, { at: '2027-01-21', v: 146 }],
+  glucose: [{ at: '2026-10-03', v: 5.9 }, { at: '2027-01-21', v: 5.8 }],
+  bp: [{ at: '2026-10-03', v: 132, v2: 84 }, { at: '2027-01-25', v: 128, v2: 78 }],
+}
 
 export type MarkerStatus = 'in range' | 'worth watching' | 'outside range'
 export interface Marker {
@@ -154,6 +173,9 @@ export const CAPACITY = [
   { key: 'sts', name: '5× sit-to-stand', unit: 's', last: 10.8, prev: 11.6, better: 'lower', how: 'Arms crossed, stand fully five times from a firm chair, as quickly as is safe.', norm: 'Under 12 s is the WHO ICOPE screen' },
   { key: 'gait', name: 'Gait speed', unit: 'm/s', last: 1.12, prev: 1.08, better: 'higher', how: 'Walk 4 metres at your usual pace. We divide 4 by your time.', norm: 'Above 1.0 m/s is the usual line' },
 ] as const
+
+/** When the two specimen capacity results were taken: prev at the December home check, last at the Joycation. */
+export const CAPACITY_AT = { prev: '2026-12-01', last: '2027-01-02' }
 
 /**
  * 28 days of signal features (not vendor scores), from Fri 1 Jan 2027. i % 7 === 1 is a Saturday

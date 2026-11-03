@@ -9,6 +9,8 @@ import { CATIONS, CATION_PHASES } from '@/data/platform'
 import { INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
 import { CATION_DETAIL, buildItinerary } from './_data'
 import { PrimaryChip, fade, kindIcon } from './_parts'
+// One shared emergency intercept for every member free-text field (Memo p.24).
+import { useCrisisGuard } from '@/routes/member/spaces/_SpaceShell'
 import { addCationRequest, useJourney, withdrawCationRequest, type CationRequest } from './_store'
 import { useJ, type JourneyKey } from './_i18n'
 
@@ -211,6 +213,8 @@ function BookingPanel({ slug, name, priceFrom, venues, windows, placeholder, int
   const [dietary, setDietary] = useState(existing?.dietary ?? '')
   const [errors, setErrors] = useState<Record<string, JourneyKey>>({})
   const [editing, setEditing] = useState(false)
+  const [held, setHeld] = useState(false)
+  const guard = useCrisisGuard()
   const sent = editing ? null : existing ?? null
   const conciergeFirst = concierge.split(' ')[0]
   const { t, r, tx } = useJ()
@@ -223,10 +227,14 @@ function BookingPanel({ slug, name, priceFrom, venues, windows, placeholder, int
     setOutcome(req?.outcome ?? '')
     setDietary(req?.dietary ?? '')
     setErrors({})
+    setHeld(false)
   }
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
+    // Emergency intercept first: nothing reaches the concierge until support has been offered.
+    if (guard(outcome, dietary)) { setHeld(true); return }
+    setHeld(false)
     const errs: Record<string, JourneyKey> = {}
     if (!interestOnly && !win) errs.win = 'errWin'
     if (outcome.trim().length < 12) errs.outcome = 'errOutcome'
@@ -316,17 +324,18 @@ function BookingPanel({ slug, name, priceFrom, venues, windows, placeholder, int
         <div className="mt-5">
           <label htmlFor={`${id}-out`} className="text-[15px] text-ink">{t('outcomeLabel')}</label>
           <p className="text-[13px] text-ink-3">{t('outcomeHelp')}</p>
-          <textarea id={`${id}-out`} rows={3} value={outcome} onChange={(e) => setOutcome(e.target.value)} placeholder={tx(placeholder)} aria-invalid={!!errors.outcome} aria-describedby={errors.outcome ? `${id}-out-err` : undefined} className={clsx('mt-2 w-full resize-none rounded-card border bg-paper-raised px-3.5 py-3 text-[16px] text-ink placeholder:text-ink-3 focus-ring', errors.outcome ? 'border-error' : 'border-line-strong')} />
+          <textarea id={`${id}-out`} rows={3} value={outcome} onChange={(e) => { setOutcome(e.target.value); setHeld(false) }} placeholder={tx(placeholder)} aria-invalid={!!errors.outcome} aria-describedby={errors.outcome ? `${id}-out-err` : undefined} className={clsx('mt-2 w-full resize-none rounded-card border bg-paper-raised px-3.5 py-3 text-[16px] text-ink placeholder:text-ink-3 focus-ring', errors.outcome ? 'border-error' : 'border-line-strong')} />
           {errors.outcome && <p id={`${id}-out-err`} className="mt-1 text-[13px] text-error" role="alert">{t(errors.outcome)}</p>}
         </div>
 
         <div className="mt-4">
           <label htmlFor={`${id}-diet`} className="text-[15px] text-ink">{t('dietLabel')} <span className="text-ink-3">{t('optional')}</span></label>
-          <input id={`${id}-diet`} value={dietary} onChange={(e) => setDietary(e.target.value)} placeholder={t('dietPh')} className="mt-2 h-11 w-full rounded-full border border-line-strong bg-paper-raised px-4 text-[15px] text-ink placeholder:text-ink-3 focus-ring" />
+          <input id={`${id}-diet`} value={dietary} onChange={(e) => { setDietary(e.target.value); setHeld(false) }} placeholder={t('dietPh')} className="mt-2 h-11 w-full rounded-full border border-line-strong bg-paper-raised px-4 text-[15px] text-ink placeholder:text-ink-3 focus-ring" />
           <p className="mt-1 text-[12px] text-ink-3">{t('dietShared')}</p>
         </div>
 
         <DaybreakButton type="submit" className="mt-6 w-full">{t(existing ? 'updateRequest' : interestOnly ? 'registerInterest' : 'requestThis')}</DaybreakButton>
+        {held && <p className="mt-2 text-center text-[14px] text-ink-2" role="status">{t('heldForSupport')}</p>}
         {existing && <Button variant="ghost" className="mt-2 w-full" onClick={() => { resetFrom(existing); setEditing(false) }}>{t('keepAsWas')}</Button>}
 
         <div className="mt-4 space-y-2 text-[12px] leading-relaxed text-ink-3">

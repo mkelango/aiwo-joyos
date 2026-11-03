@@ -1,11 +1,12 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowRight, CalendarClock, Check, Pause, Play, RefreshCw, Share2, Trash2 } from 'lucide-react'
+import { ArrowRight, CalendarClock, Captions, Check, Pause, Play, RefreshCw, Share2, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { DaybreakButton, Eyebrow, SpecimenTag } from '@/components/joy/primitives'
 import { Button, Sheet } from '@/components/ui'
-import { useLedgerRemoved, weekCounts, weekEntryCount } from '@/routes/member/core/_store'
+import { liveLedger, specimenWeek, useLedgerRemoved, weekCounts, weekEntryCount } from '@/routes/member/core/_store'
+import { useA11yPrefs } from '@/routes/member/account/_prefs'
 import { useApp } from '@/lib/store'
 import { FILMS, PLANNED_START, SAVOURING_PROMPTS } from './_data'
 import { SpaceShell, ToolCard, rovingRadio, useCrisisGuard, Toggle } from './_SpaceShell'
@@ -42,16 +43,17 @@ function LedgerInsights() {
   const week = useMemo(() => weekCounts(ledger, removed), [ledger, removed])
   const max = Math.max(1, ...week.map((l) => l.count))
   const total = useMemo(() => weekEntryCount(ledger, removed), [ledger, removed])
+  // This week's live moments (removed ones gone, on the specimen clock): the same base as the total above.
+  const live = useMemo(() => thisWeek(ledger, removed), [ledger, removed])
   const byPrompt = useMemo(() => {
     const c = { 1: 0, 2: 0, 3: 0 } as Record<1 | 2 | 3, number>
-    ledger.forEach((e) => { c[e.prompt] += 1 })
+    live.forEach((e) => { c[e.prompt] += 1 })
     return c
-  }, [ledger])
+  }, [live])
   const slots = [{ k: 1 as const, label: t('pl.slot.Midday'), time: '12:40' }, { k: 2 as const, label: t('pl.slot.Afternoon'), time: '16:15' }, { k: 3 as const, label: t('pl.slot.Evening'), time: '21:30' }]
   const pct = useMemo(() => largestRemainder([byPrompt[1], byPrompt[2], byPrompt[3]]), [byPrompt])
-  // The ledger is newest first (addLedger prepends). Do not sort by `at`: specimen entries are dated
-  // 2027, ahead of the real clock that stamps a new moment, so a string sort would bury it.
-  const best = useMemo(() => ledger.find((e) => e.word), [ledger])
+  // liveLedger places new moments on the specimen clock, so newest first is a plain sort by `at`.
+  const best = useMemo(() => live.find((e) => e.word), [live])
   return (
     <ToolCard
       className="w-full"
@@ -244,9 +246,19 @@ function Films() {
   const [optIn, setOptIn] = useSpaceState('pleasure.share.optIn.v1', false)
   const [shared, setShared] = useSpaceState<string[]>('pleasure.share.v1', [])
   const { ledger } = useApp()
+  const [removed] = useLedgerRemoved()
   const { t, d, dm, clock } = useSpaceText()
-  // Newest first, as the ledger stores them (see LedgerInsights).
-  const recent = useMemo(() => ledger.slice(0, 3), [ledger])
+  // Captions follow the Settings choice (joyos:acct:prefs); the film sheet can still switch them.
+  const prefs = useA11yPrefs()
+  const [cc, setCc] = useState(prefs.captions)
+  // A change made in Settings while this screen is open takes over from the local switch.
+  useEffect(() => { setCc(prefs.captions) }, [prefs.captions])
+  // The three newest moments still in the Ledger, dated on the specimen clock as the Ledger shows them.
+  const recent = useMemo(() => liveLedger(ledger, removed).slice(0, 3), [ledger, removed])
+  // A moment removed in the Ledger is taken back from #MyMomentOfJoy as well.
+  useEffect(() => {
+    if (shared.some((id) => removed.includes(id))) setShared((x) => x.filter((id) => !removed.includes(id)))
+  }, [removed, shared, setShared])
   // pos is elapsed seconds; the film's length comes from its m:ss label.
   const length = open ? toSecs(open.minutes) : 0
   useEffect(() => {
@@ -283,6 +295,7 @@ function Films() {
           {optIn && (
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
               <p className="pt-3 text-[14px] text-ink-2">{t('pl.fm.consent')}</p>
+              {recent.length === 0 && <p className="mt-3 text-[14px] text-ink-2">{t('pl.fm.none')}</p>}
               <ul className="mt-3 space-y-2" aria-label={t('pl.fm.latest')}>
                 {recent.map((e) => {
                   const on = shared.includes(e.id)
@@ -316,16 +329,19 @@ function Films() {
               <button onClick={() => { if (pos >= length) setPos(0); setPlaying((p) => !p) }} aria-label={playing ? t('c.pause') : t('c.play')} className="flex h-14 w-14 items-center justify-center rounded-full bg-paper-raised text-ink shadow-lift focus-ring">
                 {playing ? <Pause size={20} /> : <Play size={20} className="ml-0.5" />}
               </button>
-              {(playing || pos > 0) && (
+              {cc && (playing || pos > 0) && (
                 <p className="absolute inset-x-6 bottom-8 text-center text-[15px] text-ink" aria-live="polite"><span className="rounded bg-paper-raised/90 px-2 py-0.5">{caption}</span></p>
               )}
               <div className="absolute inset-x-4 bottom-3 h-1 overflow-hidden rounded-full bg-paper-raised/60" role="progressbar" aria-valuenow={pos} aria-valuemin={0} aria-valuemax={length} aria-valuetext={t('c.aOfB', { a: fmtSecs(pos), b: fmtSecs(length) })} aria-label={t('pl.fm.playback')}>
                 <div className="h-full bg-ink transition-[width] duration-1000 ease-linear" style={{ width: `${length ? (pos / length) * 100 : 0}%` }} />
               </div>
             </div>
-            <div className="mt-3 flex items-center justify-between gap-3">
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
               <span className="num text-[14px] text-ink-2">{fmtSecs(pos)} / {fmtSecs(length)}</span>
-              <span className="text-[13px] text-ink-3">{pos >= length && length ? t('pl.fm.watched') : t('pl.fm.captions')}</span>
+              <span className="flex flex-wrap items-center gap-3">
+                <span className="text-[13px] text-ink-3">{pos >= length && length ? t('pl.fm.watched') : cc ? t('pl.fm.captions') : t('pl.fm.captionsOff')}</span>
+                <Button size="sm" variant={cc ? 'ink' : 'ghost'} aria-pressed={cc} onClick={() => setCc((v) => !v)}><Captions size={14} /> {t('pl.fm.cc')}</Button>
+              </span>
             </div>
             <p className="eyebrow mt-4 text-ink-3">{open.who} · <span className="num">{open.minutes}</span></p>
             <p className="mt-2 text-[17px] text-ink">{d(open.note)}</p>
@@ -338,6 +354,12 @@ function Films() {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
+
+/** This specimen week's moments still in the Ledger, newest first, on the specimen clock. */
+function thisWeek(ledger: Parameters<typeof liveLedger>[0], removed: string[]) {
+  const week = new Set(specimenWeek())
+  return liveLedger(ledger, removed).filter((e) => week.has(e.at.slice(0, 10)))
+}
 
 /** Rounds shares to whole percentages that always sum to 100 (largest remainder). */
 function largestRemainder(counts: number[]) {

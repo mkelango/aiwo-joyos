@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { AccessibilityInfo, Pressable, View, useWindowDimensions } from 'react-native'
+import { Pressable, View, useWindowDimensions } from 'react-native'
 import Svg, { Circle, ClipPath, Defs, G, Path, Text as SvgText } from 'react-native-svg'
 import { TERM_TEXT, useLang } from '../lib/i18n'
-import type { Lang } from '../lib/store'
+import { useReduceMotion, type Lang } from '../lib/store'
 import type { TermKey, TermScore } from '../shared/types'
 import { useTheme } from '../theme/ThemeProvider'
 import { HatchPattern, useSvgId } from './Term'
@@ -13,7 +13,7 @@ import { kit, type KitKey } from './_i18n'
 // Six fixed petals, clockwise from the top: Body, Purpose, People, Freedom, Pleasure, Ease.
 // Each petal fills from the centre in proportion to its score over a pale ghost of itself;
 // the Burden petal is hatched Amber and signed with a minus. The fill blooms over 960 ms
-// (skipped under Reduce Motion). VoiceOver reads each petal with term, score and band
+// (skipped under Reduce Motion, the system's or the member's own). VoiceOver reads each petal with term, score and band
 // (Architecture p21): one image label listing all six, or one button per petal when onSelect.
 
 export const WHEEL_ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
@@ -33,9 +33,15 @@ interface Props {
 const ease = (x: number) => 1 - Math.pow(1 - x, 3)
 
 function useBloom(enabled: boolean) {
-  const [p, setP] = useState(enabled ? 0 : 1)
+  // Reduce motion (the member's own setting or the system one) skips the bloom entirely.
+  const reduce = useReduceMotion()
+  const [p, setP] = useState(enabled && !reduce ? 0 : 1)
   useEffect(() => {
     if (!enabled) return
+    if (reduce) {
+      setP(1)
+      return
+    }
     let raf = 0
     let alive = true
     let start = 0
@@ -47,18 +53,12 @@ function useBloom(enabled: boolean) {
       setP(t)
       if (t < 1) raf = requestAnimationFrame(step)
     }
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then((reduce) => {
-        if (!alive) return
-        if (reduce) setP(1)
-        else raf = requestAnimationFrame(step)
-      })
-      .catch(() => alive && setP(1))
+    raf = requestAnimationFrame(step)
     return () => {
       alive = false
       cancelAnimationFrame(raf)
     }
-  }, [enabled])
+  }, [enabled, reduce])
   return p
 }
 

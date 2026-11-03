@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { AlertTriangle, Check, FileSignature, FlaskConical, Pill as PillIcon, Phone, SearchX, ShieldCheck, Sparkles, Undo2 } from 'lucide-react'
+import { AlertTriangle, Check, FileSignature, FlaskConical, Pill as PillIcon, Phone, ScrollText, SearchX, ShieldCheck, Sparkles, Undo2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -12,7 +12,7 @@ import {
   CLINICAL_RECORDS, CLOSE_OUTCOMES, EXTRA_FORMULARY, EXTRA_INTERACTIONS, FORMULARY, MD_CONFIG, MEERA, MEMBER_IDS, RETURN_REASONS, SCREEN_ROUTES, SCREEN_ROUTE_OWNER,
   type SafetyAlert,
 } from './_data'
-import { clinical, recordOf, useClinicalState, type Draft, type MdActive, type MdHistory, type Order, type Screen, type Sent, type SignItem } from './_clinicalStore'
+import { clinical, recordOf, useClinicalState, type ClinicalAudit, type Draft, type MdActive, type MdHistory, type Order, type Screen, type Sent, type SignItem } from './_clinicalStore'
 import { PreviewBanner, useConsoleAccess } from './_gate'
 import { AccessNote, CardHead, Kpi, PriorityTag, ScrollTabs, SlaChip, areaCls, fieldCls, fmtClock, fmtDuration, labelCls, useConsoleNow, useTabParam } from './_parts'
 
@@ -20,7 +20,7 @@ import { AccessNote, CardHead, Kpi, PriorityTag, ScrollTabs, SlaChip, areaCls, f
 // screen-threshold queue, Clinical-grade sign-off, results and e-Rx, AI HITL queue, and the
 // Medical Director's signed, versioned thresholds. Raw clinical values appear here only.
 
-const TABS = ['safety', 'screens', 'signoff', 'member', 'ai', 'config'] as const
+const TABS = ['safety', 'screens', 'signoff', 'member', 'ai', 'config', 'audit'] as const
 const PRIORITY_RANK = { P0: 0, P1: 1 } as const
 const STATUS_RANK = { open: 0, acknowledged: 1, closed: 2 } as const
 
@@ -30,6 +30,31 @@ function reachOf(a: SafetyAlert) {
   if (!a.ackAt) return null
   const ms = +new Date(a.ackAt) - +new Date(a.openedAt)
   return { ms, within: ms <= a.slaMinutes * 60000 }
+}
+
+const NAME_OF: Record<string, string> = Object.fromEntries(Object.entries(MEMBER_IDS).map(([n, id]) => [id, n]))
+
+/** Writes one line to the clinical audit. */
+type Log = (e: { what: string; purpose: string; kind?: ClinicalAudit['kind']; memberId?: string; member?: string }) => void
+
+/**
+ * The audit writer for this portal: every line carries the signed-in demo person and role,
+ * and the grant reference when acting under one. A preview visitor's reads are written too.
+ */
+function makeLog(acc: ReturnType<typeof useConsoleAccess>): Log {
+  return (e) => {
+    const memberId = e.memberId ?? (e.member ? MEMBER_IDS[e.member] : undefined)
+    const member = e.member ?? (memberId ? CLINICAL_RECORDS[memberId]?.name ?? NAME_OF[memberId] : undefined)
+    clinical.log({
+      who: acc.chosen ? acc.person : 'No console role · preview',
+      role: acc.chosen ? acc.roleLabel : 'Preview',
+      what: e.what,
+      purpose: acc.grant ? `${e.purpose} · under ${acc.grant.ref}` : e.purpose,
+      kind: e.kind ?? 'action',
+      memberId,
+      member,
+    })
+  }
 }
 
 /** A member's name as a link into their record (raw values live here only). */
@@ -45,7 +70,9 @@ function MemberLink({ name, onOpen }: { name: string; onOpen: (id: string) => vo
 
 export default function Clinical() {
   const now = useConsoleNow()
-  const { canAct } = useConsoleAccess('/console/clinical')
+  const acc = useConsoleAccess('/console/clinical')
+  const { canAct } = acc
+  const log = makeLog(acc)
   const [tab, setTab] = useTabParam(TABS, 'safety')
   const [params, setParams] = useSearchParams()
   const memberId = params.get('member') ?? 'm_0001'
@@ -62,7 +89,14 @@ export default function Clinical() {
     setParams(next, { replace: true })
   }
   // Persisted for the browser session (_clinicalStore), like the coach console's work.
-  const { alerts, signoffs, drafts, screens, md, mdHistory } = useClinicalState()
+  const { alerts, signoffs, drafts, screens, md, mdHistory, audit } = useClinicalState()
+  const openAudit = (id: string) => {
+    const next = new URLSearchParams(params)
+    next.set('tab', 'audit')
+    next.set('amember', id)
+    setParams(next, { replace: false })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
   const setAlerts = clinical.setAlerts
   const setSignoffs = clinical.setSignoffs
   const setDrafts = clinical.setDrafts
@@ -79,7 +113,13 @@ export default function Clinical() {
   const pendingAi = drafts.filter((d) => d.state === 'pending').length
   const unassigned = screens.filter((s) => s.route === 'Unassigned').length
 
-  const ack = (id: string) => canAct && setAlerts((xs) => xs.map((a) => (a.id === id ? { ...a, status: 'acknowledged', ackAt: new Date(now).toISOString() } : a)))
+  const ack = (id: string) => {
+    const a = alerts.find((x) => x.id === id)
+    if (!canAct || !a || a.status !== 'open') return
+    setAlerts((xs) => xs.map((x) => (x.id === id ? { ...x, status: 'acknowledged', ackAt: new Date(now).toISOString() } : x)))
+    const ms = now - +new Date(a.openedAt)
+    log({ what: `Acknowledged ${a.priority} · ${a.kind} · reached in ${fmtDuration(ms)}${ms > a.slaMinutes * 60000 ? ' (after SLA)' : ''}`, purpose: 'Safety · first contact', memberId: a.memberId })
+  }
 
   return (
     <div>
@@ -101,7 +141,7 @@ export default function Clinical() {
       <PreviewBanner path="/console/clinical" />
 
       <AccessNote className="mb-6">
-        <span className="text-ink">Raw clinical values are visible in this portal only.</span> Every read is written to the member’s audit with your role and purpose. Coaches see term scores and bands; venues and tenants see none of this.
+        <span className="text-ink">Raw clinical values are visible in this portal only.</span> Every read and every action is written to the audit with your role and purpose; see it under Audit. Coaches see term scores and bands; venues and tenants see none of this.
       </AccessNote>
 
       {/* P0 strip — always on top */}
@@ -153,23 +193,25 @@ export default function Clinical() {
             { value: 'member', label: 'Member record' },
             { value: 'ai', label: 'AI review', count: pendingAi },
             { value: 'config', label: 'Medical Director' },
+            { value: 'audit', label: 'Audit', count: audit.length },
           ]}
         />
       </div>
 
       <div className="mt-6">
-        {tab === 'safety' && <SafetyBoard alerts={alerts} setAlerts={setAlerts} now={now} onAck={ack} onOpen={openMember} canAct={canAct} p0Minutes={md.values.p0} />}
-        {tab === 'screens' && <ScreenQueue screens={screens} setScreens={setScreens} setAlerts={setAlerts} alerts={alerts} now={now} onOpen={openMember} canAct={canAct} md={md} />}
-        {tab === 'signoff' && <SignOff items={signoffs} setItems={setSignoffs} now={now} onOpen={openMember} canAct={canAct} />}
-        {tab === 'member' && <MemberRecord key={memberId} memberId={memberId} setMember={setMember} now={now} canAct={canAct} alerts={alerts} />}
-        {tab === 'ai' && <AiReview drafts={drafts} setDrafts={setDrafts} onOpen={openMember} canAct={canAct} />}
+        {tab === 'safety' && <SafetyBoard alerts={alerts} setAlerts={setAlerts} now={now} onAck={ack} onOpen={openMember} canAct={canAct} p0Minutes={md.values.p0} log={log} />}
+        {tab === 'screens' && <ScreenQueue screens={screens} setScreens={setScreens} setAlerts={setAlerts} alerts={alerts} now={now} onOpen={openMember} canAct={canAct} md={md} log={log} />}
+        {tab === 'signoff' && <SignOff items={signoffs} setItems={setSignoffs} now={now} onOpen={openMember} canAct={canAct} log={log} />}
+        {tab === 'member' && <MemberRecord key={memberId} memberId={memberId} setMember={setMember} now={now} canAct={canAct} alerts={alerts} log={log} audit={audit} onAudit={openAudit} />}
+        {tab === 'ai' && <AiReview drafts={drafts} setDrafts={setDrafts} onOpen={openMember} canAct={canAct} log={log} />}
         {/* Kept mounted so a pending proposal or a new version survives a tab switch. */}
-        <div hidden={tab !== 'config'}><MedicalDirector canAct={canAct} active={md} history={mdHistory} /></div>
+        <div hidden={tab !== 'config'}><MedicalDirector canAct={canAct} active={md} history={mdHistory} log={log} /></div>
+        {tab === 'audit' && <AuditTrail key={params.get('amember') ?? 'all'} audit={audit} initialMember={params.get('amember') ?? 'all'} onOpen={openMember} />}
       </div>
 
       <p className="mt-10 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-3">
         Your work in this portal is kept for this browser session, as specimen data.
-        <button type="button" disabled={!canAct} onClick={() => { if (window.confirm('Reset the clinical portal to the specimen start? Alerts, sign-offs, AI reviews, routing, orders and the Medical Director config all go back.')) clinical.reset() }} className="text-ink-2 underline underline-offset-4 hover:text-ink focus-ring disabled:opacity-50">Reset the clinical specimen</button>
+        <button type="button" disabled={!canAct} onClick={() => { if (window.confirm('Reset the clinical portal to the specimen start? Alerts, sign-offs, AI reviews, routing, orders and the Medical Director config all go back. The audit stays: it is append-only.')) clinical.reset({ who: acc.person, role: acc.roleLabel }) }} className="text-ink-2 underline underline-offset-4 hover:text-ink focus-ring disabled:opacity-50">Reset the clinical specimen</button>
       </p>
     </div>
   )
@@ -177,7 +219,7 @@ export default function Clinical() {
 
 // ─── Safety board ──────────────────────────────────────────────────────────
 
-function SafetyBoard({ alerts, setAlerts, now, onAck, onOpen, canAct, p0Minutes }: { alerts: SafetyAlert[]; setAlerts: (f: (a: SafetyAlert[]) => SafetyAlert[]) => void; now: number; onAck: (id: string) => void; onOpen: (id: string) => void; canAct: boolean; p0Minutes: number }) {
+function SafetyBoard({ alerts, setAlerts, now, onAck, onOpen, canAct, p0Minutes, log }: { alerts: SafetyAlert[]; setAlerts: (f: (a: SafetyAlert[]) => SafetyAlert[]) => void; now: number; onAck: (id: string) => void; onOpen: (id: string) => void; canAct: boolean; p0Minutes: number; log: Log }) {
   const [closing, setClosing] = useState<SafetyAlert | null>(null)
   const [outcome, setOutcome] = useState('')
   const [note, setNote] = useState('')
@@ -187,10 +229,11 @@ function SafetyBoard({ alerts, setAlerts, now, onAck, onOpen, canAct, p0Minutes 
   const sorted = [...alerts].sort((a, b) => (a.status === 'closed' ? 1 : 0) - (b.status === 'closed' ? 1 : 0) || PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || STATUS_RANK[a.status] - STATUS_RANK[b.status] || +new Date(a.openedAt) - +new Date(b.openedAt))
 
   const close = () => {
-    if (!closing) return
+    if (!closing || !canAct) return
     if (!outcome) return setErr('Choose the outcome.')
     if (note.trim().length < 10) return setErr('Add a clinical note of at least a sentence.')
     setAlerts((xs) => xs.map((a) => (a.id === closing.id ? { ...a, status: 'closed', ackAt: a.ackAt ?? new Date(now).toISOString(), outcome: `${outcome}. ${note.trim()} — ${MEERA.name}, ${fmtClock(now)}` } : a)))
+    log({ what: `Closed ${closing.priority} · ${closing.kind} · outcome: ${outcome.toLowerCase()}${closing.ackAt ? '' : ' (closed at first contact)'}`, purpose: 'Safety · close with outcome', memberId: closing.memberId })
     setClosedNote(`${closing.priority} for ${closing.member} closed and signed at ${fmtClock(now)}. The coach sees that it is closed, not why.`)
     setClosing(null)
     setOutcome('')
@@ -292,7 +335,7 @@ function SafetyBoard({ alerts, setAlerts, now, onAck, onOpen, canAct, p0Minutes 
 
 // ─── Screen queue ──────────────────────────────────────────────────────────
 
-function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canAct, md }: {
+function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canAct, md, log }: {
   screens: Screen[]
   setScreens: (f: (s: Screen[]) => Screen[]) => void
   alerts: SafetyAlert[]
@@ -301,6 +344,7 @@ function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canA
   onOpen: (id: string) => void
   canAct: boolean
   md: MdActive
+  log: Log
 }) {
   const [choice, setChoice] = useState<Record<string, string>>({})
   const [notice, setNotice] = useState<string | null>(null)
@@ -321,9 +365,12 @@ function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canA
       }])
     }
     setScreens((s) => s.map((x) => (x.id === q.id ? { ...x, route: `${r} · ${owner}`, routedAt: fmtClock(now), alertId: existing ? undefined : alertId } : x)))
+    log({ what: `Routed ${q.instrument} ${q.score}/${q.max} to ${r} · ${owner}${existing ? '' : ` · P1 raised on config ${md.version}`}`, purpose: 'Screen-threshold routing', member: q.member })
     setNotice(`${q.member} routed to ${owner} · ${r}. ${existing ? 'An alert is already open on the safety board.' : `A P1 is now on the safety board with a ${md.values.p1} h clock (config ${md.version}).`}`)
   }
   const undo = (q: Screen) => {
+    if (!canAct) return
+    log({ what: `Undid routing of ${q.instrument} ${q.score}/${q.max} (${q.route})${q.alertId ? ' · its P1 withdrawn' : ''}`, purpose: 'Screen-threshold routing', member: q.member })
     setScreens((s) => s.map((x) => (x.id === q.id ? { ...x, route: 'Unassigned', routedAt: undefined, alertId: undefined } : x)))
     if (q.alertId) setAlerts((xs) => xs.filter((a) => a.id !== q.alertId))
     setNotice(`Routing for ${q.member} undone.`)
@@ -397,7 +444,7 @@ function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canA
 
 // ─── Sign-off ──────────────────────────────────────────────────────────────
 
-function SignOff({ items, setItems, now, onOpen, canAct }: { items: SignItem[]; setItems: (f: (s: SignItem[]) => SignItem[]) => void; now: number; onOpen: (id: string) => void; canAct: boolean }) {
+function SignOff({ items, setItems, now, onOpen, canAct, log }: { items: SignItem[]; setItems: (f: (s: SignItem[]) => SignItem[]) => void; now: number; onOpen: (id: string) => void; canAct: boolean; log: Log }) {
   const [sel, setSel] = useState(items[0]?.id)
   const [note, setNote] = useState('')
   const [attest, setAttest] = useState(false)
@@ -408,10 +455,15 @@ function SignOff({ items, setItems, now, onOpen, canAct }: { items: SignItem[]; 
   const item = items.find((i) => i.id === sel) ?? items[0]
   const prevJI = joyspanIndex(item.prev, item.method)
   const nowJI = joyspanIndex(item.now, item.method)
+  // Opening a draft shows raw lab values: that is a read, and it is written down.
+  useEffect(() => {
+    log({ what: `Read the Clinical-grade draft and lab inputs · ${item.occasion}`, purpose: 'Sign-off review', kind: 'read', memberId: item.memberId })
+  }, [item.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const sign = () => {
     if (!canAct) return
     setItems((xs) => xs.map((x) => (x.id === item.id ? { ...x, signed: `Signed · ${MEERA.name} · ${fmtClock(now)}` } : x)))
+    log({ what: `Signed Clinical grade · ${item.occasion} · Index ${nowJI?.value ?? '—'} under method ${item.method}`, purpose: 'Clinical-grade sign-off', memberId: item.memberId })
     setAttest(false)
   }
   const nextUnsigned = items.find((x) => !x.signed && !x.returned && x.id !== item.id)
@@ -419,13 +471,20 @@ function SignOff({ items, setItems, now, onOpen, canAct }: { items: SignItem[]; 
   const doReturn = () => {
     if (!retReason) return setRetErr('Choose why it is going back.')
     if (retNote.trim().length < 10) return setRetErr('Add a note of at least 10 characters for the lab and the concierge.')
+    if (!canAct) return
+    log({ what: `Returned the draft to the lab · ${retReason.toLowerCase()}`, purpose: 'Clinical-grade sign-off', memberId: item.memberId })
     setItems((xs) => xs.map((x) => (x.id === item.id ? { ...x, returned: { reason: retReason, note: retNote.trim(), at: fmtClock(now) }, notes: [...x.notes, `${MEERA.name}: returned · ${retReason.toLowerCase()} — ${retNote.trim()}`] } : x)))
     setReturning(false); setRetReason(''); setRetNote(''); setRetErr(''); setAttest(false)
   }
-  const undoReturn = () => setItems((xs) => xs.map((x) => (x.id === item.id ? { ...x, returned: null, notes: x.notes.slice(0, -1) } : x)))
+  const undoReturn = () => {
+    if (!canAct) return
+    setItems((xs) => xs.map((x) => (x.id === item.id ? { ...x, returned: null, notes: x.notes.slice(0, -1) } : x)))
+    log({ what: 'Undid the return; the draft is back in the sign-off queue', purpose: 'Clinical-grade sign-off', memberId: item.memberId })
+  }
   const annotate = () => {
     if (!note.trim() || !canAct) return
     setItems((xs) => xs.map((x) => (x.id === item.id ? { ...x, notes: [...x.notes, `${MEERA.name}: ${note.trim()}`] } : x)))
+    log({ what: 'Annotated the Clinical-grade draft', purpose: 'Clinical-grade sign-off', memberId: item.memberId })
     setNote('')
   }
 
@@ -594,8 +653,15 @@ const URGENCY = ['STAT · home draw tonight', 'Within 48 h', 'Routine · next vi
 /** An e-Rx can be withdrawn for ten minutes after it is signed. */
 const CANCEL_WINDOW_MS = 10 * 60000
 
-function MemberRecord({ memberId, setMember, now, canAct, alerts }: { memberId: string; setMember: (id: string) => void; now: number; canAct: boolean; alerts: SafetyAlert[] }) {
+function MemberRecord({ memberId, setMember, now, canAct, alerts, log, audit, onAudit }: { memberId: string; setMember: (id: string) => void; now: number; canAct: boolean; alerts: SafetyAlert[]; log: Log; audit: ClinicalAudit[]; onAudit: (id: string) => void }) {
   const rec = CLINICAL_RECORDS[memberId]
+  // Opening a record is a read; a record the relationship check refuses is written down too.
+  useEffect(() => {
+    if (rec) log({ what: 'Opened the clinical record · labs, medicines, orders', purpose: 'Results review', kind: 'read', memberId })
+    else log({ what: 'Tried to open a record · refused, no relationship or Care consent · nothing read', purpose: 'Results review', kind: 'refused', memberId })
+  }, [memberId]) // eslint-disable-line react-hooks/exhaustive-deps
+  const trail = audit.filter((e) => e.memberId === memberId)
+  const lastRead = trail.find((e) => e.kind === 'read')
   const [drug, setDrug] = useState('')
   const [strength, setStrength] = useState('')
   const [freq, setFreq] = useState('Once daily')
@@ -667,21 +733,30 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts }: { memberId: 
     if (major && override.trim().length < 10) return setErrs('A major interaction needs a written clinical reason to proceed.')
     const rx: Sent = { rx: clinical.nextRx(), drug, dose: strength, freq: `${freq} × ${days} days`, sentAt: now, reason: major ? override.trim() : undefined }
     setSent((s) => [...s, rx])
+    log({ what: `Signed and sent e-Rx ${rx.rx} · ${drug} ${strength} · ${rx.freq}${hits.length ? ` · interactions checked: ${hits.map((h) => `${h.severity} with ${h.with}`).join(', ')}` : ' · no interactions'}${rx.reason ? ' · major interaction overridden with a written reason' : ''}`, purpose: 'Prescribing', memberId })
     setCancelled(null)
     reset()
   }
-  const cancelRx = (rx: string) => { setSent((s) => s.filter((x) => x.rx !== rx)); setCancelled(rx) }
+  const cancelRx = (rx: string) => {
+    if (!canAct) return
+    const x = sent.find((y) => y.rx === rx)
+    setSent((s) => s.filter((y) => y.rx !== rx))
+    setCancelled(rx)
+    log({ what: `Cancelled e-Rx ${rx}${x ? ` · ${x.drug} ${x.dose}` : ''} inside the ten-minute window`, purpose: 'Prescribing', memberId })
+  }
   const applyAdjust = () => {
     if (!duplicate || !adjustTo || !canAct) return
     // A prescription sent this session is amended in place; a standing medicine gets a new dose.
     if (duplicate.isNew) setSent((s) => s.map((x) => (x.rx === duplicate.rx ? { ...x, dose: adjustTo } : x)))
     else setAdjusted((a) => ({ ...a, [duplicate.drug]: adjustTo }))
+    log({ what: `Amended ${duplicate.drug} ${duplicate.dose} → ${adjustTo}${duplicate.rx ? ` (e-Rx ${duplicate.rx})` : ''}`, purpose: 'Prescribing', memberId })
     setAdjustDone(`${duplicate.drug} changed from ${duplicate.dose} to ${adjustTo}. Signed by ${MEERA.name} · amended e-Rx sent to ABDM · ${first} notified.`)
     reset()
   }
   const placeOrder = (test: string, urgency: string) => {
     if (!canAct || !test) return
-    setOrders((o) => [{ test, when: `Ordered ${fmtClock(now)} · ${urgency}`, status: urgency.startsWith('STAT') ? 'Concierge Ravi dispatched · lab partner alerted' : 'Booked with the lab partner' }, ...o])
+    setOrders((o) => [{ test, when: `Ordered ${fmtClock(now)} · ${urgency}`, status: urgency.startsWith('STAT') ? 'Concierge Ravi alerted · home draw to dispatch' : 'Booked with the lab partner' }, ...o])
+    log({ what: `Ordered ${test} · ${urgency.toLowerCase()}`, purpose: 'Results review · orders', memberId })
     setOrderDone(`${test} ordered · ${urgency.toLowerCase()}. ${first} gets a plain-language note from you, not from AI.`)
     setOrderTest('')
   }
@@ -706,7 +781,7 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts }: { memberId: 
 
       <Card className="min-w-0">
         <CardHead eyebrow={<>Member clinical view · <span className="num">{rec.id}</span> · ABHA linked</>} title={<>{rec.name}, <span className="num">{rec.age}</span> · results</>} aside={<>{picker}<SpecimenTag /></>} />
-        <p className="-mt-2 mb-3 flex flex-wrap items-center gap-2 text-[13px] text-ink-3"><span>{rec.care}</span><Pill>Read logged · purpose: results review</Pill></p>
+        <p className="-mt-2 mb-3 flex flex-wrap items-center gap-2 text-[13px] text-ink-3"><span>{rec.care}</span><Pill>{lastRead ? <>Read logged <span className="num">{lastRead.at.slice(11)}</span> · purpose: results review</> : 'Read logged · purpose: results review'}</Pill></p>
         <p className="text-[15px] text-ink-2">{rec.chart.sentence}</p>
         <div className="mt-3 h-48" role="img" aria-label={`${rec.chart.lab}: ${chartData.map((d) => `${d.value} on ${d.date}`).join(', ')}`}>
           <ResponsiveContainer width="100%" height="100%">
@@ -895,16 +970,34 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts }: { memberId: 
           </form>
         </Card>
       </div>
+
+      <Card tone="sunk" className="min-w-0">
+        <CardHead
+          eyebrow={<>Audit · {rec.name} · this session</>}
+          title="Who has read or acted on this record"
+          aside={<Button size="sm" variant="secondary" onClick={() => onAudit(rec.id)}><ScrollText size={14} aria-hidden /> Full audit for {first}</Button>}
+        />
+        {trail.length === 0 ? <p className="text-[15px] text-ink-3">Nothing written yet.</p> : <AuditLines entries={trail.slice(0, 6)} />}
+        {trail.length > 6 && <p className="mt-3 text-[13px] text-ink-3"><span className="num">{trail.length - 6}</span> earlier lines in the full audit.</p>}
+        <p className="mt-4 text-[13px] text-ink-3">{first} sees these reads under “Who has seen my data”, with the role and the purpose.</p>
+      </Card>
     </div>
   )
 }
 
 // ─── AI review (HITL) ──────────────────────────────────────────────────────
 
-function AiReview({ drafts, setDrafts, onOpen, canAct }: { drafts: Draft[]; setDrafts: (f: (d: Draft[]) => Draft[]) => void; onOpen: (id: string) => void; canAct: boolean }) {
+function AiReview({ drafts, setDrafts, onOpen, canAct, log }: { drafts: Draft[]; setDrafts: (f: (d: Draft[]) => Draft[]) => void; onOpen: (id: string) => void; canAct: boolean; log: Log }) {
   const [editing, setEditing] = useState<string | null>(null)
   const [text, setText] = useState('')
-  const update = (id: string, patch: Partial<Draft>) => setDrafts((ds) => ds.map((d) => (d.id === id ? { ...d, ...patch } : d)))
+  const WHAT: Record<string, string> = { approved: 'Approved and released the AI draft', rejected: 'Rejected the AI draft · not shown to the member', pending: 'Returned the AI draft to review', edited: 'Edited the AI draft before release' }
+  const update = (id: string, patch: Partial<Draft>) => {
+    const d = drafts.find((x) => x.id === id)
+    if (!canAct || !d) return
+    setDrafts((ds) => ds.map((x) => (x.id === id ? { ...x, ...patch } : x)))
+    const what = patch.edited ? WHAT.edited : patch.state ? WHAT[patch.state] : 'Changed the AI draft'
+    log({ what: `${what} · ${d.tool} · ${d.lang}`, purpose: 'AI review · human in the loop', member: d.member })
+  }
 
   return (
     <div className="space-y-6">
@@ -976,7 +1069,7 @@ function AiReview({ drafts, setDrafts, onOpen, canAct }: { drafts: Draft[]; setD
 
 // ─── Medical Director config ───────────────────────────────────────────────
 
-function MedicalDirector({ canAct, active, history }: { canAct: boolean; active: MdActive; history: MdHistory[] }) {
+function MedicalDirector({ canAct, active, history, log }: { canAct: boolean; active: MdActive; history: MdHistory[]; log: Log }) {
   const base = MD_CONFIG.thresholds
   const [vals, setVals] = useState<Record<string, number>>(active.values)
   // Follow the active version when it changes from outside (a reset, or another tab of this session).
@@ -999,18 +1092,25 @@ function MedicalDirector({ canAct, active, history }: { canAct: boolean; active:
     if (why.trim().length < 15) return setErr('Write the clinical rationale. It is published with the version.')
     for (const t of base) if (Number.isNaN(vals[t.key]) || vals[t.key] < t.min || vals[t.key] > t.max) return setErr(`${t.label} must be between ${t.min} and ${t.max}.`)
     setProposal({ version: nextVersion, changes, why: why.trim() })
+    log({ what: `Proposed thresholds ${nextVersion} for second signature · ${changes.join('; ')}`, purpose: 'Medical Director config' })
     setJustActivated(null)
     setErr('')
   }
-  const withdraw = () => { setProposal(null); setVals(active.values) }
+  const withdraw = () => {
+    if (!canAct || !proposal) return
+    log({ what: `Withdrew proposal ${proposal.version}`, purpose: 'Medical Director config' })
+    setProposal(null)
+    setVals(active.values)
+  }
   const activate = () => {
-    if (!proposal) return
+    if (!proposal || !canAct) return
     const hash = `cfg:${Math.random().toString(16).slice(2, 6)}…${Math.random().toString(16).slice(2, 6)}`
     const signers = ['Dr Meera Iyer · Medical Director', 'Dr Sanjay Menon · Lead Psychologist']
     clinical.activateMd(
       { version: proposal.version, signedOn: '28 Jan 2027', signers, hash, values: { ...vals } },
       { version: proposal.version, date: '28 Jan 2027', change: proposal.changes.join('; '), signers: 'Dr Meera Iyer, Dr Sanjay Menon', hash },
     )
+    log({ what: `Activated thresholds ${proposal.version} · second signature by Dr Sanjay Menon (simulated) · ${hash}`, purpose: 'Medical Director config' })
     setJustActivated(proposal.version)
     setProposal(null)
     setWhy('')
@@ -1110,3 +1210,93 @@ function MedicalDirector({ canAct, active, history }: { canAct: boolean; active:
   )
 }
 
+// ─── Audit trail ───────────────────────────────────────────────────────────
+
+const KIND_LABEL: Record<ClinicalAudit['kind'], string> = { read: 'Read', action: 'Action', refused: 'Refused' }
+
+function AuditLines({ entries, onOpen }: { entries: ClinicalAudit[]; onOpen?: (id: string) => void }) {
+  return (
+    <ol className="relative space-y-4 border-l border-line pl-5">
+      {entries.map((e) => (
+        <li key={e.id} className="relative">
+          <span className={clsx('absolute -left-[25px] top-1.5 h-2 w-2 rounded-full', e.kind === 'action' ? 'bg-ink' : 'border border-line-strong bg-paper-raised')} aria-hidden />
+          <p className="flex flex-wrap items-center gap-x-2 text-[12px] text-ink-3">
+            <span className="num">{e.at}</span>
+            <span className={clsx('rounded-full px-2 py-px text-[11px]', e.kind === 'action' ? 'bg-ink text-paper' : 'border border-line-strong text-ink-2')}>{KIND_LABEL[e.kind]}</span>
+            {e.member && (onOpen && e.memberId && CLINICAL_RECORDS[e.memberId]
+              ? <button type="button" onClick={() => onOpen(e.memberId!)} className="text-ink underline decoration-line-strong underline-offset-4 hover:decoration-ink focus-ring">{e.member}</button>
+              : <span className="text-ink-2">{e.member}</span>)}
+          </p>
+          <p className="text-[15px] text-ink"><span className="font-medium">{e.who}</span> <span className="text-ink-3">· {e.role}</span> · {e.what}</p>
+          <p className="text-[13px] text-ink-3">Purpose: {e.purpose}</p>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+/**
+ * Everything read or done in this portal this session, newest first, as it would be written
+ * to the DPDP consent ledger: actor, role, purpose, record and time. Append-only.
+ */
+function AuditTrail({ audit, initialMember, onOpen }: { audit: ClinicalAudit[]; initialMember: string; onOpen: (id: string) => void }) {
+  const [member, setMember] = useState(initialMember)
+  const [kind, setKind] = useState<'all' | ClinicalAudit['kind']>('all')
+  const members = Array.from(new Map(audit.filter((e) => e.memberId).map((e) => [e.memberId!, e.member ?? e.memberId!])).entries())
+  if (member !== 'all' && !members.some(([id]) => id === member)) members.push([member, CLINICAL_RECORDS[member]?.name ?? NAME_OF[member] ?? member])
+  const shown = audit.filter((e) => (member === 'all' || e.memberId === member) && (kind === 'all' || e.kind === kind))
+  const reads = audit.filter((e) => e.kind === 'read').length
+  const actions = audit.filter((e) => e.kind === 'action').length
+  const refused = audit.filter((e) => e.kind === 'refused').length
+
+  return (
+    <div className="grid gap-6 xl:grid-cols-[1.7fr_1fr]">
+      <Card className="min-w-0">
+        <CardHead
+          eyebrow="Clinical audit · this session"
+          title="Every read and every action, as written"
+          aside={<Pill><ShieldCheck size={12} aria-hidden /> Append-only</Pill>}
+        />
+        <div className="mb-5 flex flex-wrap items-center gap-3">
+          <ScrollTabs
+            label="Filter the audit by kind"
+            value={kind}
+            onChange={setKind}
+            items={[
+              { value: 'all', label: 'All', count: audit.length },
+              { value: 'read', label: 'Reads', count: reads },
+              { value: 'action', label: 'Actions', count: actions },
+              { value: 'refused', label: 'Refused', count: refused },
+            ]}
+          />
+          <label htmlFor="audit-member" className="sr-only">Filter the audit by member</label>
+          <select id="audit-member" value={member} onChange={(e) => setMember(e.target.value)} className="h-9 max-w-[260px] rounded-full border border-line-strong bg-paper-raised px-3 text-[13px] text-ink focus-ring">
+            <option value="all">Every member</option>
+            {members.map(([id, name]) => <option key={id} value={id}>{name} · {id}</option>)}
+          </select>
+        </div>
+        {shown.length === 0 ? (
+          <p className="py-8 text-center text-[15px] text-ink-2">{audit.length === 0 ? 'Nothing written yet this session. Open a member record, read a draft or act on an alert, and the line appears here.' : 'No lines match this filter.'}</p>
+        ) : (
+          <AuditLines entries={shown} onOpen={onOpen} />
+        )}
+      </Card>
+      <div className="space-y-6">
+        <div className="grid grid-cols-3 gap-3">
+          <Kpi label="Reads" value={reads} />
+          <Kpi label="Actions" value={actions} />
+          <Kpi label="Refused" value={refused} />
+        </div>
+        <Card tone="sunk">
+          <Eyebrow>What is written</Eyebrow>
+          <ul className="mt-3 space-y-2 text-[15px] text-ink-2">
+            <li>Opening a member record or a Clinical-grade draft: a read, with its purpose.</li>
+            <li>Acknowledging or closing an alert, routing a screen, signing or returning a draft, AI approvals, e-Rx, orders and threshold changes: an action.</li>
+            <li>A record the relationship check refuses: written as refused, with nothing read.</li>
+          </ul>
+          <p className="mt-4 text-[13px] text-ink-3">Kept seven years in the DPDP consent ledger. Each member sees the reads of their own record in their trust centre. Resetting the specimen does not erase this list.</p>
+        </Card>
+      </div>
+    </div>
+  )
+}

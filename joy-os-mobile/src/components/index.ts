@@ -1,10 +1,12 @@
 // Joy OS mobile component kit. Import from '@/components' (or relative '../src/components').
 export { AiwoMark, AppBar } from './Brand'
+export { AppBanners, GRACE_UNTIL } from './AppBanners'
 export { ArrowLink, Button, DaybreakButton, type ButtonVariant } from './Buttons'
 export { Card, type CardTone } from './Card'
 export { CrisisSheet } from './CrisisSheet'
 export { Delta } from './Delta'
 export { Icon, type IconName } from './Icon'
+export { HistoryGlyph, IndexHistoryChart, type HistoryMarker, type HistoryPoint } from './IndexHistoryChart'
 export { JoyspanWheel, WHEEL_ORDER, describeWheel } from './JoyspanWheel'
 export { LoopRing } from './LoopRing'
 export { MethodLine, SpecimenTag, fmtDate, fmtDateDots, useFmtDate } from './MethodLine'

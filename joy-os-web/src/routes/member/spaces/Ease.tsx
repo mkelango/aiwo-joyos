@@ -28,7 +28,7 @@ export default function Ease() {
   const isi = history.ISI[history.ISI.length - 1].score
   const tasks = (Object.keys(history) as Screen[]).flatMap((s) => {
     const last = history[s][history[s].length - 1]
-    return last.date === SPACE_TODAY && bandFor(s, last.score).route ? [{ screen: s, score: last.score }] : []
+    return last.date === SPACE_TODAY && bandFor(s, last.score).route ? [{ id: `${s}:${last.date}:${last.score}`, screen: s, score: last.score, on: last.date }] : []
   })
   return (
     <SpaceShell
@@ -118,16 +118,23 @@ function SecondArrow() {
   const [problem, setProblem] = useState('')
   const [arrow, setArrow] = useState('')
   const [err, setErr] = useState(false)
-  const { t, r } = useSpaceText()
+  const { t, r, dm } = useSpaceText()
   const [paused, setPaused] = useState(false)
   const [reflect, setReflect] = useState<string | null>(null)
+  // The entry being read: the newest unless the member picks an earlier one.
+  const [picked, setPicked] = useState<string | null>(null)
+  const [showAll, setShowAll] = useState(false)
   const save = () => {
     if (!problem.trim() || !arrow.trim()) return setErr(true)
     if (guard(problem, arrow)) { setPaused(true); setErr(false); return }
     setEntries((e) => [{ id: `j${Date.now()}`, date: SPACE_TODAY, problem: problem.trim(), arrow: arrow.trim() }, ...e])
-    setProblem(''); setArrow(''); setErr(false); setPaused(false); setReflect(null)
+    setProblem(''); setArrow(''); setErr(false); setPaused(false); setReflect(null); setPicked(null)
   }
-  const latest = entries[0]
+  const shown = entries.find((e) => e.id === picked) ?? entries[0]
+  const isLatest = shown?.id === entries[0]?.id
+  const thisMonth = entries.filter((e) => e.date.slice(0, 7) === SPACE_TODAY.slice(0, 7)).length
+  const LIMIT = 4
+  const list = showAll ? entries : entries.slice(0, LIMIT)
   return (
     <ToolCard className="w-full" eyebrow={t('ease.sa.eyebrow')} title={t('ease.sa.title')} sub={t('ease.sa.sub')}>
       <form onSubmit={(e) => { e.preventDefault(); save() }} className="space-y-3">
@@ -154,27 +161,51 @@ function SecondArrow() {
         </div>
       </form>
 
-      <div className="mt-7 border-t border-line pt-5">
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          <Eyebrow>{t('c.latest', { d: fmtDate(latest.date) })}</Eyebrow>
-          {!reflect && <Button size="sm" variant="ghost" onClick={() => setReflect(latest.id)} className="whitespace-nowrap"><Sparkles size={14} /> {t('ease.sa.reflect')}</Button>}
-        </div>
-        <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-xl bg-paper-sunk p-3.5"><dt className="eyebrow text-ink-3">{t('ease.sa.first')}</dt><dd className="mt-1 text-[15px] text-ink">{latest.problem}</dd></div>
-          <div className="hatch-b rounded-xl p-[3px]"><div className="h-full rounded-[10px] bg-paper-raised p-3"><dt className="eyebrow text-ink-3">{t('ease.sa.second')}</dt><dd className="mt-1 text-[15px] text-ink">{latest.arrow}</dd></div></div>
-        </dl>
-        <AnimatePresence>
-          {reflect === latest.id && (
-            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-3 rounded-xl border border-line p-4">
-              <p className="text-[15px] leading-relaxed text-ink">
-                {t('ease.sa.reflection', { p: latest.problem.replace(/\.$/, ''), a: latest.arrow.replace(/\.$/, '') })}
-              </p>
-              <p className="eyebrow mt-3 break-words text-ink-3">{t('ease.sa.drafted')}</p>
-            </motion.div>
+      {shown && (
+        <div className="mt-7 border-t border-line pt-5">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <Eyebrow>{isLatest ? t('c.latest', { d: fmtDate(shown.date) }) : t('ease.sa.entryOn', { d: fmtDate(shown.date) })}</Eyebrow>
+            {reflect === shown.id
+              ? <Button size="sm" variant="ghost" onClick={() => setReflect(null)} className="whitespace-nowrap">{t('ease.sa.hideReflect')}</Button>
+              : <Button size="sm" variant="ghost" onClick={() => setReflect(shown.id)} className="whitespace-nowrap"><Sparkles size={14} /> {t('ease.sa.reflect')}</Button>}
+          </div>
+          <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl bg-paper-sunk p-3.5"><dt className="eyebrow text-ink-3">{t('ease.sa.first')}</dt><dd className="mt-1 break-words text-[15px] text-ink">{shown.problem}</dd></div>
+            <div className="hatch-b rounded-xl p-[3px]"><div className="h-full rounded-[10px] bg-paper-raised p-3"><dt className="eyebrow text-ink-3">{t('ease.sa.second')}</dt><dd className="mt-1 break-words text-[15px] text-ink">{shown.arrow}</dd></div></div>
+          </dl>
+          <AnimatePresence>
+            {reflect === shown.id && (
+              <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-3 rounded-xl border border-line p-4">
+                <p className="text-[15px] leading-relaxed text-ink">
+                  {t('ease.sa.reflection', { p: shown.problem.replace(/\.$/, ''), a: shown.arrow.replace(/\.$/, '') })}
+                </p>
+                <p className="eyebrow mt-3 break-words text-ink-3">{t('ease.sa.drafted')}</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          {entries.length > 1 && (
+            <div className="mt-5">
+              <Eyebrow>{t('ease.sa.all')}</Eyebrow>
+              <ul className="mt-2 space-y-1" aria-label={t('ease.sa.all')}>
+                {list.map((e) => (
+                  <li key={e.id}>
+                    <button type="button" onClick={() => { setPicked(e.id); if (reflect !== e.id) setReflect(null) }} aria-pressed={e.id === shown.id} className={clsx('grid w-full grid-cols-[4.25rem_minmax(0,1fr)] gap-2 rounded-xl px-3 py-2 text-left text-[14px] focus-ring', e.id === shown.id ? 'bg-paper-sunk text-ink' : 'text-ink-2 hover:bg-paper-sunk')}>
+                      <span className="num text-ink-3">{dm(e.date)}</span>
+                      <span className="min-w-0 truncate">{e.problem}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {entries.length > LIMIT && (
+                <button type="button" onClick={() => setShowAll((v) => !v)} className="mt-2 rounded text-[13px] text-ink underline-offset-4 hover:underline focus-ring">
+                  {showAll ? t('ease.sa.showFewer') : t('ease.sa.showAll', { n: entries.length })}
+                </button>
+              )}
+            </div>
           )}
-        </AnimatePresence>
-        {entries.length > 1 && <p className="mt-4 text-[13px] text-ink-3">{r('ease.sa.entries', { n: <span className="num">{entries.length}</span> })}</p>}
-      </div>
+          {thisMonth > 0 && <p className="mt-4 text-[13px] text-ink-3">{r('ease.sa.entries', { n: <span className="num">{thisMonth}</span> })}</p>}
+        </div>
+      )}
     </ToolCard>
   )
 }
@@ -246,7 +277,8 @@ function Screens({ history, setHistory }: { history: History; setHistory: Dispat
   const h = history[screen]
   const latest = h[h.length - 1]
   const band = bandFor(screen, latest.score)
-  const start = () => { setAnswers(form.items.map(() => null)); setPain(null); setErr(null); setJustTook(null); setTaking(true) }
+  const [replaced, setReplaced] = useState(false)
+  const start = () => { setAnswers(form.items.map(() => null)); setPain(null); setErr(null); setJustTook(null); setReplaced(false); setTaking(true) }
   const cancel = () => { setTaking(false); setErr(null) }
   const submit = () => {
     let score: number
@@ -259,8 +291,10 @@ function Screens({ history, setHistory }: { history: History; setHistory: Dispat
       const top = form.options.length - 1
       score = answers.reduce<number>((sum, a, i) => sum + (form.reverse?.includes(i) ? top - (a ?? 0) : (a ?? 0)), 0)
     }
-    setHistory((x) => ({ ...x, [screen]: [...x[screen], { date: SPACE_TODAY, score }] }))
-    setTaking(false); setErr(null); setJustTook(screen)
+    // A second sitting today corrects today's result rather than adding another bar.
+    const again = h[h.length - 1].date === SPACE_TODAY
+    setHistory((x) => ({ ...x, [screen]: [...x[screen].filter((e, i, all) => !(i === all.length - 1 && e.date === SPACE_TODAY)), { date: SPACE_TODAY, score }] }))
+    setTaking(false); setErr(null); setJustTook(screen); setReplaced(again)
   }
   const takenToday = latest.date === SPACE_TODAY
   return (
@@ -294,7 +328,7 @@ function Screens({ history, setHistory }: { history: History; setHistory: Dispat
           <AnimatePresence mode="wait" initial={false}>
             {!taking ? (
               <motion.div key="result" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex h-full flex-col">
-                {justTook === screen && <p role="status" className="mb-4 flex items-center gap-2 text-[14px] text-ink-2"><Check size={14} className="shrink-0" aria-hidden /> {t('ease.sc.saved')}</p>}
+                {justTook === screen && <p role="status" className="mb-4 flex items-center gap-2 text-[14px] text-ink-2"><Check size={14} className="shrink-0" aria-hidden /> {t(replaced ? 'ease.sc.replaced' : 'ease.sc.saved')}</p>}
                 <Eyebrow>{t('c.latest', { d: fmtDate(latest.date) })}</Eyebrow>
                 <div className="mt-2 flex items-end gap-3">
                   <span className="num text-[3.5rem] font-light leading-none text-ink">{latest.score}</span>
@@ -303,11 +337,11 @@ function Screens({ history, setHistory }: { history: History; setHistory: Dispat
                 <p className="mt-4 rounded-xl bg-paper-sunk p-4 text-[17px] text-ink">{d(band.copy)}</p>
                 <p className="eyebrow mt-2 text-ink-3">{t('ease.sc.copy', { screen: label(screen) })}</p>
                 {band.route && (
-                  <p className="mt-3 flex items-start gap-2 rounded-xl border border-line-strong p-3.5 text-[15px] text-ink"><Stethoscope size={16} className="mt-0.5 shrink-0" aria-hidden /> {t(ROUTE_COPY[screen])}</p>
+                  <p className="mt-3 flex items-start gap-2 rounded-xl border border-line-strong p-3.5 text-[15px] text-ink"><Stethoscope size={16} className="mt-0.5 shrink-0" aria-hidden /> {t(routeFor(screen, latest.score).copy)}</p>
                 )}
                 <div className="mt-auto flex flex-wrap items-center gap-3 pt-5">
                   {takenToday
-                    ? <><Link to="/app/care/messages" className="inline-flex items-center gap-1.5 rounded text-[15px] text-ink underline-offset-4 hover:underline focus-ring">{t('ease.sc.message')} <ArrowRight size={15} /></Link><span className="text-[14px] text-ink-3">{t('ease.sc.next', { screen: label(screen), cad: d(meta.cadence.toLowerCase()) })}</span></>
+                    ? <><Link to="/app/care/messages" className="inline-flex items-center gap-1.5 rounded text-[15px] text-ink underline-offset-4 hover:underline focus-ring">{t('ease.sc.message')} <ArrowRight size={15} /></Link><Button size="sm" variant="ghost" onClick={start}>{t('ease.sc.retake')}</Button><span className="w-full text-[14px] text-ink-3">{t('ease.sc.next', { screen: label(screen), cad: d(meta.cadence.toLowerCase()) })}</span></>
                     : <><Button variant="ink" onClick={start} className="!whitespace-normal">{r('ease.sc.take', { screen: label(screen), n: <span className="num">{form.minutes}</span> })}</Button><span className="text-[14px] text-ink-3">{t('ease.sc.cad', { cad: d(meta.cadence) })}</span></>}
                 </div>
               </motion.div>
@@ -369,6 +403,12 @@ const ROUTE_COPY: Record<Screen, SpKey> = {
   ISI: 'ease.route.ISI',
   'PSS-4': 'ease.route.PSS-4',
   Pain: 'ease.route.Pain',
+}
+
+/** Who a routed result goes to, how soon, and the pre-approved copy. Severe PHQ-4 (9–12) is a same-day call, as its band copy says. */
+function routeFor(screen: Screen, score: number): { who: string; within: string; copy: SpKey } {
+  if (screen === 'PHQ-4' && score >= 9) return { who: ROUTE_TO['PHQ-4'].who, within: 'Call today', copy: 'ease.route.PHQ-4.today' }
+  return { ...ROUTE_TO[screen], copy: ROUTE_COPY[screen] }
 }
 
 // ─── Sleep plan & wind-down ───────────────────────────────────────────────
@@ -466,14 +506,33 @@ const ROUTED_BEFORE = [
   { on: '2026-07-06', what: 'ISI 15', who: 'Dr Meera Iyer', outcome: 'Reviewed in 31 h · sleep plan, no study · closed' },
 ]
 
-function ClinicianRouting({ tasks, onTalk }: { tasks: { screen: Screen; score: number }[]; onTalk: () => void }) {
+type RoutingTask = { id: string; screen: Screen; score: number; on: string }
+type TaskState = { status: 'callRequested' | 'closed' }
+
+function ClinicianRouting({ tasks, onTalk }: { tasks: RoutingTask[]; onTalk: () => void }) {
   const sanjay = TEAM.find((p) => p.role === 'Psychologist')!
   const meera = TEAM.find((p) => p.role === 'Physician')!
   const { t, d, r, dm } = useSpaceText()
   const label = (x: Screen) => (x === 'Pain' ? t('ease.pain') : x)
+  // What the member did with each routed task (keyed by screen, date and score), kept with the record.
+  const [states, setStates] = useSpaceState<Record<string, TaskState>>('ease.routing.v1', {})
+  const open = tasks.filter((task) => states[task.id]?.status !== 'closed')
+  // Closed tasks stay in the audit trail even after today's result is corrected.
+  const closed = Object.entries(states).flatMap(([id, st]) => {
+    const [screen, on, score] = id.split(':')
+    return st.status === 'closed' && screen in SCREEN_META ? [{ id, screen: screen as Screen, on, score: Number(score) }] : []
+  })
+  const setTask = (id: string, st: TaskState | null) => setStates((x) => {
+    const next = { ...x }
+    if (st) next[id] = st
+    else delete next[id]
+    return next
+  })
   const rules = [
+    { when: t('ease.cr.r0w'), then: t('ease.cr.r0t', { name: sanjay.name }) },
     { when: t('ease.cr.r1w'), then: t('ease.cr.r1t', { name: sanjay.name }) },
     { when: t('ease.cr.r2w'), then: t('ease.cr.r2t', { name: meera.name }) },
+    { when: t('ease.cr.r5w'), then: t('ease.cr.r5t') },
     { when: t('ease.cr.r3w'), then: t('ease.cr.r3t', { name: meera.name }) },
     { when: t('ease.cr.r4w'), then: t('ease.cr.r4t') },
   ]
@@ -498,19 +557,40 @@ function ClinicianRouting({ tasks, onTalk }: { tasks: { screen: Screen; score: n
         ))}
       </dl>
       <div className="mt-6 border-t border-line pt-4">
-        {tasks.length > 0 && <Eyebrow>{t('ease.cr.open')}</Eyebrow>}
-        <ul className={clsx('space-y-2', tasks.length > 0 && 'mt-2.5')} aria-live="polite">
-          {tasks.map((task) => (
-            <li key={task.screen} className="rounded-xl border border-line-strong bg-paper-raised p-3 text-[14px]">
-              <span className="flex items-center justify-between gap-2 text-ink"><span>{label(task.screen)} <span className="num">{task.score}</span> · {d(ROUTE_TO[task.screen].who)}</span><span className="num shrink-0 text-[12px] text-ink-3">{dm(SPACE_TODAY)}</span></span>
-              <span className="mt-0.5 block text-[13px] text-ink-2">{t('ease.cr.task', { within: d(ROUTE_TO[task.screen].within) })}</span>
-            </li>
-          ))}
+        {open.length > 0 && <Eyebrow>{t('ease.cr.open')}</Eyebrow>}
+        <ul className={clsx('space-y-2', open.length > 0 && 'mt-2.5')} aria-live="polite">
+          {open.map((task) => {
+            const rt = routeFor(task.screen, task.score)
+            const st = states[task.id]?.status
+            return (
+              <li key={task.id} className="rounded-xl border border-line-strong bg-paper-raised p-3 text-[14px]">
+                <span className="flex items-center justify-between gap-2 text-ink"><span>{label(task.screen)} <span className="num">{task.score}</span> · {d(rt.who)}</span><span className="num shrink-0 text-[12px] text-ink-3">{dm(task.on)}</span></span>
+                <span className="mt-0.5 block text-[13px] text-ink-2">{t('ease.cr.task', { within: d(rt.within) })}</span>
+                <span className="mt-1 block text-[13px] text-ink-3" role="status">{st === 'callRequested' ? t('ease.cr.soonerDone', { who: d(rt.who) }) : t('ease.cr.waiting')}</span>
+                <span className="mt-2.5 flex flex-wrap gap-2">
+                  {st !== 'callRequested' && <Button size="sm" variant="ghost" onClick={() => setTask(task.id, { status: 'callRequested' })}><Phone size={13} /> {t('ease.cr.sooner')}</Button>}
+                  <Button size="sm" variant="ghost" onClick={() => setTask(task.id, { status: 'closed' })}><Check size={13} /> {t('ease.cr.close')}</Button>
+                </span>
+              </li>
+            )
+          })}
         </ul>
-        <Eyebrow className={tasks.length ? 'mt-4' : undefined}>{t('ease.cr.before')}</Eyebrow>
+        <Eyebrow className={open.length ? 'mt-4' : undefined}>{t('ease.cr.before')}</Eyebrow>
         <ul className="mt-2.5 space-y-2">
-          {(tasks.length ? ROUTED_BEFORE.slice(0, 1) : ROUTED_BEFORE).map((rb) => (
-            <li key={rb.what} className="rounded-xl bg-paper-raised p-3 text-[14px]">
+          {closed.map((task) => {
+            const rt = routeFor(task.screen, task.score)
+            return (
+              <li key={task.id} className="rounded-xl bg-paper-raised p-3 text-[14px]">
+                <span className="flex items-center justify-between gap-2 text-ink"><span><span className="num">{task.screen === 'Pain' ? label(task.screen) : task.screen} {task.score}</span> · {d(rt.who)}</span><span className="num shrink-0 text-[12px] text-ink-3">{fmtDate(task.on)}</span></span>
+                <span className="mt-0.5 flex flex-wrap items-center justify-between gap-2 text-[13px] text-ink-2">
+                  {t('ease.cr.closedBy', { who: d(rt.who) })}
+                  <button type="button" onClick={() => setTask(task.id, null)} className="rounded text-ink underline-offset-4 hover:underline focus-ring">{t('ease.cr.reopen')}</button>
+                </span>
+              </li>
+            )
+          })}
+          {ROUTED_BEFORE.map((rb) => (
+            <li key={rb.on + rb.what} className="rounded-xl bg-paper-raised p-3 text-[14px]">
               <span className="flex items-center justify-between gap-2 text-ink"><span><span className="num">{rb.what}</span> · {rb.who}</span><span className="num shrink-0 text-[12px] text-ink-3">{fmtDate(rb.on)}</span></span>
               <span className="mt-0.5 block text-[13px] text-ink-2">{d(rb.outcome)}</span>
             </li>

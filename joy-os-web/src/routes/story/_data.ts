@@ -7,7 +7,7 @@ import type { TermKey } from '@/domain/types'
 export const ALL_TERMS: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 
 // ─── Surfaces and outcomes ───────────────────────────────────────────────────
-export type SurfaceKey = 'app' | 'web' | 'whatsapp' | 'watch' | 'coach' | 'clinical' | 'partner' | 'tenant' | 'science' | 'ops'
+export type SurfaceKey = 'app' | 'web' | 'whatsapp' | 'watch' | 'coach' | 'clinical' | 'partner' | 'tenant' | 'science' | 'ops' | 'exec'
 export const SURFACES: { key: SurfaceKey; name: string; sub: string; group: 'member' | 'console'; to: string }[] = [
   { key: 'app', name: 'Member app', sub: 'iOS · Android', group: 'member', to: '/app' },
   { key: 'web', name: 'Joy OS web', sub: 'Index, plans, events', group: 'member', to: '/app/index' },
@@ -19,6 +19,7 @@ export const SURFACES: { key: SurfaceKey; name: string; sub: string; group: 'mem
   { key: 'tenant', name: 'Tenant admin', sub: 'Aggregates only, ≥ 50', group: 'console', to: '/console/tenant' },
   { key: 'science', name: 'Science Office', sub: 'Methods · cohorts', group: 'console', to: '/console/science' },
   { key: 'ops', name: 'Control plane', sub: 'Flags · evals · SLOs', group: 'console', to: '/console/ops' },
+  { key: 'exec', name: 'Leadership scoreboard', sub: 'Re-measured per rupee', group: 'console', to: '/console/exec' },
 ]
 
 export type OutcomeKey = 'delta' | 'remeasure' | 'cost'
@@ -51,11 +52,11 @@ export const MODULES: Module[] = [
   {
     n: '01', name: 'Index engine', what: 'Instrument registry, questionnaires, scoring, bands and method versions; Check → Index → Clinical; JALY as a research metric only.',
     terms: ALL_TERMS, termNote: 'All six', release: 'J0', releaseNote: 'J0 · Edition 01', kept: 'LONGEVIS scoring pattern',
-    surfaces: ['app', 'web', 'whatsapp', 'science', 'clinical'], outcomes: ['delta', 'remeasure'],
+    surfaces: ['app', 'web', 'whatsapp', 'science', 'clinical', 'exec'], outcomes: ['delta', 'remeasure'],
     data: ['IndexScore (method pinned)', 'InstrumentResponse', 'MethodVersion · weights · λ'],
     arch: ['index', 'ops-db', 'research'],
     test: { raise: 'All six, by making each one measurable: it is how every term is known.', know: 'Re-measure rate and test–retest reliability per instrument.', miss: 'Without it there is no number that can go down, and so no product.' },
-    routes: [{ label: 'The Check', to: '/check' }, { label: 'Your Index', to: '/app/index' }, { label: 'The method', to: '/app/method' }],
+    routes: [{ label: 'The Check', to: '/check' }, { label: 'Your Index', to: '/app/index' }, { label: 'The method', to: '/app/method' }, { label: 'Leadership scoreboard', to: '/console/exec' }],
   },
   {
     n: '02', name: 'Today', what: 'Home: the Index, the Wheel, the lowest term, one action, the circle, the next measure date.',
@@ -132,7 +133,7 @@ export const MODULES: Module[] = [
   {
     n: '10', name: 'Signals', what: 'HealthKit, Health Connect, Terra, labs, Signal Points, Joy Ledger experience sampling, calendar (opt-in).',
     terms: ALL_TERMS, termNote: 'All six', release: 'J0', releaseNote: 'J0 · Edition 01', kept: 'Terra, labs, ABDM',
-    surfaces: ['app', 'watch', 'whatsapp', 'ops'], outcomes: ['remeasure', 'cost'],
+    surfaces: ['app', 'watch', 'whatsapp', 'ops', 'exec'], outcomes: ['remeasure', 'cost'],
     data: ['Time series (sleep, HRV, steps)', 'Ledger entries', 'Device link · consent'],
     arch: ['device', 'terra', 'esm', 'signal-points', 'calendar', 'timeseries'],
     test: { raise: 'None directly: it makes every term cheaper to know.', know: 'Record capture cost per person-year, ₹40,000 → ₹400.', miss: 'They would notice re-measuring become harder.' },
@@ -150,16 +151,16 @@ export const MODULES: Module[] = [
   {
     n: '12', name: 'Commerce and memberships', what: 'Joy OS Plus, Circle, Clinical, Patron; ’cation and event payments; Joy Passport; prepaid partner stays.',
     terms: [], termNote: 'No term: it funds the loop', release: 'J1', releaseNote: 'J1 · Joy OS 1.0', kept: 'Razorpay, GST, entitlements',
-    surfaces: ['app', 'web', 'partner'], outcomes: ['cost'],
+    surfaces: ['app', 'web', 'partner', 'exec'], outcomes: ['cost'],
     data: ['Entitlement', 'Invoice (GST)', 'Joy Passport balance'],
     arch: ['commerce'],
     test: { raise: 'None. It must never sit beside a score.', know: 'Renewal on the delta, not on urgency.', miss: 'Only if it got in the way, which is the test.' },
-    routes: [{ label: 'Membership plans', to: '/app/membership' }, { label: 'Partner console', to: '/console/partner' }],
+    routes: [{ label: 'Membership plans', to: '/app/membership' }, { label: 'Partner console', to: '/console/partner' }, { label: 'Leadership scoreboard', to: '/console/exec' }],
   },
   {
     n: '13', name: 'Households and tenants', what: 'Couples, families, Family Joy Office; Joyspan@Work, insurer, hospital, House and residence tenants; aggregate dashboards.',
     terms: ['R', 'H', 'P', 'F', 'D', 'B'], termNote: 'Relationships · all', release: 'J3', releaseNote: 'J3 households, Joyspan@Work and the first insurer tenant · J4 licensed tenants at scale', kept: 'Corporate portal, RLS',
-    surfaces: ['app', 'tenant'], outcomes: ['remeasure', 'cost'],
+    surfaces: ['app', 'tenant', 'exec'], outcomes: ['remeasure', 'cost'],
     data: ['Household (partner answers private)', 'Tenant · eligibility · SSO', 'Aggregates, k ≥ 10, ≥ 50'],
     arch: ['households', 'identity', 'analytics'],
     test: { raise: 'Relationships at home; every term at scale.', know: 'CSI-4 per partner; tenant cohort deltas.', miss: 'Couples would, and every employer that licenses it.' },

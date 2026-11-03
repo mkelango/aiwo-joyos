@@ -50,8 +50,10 @@ function useLinks() {
 export default function NotFound() {
   const { pathname } = useLocation()
   const nav = useNavigate()
-  const inApp = pathname.startsWith('/app')
-  const inConsole = pathname.startsWith('/console')
+  // A segment match, as ErrorBoundary does: /apps, /apple or /consoles are top-level
+  // unknown paths (no MemberLayout or ConsoleLayout around them) and take the public face.
+  const inApp = pathname === '/app' || pathname.startsWith('/app/')
+  const inConsole = pathname === '/console' || pathname.startsWith('/console/')
   const t = useDict(NF)
   const te = useDict(E)
   const L = useLinks()

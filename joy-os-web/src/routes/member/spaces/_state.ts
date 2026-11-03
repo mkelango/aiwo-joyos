@@ -41,3 +41,15 @@ export function useSpaceState<T>(key: string, initial: T | (() => T)): [T, Dispa
   }, [key, v])
   return [v, setV]
 }
+
+/** One-off read of a saved Space value (for a reply drafted from what another card saved). */
+export function readSpaceState<T>(key: string, initial: T): T {
+  try {
+    const raw = localStorage.getItem(PREFIX + key)
+    if (raw === null) return initial
+    const parsed: unknown = JSON.parse(raw)
+    return sameShape(parsed, initial) ? (parsed as T) : initial
+  } catch {
+    return initial
+  }
+}

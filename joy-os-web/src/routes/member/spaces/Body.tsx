@@ -1,12 +1,15 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronLeft, Link2, Lock, Pause, Play, RotateCcw, Search, ShieldCheck, Timer } from 'lucide-react'
+import { ArrowDown, ArrowRight, ArrowUp, Check, ChevronDown, ChevronLeft, Link2, Lock, Pause, Play, Plus, RotateCcw, Search, ShieldCheck, Smartphone, Timer, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { DaybreakButton, Eyebrow, MethodLine, SpecimenTag, fmtDate } from '@/components/joy/primitives'
 import { Button, Pill, Sheet, Tabs } from '@/components/ui'
-import { BIOMARKERS, CAPACITY, DEVICES, LE8, PANEL_META, SIGNALS, SPACE_TODAY, type Marker, type MarkerStatus } from './_data'
+import { DEVICES as ACCOUNT_DEVICES, type DeviceState } from '@/routes/member/account/_data'
+import { useData as useAccountData } from '@/routes/member/account/_i18n'
+import { usePersisted } from '@/routes/member/account/_util'
+import { BIOMARKERS, CAPACITY, CAPACITY_HISTORY_START, LE8, LE8_HEIGHT_CM, LE8_KEY, LE8_LOG_START, PANEL_META, SIGNALS, SPACE_TODAY, bmiOf, le8Latest, le8Score, le8Series, le8Status, type Le8Key, type Le8Reading, type Marker, type MarkerStatus } from './_data'
 import { ChartTip, SpaceShell, ToolCard, axisTick, Toggle } from './_SpaceShell'
 import { useSpaceText, type SpKey } from './_i18n'
 import { useSpaceState } from './_state'
@@ -35,46 +38,101 @@ export default function Body() {
 
 // ─── Device link ──────────────────────────────────────────────────────────
 
+// The device record /app/devices keeps (joyos:acct:devices) is the one source of truth:
+// a link or disconnect here shows there, and the reverse. Same key, same shape.
+type DeviceOverride = { state: DeviceState; lastSync?: string; freshness?: 'fresh' | 'stale' }
+type AcctDevice = (typeof ACCOUNT_DEVICES)[number]
+function applyDeviceStates(states: Record<string, DeviceOverride>): AcctDevice[] {
+  // As on /app/devices: Android-only sources keep their own state.
+  return ACCOUNT_DEVICES.map((d) => (states[d.id] ? { ...d, ...states[d.id], state: states[d.id].state === 'available' && d.state === 'android' ? 'android' : states[d.id].state } : d))
+}
+
 function DeviceLink() {
-  const [state, setState] = useState<Record<string, 'connected' | 'available' | 'linking'>>(() => Object.fromEntries(DEVICES.map((d) => [d.id, d.status])))
-  const [sharing, setSharing] = useState<Record<string, boolean>>({ oura: true, hk: true })
-  const { t, d, r } = useSpaceText()
-  const link = (id: string) => {
-    setState((s) => ({ ...s, [id]: 'linking' }))
-    window.setTimeout(() => {
-      setState((s) => ({ ...s, [id]: 'connected' }))
-      setSharing((s) => ({ ...s, [id]: true }))
+  const [saved, setSaved] = usePersisted<{ states: Record<string, DeviceOverride> }>('devices', { states: {} })
+  const devices = useMemo(() => applyDeviceStates(saved.states), [saved])
+  const setDevice = (id: string, patch: DeviceOverride) => setSaved((cur) => {
+    const next = applyDeviceStates(cur.states).map((d) => (d.id === id ? { ...d, ...patch } : d))
+    return { states: Object.fromEntries(next.map((d) => [d.id, { state: d.state, lastSync: d.lastSync, freshness: d.freshness }])) }
+  })
+  // Pausing a share is this card's own choice (the device stays linked), kept apart from the device record.
+  const [paused, setPaused] = useSpaceState<Record<string, boolean>>('body.devices.paused.v1', {})
+  const [linking, setLinking] = useState<string | null>(null)
+  const [confirm, setConfirm] = useState<AcctDevice | null>(null)
+  const [note, setNote] = useState('')
+  const timer = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+  const { t, r } = useSpaceText()
+  const dx = useAccountData()
+  const link = (dv: AcctDevice) => {
+    setLinking(dv.id); setNote('')
+    window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => {
+      setDevice(dv.id, { state: 'connected', lastSync: 'Just now', freshness: 'fresh' })
+      setPaused((p) => ({ ...p, [dv.id]: false }))
+      setLinking(null)
+      setNote(t('body.dev.linked', { name: dv.name }))
     }, 1200)
   }
+  const disconnect = (dv: AcctDevice) => {
+    setDevice(dv.id, { state: 'available' })
+    setPaused((p) => ({ ...p, [dv.id]: false }))
+    setConfirm(null)
+    setNote(t('body.dev.disconnected', { name: dv.name }))
+  }
+  // Connected first, then the ones that can be linked; Android-only sources last.
+  const order: Record<DeviceState, number> = { connected: 0, available: 1, android: 2 }
+  const list = [...devices].sort((a, b) => order[a.state] - order[b.state])
   return (
-    <ToolCard className="w-full" eyebrow={t('body.dev.eyebrow')} title={t('body.dev.title')} sub={t('body.dev.sub')}>
+    <ToolCard className="w-full" eyebrow={t('body.dev.eyebrow')} title={t('body.dev.title')} sub={t('body.dev.sub')} aside={<SpecimenTag />}>
       <ul className="space-y-3">
-        {DEVICES.map((dv) => {
-          const st = state[dv.id]
+        {list.map((dv) => {
+          const on = dv.state === 'connected'
+          const busy = linking === dv.id
+          const sharing = on && !paused[dv.id]
           return (
             <li key={dv.id} className="rounded-2xl border border-line p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[16px] text-ink">{dv.name} <span className="text-[13px] text-ink-3">{d(dv.via)}</span></p>
-                  <p className="mt-0.5 text-[13px] text-ink-2">{d(dv.reads)}</p>
+                  <p className="text-[16px] text-ink">{dv.name} <span className="text-[13px] text-ink-3">{dx(dv.via)}</span></p>
+                  <p className="mt-0.5 text-[13px] text-ink-2">{dv.signals.map(dx).join(', ')}</p>
                   <p className="mt-1.5 flex items-center gap-1.5 text-[13px] text-ink-3">
-                    <span className={clsx('h-2 w-2 rounded-full', st === 'connected' ? 'bg-term-h' : 'border border-line-strong')} aria-hidden />
-                    {st === 'connected' ? (sharing[dv.id] ? (dv.id === 'oura' || dv.id === 'hk' ? d(dv.last) : t('body.dev.linkedNow')) : t('body.dev.paused')) : st === 'linking' ? t('body.dev.linking') : t('body.dev.notLinked')}
+                    <span className={clsx('h-2 w-2 shrink-0 rounded-full', on ? 'bg-term-h' : 'border border-line-strong')} aria-hidden />
+                    {on
+                      ? (sharing ? t('body.dev.lastSync', { when: dx(dv.lastSync ?? 'Just now') }) : t('body.dev.paused'))
+                      : busy ? t('body.dev.linking') : dv.state === 'android' ? <span className="inline-flex items-center gap-1"><Smartphone size={13} aria-hidden /> {t('body.dev.notLinked')}</span> : t('body.dev.notLinked')}
                   </p>
                 </div>
-                {st === 'connected' ? (
+                {on ? (
                   <div className="pt-0.5">
-                    <Toggle checked={!!sharing[dv.id]} onChange={(v) => setSharing((s) => ({ ...s, [dv.id]: v }))} label={<span className="sr-only">{t('body.dev.share', { name: dv.name })}</span>} />
+                    <Toggle checked={sharing} onChange={(v) => setPaused((s) => ({ ...s, [dv.id]: !v }))} label={<span className="sr-only">{t('body.dev.share', { name: dv.name })}</span>} />
                   </div>
-                ) : (
-                  <Button size="sm" onClick={() => link(dv.id)} disabled={st === 'linking'} className="shrink-0"><Link2 size={14} /> {st === 'linking' ? t('body.dev.linkingBtn') : t('body.dev.link')}</Button>
+                ) : dv.state === 'android' ? null : (
+                  <Button size="sm" onClick={() => link(dv)} disabled={busy || !!linking} className="shrink-0"><Link2 size={14} /> {busy ? t('body.dev.linkingBtn') : t('body.dev.link')}</Button>
                 )}
               </div>
+              {on && (
+                <div className="mt-2 flex justify-end">
+                  <button type="button" onClick={() => setConfirm(dv)} className="rounded text-[13px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring">{t('body.dev.disconnect')}</button>
+                </div>
+              )}
             </li>
           )
         })}
       </ul>
+      {note && <p role="status" className="mt-3 flex items-center gap-2 text-[14px] text-ink-2"><Check size={14} className="shrink-0" aria-hidden /> {note}</p>}
+      <Link to="/app/devices" className="mt-4 inline-flex items-center gap-1.5 self-start rounded text-[15px] text-ink underline-offset-4 hover:underline focus-ring">{t('body.dev.manage')} <ArrowRight size={15} /></Link>
       <p className="mt-4 flex items-start gap-2 text-[13px] text-ink-3"><ShieldCheck size={15} className="mt-0.5 shrink-0" aria-hidden /> <span>{r('body.dev.consent', { link: <Link to="/app/trust" className="rounded underline underline-offset-4 focus-ring">{t('c.trust')}</Link> })}</span></p>
+      <Sheet open={!!confirm} onClose={() => setConfirm(null)} title={t('body.dev.disconnectQ', { name: confirm?.name ?? '' })} side="center">
+        {confirm && (
+          <>
+            <p className="text-[17px] text-ink-2">{t('body.dev.disconnectBody')}</p>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setConfirm(null)}>{t('body.dev.keep')}</Button>
+              <Button variant="ink" onClick={() => disconnect(confirm)}>{t('body.dev.disconnect')}</Button>
+            </div>
+          </>
+        )}
+      </Sheet>
     </ToolCard>
   )
 }
@@ -92,11 +150,52 @@ const LE8_IDEAL: Record<string, string> = {
   bp: 'Ideal is under 120 / 80 mmHg.',
 }
 
+/** Accepted range per metric, as numbers and units (the same in every language). */
+const LE8_RANGE: Record<Le8Key, string> = {
+  diet: '0–16', activity: '0–1500 min', nicotine: '', sleep: '1–15 h', bmi: '30–250 kg', lipids: '40–400 mg/dL', glucose: '3.5–15%', bp: '70–250 / 40–150 mmHg',
+}
+
+function useLe8Reading() {
+  const { t } = useSpaceText()
+  return (r: Le8Reading) => {
+    const [x, y] = r.v
+    switch (r.key) {
+      case 'diet': return t('body.le8.r.diet', { n: x })
+      case 'activity': return t('body.le8.r.activity', { n: x })
+      case 'nicotine': return t(`body.le8.nic.${x}` as SpKey)
+      case 'sleep': return t('body.le8.r.sleep', { h: Math.floor(x / 60), m: String(x % 60).padStart(2, '0') })
+      case 'bmi': return t('body.le8.r.bmi', { bmi: bmiOf(x).toFixed(1), w: x })
+      case 'lipids': return t('body.le8.r.lipids', { n: x })
+      case 'glucose': return t('body.le8.r.glucose', { n: x.toFixed(1) })
+      case 'bp': return t('body.le8.r.bp', { s: x, d: y })
+    }
+  }
+}
+
 function Le8Tracker() {
   const [open, setOpen] = useState<string | null>('lipids')
-  const composite = Math.round(LE8.reduce((a, b) => a + b.score, 0) / LE8.length)
-  const { t, d } = useSpaceText()
+  const [store, setStore] = useSpaceState<{ log: Le8Reading[] }>(LE8_KEY, { log: LE8_LOG_START })
+  const [logging, setLogging] = useState<Le8Key | null>(null)
+  const [savedNote, setSavedNote] = useState('')
+  const { t, d, dm } = useSpaceText()
+  const reading = useLe8Reading()
+  const latest = useMemo(() => le8Latest(store.log), [store.log])
+  const series = useMemo(() => le8Series(store.log), [store.log])
+  const rows = LE8.map((m) => {
+    const r = latest[m.key as Le8Key]
+    const score = r ? le8Score(r.key, r.v) : m.score
+    return { ...m, key: m.key as Le8Key, r, score, status: le8Status(score) }
+  })
+  const composite = Math.round(rows.reduce((a, b) => a + b.score, 0) / rows.length)
   const label = { ideal: t('body.le8.ideal'), good: t('body.le8.good'), watch: t('body.watch') }
+  const save = (key: Le8Key, v: number[]) => {
+    const entry: Le8Reading = { id: `le8-${key}-${Date.now()}`, key, on: SPACE_TODAY, v, source: key === 'bp' ? 'Home cuff' : 'Entered by you', mine: true }
+    // One reading a day per metric: a second one today replaces the first you logged.
+    setStore((s) => ({ log: [...s.log.filter((x) => !(x.mine && x.key === key && x.on === SPACE_TODAY)), entry] }))
+    setLogging(null)
+    setSavedNote(t('body.le8.saved', { name: d(LE8.find((m) => m.key === key)!.name), score: le8Score(key, v) }))
+  }
+  const remove = (id: string) => setStore((s) => ({ log: s.log.filter((x) => x.id !== id) }))
   return (
     <ToolCard
       className="w-full"
@@ -105,40 +204,165 @@ function Le8Tracker() {
       sub={t('body.le8.sub')}
       aside={<div className="text-right"><span className="num block text-[2.25rem] font-light leading-none text-ink">{composite}</span><span className="eyebrow text-ink-3">{t('body.le8.composite')}</span></div>}
     >
+      {series.length > 1 && (
+        <div className="mb-4 rounded-xl bg-paper-sunk p-3">
+          <p className="eyebrow text-ink-3">{t('body.le8.trend')}</p>
+          <div className="mt-2 h-[88px]" aria-hidden>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={series} margin={{ top: 6, right: 18, left: -26, bottom: 0 }}>
+                <XAxis dataKey="on" tick={axisTick} tickLine={false} axisLine={{ stroke: 'var(--line)' }} tickFormatter={dm} />
+                <YAxis tick={axisTick} tickLine={false} axisLine={false} domain={['dataMin - 5', 'dataMax + 5']} allowDecimals={false} />
+                <Tooltip content={<ChartTip fmt={dm} />} cursor={{ stroke: 'var(--line-strong)' }} />
+                <Line isAnimationActive={false} type="monotone" dataKey="value" stroke="var(--term-h)" strokeWidth={2} dot={{ r: 3, fill: 'var(--term-h)' }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <p className="sr-only">{t('body.le8.trendSr', { list: series.map((p) => `${dm(p.on)} ${p.value}`).join(', ') })}</p>
+        </div>
+      )}
+      {savedNote && <p role="status" className="mb-2 flex items-center gap-2 text-[14px] text-ink-2"><Check size={14} className="shrink-0" aria-hidden /> {savedNote}</p>}
       <ul className="divide-y divide-line">
-        {LE8.map((m) => (
-          <li key={m.key}>
-            <button onClick={() => setOpen(open === m.key ? null : m.key)} aria-expanded={open === m.key} className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 py-3 text-left focus-ring rounded sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)_auto]">
-              <span className="min-w-0 break-words text-[15px] text-ink">{d(m.name)}</span>
-              <span className="order-3 col-span-2 flex items-center gap-3 sm:order-none sm:col-span-1">
-                <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-paper-sunk" aria-hidden>
-                  <span className="block h-full rounded-full bg-term-h" style={{ width: `${m.score}%`, opacity: m.status === 'watch' ? 0.55 : 1 }} />
+        {rows.map((m) => {
+          const hist = store.log.filter((x) => x.key === m.key).sort((a, b) => (a.on < b.on ? 1 : a.on > b.on ? -1 : 0))
+          return (
+            <li key={m.key}>
+              <button onClick={() => { setOpen(open === m.key ? null : m.key); setLogging(null) }} aria-expanded={open === m.key} className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 py-3 text-left focus-ring rounded sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)_auto]">
+                <span className="min-w-0 break-words text-[15px] text-ink">{d(m.name)}</span>
+                <span className="order-3 col-span-2 flex items-center gap-3 sm:order-none sm:col-span-1">
+                  <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-paper-sunk" aria-hidden>
+                    <span className="block h-full rounded-full bg-term-h" style={{ width: `${m.score}%`, opacity: m.status === 'watch' ? 0.55 : 1 }} />
+                  </span>
+                  <span className="num w-8 text-right text-[14px] text-ink">{m.score}</span>
                 </span>
-                <span className="num w-8 text-right text-[14px] text-ink">{m.score}</span>
-              </span>
-              <span className="flex items-center gap-2">
-                <span className={clsx('text-right text-[12px]', m.status === 'watch' ? 'text-ink' : 'text-ink-3')}>{label[m.status]}</span>
-                <ChevronDown size={15} className={clsx('text-ink-3 transition-transform', open === m.key && 'rotate-180')} aria-hidden />
-              </span>
-            </button>
-            <AnimatePresence initial={false}>
-              {open === m.key && (
-                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
-                  <div className="mb-3 grid gap-3 rounded-xl bg-paper-sunk p-3.5 text-[14px] sm:grid-cols-[auto_1fr]">
-                    <div>
-                      <span className="eyebrow block text-ink-3">{t('body.reading')}</span>
-                      <span className="num text-ink">{d(m.reading)}</span>
-                      <span className="block text-[12px] text-ink-3">{d(m.source)}</span>
+                <span className="flex items-center gap-2">
+                  <span className={clsx('text-right text-[12px]', m.status === 'watch' ? 'text-ink' : 'text-ink-3')}>{label[m.status]}</span>
+                  <ChevronDown size={15} className={clsx('text-ink-3 transition-transform', open === m.key && 'rotate-180')} aria-hidden />
+                </span>
+              </button>
+              <AnimatePresence initial={false}>
+                {open === m.key && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
+                    <div className="mb-3 rounded-xl bg-paper-sunk p-3.5 text-[14px]">
+                      <div className="grid gap-3 sm:grid-cols-[auto_1fr]">
+                        <div>
+                          <span className="eyebrow block text-ink-3">{t('body.reading')}</span>
+                          <span className="num text-ink">{m.r ? reading(m.r) : d(m.reading)}</span>
+                          <span className="block text-[12px] text-ink-3">{d(m.r?.source ?? m.source)}{m.r ? <> · <span className="num">{dm(m.r.on)}</span></> : null}</span>
+                        </div>
+                        <p className="text-ink-2 sm:border-l sm:border-line sm:pl-4">{d(LE8_IDEAL[m.key])}</p>
+                      </div>
+                      {hist.length > 0 && (
+                        <div className="mt-4 border-t border-line pt-3">
+                          <span className="eyebrow block text-ink-3">{t('body.le8.history')}</span>
+                          <ol className="mt-2 space-y-1.5">
+                            {hist.map((x) => (
+                              <li key={x.id} className="grid grid-cols-[4.25rem_minmax(0,1fr)_auto] items-center gap-2 text-[13px]">
+                                <span className="num text-ink-3">{dm(x.on)}</span>
+                                <span className="min-w-0 break-words text-ink">{reading(x)} <span className="text-ink-3">· {d(x.source)}</span></span>
+                                <span className="flex items-center gap-1.5">
+                                  <span className="num text-ink-2" aria-label={t('body.le8.score', { n: le8Score(x.key, x.v) })}>{le8Score(x.key, x.v)}</span>
+                                  {x.mine && <button type="button" onClick={() => remove(x.id)} aria-label={t('body.le8.removeReading', { d: dm(x.on) })} className="rounded-full p-1 text-ink-3 hover:bg-paper-raised focus-ring"><Trash2 size={13} /></button>}
+                                </span>
+                              </li>
+                            ))}
+                          </ol>
+                        </div>
+                      )}
+                      <div className="mt-4">
+                        {logging === m.key
+                          ? <Le8Form k={m.key} last={m.r} onSave={(v) => save(m.key, v)} onCancel={() => setLogging(null)} />
+                          : <Button size="sm" onClick={() => { setLogging(m.key); setSavedNote('') }}><Plus size={14} /> {t('body.le8.log')}</Button>}
+                      </div>
                     </div>
-                    <p className="text-ink-2 sm:border-l sm:border-line sm:pl-4">{d(LE8_IDEAL[m.key])}</p>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </li>
-        ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </li>
+          )
+        })}
       </ul>
     </ToolCard>
+  )
+}
+
+/** The input for one LE8 metric; numbers only, so nothing here needs the emergency intercept. */
+function Le8Form({ k, last, onSave, onCancel }: { k: Le8Key; last?: Le8Reading; onSave: (v: number[]) => void; onCancel: () => void }) {
+  const { t } = useSpaceText()
+  const lv = last?.v ?? []
+  const [a, setA] = useState(k === 'sleep' ? String(Math.floor((lv[0] ?? 420) / 60)) : k === 'nicotine' ? String(lv[0] ?? 0) : '')
+  const [b, setB] = useState(k === 'sleep' ? String((lv[0] ?? 420) % 60) : '')
+  const [err, setErr] = useState(false)
+  const id = `le8-${k}`
+  const num = (s: string) => (s.trim() === '' ? NaN : Number(s.replace(',', '.')))
+  const submit = () => {
+    const x = num(a)
+    const y = num(b)
+    const ok = (() => {
+      switch (k) {
+        case 'diet': return Number.isInteger(x) && x >= 0 && x <= 16
+        case 'activity': return Number.isInteger(x) && x >= 0 && x <= 1500
+        case 'nicotine': return Number.isInteger(x) && x >= 0 && x <= 4
+        case 'sleep': return Number.isInteger(x) && Number.isInteger(y) && y >= 0 && y < 60 && x * 60 + y >= 60 && x * 60 + y <= 900
+        case 'bmi': return x >= 30 && x <= 250
+        case 'lipids': return Number.isInteger(x) && x >= 40 && x <= 400
+        case 'glucose': return x >= 3.5 && x <= 15
+        case 'bp': return Number.isInteger(x) && Number.isInteger(y) && x >= 70 && x <= 250 && y >= 40 && y <= 150 && x > y
+      }
+    })()
+    if (!ok) return setErr(true)
+    onSave(k === 'sleep' ? [x * 60 + y] : k === 'bp' ? [x, y] : k === 'bmi' ? [Math.round(x * 10) / 10] : k === 'glucose' ? [Math.round(x * 10) / 10] : [x])
+  }
+  const inCls = 'num h-11 w-full rounded-xl border border-line-strong bg-paper px-3.5 text-[16px] text-ink focus-ring'
+  const field = (label: string, v: string, set: (s: string) => void, ph: string, decimal = false) => (
+    <label className="block min-w-0">
+      <span className="text-[13px] text-ink-2">{label}</span>
+      <input inputMode={decimal ? 'decimal' : 'numeric'} value={v} onChange={(e) => { set(e.target.value); setErr(false) }} placeholder={ph} aria-invalid={err} aria-describedby={err ? `${id}-err` : undefined} className={clsx(inCls, 'mt-1')} />
+    </label>
+  )
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); submit() }} noValidate className="space-y-3 rounded-xl border border-line bg-paper-raised p-3.5">
+      {k === 'diet' && field(t('body.le8.in.diet'), a, setA, '12')}
+      {k === 'activity' && field(t('body.le8.in.activity'), a, setA, '150')}
+      {k === 'nicotine' && (
+        <fieldset>
+          <legend className="text-[13px] text-ink-2">{t('body.le8.in.nicotine')}</legend>
+          <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
+            {[0, 1, 2, 3, 4].map((n) => (
+              <label key={n} className={clsx('cursor-pointer rounded-xl border px-3 py-2 text-[14px] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-[color:var(--daybreak)]', a === String(n) ? 'border-ink bg-ink text-paper' : 'border-line text-ink-2 hover:border-line-strong')}>
+                <input type="radio" name={id} className="sr-only" checked={a === String(n)} onChange={() => { setA(String(n)); setErr(false) }} />
+                {t(`body.le8.nic.${n}` as SpKey)}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+      {k === 'sleep' && (
+        <fieldset>
+          <legend className="text-[13px] text-ink-2">{t('body.le8.in.sleep')}</legend>
+          <div className="mt-1 grid grid-cols-2 gap-3">
+            {field(t('body.le8.in.hours'), a, setA, '7')}
+            {field(t('body.le8.in.minutes'), b, setB, '0')}
+          </div>
+        </fieldset>
+      )}
+      {k === 'bmi' && <>{field(t('body.le8.in.bmi'), a, setA, '77.2', true)}<p className="text-[12px] text-ink-3">{t('body.le8.in.bmiNote', { h: LE8_HEIGHT_CM })}</p></>}
+      {k === 'lipids' && <>{field(t('body.le8.in.lipids'), a, setA, '146')}<p className="text-[12px] text-ink-3">{t('body.le8.labNote')}</p></>}
+      {k === 'glucose' && <>{field(t('body.le8.in.glucose'), a, setA, '5.8', true)}<p className="text-[12px] text-ink-3">{t('body.le8.labNote')}</p></>}
+      {k === 'bp' && (
+        <fieldset>
+          <legend className="text-[13px] text-ink-2">{t('body.le8.in.bp')}</legend>
+          <div className="mt-1 grid grid-cols-2 gap-3">
+            {field(t('body.le8.in.sys'), a, setA, '128')}
+            {field(t('body.le8.in.dia'), b, setB, '78')}
+          </div>
+        </fieldset>
+      )}
+      {err && <p id={`${id}-err`} role="alert" className="text-[13px] text-error">{t('body.le8.err', { range: LE8_RANGE[k] || '0–4' })}</p>}
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" size="sm" variant="ink"><Check size={14} /> {t('body.le8.save')}</Button>
+        <Button size="sm" variant="ghost" onClick={onCancel}>{t('c.cancel')}</Button>
+      </div>
+    </form>
   )
 }
 
@@ -318,6 +542,11 @@ function CapacityBattery() {
     on: '2027-01-02', values: CAPACITY.map((c) => c.last), prev: CAPACITY.map((c) => c.prev), prevOn: null,
   })
   const prevLabel = latest.prevOn ? dm(latest.prevOn) : t('c.october')
+  // Every test kept, oldest first; one row a day (a second test today replaces the first).
+  const [history, setHistory] = useSpaceState<{ on: string; values: number[] }[]>('body.capacity.history.v1', () => {
+    const seed = CAPACITY_HISTORY_START.filter((h) => h.on !== latest.on)
+    return [...seed, { on: latest.on, values: latest.values }].sort((a, b) => (a.on < b.on ? -1 : a.on > b.on ? 1 : 0))
+  })
   const [justSaved, setJustSaved] = useState(false)
   const steps: Step[] = ['grip', 'sts', 'gait']
   const idx = steps.indexOf(step)
@@ -339,7 +568,13 @@ function CapacityBattery() {
   const results = step === 'done' ? [Number(grip), sts!, Math.round((4 / gaitTime!) * 100) / 100] : null
   const back = () => { setErr(''); setStep(step === 'gait' ? 'sts' : 'grip') }
   const done = () => {
-    if (results) setLatest((l) => ({ on: SPACE_TODAY, values: results, prev: l.values, prevOn: l.on }))
+    if (results) {
+      setLatest((l) => (l.on === SPACE_TODAY
+        // A retake on the same day replaces today's reading and keeps the earlier comparison.
+        ? { ...l, values: results }
+        : { on: SPACE_TODAY, values: results, prev: l.values, prevOn: l.on }))
+      setHistory((h) => [...h.filter((x) => x.on !== SPACE_TODAY), { on: SPACE_TODAY, values: results }])
+    }
     setStep('intro'); setGrip(''); setSts(null); setStsManual(''); setGaitTime(null); setJustSaved(true)
   }
 
@@ -364,6 +599,7 @@ function CapacityBattery() {
               )
             })}
           </ul>
+          <CapacityHistory history={history} />
           <p className="mt-4 rounded-xl bg-paper-sunk p-3.5 text-[14px] text-ink-2"><b className="font-medium text-ink">{t('body.cap.beforeT')}</b> {t('body.cap.beforeB')}</p>
           <div className="mt-auto flex flex-wrap items-center gap-3 pt-6">
             <DaybreakButton onClick={() => { setJustSaved(false); setStep('grip') }}>{t('body.cap.start')}</DaybreakButton>
@@ -440,6 +676,49 @@ function CapacityBattery() {
         </div>
       )}
     </ToolCard>
+  )
+}
+
+/** Every home test, newest first, with the direction of each move. A fall is shown plainly, never in red. */
+function CapacityHistory({ history }: { history: { on: string; values: number[] }[] }) {
+  const { t, d, dm } = useSpaceText()
+  const rows = [...history].reverse()
+  return (
+    <div className="mt-5 overflow-x-auto">
+      <table className="w-full min-w-[320px] border-collapse text-left text-[13px]">
+        <caption className="eyebrow pb-2 text-left text-ink-3">{t('body.cap.history')}</caption>
+        <thead>
+          <tr className="border-b border-line">
+            <th scope="col" className="py-2 pr-3 font-normal text-ink-3">{t('body.cap.date')}</th>
+            {CAPACITY.map((c) => <th key={c.key} scope="col" className="py-2 pr-3 text-right font-normal text-ink-3">{d(c.name)} <span className="text-[11px]">({c.unit})</span></th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, ri) => {
+            const before = rows[ri + 1]
+            return (
+              <tr key={row.on} className="border-b border-line/70 last:border-0">
+                <th scope="row" className="num py-2 pr-3 font-normal text-ink-2">{dm(row.on)}</th>
+                {CAPACITY.map((c, i) => {
+                  const v = row.values[i]
+                  const p = before?.values[i]
+                  const moved = p === undefined || p === v ? 0 : v > p ? 1 : -1
+                  return (
+                    <td key={c.key} className="py-2 pr-3 text-right">
+                      <span className="inline-flex items-center gap-1 font-mono text-ink">
+                        {v}
+                        {moved > 0 && <ArrowUp size={11} className="text-ink-3" aria-label={t('body.bio.rose')} />}
+                        {moved < 0 && <ArrowDown size={11} className="text-ink-3" aria-label={t('body.bio.fell')} />}
+                      </span>
+                    </td>
+                  )
+                })}
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
   )
 }
 

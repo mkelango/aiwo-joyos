@@ -77,6 +77,66 @@ export const CORE = {
   specimen: { en: 'Specimen · not a real member', ta: 'மாதிரி · உண்மையான உறுப்பினர் அல்ல', hi: 'नमूना · असली सदस्य नहीं' },
 
   // ─── Today ──────────────────────────────────────────────────────────────
+  // Today · read aloud (Settings → Accessibility → voice)
+  tdReadAloud: { en: 'Read aloud', ta: 'உரக்கப் படிக்கவும்', hi: 'पढ़कर सुनाएँ' },
+  tdStopReading: { en: 'Stop reading', ta: 'படிப்பதை நிறுத்தவும்', hi: 'सुनाना रोकें' },
+  tdReadUnavailable: { en: 'Reading aloud is not available in this browser.', ta: 'இந்த உலாவியில் உரக்கப் படிக்கும் வசதி இல்லை.', hi: 'इस ब्राउज़र में पढ़कर सुनाने की सुविधा नहीं है।' },
+  tdSpeakIndex: { en: 'Your Joyspan Index is {v}. Lowest term: {term}.', ta: 'உங்கள் ஜாய்ஸ்பான் குறியீடு {v}. மிகக் குறைந்த அம்சம்: {term}.', hi: 'आपका जॉयस्पैन इंडेक्स {v} है। सबसे कम पहलू: {term}।' },
+  tdSpeakAction: { en: 'Today’s one thing: {title}', ta: 'இன்றைய ஒரு செயல்: {title}', hi: 'आज का एक काम: {title}' },
+  tdSpeakPool: { en: 'Also in your pool: {list}.', ta: 'உங்கள் தொகுப்பிலும் உள்ளவை: {list}.', hi: 'आपकी सूची में यह भी है: {list}।' },
+  tdSpeakDay: { en: 'Day {n} of 90.', ta: '90 இல் நாள் {n}.', hi: '90 में से दिन {n}।' },
+  // Today · the pool, from the three actions in each space
+  tdPool: { en: 'Today’s pool · from your spaces', ta: 'இன்றைய தொகுப்பு · உங்கள் இடங்களிலிருந்து', hi: 'आज की सूची · आपके स्पेस से' },
+  tdPoolSub: { en: 'You added these. Any one is enough, and “not today” is always allowed.', ta: 'இவற்றை நீங்கள் சேர்த்தீர்கள். ஏதேனும் ஒன்று போதும்; “இன்று வேண்டாம்” என்று சொல்ல எப்போதும் அனுமதி உண்டு.', hi: 'ये आपने जोड़े हैं। कोई एक काफ़ी है, और “आज नहीं” कहना हमेशा ठीक है।' },
+  tdPoolEmpty: { en: 'Nothing added yet. Each space offers three actions you can add here.', ta: 'இன்னும் எதுவும் சேர்க்கப்படவில்லை. ஒவ்வொரு இடத்திலும் இங்கே சேர்க்கக்கூடிய மூன்று செயல்கள் உள்ளன.', hi: 'अभी कुछ नहीं जोड़ा गया। हर स्पेस में तीन काम हैं जिन्हें आप यहाँ जोड़ सकते हैं।' },
+  tdPoolSpaces: { en: 'Open your spaces', ta: 'உங்கள் இடங்களைத் திறக்கவும்', hi: 'अपने स्पेस खोलें' },
+  tdPoolMark: { en: 'Mark “{title}” done for today', ta: '“{title}” இன்றைக்கு முடிந்ததாகக் குறிக்கவும்', hi: '“{title}” को आज के लिए पूरा चिह्नित करें' },
+  tdPoolDone: { en: 'Done today', ta: 'இன்று முடிந்தது', hi: 'आज पूरा हुआ' },
+  tdPoolCount: { en: '{d} of {n} done today', ta: 'இன்று {n} இல் {d} முடிந்தது', hi: 'आज {n} में से {d} पूरे' },
+  tdPoolManage: { en: 'Change in {space}', ta: '{space} இல் மாற்றவும்', hi: '{space} में बदलें' },
+  tdTogether: { en: 'Together', ta: 'இணைந்து', hi: 'साथ में' },
+  tdSoloShort: { en: 'Solo', ta: 'தனியாக', hi: 'अकेले' },
+  // Today · global states
+  tdQueued: { en: 'Kept on this device · syncs when you’re back online', ta: 'இந்தச் சாதனத்தில் வைக்கப்பட்டுள்ளது · மீண்டும் இணைந்ததும் ஒத்திசைக்கப்படும்', hi: 'इसी डिवाइस पर रखा गया · ऑनलाइन लौटते ही सिंक होगा' },
+  tdGrace: { en: 'Grace access until {date}. Your Index, Ledger and Trust centre never pause.', ta: '{date} வரை சலுகை அணுகல். உங்கள் குறியீடு, லெட்ஜர், நம்பிக்கை மையம் ஒருபோதும் நிற்காது.', hi: '{date} तक मोहलत। आपका इंडेक्स, लेजर और भरोसा केंद्र कभी नहीं रुकते।' },
+  tdGraceLink: { en: 'Membership', ta: 'உறுப்பினர் திட்டம்', hi: 'सदस्यता' },
+  tdSignalsDown: { en: 'Signals down · a sitting now would be survey-only', ta: 'சிக்னல்கள் இல்லை · இப்போது அளவிட்டால் கேள்வித்தாள் மட்டுமே', hi: 'सिग्नल बंद · अभी मापने पर केवल सर्वे से' },
+  // Survey-only Index (signals off, or no device connected)
+  soPill: { en: 'Survey only · flagged', ta: 'கேள்வித்தாள் மட்டும் · குறிக்கப்பட்டது', hi: 'केवल सर्वे · चिह्नित' },
+  soScoring: {
+    en: 'Every wearable signal was off, so this Index rests on your answers and on anything you logged in the app yourself, such as Ledger moments. It is marked survey-only wherever it shows.',
+    ta: 'அணியும் சாதனச் சிக்னல்கள் அனைத்தும் அணைக்கப்பட்டிருந்தன; எனவே இந்தக் குறியீடு உங்கள் பதில்களையும், லெட்ஜர் தருணங்கள் போல நீங்களே செயலியில் பதிவுசெய்தவற்றையும் மட்டுமே அடிப்படையாகக் கொண்டது. இது காட்டப்படும் எல்லா இடங்களிலும் “கேள்வித்தாள் மட்டும்” எனக் குறிக்கப்படும்.',
+    hi: 'हर वियरेबल सिग्नल बंद था, इसलिए यह इंडेक्स केवल आपके जवाबों और ऐप में खुद दर्ज की गई चीज़ों, जैसे लेजर के पलों, पर टिका है। यह जहाँ भी दिखेगा, “केवल सर्वे” के रूप में चिह्नित होगा।',
+  },
+  soBanner: { en: 'Survey only: no wearable signal was used.', ta: 'கேள்வித்தாள் மட்டும்: அணியும் சாதனச் சிக்னல் எதுவும் பயன்படுத்தப்படவில்லை.', hi: 'केवल सर्वे: कोई वियरेबल सिग्नल इस्तेमाल नहीं हुआ।' },
+  soDownTitle: { en: 'Signals are down', ta: 'சிக்னல்கள் இல்லை', hi: 'सिग्नल बंद हैं' },
+  soDownBody: {
+    en: 'No device is connected. Your signed Index stays as it is; a sitting taken now uses no wearable signal, only your answers and what you log in the app, and is flagged survey-only.',
+    ta: 'எந்தச் சாதனமும் இணைக்கப்படவில்லை. கையொப்பமிட்ட உங்கள் குறியீடு அப்படியே இருக்கும்; இப்போது அளவிட்டால் அணியும் சாதனச் சிக்னல் எதுவும் பயன்படாது, உங்கள் பதில்களும் செயலியில் நீங்கள் பதிவுசெய்தவையும் மட்டுமே; அது “கேள்வித்தாள் மட்டும்” எனக் குறிக்கப்படும்.',
+    hi: 'कोई डिवाइस जुड़ा नहीं है। आपका हस्ताक्षरित इंडेक्स वैसा ही रहेगा; अभी मापने पर कोई वियरेबल सिग्नल इस्तेमाल नहीं होगा, केवल आपके जवाब और ऐप में दर्ज चीज़ें, और यह “केवल सर्वे” के रूप में चिह्नित होगा।',
+  },
+  soSignalsStep: {
+    en: 'No device is connected, so no wearable signal can be read. This sitting will be scored from your answers and the signals you log in the app below, and flagged survey-only.',
+    ta: 'எந்தச் சாதனமும் இணைக்கப்படாததால் அணியும் சாதனச் சிக்னல் எதையும் படிக்க முடியாது. இந்த அமர்வு உங்கள் பதில்களையும், கீழே செயலியில் நீங்கள் பதிவுசெய்யும் சிக்னல்களையும் வைத்து மதிப்பிடப்பட்டு “கேள்வித்தாள் மட்டும்” எனக் குறிக்கப்படும்.',
+    hi: 'कोई डिवाइस जुड़ा नहीं है, इसलिए कोई वियरेबल सिग्नल पढ़ा नहीं जा सकता। यह सिटिंग आपके जवाबों और नीचे ऐप में दर्ज सिग्नलों से स्कोर होगी और “केवल सर्वे” के रूप में चिह्नित होगी।',
+  },
+  soAllOff: {
+    en: 'All signals are off. This sitting will be scored from your answers alone and flagged survey-only.',
+    ta: 'எல்லாச் சிக்னல்களும் அணைக்கப்பட்டுள்ளன. இந்த அமர்வு உங்கள் பதில்களை மட்டும் வைத்து மதிப்பிடப்பட்டு “கேள்வித்தாள் மட்டும்” எனக் குறிக்கப்படும்.',
+    hi: 'सभी सिग्नल बंद हैं। यह सिटिंग केवल आपके जवाबों से स्कोर होगी और “केवल सर्वे” के रूप में चिह्नित होगी।',
+  },
+  soWearableOff: {
+    en: 'Every wearable signal is off. This sitting will be scored from your answers and the signals you log in the app, and flagged survey-only.',
+    ta: 'அணியும் சாதனச் சிக்னல்கள் அனைத்தும் அணைக்கப்பட்டுள்ளன. இந்த அமர்வு உங்கள் பதில்களையும் செயலியில் நீங்கள் பதிவுசெய்யும் சிக்னல்களையும் வைத்து மதிப்பிடப்பட்டு “கேள்வித்தாள் மட்டும்” எனக் குறிக்கப்படும்.',
+    hi: 'हर वियरेबल सिग्नल बंद है। यह सिटिंग आपके जवाबों और ऐप में दर्ज सिग्नलों से स्कोर होगी और “केवल सर्वे” के रूप में चिह्नित होगी।',
+  },
+  soOpenDevices: { en: 'Open Devices', ta: 'சாதனங்களைத் திறக்கவும்', hi: 'डिवाइस खोलें' },
+  // Offline queue
+  oqWaiting: { en: 'Waiting to sync', ta: 'ஒத்திசைக்கக் காத்திருக்கிறது', hi: 'सिंक की प्रतीक्षा में' },
+  oqSyncing: { en: 'Syncing', ta: 'ஒத்திசைக்கப்படுகிறது', hi: 'सिंक हो रहा है' },
+  oqIndex: { en: 'You are offline. This result is kept on this device and syncs when you are back.', ta: 'இணைய இணைப்பு இல்லை. இந்த முடிவு இந்தச் சாதனத்தில் வைக்கப்பட்டு, மீண்டும் இணைந்ததும் ஒத்திசைக்கப்படும்.', hi: 'आप ऑफ़लाइन हैं। यह नतीजा इसी डिवाइस पर रखा गया है और वापस जुड़ते ही सिंक हो जाएगा।' },
+  oqLedger: { en: 'Offline: kept on this device, syncs when you are back.', ta: 'இணைப்பு இல்லை: இந்தச் சாதனத்தில் வைக்கப்பட்டது, மீண்டும் இணைந்ததும் ஒத்திசைக்கப்படும்.', hi: 'ऑफ़लाइन: इसी डिवाइस पर रखा गया, वापस जुड़ते ही सिंक होगा।' },
+
   tdOpenIndex: { en: 'Open your Index', ta: 'உங்கள் குறியீட்டைத் திறக்கவும்', hi: 'अपना इंडेक्स खोलें' },
   tdWithKavya: { en: 'with Kavya', ta: 'Kavya உடன்', hi: 'Kavya के साथ' },
   tdSolo: { en: 'solo', ta: 'தனியாக', hi: 'अकेले' },

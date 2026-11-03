@@ -11,6 +11,8 @@ import { Checkbox, Field, LinkButton, Section, Segmented, Select, TeleManasStrip
 import { inputCls, rich, useMemberProfile, usePersisted, useToast } from './_util'
 import { useDict } from '@/lib/i18n'
 import { CARE, useData } from './_i18n'
+import { interceptsCrisis, useApp } from '@/lib/store'
+import { ReadAloud, SpeakAnswer } from './_voice'
 
 // CARE (Memo p.17, module 09 Care bridge): my people, the stepped-care ladder,
 // consults under the Telemedicine Practice Guidelines 2020, signed results, e-Rx
@@ -528,20 +530,25 @@ function BookingSheet({ clinician, onClose, onBooked }: { clinician: (typeof CLI
   const [reason, setReason] = useState('')
   const [consent, setConsent] = useState(false)
   const [tried, setTried] = useState(false)
+  // Emergency intercept (Memo p.24): crisis words open the P0 sheet first and hold the booking once.
+  const { setCrisisOpen } = useApp()
+  const [held, setHeld] = useState(false)
   const slots = clinician ? [clinician.next, 'Wed 10 Feb · 18:00', 'Sat 13 Feb · 10:30'] : []
   const errors = { slot: !slot ? t('errTime') : null, reason: reason.trim().length < 6 ? t('errReason') : null, consent: !consent ? t('errConsent') : null }
   const valid = !errors.slot && !errors.reason && !errors.consent
-  const close = () => { setSlot(''); setReason(''); setConsent(false); setTried(false); onClose() }
+  const close = () => { setSlot(''); setReason(''); setConsent(false); setTried(false); setHeld(false); onClose() }
   return (
     <Sheet open={!!clinician} onClose={close} title={clinician ? t('bookWith', { name: clinician.name }) : t('bookPlain')}>
       {clinician && (
         <form
           onSubmit={(e) => {
             e.preventDefault()
+            // The intercept runs before anything else touches the free text.
+            if (!held && interceptsCrisis(reason)) { setCrisisOpen(true); setHeld(true); return }
             setTried(true)
             if (!valid) return
             onBooked(slot, reason.trim())
-            setSlot(''); setReason(''); setConsent(false); setTried(false)
+            setSlot(''); setReason(''); setConsent(false); setTried(false); setHeld(false)
           }}
           className="flex flex-col gap-5"
           noValidate
@@ -565,8 +572,14 @@ function BookingSheet({ clinician, onClose, onBooked }: { clinician: (typeof CLI
             {tried && errors.slot && <p role="alert" className="mt-1.5 text-[14px] text-error">{errors.slot}</p>}
           </fieldset>
           <Field label={t('talkAbout')} hint={t('talkHint')} error={tried ? errors.reason : null}>
-            {(id, d) => <textarea id={id} aria-describedby={d} rows={3} value={reason} onChange={(e) => setReason(e.target.value)} className={clsx(inputCls, 'h-auto py-2.5')} placeholder={t('talkPlaceholder')} />}
+            {(id, d) => <textarea id={id} aria-describedby={d} rows={3} value={reason} onChange={(e) => { setReason(e.target.value); setHeld(false) }} className={clsx(inputCls, 'h-auto py-2.5')} placeholder={t('talkPlaceholder')} />}
           </Field>
+          {/* Voice-first (Settings · Accessibility): hear the question, answer by speaking. */}
+          <div className="-mt-2 flex flex-wrap items-start gap-3 empty:hidden">
+            <ReadAloud text={`${t('talkAbout')} ${t('talkHint')}`} className="min-w-0 flex-1" />
+            <SpeakAnswer sample="Sleep, mostly. Work has been heavy and I wake at 3 most nights." onText={(x) => { setReason((r) => (r.trim() ? `${r.trim()} ${x}` : x)); setHeld(false) }} />
+          </div>
+          {held && <p role="status" className="rounded-card border border-line bg-paper-sunk px-4 py-3 text-[14px] text-ink">{t('crisisHeld')}</p>}
           <div className="rounded-card bg-paper-sunk p-4">
             <Checkbox checked={consent} onChange={setConsent}>
               {t('consentTele')}

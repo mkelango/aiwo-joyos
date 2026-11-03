@@ -4,23 +4,39 @@ import { View } from 'react-native'
 import { BandLabel, Body, Card, DaybreakButton, Divider, Eyebrow, Icon, Meta, Mono, Numeral, Pill, Screen, ScreenHeader, SectionTitle, Serif, SpecimenTag, TermDot, Title } from '@/components'
 import { METHODS, bandFor, joyspanIndex, lowestTerm } from '@/shared/indexEngine'
 import { INSTRUMENTS } from '@/shared/platform'
-import { termByKey } from '@/shared/terms'
+import { TERMS, termByKey } from '@/shared/terms'
 import type { MethodVersion, TermKey, TermScore } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { AI_LIMITS, DISPLAY_RULES, GRADES, NEVER_IMPORTED } from '@/screens/b/_data'
 import { CheckLine, IconButton, ORDER } from '@/screens/b/parts'
-import { useDict, useTermText } from '@/lib/i18n'
-import { METHOD, GRADE_TEXT, RULES_TEXT, NEVER_TEXT, AI_TEXT, LICENCE_TEXT, METHOD_LABEL } from '@/screens/b/i18n/method'
+import { useDict, useLang, useTermText } from '@/lib/i18n'
+import { METHOD, GRADE_TEXT, RULES_TEXT, NEVER_TEXT, AI_TEXT, LICENCE_TEXT, METHOD_LABEL, INSTR_TEXT, PART_TEXT } from '@/screens/b/i18n/method'
 import { BAND, useTx } from '@/screens/b/i18n/common'
 
 // THE METHOD (Memo p.10): the formula, a live worked example run through the same engine as
 // your Index, the three grades, the instrument registry with licences, method versions,
 // display rules, what is never imported, and the AI's limits. One Daybreak: try it yourself.
+// The six terms show their framework, within-term weights (the published formula) and
+// instruments, matching the web Method page.
+
+/** "H = 0.5·LE8 + 0.3·Capacity + 0.2·Self-rated" → [{ w: 0.5, part: 'LE8' }, …]. */
+function weightsOf(formula: string) {
+  const rhs = formula.split('=').slice(1).join('=')
+  return rhs
+    .split(' + ')
+    .map((x) => x.trim())
+    .map((x) => {
+      const m = /^([\d.]+)·(.+)$/.exec(x)
+      return m ? { w: Number(m[1]), part: m[2].replace(/^\((.*)\)$/, '$1') } : null
+    })
+    .filter((x): x is { w: number; part: string } => !!x)
+}
 
 const START: Record<TermKey, number> = { H: 70, P: 80, R: 75, F: 60, D: 55, B: 25 }
 
 export default function Method() {
-  const { c, space } = useTheme()
+  const th = useTheme()
+  const { c, space } = th
   const [vals, setVals] = useState(START)
   const terms: TermScore[] = ORDER.map((k) => ({ key: k, value: vals[k], band: bandFor(vals[k], k === 'B') }))
   const res = joyspanIndex(terms, 'v1.0')!
@@ -28,6 +44,9 @@ export default function Method() {
   const t = useDict(METHOD)
   const tt = useTermText()
   const tx = useTx()
+  const lang = useLang()
+  const instr = (i: string) => (lang === 'en' ? i : INSTR_TEXT[i]?.[lang] ?? i)
+  const partName = (p: string) => (lang === 'en' ? p : PART_TEXT[p]?.[lang] ?? p)
   const bandWord = (b: ReturnType<typeof bandFor>) => (b === 'not-yet-measured' ? b : tx(BAND[b], b))
   const step = (k: TermKey, d: number) => setVals((v) => ({ ...v, [k]: Math.max(0, Math.min(100, v[k] + d)) }))
 
@@ -109,6 +128,54 @@ export default function Method() {
             <Meta>{tx(GRADE_TEXT[g.key]?.what, g.what)}</Meta>
           </Card>
         ))}
+      </View>
+
+      <View style={{ gap: space.s2 }}>
+        <SectionTitle>{t('tmTitle')}</SectionTitle>
+        <Body tone="ink2">{t('tmLead')}</Body>
+        {TERMS.map((x) => {
+          const parts = weightsOf(x.formula)
+          const col = th.term(x.key)
+          return (
+            <Card key={x.key} tone="raised" style={{ gap: space.s2 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
+                  <TermDot term={x.key} />
+                  <Body weight="medium" accessibilityRole="header" aria-level={3}>{tt.name(x.key)}</Body>
+                </View>
+                <Eyebrow tone="ink3">{t('tmSpace', { space: tt.space(x.key) })}</Eyebrow>
+              </View>
+              <Meta>{lang === 'en' ? x.framework : t(`fw_${x.key}` as 'fw_H')}</Meta>
+              <View style={{ backgroundColor: c.paperSunk, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10 }}>
+                <Mono size={14} tone="ink">{x.formula}</Mono>
+              </View>
+              <View style={{ gap: 6 }}>
+                <Eyebrow>{t('tmWeights')}</Eyebrow>
+                {parts.map((pt) => (
+                  <View key={pt.part} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 28 }} accessible accessibilityLabel={t('tmWeightA11y', { part: partName(pt.part), w: pt.w })}>
+                    <Meta size={14} tone="ink" style={{ width: 128 }}>{partName(pt.part)}</Meta>
+                    <View style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: c.paperSunk, overflow: 'hidden' }}>
+                      <View style={{ width: `${Math.round(pt.w * 100)}%`, height: '100%', backgroundColor: col.main, borderRadius: 3 }} />
+                    </View>
+                    <Mono size={14} tone="ink2" style={{ width: 40, textAlign: 'right' }}>{pt.w.toFixed(2)}</Mono>
+                  </View>
+                ))}
+              </View>
+              <View style={{ gap: 6 }}>
+                <Eyebrow>{t('tmInstruments')}</Eyebrow>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {x.instruments.map((i) => (
+                    <Pill key={i}>{instr(i)}</Pill>
+                  ))}
+                </View>
+              </View>
+              <Meta size={14} tone="ink3">
+                {`${t('tmWhatMoves')} ${lang === 'en' ? x.whatMoves : t(`wm_${x.key}` as 'wm_H')}${x.inverse ? t('tmInverse') : ''}`}
+              </Meta>
+            </Card>
+          )
+        })}
+        <Meta size={14} tone="ink3">{t('tmLambda', { lambda: METHODS['v1.0'].lambda })}</Meta>
       </View>
 
       <View style={{ gap: space.s2 }}>

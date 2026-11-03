@@ -107,6 +107,49 @@ export const TRUST = {
   yourQ: { en: 'Your question', ta: 'உங்கள் கேள்வி', hi: 'आपका सवाल' },
   qPh: { en: 'e.g. Why did the concierge need my household?', ta: 'எ.கா. கான்சியர்ஜுக்கு என் குடும்ப விவரம் ஏன் தேவைப்பட்டது?', hi: 'जैसे कंसीयर्ज को मेरे परिवार की जानकारी क्यों चाहिए थी?' },
   recorded: { en: 'Recorded', ta: 'பதிவானது', hi: 'दर्ज हुआ' },
+  // The method and its versions
+  methodTitle: { en: 'The method', ta: 'முறை', hi: 'तरीका' },
+  methodBody: { en: 'Every score keeps the method version it was computed with. Nothing is silently recomputed; a new version is published before it is used.', ta: 'ஒவ்வொரு மதிப்பெண்ணும் அது கணக்கிடப்பட்ட முறையின் பதிப்பை வைத்திருக்கும். எதுவும் அமைதியாக மீண்டும் கணக்கிடப்படுவதில்லை; புதிய பதிப்பு பயன்படுத்தப்படும் முன் வெளியிடப்படும்.', hi: 'हर स्कोर उसी तरीके के संस्करण के साथ रहता है जिससे वह निकाला गया। कुछ भी चुपचाप दोबारा नहीं गिना जाता; नया संस्करण इस्तेमाल से पहले प्रकाशित होता है।' },
+  yourIndexOn: { en: 'Your Index: {method} · {build}', ta: 'உங்கள் குறியீடு: {method} · {build}', hi: 'आपका इंडेक्स: {method} · {build}' },
+  vCurrent: { en: 'In use', ta: 'பயன்பாட்டில்', hi: 'इस्तेमाल में' },
+  vPlanned: { en: 'Planned', ta: 'திட்டமிடப்பட்டது', hi: 'योजना में' },
+  published: { en: 'published {date}', ta: '{date} அன்று வெளியிடப்பட்டது', hi: '{date} को प्रकाशित' },
+  readMethod: { en: 'Read the method', ta: 'முறையைப் படியுங்கள்', hi: 'तरीका पढ़ें' },
+  // Nominee (DPDP Act)
+  nominee: { en: 'Nominee · DPDP Act', ta: 'நியமனதாரர் · DPDP சட்டம்', hi: 'नॉमिनी · DPDP क़ानून' },
+  nomineeTitle: { en: 'Someone who can act for you', ta: 'உங்கள் சார்பில் செயல்படக்கூடிய ஒருவர்', hi: 'जो आपकी ओर से काम कर सके' },
+  nomineeBody: { en: 'Under the DPDP Act, your nominee can exercise your data rights if you die or cannot act yourself. They see nothing until then.', ta: 'DPDP சட்டப்படி, நீங்கள் இறந்துவிட்டாலோ செயல்பட முடியாவிட்டாலோ உங்கள் நியமனதாரர் உங்கள் தரவு உரிமைகளைப் பயன்படுத்தலாம். அதுவரை அவர் எதையும் பார்க்க மாட்டார்.', hi: 'DPDP क़ानून के तहत, अगर आप न रहें या ख़ुद काम न कर सकें तो आपके नॉमिनी आपके डेटा अधिकार इस्तेमाल कर सकते हैं। तब तक वे कुछ नहीं देखते।' },
+  change: { en: 'Change', ta: 'மாற்று', hi: 'बदलें' },
+  fullName: { en: 'Full name', ta: 'முழுப் பெயர்', hi: 'पूरा नाम' },
+  relationship: { en: 'Relationship', ta: 'உறவுமுறை', hi: 'रिश्ता' },
+  email: { en: 'Email', ta: 'மின்னஞ்சல்', hi: 'ईमेल' },
+  emailHint: { en: 'We tell them once, by email. Nothing else is sent.', ta: 'அவருக்கு ஒருமுறை மின்னஞ்சலில் தெரிவிப்போம். வேறு எதுவும் அனுப்பப்படாது.', hi: 'हम उन्हें एक बार ईमेल से बताते हैं। और कुछ नहीं भेजा जाता।' },
+  errFullName: { en: 'Enter their full name.', ta: 'அவரது முழுப் பெயரை உள்ளிடுங்கள்.', hi: 'उनका पूरा नाम लिखें।' },
+  errEmail: { en: 'Enter an email address like name@example.in.', ta: 'name@example.in போன்ற மின்னஞ்சல் முகவரியை உள்ளிடுங்கள்.', hi: 'name@example.in जैसा ईमेल पता लिखें।' },
+  saveNominee: { en: 'Save nominee', ta: 'நியமனதாரரைச் சேமிக்கவும்', hi: 'नॉमिनी सहेजें' },
+  nomineeSaved: { en: '{name} is now your nominee. We have told them by email.', ta: '{name} இனி உங்கள் நியமனதாரர். அவருக்கு மின்னஞ்சலில் தெரிவித்துள்ளோம்.', hi: '{name} अब आपके नॉमिनी हैं। हमने उन्हें ईमेल से बता दिया है।' },
+  // ABHA (Ayushman Bharat Health Account), optional
+  abha: { en: 'ABHA · Ayushman Bharat Health Account', ta: 'ABHA · ஆயுஷ்மான் பாரத் சுகாதாரக் கணக்கு', hi: 'ABHA · आयुष्मान भारत हेल्थ अकाउंट' },
+  abhaLinked: { en: 'Linked', ta: 'இணைக்கப்பட்டது', hi: 'जुड़ा हुआ' },
+  abhaOptional: { en: 'Optional', ta: 'விருப்பத்தேர்வு', hi: 'वैकल्पिक' },
+  abhaNotLinked: { en: 'Not linked', ta: 'இணைக்கப்படவில்லை', hi: 'जुड़ा नहीं' },
+  abhaSince: { en: 'Linked since ', ta: 'இணைக்கப்பட்ட நாள்: ', hi: 'जुड़ा है, इस तारीख़ से: ' },
+  abhaWhy: { en: 'Link it to bring lab reports and prescriptions from ABDM into your record. Optional.', ta: 'ABDM-இலிருந்து ஆய்வக அறிக்கைகளையும் மருந்துச் சீட்டுகளையும் உங்கள் பதிவில் கொண்டுவர இணையுங்கள். விருப்பத்தேர்வு.', hi: 'ABDM से लैब रिपोर्ट और पर्चे अपने रिकॉर्ड में लाने के लिए जोड़ें। वैकल्पिक।' },
+  abhaLink: { en: 'Link ABHA', ta: 'ABHA-வை இணை', hi: 'ABHA जोड़ें' },
+  abhaUnlink: { en: 'Unlink', ta: 'இணைப்பை நீக்கு', hi: 'अलग करें' },
+  abhaUnlinkTitle: { en: 'Unlink ABHA?', ta: 'ABHA இணைப்பை நீக்கவா?', hi: 'ABHA अलग करें?' },
+  abhaUnlinkBody: { en: 'Records already in Joy OS stay. Nothing new comes from ABDM until you link again.', ta: 'Joy OS-இல் ஏற்கனவே உள்ள பதிவுகள் இருக்கும். மீண்டும் இணைக்கும்வரை ABDM-இலிருந்து புதிதாக எதுவும் வராது.', hi: 'Joy OS में पहले से मौजूद रिकॉर्ड रहेंगे। दोबारा जोड़ने तक ABDM से कुछ नया नहीं आएगा।' },
+  abhaKeep: { en: 'Keep it linked', ta: 'இணைப்பை வைத்திரு', hi: 'जुड़ा रहने दें' },
+  abhaField: { en: 'ABHA address or number', ta: 'ABHA முகவரி அல்லது எண்', hi: 'ABHA पता या नंबर' },
+  abhaFormat: { en: 'Enter an ABHA address (name@abdm) or the 14-digit number.', ta: 'ABHA முகவரியை (name@abdm) அல்லது 14 இலக்க எண்ணை உள்ளிடுங்கள்.', hi: 'ABHA पता (name@abdm) या 14 अंकों का नंबर लिखें।' },
+  abhaAgree: { en: 'I agree to share my lab reports and prescriptions from ABDM with Joy OS.', ta: 'ABDM-இலிருந்து என் ஆய்வக அறிக்கைகளையும் மருந்துச் சீட்டுகளையும் Joy OS உடன் பகிர ஒப்புக்கொள்கிறேன்.', hi: 'मैं ABDM से अपनी लैब रिपोर्ट और पर्चे Joy OS के साथ साझा करने के लिए सहमत हूँ।' },
+  abhaPleaseAgree: { en: 'Please confirm before you continue.', ta: 'தொடரும் முன் உறுதிசெய்யுங்கள்.', hi: 'आगे बढ़ने से पहले पुष्टि करें।' },
+  abhaToAbdm: { en: 'Continue to ABDM', ta: 'ABDM-க்குத் தொடரவும்', hi: 'ABDM पर आगे बढ़ें' },
+  abhaOtp: { en: 'ABDM has sent a one-time code to the phone linked to your ABHA. Approve there.', ta: 'உங்கள் ABHA உடன் இணைந்த தொலைபேசிக்கு ABDM ஒருமுறைக் குறியீட்டை அனுப்பியுள்ளது. அங்கே அங்கீகரியுங்கள்.', hi: 'ABDM ने आपके ABHA से जुड़े फ़ोन पर एक बार का कोड भेजा है। वहीं मंज़ूर करें।' },
+  abhaOtpNote: { en: 'Joy OS never sees the code. Specimen: no request is sent.', ta: 'Joy OS அந்தக் குறியீட்டை ஒருபோதும் பார்க்காது. மாதிரி: எந்தக் கோரிக்கையும் அனுப்பப்படவில்லை.', hi: 'Joy OS कोड कभी नहीं देखता। नमूना: कोई अनुरोध नहीं भेजा गया।' },
+  abhaSimulate: { en: 'Simulate approval', ta: 'அங்கீகாரத்தை உருவகப்படுத்து', hi: 'मंज़ूरी का अभ्यास करें' },
+  abhaLinkedToast: { en: 'ABHA {address} is linked.', ta: 'ABHA {address} இணைக்கப்பட்டது.', hi: 'ABHA {address} जुड़ गया।' },
+  abhaUnlinkedToast: { en: 'ABHA unlinked. Records already here stay.', ta: 'ABHA இணைப்பு நீக்கப்பட்டது. ஏற்கனவே உள்ள பதிவுகள் இருக்கும்.', hi: 'ABHA अलग किया गया। पहले से मौजूद रिकॉर्ड रहेंगे।' },
 } satisfies Dict
 
 export const SCOPE_TEXT: Record<string, L3> = {
@@ -161,3 +204,13 @@ export const CLAIM_T: { claim: L3; note: L3 }[] = [
   { claim: { en: '“Reverses ageing.”', ta: '“முதுமையைத் திருப்புகிறது.”', hi: '“बुढ़ापा पलट देता है।”' }, note: { en: 'Never used, anywhere.', ta: 'எங்கும், ஒருபோதும் பயன்படுத்தப்படவில்லை.', hi: 'कहीं भी, कभी इस्तेमाल नहीं हुआ।' } },
   { claim: { en: '“Sleepcation improves sleep for most guests.”', ta: '“Sleepcation பெரும்பாலான விருந்தினர்களின் உறக்கத்தை மேம்படுத்துகிறது.”', hi: '“Sleepcation ज़्यादातर मेहमानों की नींद बेहतर करता है।”' }, note: { en: 'Q4 cohort: 48% improved, under the 50% line. Published and being redesigned.', ta: 'Q4 குழு: 48% மேம்பட்டது, 50% கோட்டுக்குக் கீழ். வெளியிடப்பட்டு மறுவடிவமைக்கப்படுகிறது.', hi: 'Q4 समूह: 48% बेहतर हुए, 50% की रेखा से नीचे। प्रकाशित और नए सिरे से बनाया जा रहा है।' } },
 ]
+
+/** Nominee relationships. */
+export const NOMINEE_REL: Record<string, L3> = {
+  Spouse: { en: 'Spouse', ta: 'வாழ்க்கைத் துணை', hi: 'जीवनसाथी' },
+  Child: { en: 'Child', ta: 'பிள்ளை', hi: 'बच्चा' },
+  Parent: { en: 'Parent', ta: 'பெற்றோர்', hi: 'माता-पिता' },
+  Sibling: { en: 'Sibling', ta: 'உடன்பிறப்பு', hi: 'भाई-बहन' },
+  Friend: { en: 'Friend', ta: 'நண்பர்', hi: 'दोस्त' },
+  Other: { en: 'Other', ta: 'பிறர்', hi: 'अन्य' },
+}

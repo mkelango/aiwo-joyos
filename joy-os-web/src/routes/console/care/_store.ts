@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { DRIFT_TASKS } from '@/data/platform'
 import type { DriftSignal, DriftTask, TermKey } from '@/domain/types'
-import { DRIFT_OVERRIDES } from './_data'
+import { DRIFT_OVERRIDES, type ConciergeBooking } from './_data'
 import type { AuditEvent } from './_parts'
 
 // A small store for the coach console, so work survives moving between the queue and a
@@ -18,7 +18,24 @@ export type MemberWork = {
   audit?: AuditEvent[]
 }
 export type CircleWork = { attended: string[]; savedAt: string | null; room: 'closed' | 'open' }
-type State = { tasks: CoachTask[]; members: Record<string, MemberWork>; circles: Record<string, CircleWork> }
+
+// The concierge desk's work: bookings, home draws, pre-arrival and the Day 60 talk.
+export type BookingWork = { status: 'requested' | 'offered' | 'confirmed' | 'cancelled'; when?: string; reason?: string; at?: string }
+export type DrawWork = { status: 'to-dispatch' | 'dispatched' | 'collected' | 'at-lab'; phleb?: string; slot?: string; fastingOk?: boolean; at?: string }
+export type ArrivalWork = { done: number[]; briefAt?: string | null }
+export type TalkWork = { slot?: string; outcome?: string; note?: string; at?: string; bookingId?: string }
+export type ConciergeWork = {
+  bookings: Record<string, BookingWork>
+  /** Bookings the concierge raised this session (from a Day 60 talk). */
+  added: ConciergeBooking[]
+  draws: Record<string, DrawWork>
+  arrivals: Record<string, ArrivalWork>
+  talks: Record<string, TalkWork>
+  log: AuditEvent[]
+}
+const emptyConcierge = (): ConciergeWork => ({ bookings: {}, added: [], draws: {}, arrivals: {}, talks: {}, log: [] })
+
+type State = { tasks: CoachTask[]; members: Record<string, MemberWork>; circles: Record<string, CircleWork>; concierge: ConciergeWork }
 
 const KEY = 'joyos:care:coach:v2'
 
@@ -26,12 +43,18 @@ const seedTasks = (): CoachTask[] =>
   DRIFT_TASKS.map((t) => ({ ...t, ...(DRIFT_OVERRIDES[t.id] ?? {}) }))
 
 function load(): State {
-  const fresh: State = { tasks: seedTasks(), members: {}, circles: {} }
+  const fresh: State = { tasks: seedTasks(), members: {}, circles: {}, concierge: emptyConcierge() }
   try {
     const raw = sessionStorage.getItem(KEY)
     if (!raw) return fresh
     const parsed = JSON.parse(raw) as Partial<State>
-    return { tasks: Array.isArray(parsed.tasks) ? parsed.tasks : fresh.tasks, members: parsed.members ?? {}, circles: parsed.circles ?? {} }
+    const c = parsed.concierge
+    return {
+      tasks: Array.isArray(parsed.tasks) ? parsed.tasks : fresh.tasks,
+      members: parsed.members ?? {},
+      circles: parsed.circles ?? {},
+      concierge: c && typeof c === 'object' ? { ...emptyConcierge(), ...c, added: Array.isArray(c.added) ? c.added : [], log: Array.isArray(c.log) ? c.log : [] } : emptyConcierge(),
+    }
   } catch {
     return fresh
   }
@@ -73,8 +96,11 @@ export const coach = {
     const cur = state.circles[id] ?? { attended: [], savedAt: null, room: 'closed' as const }
     emit({ ...state, circles: { ...state.circles, [id]: f(cur) } })
   },
+  updateConcierge(f: (w: ConciergeWork) => ConciergeWork) {
+    emit({ ...state, concierge: f(state.concierge) })
+  },
   reset() {
-    emit({ tasks: seedTasks(), members: {}, circles: {} })
+    emit({ tasks: seedTasks(), members: {}, circles: {}, concierge: emptyConcierge() })
   },
 }
 

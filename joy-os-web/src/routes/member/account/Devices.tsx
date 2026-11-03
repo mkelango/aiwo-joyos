@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import { motion } from 'framer-motion'
 import { AlertCircle, Apple, Check, CircleDot, Clock, Link2, RefreshCw, ShieldOff, Smartphone, Watch } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Bar, BarChart, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { DaybreakButton, SpecimenTag, TermChip } from '@/components/joy/primitives'
 import { Button, Card, EmptyState, PageHeader, Pill, Sheet } from '@/components/ui'
@@ -10,6 +11,8 @@ import { Checkbox, Section, Toggle } from './_parts'
 import { fmtShortDate, rich, usePersisted, useToast } from './_util'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
 import { DEV, useData } from './_i18n'
+import { finishedOnboarding } from './_onboarding'
+import { WatchComplication } from './_watch'
 
 // DEVICES (Signals, Memo p.15–16): Oura by default via Terra, Apple Health with
 // per-type HealthKit reads and mindful-minutes write-back, Health Connect, WHOOP,
@@ -52,6 +55,15 @@ export default function Devices() {
   const writeBack = hkSaved.writeBack
   const setWriteBack = (v: boolean) => setHkSaved((cur) => ({ ...cur, writeBack: v }))
   const connected = devices.filter((d) => d.state === 'connected')
+  // Devices linked during onboarding (the hand-off seeds them as connected; this only labels them).
+  const [fromSetup] = useState<string[]>(() => finishedOnboarding()?.linked ?? [])
+  const { hash } = useLocation()
+  // Arriving from the WhatsApp and watch screen with #watch (or any section): scroll once rendered.
+  useEffect(() => {
+    if (!hash) return
+    const id = window.setTimeout(() => document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60)
+    return () => window.clearTimeout(id)
+  }, [hash])
   const others = devices.filter((d) => d.state !== 'connected')
 
   const ouraOn = connected.some((d) => d.id === 'oura')
@@ -111,7 +123,7 @@ export default function Devices() {
                 <div className="flex items-center gap-3">
                   <DeviceIcon id={d.id} />
                   <div>
-                    <p className="flex flex-wrap items-center gap-2 text-[17px] text-ink">{d.name} {d.isDefault && <Pill tone="daybreak">{t('default')}</Pill>}</p>
+                    <p className="flex flex-wrap items-center gap-2 text-[17px] text-ink">{d.name} {d.isDefault && <Pill tone="daybreak">{t('default')}</Pill>} {fromSetup.includes(d.id) && <Pill>{t('linkedInSetup')}</Pill>}</p>
                     <p className="text-[14px] text-ink-2">{dx(d.via)}</p>
                   </div>
                 </div>
@@ -147,6 +159,11 @@ export default function Devices() {
             </Card>
           ))}
         </div>
+      </Section>
+
+      {/* Watch complication — quick-add a Joy Ledger moment from the wrist */}
+      <Section id="watch" className="mt-16" eyebrow={t('wxEyebrow')} title={t('wxTitle')} lead={t('wxLead')}>
+        <WatchComplication onToast={showToast} />
       </Section>
 
       {/* Data quality */}

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react'
 import type { LedgerEntry, Role } from '@/domain/types'
-import { LEDGER } from '@/data/member'
+import { LEDGER, PAYMENTS_GRACE } from '@/data/member'
 
 // Front-end-only app state. Persists per-viewer conveniences in localStorage
 // (theme, text size, language, demo role). Swap for TanStack Query + the BFF later.
@@ -16,6 +16,11 @@ export type Theme = 'light' | 'dark'
 export type TextSize = 'default' | 'large' | 'xlarge'
 export type Lang = 'en' | 'ta' | 'hi'
 export type CrisisReason = false | 'intercept' | 'manual'
+/** What was changed while offline and waits on this device for the connection to come back. */
+export type SyncKind = 'ledger' | 'ledger-remove' | 'action' | 'index'
+export interface SyncItem { id: string; kind: SyncKind; at: string }
+/** idle: nothing moving · syncing: back online, sending the queue · synced: just finished. */
+export type SyncState = 'idle' | 'syncing' | 'synced'
 
 interface AppState {
   theme: Theme
@@ -32,6 +37,18 @@ interface AppState {
   addLedger: (e: Omit<LedgerEntry, 'id' | 'at'>) => void
   offline: boolean
   setOffline: (v: boolean) => void
+  /** Changes kept on this device while offline (specimen: nothing leaves the browser). */
+  syncQueue: SyncItem[]
+  /** Queue a change (deduplicated by id). Only queues while offline. */
+  queueSync: (item: { id: string; kind: SyncKind }) => void
+  /** Drop a queued change, e.g. an entry added offline and then removed before sync. */
+  unqueueSync: (id: string) => void
+  syncState: SyncState
+  /** How many changes the last reconnect sent. */
+  syncedCount: number
+  /** Payments grace: a failed renewal, 14 days of unchanged access (specimen demo switch). */
+  paymentsGrace: boolean
+  setPaymentsGrace: (v: boolean) => void
   /** Why the crisis sheet is open: an intercept caught free text, or the member asked for a person. */
   crisisOpen: CrisisReason
   /** true means an intercept; pass 'manual' from a plain "Talk to someone" button. */
@@ -94,6 +111,17 @@ if (typeof document !== 'undefined') {
   )
 }
 
+/** true when the specimen February invoice has been paid on Membership. */
+function februaryPaid() {
+  try {
+    const raw = localStorage.getItem('joyos:acct:membership')
+    const extra = raw ? ((JSON.parse(raw) as { extra?: { id?: string; status?: string }[] }).extra ?? []) : []
+    return extra.some((i) => i.id === PAYMENTS_GRACE.invoice && i.status === 'Paid')
+  } catch {
+    return false
+  }
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = usePersisted<Theme>('theme', 'light')
   const [textSize, setTextSize] = usePersisted<TextSize>('text', 'default')
@@ -102,7 +130,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = usePersisted<Role>('role', 'member')
   const [actionDone, setActionDone] = usePersisted('actionDone', false)
   const [ledger, setLedger] = usePersisted<LedgerEntry[]>('ledger', LEDGER)
-  const [offline, setOffline] = useState(false)
+  const [offline, setOffline] = usePersisted('offline', false)
+  const [syncQueue, setSyncQueue] = usePersisted<SyncItem[]>('syncQueue', [])
+  const [syncState, setSyncState] = useState<SyncState>('idle')
+  const [syncedCount, setSyncedCount] = useState(0)
+  const [paymentsGrace, setPaymentsGrace] = usePersisted('paymentsGrace', false)
+  // Grace ends once February is paid (Membership keeps its invoices under joyos:acct:membership).
+  // Checked here too, so the app-wide banner never outlives the payment on a screen that is
+  // not Membership, for instance after paying in another tab.
+  useEffect(() => {
+    if (!paymentsGrace) return
+    const check = () => { if (februaryPaid()) setPaymentsGrace(false) }
+    check()
+    window.addEventListener('storage', check)
+    return () => window.removeEventListener('storage', check)
+  }, [paymentsGrace, setPaymentsGrace])
+  const queueSync = useCallback(
+    (item: { id: string; kind: SyncKind }) => {
+      if (!offline) return
+      setSyncQueue((q) => (q.some((x) => x.id === item.id) ? q : [...q, { ...item, at: localMinute(new Date()) }]))
+    },
+    [offline, setSyncQueue],
+  )
+  const unqueueSync = useCallback((id: string) => setSyncQueue((q) => q.filter((x) => x.id !== id)), [setSyncQueue])
+
+  // Reconnect: queued → syncing → synced. A specimen sync — nothing is sent anywhere; the
+  // queue simply clears after a short, honest pause, and the banner says how many went.
+  const queued = syncQueue.length
+  useEffect(() => {
+    if (offline) {
+      setSyncState((s) => (s === 'idle' ? s : 'idle'))
+      return
+    }
+    if (queued === 0) return
+    setSyncState('syncing')
+    const t = window.setTimeout(() => {
+      setSyncQueue([])
+      setSyncedCount(queued)
+      setSyncState('synced')
+    }, 1800)
+    return () => window.clearTimeout(t)
+  }, [offline, queued, setSyncQueue])
+  useEffect(() => {
+    if (syncState !== 'synced') return
+    const t = window.setTimeout(() => setSyncState('idle'), 4500)
+    return () => window.clearTimeout(t)
+  }, [syncState])
   const [crisisOpen, setCrisisReason] = useState<CrisisReason>(false)
   const setCrisisOpen = useCallback((v: boolean | CrisisReason) => setCrisisReason(v === true ? 'intercept' : v), [])
 
@@ -115,10 +188,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       theme, setTheme, textSize, setTextSize, lang, setLang, role, setRole,
       actionDone, setActionDone,
       ledger,
-      addLedger: (e) => setLedger((l) => [{ ...e, id: `l${Date.now()}`, at: localMinute(new Date()) }, ...l]),
-      offline, setOffline, crisisOpen, setCrisisOpen,
+      addLedger: (e) => {
+        const id = `l${Date.now()}`
+        setLedger((l) => [{ ...e, id, at: localMinute(new Date()) }, ...l])
+        // Written offline: kept here and counted in the banner until the connection is back.
+        queueSync({ id, kind: 'ledger' })
+      },
+      offline, setOffline, syncQueue, queueSync, unqueueSync, syncState, syncedCount,
+      paymentsGrace, setPaymentsGrace,
+      crisisOpen, setCrisisOpen,
     }),
-    [theme, setTheme, textSize, setTextSize, lang, setLang, role, setRole, actionDone, setActionDone, ledger, setLedger, offline, crisisOpen, setCrisisOpen],
+    [theme, setTheme, textSize, setTextSize, lang, setLang, role, setRole, actionDone, setActionDone, ledger, setLedger, offline, setOffline, syncQueue, queueSync, unqueueSync, syncState, syncedCount, paymentsGrace, setPaymentsGrace, crisisOpen, setCrisisOpen],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

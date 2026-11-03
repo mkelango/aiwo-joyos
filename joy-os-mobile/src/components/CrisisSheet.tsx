@@ -1,11 +1,17 @@
 import { router } from 'expo-router'
+import { useState } from 'react'
 import { Linking, View } from 'react-native'
 import { useDict } from '../lib/i18n'
 import { useApp } from '../lib/store'
+import { accountStore, useStore } from '../screens/b/bStore'
+import { RELATION_TEXT } from '../screens/b/i18n/account'
+import { useTx } from '../screens/b/i18n/common'
+import { TEAM } from '../shared/member'
 import { useTheme } from '../theme/ThemeProvider'
 import { Button, DaybreakButton } from './Buttons'
 import { Card } from './Card'
 import { Sheet } from './Sheet'
+import { Icon } from './Icon'
 import { Body, Eyebrow, Meta, Mono } from './Text'
 import { KIT } from './_i18n'
 
@@ -13,12 +19,28 @@ import { KIT } from './_i18n'
  * Crisis screen (P0, Memo p.24). Mounted once in app/_layout.tsx and opened through
  * useApp().setCrisisOpen(true) — by the emergency intercept (interceptsCrisis) on any free
  * text, or by a "Talk to someone now" link. Pre-approved copy only; no AI text here.
+ * Your people are actionable: a new message straight to the on-call clinician, and the
+ * emergency contact told only when the member asks (or called directly).
  */
+// The psychologist on call tonight (specimen roster).
+const ON_CALL = TEAM.find((p) => p.id === 'p_sanjay')!
+
 export function CrisisSheet() {
   const { crisisOpen, setCrisisOpen } = useApp()
-  const { space } = useTheme()
+  const { c, space } = useTheme()
   const t = useDict(KIT)
-  const close = () => setCrisisOpen(false)
+  const tx = useTx()
+  const [acct] = useStore(accountStore)
+  const contact = acct.emergency
+  const first = contact.name.split(' ')[0] || contact.name
+  // Telling the contact is the member's choice, made here; kept for this sheet only.
+  const [told, setTold] = useState(false)
+  const close = () => {
+    setCrisisOpen(false)
+    setTold(false)
+  }
+  const digits = contact.phone.replace(/\D/g, '')
+  const tel = digits.length === 10 ? `tel:+91${digits}` : digits ? `tel:${digits}` : null
   return (
     <Sheet
       open={crisisOpen}
@@ -45,14 +67,47 @@ export function CrisisSheet() {
         <Eyebrow>{t('yourPeople')}</Eyebrow>
         <Body>{t('yourPeopleBody')}</Body>
         <Button
-          variant="link"
+          variant="ink"
+          block
+          icon="message-circle"
+          accessibilityLabel={`${t('messageOnCall')}: ${ON_CALL.name}`}
+          accessibilityHint={t('callOnCallHint')}
           onPress={() => {
             close()
-            router.push('/care')
+            // Straight into a new message to the on-call clinician, never the Care tab root.
+            router.push(`/messages?compose=1&to=${ON_CALL.id}`)
           }}
         >
-          {t('messageOnCall')}
+          {t('callOnCall')}
         </Button>
+        <Card tone="sunk" style={{ gap: space.s1 }}>
+          <Eyebrow>{t('emergencyContact', { relation: tx(RELATION_TEXT[contact.relation], contact.relation) })}</Eyebrow>
+          <Body weight="medium">{contact.name}</Body>
+          {told ? (
+            <View accessibilityLiveRegion="polite" style={{ flexDirection: 'row', gap: 10 }}>
+              <Icon name="check" size={18} color={c.ink} />
+              <Body style={{ flex: 1 }}>{t('toldContact', { name: first })}</Body>
+            </View>
+          ) : (
+            <Meta>{t('tellContactHint')}</Meta>
+          )}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s1 }}>
+            {told ? (
+              <Button variant="ghost" size="sm" onPress={() => setTold(false)}>
+                {t('undoTell', { name: first })}
+              </Button>
+            ) : (
+              <Button variant="secondary" size="sm" icon="user-check" onPress={() => setTold(true)}>
+                {t('tellContact', { name: first })}
+              </Button>
+            )}
+            {tel ? (
+              <Button variant="secondary" size="sm" icon="phone" accessibilityHint={t('callContactHint')} onPress={() => Linking.openURL(tel).catch(() => {})}>
+                {t('callContact', { name: first })}
+              </Button>
+            ) : null}
+          </View>
+        </Card>
       </View>
     </Sheet>
   )

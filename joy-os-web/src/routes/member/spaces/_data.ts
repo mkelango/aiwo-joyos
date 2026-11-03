@@ -87,6 +87,33 @@ export const VIVA_DRAFT: Record<TermKey, { tool: string; ask: string; draft: str
   B: null,
 }
 
+/**
+ * The second named VIVA tool of each space (terms.ts lists two per space), each with a
+ * canned specimen prompt and draft. le8_coach is drafted at ask time from the LE8 log.
+ */
+export const VIVA_MORE: Record<TermKey, { tool: string; ask: string; draft: string; reviewer: string }[]> = {
+  H: [{ tool: 'le8_coach', ask: 'Which of my Essential 8 should I work on first?', draft: '', reviewer: 'Reviewed by Dr Meera Iyer' }],
+  P: [{ tool: 'tomorrow_question', ask: 'Ask me this week’s Tomorrow question.', draft: 'What is one thing tomorrow that you would be sorry to miss? Write it down tonight, next to your earlier answers. Only you can read it.', reviewer: 'Coach Priya sees this in your digest' }],
+  R: [{ tool: 'repair_conversation', ask: 'Help me start a repair after an argument.', draft: 'Start with your own part, in one sentence: “I was short with you, and I am sorry.” Then ask one question and only listen. A repair is not about who was right; it is about coming back.', reviewer: 'Never reveals one partner to the other' }],
+  F: [{ tool: 'no_list_coach', ask: 'Help me say no to one thing this week.', draft: 'The Tuesday reviews take more of your week than anything else asked of you. You could try: “I will join the first fifteen minutes and read the notes after.” A smaller yes is still a no to the rest.', reviewer: 'Calendar entries discarded · totals only · never financial advice' }],
+  D: [{ tool: 'savour_prompt', ask: 'Give me a savouring prompt for this evening.', draft: 'When the tea is poured tonight, wait ten seconds before the first sip. Notice the smell and the warmth of the cup. Then tell Kavya one thing from today you would be sorry to have missed.', reviewer: 'From the savouring library · no advice' }],
+  B: [],
+}
+
+/** Words that send a question typed in a space's VIVA card to one of its tools (specimen matching). */
+export const VIVA_MATCH: Record<string, RegExp> = {
+  explain_biomarker: /apob|ldl|hdl|hba1c|marker|cholesterol|vitamin|biomarker|\blab\b|panel|ferritin|crp/i,
+  le8_coach: /le8|essential|heart|blood pressure|\bbp\b|sleep|diet|bmi|weight|activity|walk|first/i,
+  ikigai_coach: /ikigai|anchor|purpose|direction|meaning|contribut/i,
+  tomorrow_question: /tomorrow|question/i,
+  couples_prompt: /state of us|kavya|partner|couple|wife|husband|marriage/i,
+  repair_conversation: /argu|fight|repair|sorry|apolog|upset|quarrel/i,
+  time_audit_summary: /audit|hours|calendar|meeting|where.*time|my time/i,
+  no_list_coach: /\bno\b|say no|declin|refus|boundar|too many/i,
+  ledger_weekly_story: /ledger|where did joy|joy come|this week/i,
+  savour_prompt: /savou?r|enjoy|evening|tea|meal|slow down/i,
+}
+
 // ─── Body ──────────────────────────────────────────────────────────────────
 
 export const DEVICES = [
@@ -108,6 +135,82 @@ export const LE8 = [
   { key: 'glucose', name: 'Blood glucose', score: 60, status: 'watch' as Le8Status, reading: 'HbA1c 5.8%', source: 'Panel · Jan' },
   { key: 'bp', name: 'Blood pressure', score: 75, status: 'good' as Le8Status, reading: '128 / 78 mmHg', source: 'Home cuff' },
 ]
+
+export type Le8Key = 'diet' | 'activity' | 'nicotine' | 'sleep' | 'bmi' | 'lipids' | 'glucose' | 'bp'
+/**
+ * One LE8 reading. `v` holds the raw values: diet [MEPA 0–16], activity [min/week],
+ * nicotine [answer 0–4], sleep [minutes a night], bmi [weight kg], lipids [non-HDL mg/dL],
+ * glucose [HbA1c %], bp [systolic, diastolic]. `mine` marks a reading the member logged here.
+ */
+export interface Le8Reading { id: string; key: Le8Key; on: string; v: number[]; source: string; mine?: boolean }
+
+/** Clinic height for the specimen member; BMI is computed from a logged weight. */
+export const LE8_HEIGHT_CM = 172
+export const bmiOf = (kg: number) => Math.round((kg / (LE8_HEIGHT_CM / 100) ** 2) * 10) / 10
+
+/** AHA Life's Essential 8 (2022) points, 0–100, from a reading's raw values. */
+export function le8Score(key: Le8Key, v: number[]): number {
+  const x = v[0]
+  switch (key) {
+    case 'diet': return x >= 15 ? 100 : x >= 12 ? 80 : x >= 8 ? 50 : x >= 4 ? 25 : 0
+    case 'activity': return x >= 150 ? 100 : x >= 120 ? 90 : x >= 90 ? 80 : x >= 60 ? 60 : x >= 30 ? 40 : x >= 1 ? 20 : 0
+    case 'nicotine': return [100, 75, 50, 25, 0][x] ?? 0
+    case 'sleep': { const h = x / 60; return h >= 7 && h < 9 ? 100 : h >= 9 && h < 10 ? 90 : h >= 6 && h < 7 ? 70 : (h >= 5 && h < 6) || h >= 10 ? 40 : h >= 4 ? 20 : 0 }
+    case 'bmi': { const b = bmiOf(x); return b < 25 ? 100 : b < 30 ? 70 : b < 35 ? 30 : b < 40 ? 15 : 0 }
+    case 'lipids': return x < 130 ? 100 : x < 160 ? 60 : x < 190 ? 40 : x < 220 ? 20 : 0
+    case 'glucose': return x < 5.7 ? 100 : x < 6.5 ? 60 : x < 7 ? 40 : x < 8 ? 30 : x < 9 ? 20 : x < 10 ? 10 : 0
+    case 'bp': { const [s, d] = v; return s >= 160 || d >= 100 ? 0 : s >= 140 || d >= 90 ? 25 : s >= 130 || d >= 80 ? 50 : s >= 120 ? 75 : 100 }
+  }
+}
+export const le8Status = (score: number): Le8Status => (score >= 90 ? 'ideal' : score >= 70 ? 'good' : 'watch')
+
+/** Specimen LE8 history: July and October 2026 baselines, then the January 2027 readings shown above. */
+export const LE8_LOG_START: Le8Reading[] = [
+  { id: 'le8-diet-jul', key: 'diet', on: '2026-07-06', v: [9], source: 'Self-report' },
+  { id: 'le8-act-jul', key: 'activity', on: '2026-07-06', v: [95], source: 'Apple Health' },
+  { id: 'le8-nic-jul', key: 'nicotine', on: '2026-07-06', v: [0], source: 'Self-report' },
+  { id: 'le8-sleep-jul', key: 'sleep', on: '2026-07-06', v: [366], source: 'Oura' },
+  { id: 'le8-bmi-jul', key: 'bmi', on: '2026-07-06', v: [80.5], source: 'Clinic' },
+  { id: 'le8-lip-jul', key: 'lipids', on: '2026-07-06', v: [162], source: 'Lab panel' },
+  { id: 'le8-glu-jul', key: 'glucose', on: '2026-07-06', v: [6.0], source: 'Lab panel' },
+  { id: 'le8-bp-jul', key: 'bp', on: '2026-07-06', v: [136, 84], source: 'Clinic' },
+  { id: 'le8-diet-oct', key: 'diet', on: '2026-10-03', v: [11], source: 'Self-report' },
+  { id: 'le8-act-oct', key: 'activity', on: '2026-10-03', v: [140], source: 'Apple Health' },
+  { id: 'le8-sleep-oct', key: 'sleep', on: '2026-10-03', v: [384], source: 'Oura' },
+  { id: 'le8-bmi-oct', key: 'bmi', on: '2026-10-03', v: [78.6], source: 'Clinic' },
+  { id: 'le8-lip-oct', key: 'lipids', on: '2026-10-03', v: [151], source: 'Lab panel' },
+  { id: 'le8-glu-oct', key: 'glucose', on: '2026-10-03', v: [5.9], source: 'Lab panel' },
+  { id: 'le8-bp-oct', key: 'bp', on: '2026-10-03', v: [132, 80], source: 'Home cuff' },
+  { id: 'le8-diet-jan', key: 'diet', on: '2027-01-22', v: [12], source: 'Self-report' },
+  { id: 'le8-act-jan', key: 'activity', on: '2027-01-22', v: [165], source: 'Apple Health' },
+  { id: 'le8-sleep-jan', key: 'sleep', on: '2027-01-22', v: [400], source: 'Oura' },
+  { id: 'le8-bmi-jan', key: 'bmi', on: '2027-01-22', v: [77.2], source: 'Clinic' },
+  { id: 'le8-lip-jan', key: 'lipids', on: '2027-01-22', v: [146], source: 'Panel · Jan' },
+  { id: 'le8-glu-jan', key: 'glucose', on: '2027-01-22', v: [5.8], source: 'Panel · Jan' },
+  { id: 'le8-bp-jan', key: 'bp', on: '2027-01-22', v: [128, 78], source: 'Home cuff' },
+]
+export const LE8_KEY = 'body.le8.v1'
+
+/** Newest reading per metric on or before `upTo` (all readings when omitted). Same-day ties go to the later entry. */
+export function le8Latest(log: Le8Reading[], upTo?: string) {
+  const out: Partial<Record<Le8Key, Le8Reading>> = {}
+  log.forEach((r) => {
+    if (upTo && r.on > upTo) return
+    const cur = out[r.key]
+    if (!cur || r.on >= cur.on) out[r.key] = r
+  })
+  return out
+}
+
+/** The LE8 composite (mean of the eight) at every date a reading was logged, oldest first. */
+export function le8Series(log: Le8Reading[]) {
+  const dates = [...new Set(log.map((r) => r.on))].sort()
+  return dates.flatMap((on) => {
+    const latest = le8Latest(log, on)
+    const scores = LE8.map((m) => latest[m.key as Le8Key]).filter(Boolean).map((r) => le8Score(r!.key, r!.v))
+    return scores.length === LE8.length ? [{ on, value: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) }] : []
+  })
+}
 
 export type MarkerStatus = 'in range' | 'worth watching' | 'outside range'
 export interface Marker {
@@ -150,6 +253,13 @@ export const CAPACITY = [
   { key: 'sts', name: '5× sit-to-stand', unit: 's', last: 10.8, prev: 11.6, better: 'lower', how: 'Arms crossed, stand fully five times from a firm chair, as quickly as is safe.', norm: 'Under 12 s is the WHO ICOPE screen' },
   { key: 'gait', name: 'Gait speed', unit: 'm/s', last: 1.12, prev: 1.08, better: 'higher', how: 'Walk 4 metres at your usual pace. We divide 4 by your time.', norm: 'Above 1.0 m/s is the usual line' },
 ] as const
+
+/** Every home capacity test so far, oldest first (grip kg, sit-to-stand s, gait m/s). */
+export const CAPACITY_HISTORY_START: { on: string; values: number[] }[] = [
+  { on: '2026-07-06', values: [35, 12.4, 1.02] },
+  { on: '2026-10-03', values: CAPACITY.map((c) => c.prev) },
+  { on: '2027-01-02', values: CAPACITY.map((c) => c.last) },
+]
 
 /**
  * 28 days of signal features (not vendor scores), 1–28 Jan 2027. 1 Jan 2027 is a
@@ -327,7 +437,7 @@ export const SCREEN_META: Record<Screen, { max: number; what: string; cadence: s
     bands: [
       { upTo: 5, label: 'Lower', copy: 'Your answers suggest lower perceived stress.', route: false },
       { upTo: 10, label: 'Moderate', copy: 'Your answers suggest moderate perceived stress.', route: false },
-      { upTo: 16, label: 'Higher', copy: 'Your answers suggest higher perceived stress. Your coach will be in touch this week.', route: false },
+      { upTo: 16, label: 'Higher', copy: 'Your answers suggest higher perceived stress. Your coach will be in touch this week.', route: true },
     ],
   },
   Pain: {

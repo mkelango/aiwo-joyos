@@ -1,15 +1,15 @@
 import { router } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { View } from 'react-native'
-import { Body, Button, Card, DaybreakButton, Divider, Eyebrow, ListRow, Meta, Mono, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, Toggle, Title } from '@/components'
+import { Body, Button, Card, DaybreakButton, Divider, Eyebrow, ListRow, Meta, Mono, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, Toggle, Title, fmtDate } from '@/components'
 import { LANGS, useDict, useT } from '@/lib/i18n'
 import { SETTINGS } from '@/screens/b/i18n/account'
 import { LANG_LABEL, perDayKey, useCommon, usePrefsError } from '@/screens/b/i18n/common'
-import { useApp, type TextSize, type ThemePref } from '@/lib/store'
+import { useApp, useReduceMotion, type TextSize, type ThemePref } from '@/lib/store'
 import { MEMBER } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
 import { PLANS } from '@/screens/b/_data'
-import { accountStore, notifPrefsStore, onboardingStore, sessionStore, useStore, validatePrefs } from '@/screens/b/bStore'
+import { a11yStore, accountStore, lockStore, notifPrefsStore, onboardingStore, sessionStore, useStore, validatePrefs, type LockState } from '@/screens/b/bStore'
 import { ChoiceCard, TimeStepper, memberOnly } from '@/screens/b/parts'
 
 // SETTINGS: language (English · தமிழ் · हिन्दी), theme (follows the system by default),
@@ -31,7 +31,26 @@ function Settings() {
   const tc = useCommon()
   const prefsErr = usePrefsError()
   const householdName = MEMBER.household === SETTINGS.householdName.en ? ts('householdName') : MEMBER.household
-  const { lang, setLang, themePref, setThemePref, textSize, setTextSize, offline, setOffline } = useApp()
+  const { lang, setLang, themePref, setThemePref, textSize, setTextSize, offline, setOffline, syncQueue, reduceMotion, setReduceMotion } = useApp()
+  // Reduce motion is on if the member chose it or the phone asks for it.
+  const motionReduced = useReduceMotion()
+  const systemMotion = motionReduced && !reduceMotion
+  const [a11y, setA11y] = useStore(a11yStore)
+  const [lock, setLock] = useStore(lockStore)
+  const [pkNote, setPkNote] = useState<string | null>(null)
+  const removePasskey = (id: string) => {
+    if (lock.passkeys.length <= 1) return setPkNote(ts('lastPk'))
+    setPkNote(null)
+    setLock((l) => ({ ...l, passkeys: l.passkeys.filter((p) => p.id !== id) }))
+  }
+  // The seeded first passkey is this phone; its label follows the member's language.
+  const pkLabel = (pk: LockState['passkeys'][number]) => (pk.id === 'pk1' ? ts('pkThisIphone') : pk.name || ts('pkName'))
+  const addPasskey = () => {
+    const d = new Date()
+    const added = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    setLock((l) => ({ ...l, passkeys: [...l.passkeys, { id: `pk${Date.now()}`, name: '', added }] }))
+    setPkNote(ts('pkAdded'))
+  }
   const [acct] = useStore(accountStore)
   // The same preferences onboarding and Notifications use, kept on this phone.
   const [prefs, setPrefs] = useStore(notifPrefsStore)
@@ -169,6 +188,64 @@ function Settings() {
         </Card>
       </View>
 
+      {/* Accessibility */}
+      <View style={{ gap: space.s2 }}>
+        <SectionTitle>{ts('accessibility')}</SectionTitle>
+        <Card tone="raised" style={{ gap: space.s2 }}>
+          <Toggle checked={motionReduced} onChange={setReduceMotion} disabled={systemMotion} label={ts('reduceMotion')} description={systemMotion ? ts('reduceMotionSystem') : ts('reduceMotionD')} />
+          <Divider />
+          <Toggle checked={a11y.captions} onChange={(v) => setA11y((x) => ({ ...x, captions: v }))} label={ts('captions')} description={ts('captionsD')} />
+        </Card>
+      </View>
+
+      {/* Security */}
+      <View style={{ gap: space.s2 }}>
+        <SectionTitle>{ts('security')}</SectionTitle>
+        <Card tone="raised" style={{ gap: space.s2 }}>
+          <Toggle checked={lock.appLock} onChange={(v) => setLock((l) => ({ ...l, appLock: v }))} label={ts('appLock')} description={ts('appLockD')} />
+          {lock.appLock ? (
+            <>
+              <Eyebrow>{ts('lockAfter')}</Eyebrow>
+              <Segmented<LockState['after']>
+                value={lock.after}
+                onChange={(v) => setLock((l) => ({ ...l, after: v }))}
+                items={[
+                  { value: 'now', label: ts('lockNow') },
+                  { value: '1m', label: ts('lock1') },
+                  { value: '5m', label: ts('lock5') },
+                  { value: '15m', label: ts('lock15') },
+                ]}
+                style={{ flexWrap: 'wrap' }}
+              />
+            </>
+          ) : null}
+          <Divider />
+          <Eyebrow>{ts('passkeys')}</Eyebrow>
+          <Meta size={14}>{ts('passkeysBody')}</Meta>
+          {lock.passkeys.map((pk) => (
+            <View key={pk.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1 }}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Body>{pkLabel(pk)}</Body>
+                <Meta size={14}>
+                  {ts('addedOn').split('{date}')[0]}
+                  <Mono size={14} tone="ink2">{fmtDate(pk.added)}</Mono>
+                  {ts('addedOn').split('{date}')[1] ?? ''}
+                </Meta>
+              </View>
+              <Button size="sm" variant="ghost" accessibilityLabel={ts('removePkA11y', { name: pkLabel(pk) })} onPress={() => removePasskey(pk.id)}>
+                {ts('removePk')}
+              </Button>
+            </View>
+          ))}
+          {pkNote ? (
+            <Meta accessibilityLiveRegion="polite">{pkNote}</Meta>
+          ) : null}
+          <Button variant="secondary" size="sm" icon="key" onPress={addPasskey}>
+            {ts('addPk')}
+          </Button>
+        </Card>
+      </View>
+
       {/* Notifications */}
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{ts('notifications')}</SectionTitle>
@@ -234,6 +311,11 @@ function Settings() {
             label={ts('workOffline')}
             description={offline ? ts('offlineOn') : ts('offlineOff')}
           />
+          {syncQueue.length ? (
+            <Meta size={14} accessibilityLiveRegion="polite">
+              {syncQueue.length === 1 ? ts('queued1') : ts('queuedN', { n: syncQueue.length })}
+            </Meta>
+          ) : null}
         </Card>
       </View>
 

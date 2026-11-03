@@ -2,6 +2,7 @@ import { useCallback, useSyncExternalStore } from 'react'
 import type { LedgerEntry, TermKey, TermScore } from '@/domain/types'
 import { LEDGER, LEDGER_WEEK, MEMBER } from '@/data/member'
 import { DAY90_DATES, LEDGER_WEEK_ENTRIES } from './_data'
+import { DEVICES } from '@/routes/member/account/_data'
 
 // Lane-local persisted state for the member core (Today, Index, Ledger, VIVA).
 // Per-viewer conveniences in localStorage, every access wrapped in try/catch so the
@@ -194,7 +195,40 @@ export interface MeasuredIndex {
   lowestTerm: TermKey
   preview: boolean
   phqFlag: boolean
+  /** Every wearable signal was off (by choice, or because no device was connected): scored from answers and in-app logs only. */
+  surveyOnly?: boolean
 }
 export function useMeasured() {
   return useLocal<MeasuredIndex | null>('measured-index', null)
+}
+
+// ─── Signals down ───────────────────────────────────────────────────────────
+// The device record kept by /app/devices (joyos:acct:devices) is the one source of truth.
+// With no device connected, the next Index is scored from the survey alone, and says so.
+const DEVICES_KEY = 'joyos:acct:devices'
+function readDevicesRaw(): string | null {
+  try {
+    return localStorage.getItem(DEVICES_KEY)
+  } catch {
+    return null
+  }
+}
+function subscribeStorage(cb: () => void) {
+  window.addEventListener('storage', cb)
+  return () => window.removeEventListener('storage', cb)
+}
+/** Names of the devices connected now (specimen default: the ring and Apple Health). */
+export function connectedDevices(raw: string | null): string[] {
+  let states: Record<string, { state?: string }> = {}
+  try {
+    states = raw ? ((JSON.parse(raw) as { states?: Record<string, { state?: string }> }).states ?? {}) : {}
+  } catch {
+    states = {}
+  }
+  return DEVICES.filter((d) => (states[d.id]?.state ?? d.state) === 'connected').map((d) => d.name)
+}
+/** true when no wearable is connected: the Index can only be survey-only. */
+export function useSignalsDown() {
+  const raw = useSyncExternalStore(subscribeStorage, readDevicesRaw, () => null)
+  return connectedDevices(raw).length === 0
 }

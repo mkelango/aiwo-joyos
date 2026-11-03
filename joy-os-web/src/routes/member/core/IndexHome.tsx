@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowDown, ArrowRight, BookOpen, CircleDashed, FlaskConical, Printer, RotateCcw, ShieldCheck, X } from 'lucide-react'
+import { ArrowDown, ArrowRight, BookOpen, CircleDashed, FlaskConical, Printer, RotateCcw, ShieldCheck, Watch, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -13,7 +13,7 @@ import { METHODS, bandFor, jaly, joyspanIndex, lowestTerm } from '@/domain/index
 import type { IndexScore, TermKey } from '@/domain/types'
 import { HISTORY_METHOD, METHOD_V10_PUBLISHED, NOT_YET_EXAMPLE, TERM_DETAIL } from './_data'
 import { KV, PrintOnly, TICK, TOOLTIP_STYLE } from './_parts'
-import { useMeasured, type MeasuredIndex } from './_store'
+import { useMeasured, useSignalsDown, type MeasuredIndex } from './_store'
 import { ACTION_TEXT, CONFIDENCE_KEY, SIGNAL_SOURCE_TEXT, TERM_DETAIL_TEXT, fmtLocal, rich, useCore } from './_i18n'
 import { useT } from '@/lib/i18n'
 import type { Lang } from '@/lib/store'
@@ -38,6 +38,7 @@ export default function IndexHome() {
   const band = useBandText()
   const lowName = name(lowest.key)
   const at = ACTION_TEXT[TODAY_ACTION.id]
+  const signalsDown = useSignalsDown()
 
   return (
     <div>
@@ -59,6 +60,20 @@ export default function IndexHome() {
       />
 
       {measured && <MeasuredBanner m={measured} onClear={() => setMeasured(null)} />}
+
+      {/* Signals down: the Index can only be survey-only, and says so (never a fault colour). */}
+      {signalsDown && (
+        <div role="status" className="mb-6 flex flex-col gap-3 rounded-card border border-line bg-paper-sunk px-5 py-4 sm:flex-row sm:items-center sm:justify-between lg:mb-8">
+          <div className="flex items-start gap-3">
+            <Watch size={18} className="mt-0.5 shrink-0 text-ink-3" aria-hidden />
+            <div className="min-w-0">
+              <p className="flex flex-wrap items-center gap-2 text-[16px] text-ink">{c('soDownTitle')} <Pill tone="neutral">{c('soPill')}</Pill></p>
+              <p className="mt-1 text-[14px] text-ink-2">{c('soDownBody')}</p>
+            </div>
+          </div>
+          <Link to="/app/devices" className="inline-flex shrink-0 items-center gap-1.5 self-start text-[15px] text-ink underline-offset-4 hover:underline focus-ring sm:self-center">{c('soOpenDevices')} <ArrowRight size={15} /></Link>
+        </div>
+      )}
 
       {/* ─── The Index + the Wheel + the selected term ─────────────────────── */}
       <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr] lg:gap-8">
@@ -524,6 +539,11 @@ function MeasuredBanner({ m, onClear }: { m: MeasuredIndex; onClear: () => void 
               {rich(c('lowestTermIs'), { term: <span className="text-ink">{name(m.lowestTerm)}</span> })}{' '}
               {m.preview ? c('mbKept') : c('mbAwaiting')}
             </p>
+            {m.surveyOnly && (
+              <p className="mt-2 flex flex-wrap items-center gap-2 text-[14px] text-ink-2">
+                <Pill tone="neutral">{c('soPill')}</Pill> {c('soBanner')}
+              </p>
+            )}
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">

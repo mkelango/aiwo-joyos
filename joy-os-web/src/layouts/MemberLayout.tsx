@@ -1,13 +1,13 @@
 import clsx from 'clsx'
 import {
   BookOpen, CalendarDays, CircleDot, Compass, HeartHandshake, Home, MessageCircle, Plane, Settings,
-  ShieldCheck, Sparkles, Users, WifiOff, Feather, Watch, CreditCard, Bell, UserRound,
+  ShieldCheck, Sparkles, Users, WifiOff, Feather, Watch, CreditCard, Bell, UserRound, RefreshCw, Check, ArrowRight,
 } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { JoyOsLockup } from '@/components/joy/Brand'
 import { fmtDate } from '@/components/joy/primitives'
 import { LoopRing } from '@/components/ui'
-import { MEMBER } from '@/data/member'
+import { MEMBER, PAYMENTS_GRACE } from '@/data/member'
 import { useApp } from '@/lib/store'
 import { useDict, useT } from '@/lib/i18n'
 import { SHARED } from '@/components/_i18n'
@@ -17,7 +17,8 @@ import { CrisisSheet, ThemeToggle } from './shared'
 export default function MemberLayout() {
   const t = useT()
   const s = useDict(SHARED)
-  const { offline, setOffline, lang } = useApp()
+  const { offline, setOffline, syncQueue, syncState, syncedCount, paymentsGrace, lang } = useApp()
+  const queued = syncQueue.length
   const indic = lang !== 'en'
   const { pathname } = useLocation()
   const TABS = [
@@ -91,10 +92,28 @@ export default function MemberLayout() {
       )}
 
       <div className={clsx(!immersive && 'lg:pl-[264px]')}>
-        {offline && (
+        {offline ? (
           <div role="status" className="flex flex-wrap items-center justify-center gap-2 bg-ink px-4 py-2 text-center text-[14px] text-paper">
-            <WifiOff size={15} className="shrink-0" /> {s('offline')}
-            <button className="underline underline-offset-2" onClick={() => setOffline(false)}>{s('dismiss')}</button>
+            <WifiOff size={15} className="shrink-0" />
+            <span>{queued === 0 ? s('offlineNone') : s(queued === 1 ? 'offlineOne' : 'offlineMany', { n: queued })}</span>
+            <button className="underline underline-offset-2 focus-ring" onClick={() => setOffline(false)}>{s('backOnline')}</button>
+          </div>
+        ) : syncState !== 'idle' ? (
+          <div role="status" className="flex flex-wrap items-center justify-center gap-2 bg-paper-sunk px-4 py-2 text-center text-[14px] text-ink">
+            {syncState === 'syncing' ? <RefreshCw size={15} className="shrink-0 animate-spin motion-reduce:animate-none" aria-hidden /> : <Check size={15} className="shrink-0" aria-hidden />}
+            <span>
+              {syncState === 'syncing'
+                ? s(queued === 1 ? 'syncingOne' : 'syncingMany', { n: queued })
+                : s(syncedCount === 1 ? 'syncedOne' : 'syncedMany', { n: syncedCount })}
+            </span>
+          </div>
+        ) : null}
+        {/* Payments grace: a calm note on every screen, never red, never a countdown. Membership has its own card. */}
+        {paymentsGrace && !immersive && !pathname.startsWith('/app/membership') && (
+          <div role="status" className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-daybreak-soft px-4 py-2 text-center text-[14px] text-ink">
+            <CreditCard size={15} className="shrink-0" aria-hidden />
+            <span>{s('graceBanner', { date: fmtDate(PAYMENTS_GRACE.until, lang) })}</span>
+            <NavLink to="/app/membership" className="inline-flex items-center gap-1 underline underline-offset-2 focus-ring">{s('graceLink')} <ArrowRight size={13} aria-hidden /></NavLink>
           </div>
         )}
         <main id="main" className={clsx('mx-auto w-full max-w-[1120px] px-4 pt-6 md:px-8 md:pt-10', immersive ? 'pb-10' : 'pb-44 lg:pb-24')}>

@@ -132,6 +132,7 @@ export interface AccessEvent {
 export type Role =
   | 'member'
   | 'coach'
+  | 'concierge'
   | 'clinician'
   | 'partner'
   | 'tenant'

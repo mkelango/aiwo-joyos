@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { BellOff, Camera, Check, EyeOff, Lock, MessageCircle, Plus, Trash2, X } from 'lucide-react'
+import { BellOff, Camera, Check, CloudOff, EyeOff, Lock, MessageCircle, Plus, RefreshCw, Trash2, X } from 'lucide-react'
 import { useEffect, useId, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Bar, BarChart, LabelList, ResponsiveContainer, XAxis, YAxis } from 'recharts'
@@ -71,7 +71,7 @@ async function toThumb(file: File, max = 320): Promise<string> {
 }
 
 export default function Ledger() {
-  const { ledger } = useApp()
+  const { ledger, syncQueue, queueSync, unqueueSync } = useApp()
   const [removed, setRemoved] = useLedgerRemoved()
   const [rows, setRows] = useLocal<ScheduleRow[]>('ledger-schedule', DEFAULT_SCHEDULE)
   const live = useMemo(() => liveLedger(ledger, removed), [ledger, removed])
@@ -105,7 +105,24 @@ export default function Ledger() {
       </div>
 
       <div className="mt-6 grid gap-6 lg:mt-8 lg:grid-cols-[1.6fr_1fr] lg:gap-8">
-        <EntriesCard live={live} onRemove={(id) => setRemoved((r) => [...new Set([...r, id])])} onRestore={(id) => setRemoved((r) => r.filter((x) => x !== id))} />
+        <EntriesCard
+          live={live}
+          onRemove={(id) => {
+            setRemoved((r) => [...new Set([...r, id])])
+            // Offline: an entry added and removed before sync simply leaves the queue;
+            // removing one that already synced queues the removal instead.
+            if (syncQueue.some((q) => q.id === id)) unqueueSync(id)
+            else queueSync({ id: `rm:${id}`, kind: 'ledger-remove' })
+          }}
+          onRestore={(id) => {
+            setRemoved((r) => r.filter((x) => x !== id))
+            if (syncQueue.some((q) => q.id === `rm:${id}`)) unqueueSync(`rm:${id}`)
+            else {
+              const e = ledger.find((x) => x.id === id)
+              if (e && !isSeed(e)) queueSync({ id, kind: 'ledger' }) // only while offline
+            }
+          }}
+        />
         <div className="flex flex-col gap-6">
           <Card tone="raised">
             <div className="flex items-center justify-between gap-3">
@@ -129,7 +146,7 @@ export default function Ledger() {
 function PromptCard({ prompt, time, next, live }: { prompt: 1 | 2 | 3; time?: string; next: ScheduleRow | null; live: LedgerEntry[] }) {
   const t = useT()
   const { t: c, lang, name, tag: tagText } = useCore()
-  const { ledger, addLedger, setCrisisOpen } = useApp()
+  const { ledger, addLedger, setCrisisOpen, offline } = useApp()
   const [photos, setPhotos] = useLocal<Record<string, string>>('ledger-photos', {})
   const wordId = useId()
   const labelId = useId()
@@ -279,6 +296,7 @@ function PromptCard({ prompt, time, next, live }: { prompt: 1 | 2 | 3; time?: st
             <p className="mt-2 text-[15px] text-ink-3">
               {next ? rich(c('lgNextAt'), { t: <span className="num">{next.time}</span> }) : c('lgLastToday')}{c('lgNowShows')}
             </p>
+            {offline && <p className="mt-2 flex items-center gap-1.5 text-[14px] text-ink-2"><CloudOff size={14} aria-hidden className="shrink-0" /> {c('oqLedger')}</p>}
             <Button variant="link" className="mt-auto self-start pt-6" onClick={reset}>{c('lgAddAnother')}</Button>
           </motion.div>
         ) : state === 'held' ? (
@@ -474,6 +492,8 @@ function CalendarCard({ live }: { live: LedgerEntry[] }) {
 // ─── The entries ────────────────────────────────────────────────────────────
 function EntriesCard({ live, onRemove, onRestore }: { live: LedgerEntry[]; onRemove: (id: string) => void; onRestore: (id: string) => void }) {
   const [photos, setPhotos] = useLocal<Record<string, string>>('ledger-photos', {})
+  const { syncQueue, syncState } = useApp()
+  const queuedIds = useMemo(() => new Set(syncQueue.map((q) => q.id)), [syncQueue])
   const [filter, setFilter] = useState<string | null>(null)
   // A removed entry's on-device photo leaves storage at once; Undo puts it back.
   const [undo, setUndo] = useState<{ id: string; label: string; photo?: string } | null>(null)
@@ -555,6 +575,12 @@ function EntriesCard({ live, onRemove, onRestore }: { live: LedgerEntry[]; onRem
                         {e.tags.map((t) => <span key={t} className="rounded-full px-2.5 py-0.5 text-[13px] text-ink" style={{ background: 'var(--term-d-soft)' }}>{tag(t)}</span>)}
                       </div>
                       {e.word && <p className="mt-1.5 text-[16px] text-ink">“{e.word}”</p>}
+                      {queuedIds.has(e.id) && (
+                        <p className="mt-1.5 flex items-center gap-1.5 text-[13px] text-ink-3">
+                          {syncState === 'syncing' ? <RefreshCw size={12} className="animate-spin motion-reduce:animate-none" aria-hidden /> : <CloudOff size={12} aria-hidden />}
+                          {c(syncState === 'syncing' ? 'oqSyncing' : 'oqWaiting')}
+                        </p>
+                      )}
                       {photos[e.id] ? (
                         <img src={photos[e.id]} alt={e.word ? c('enPhotoOf', { word: e.word }) : c('lgPhotoAlt')} className="mt-2 h-14 w-14 rounded-md object-cover" />
                       ) : (

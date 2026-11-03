@@ -435,3 +435,26 @@ export const FLAGSHIP_RECAP = {
   circleFormed: '2027-01-05',
   sessionsAttended: ['The Summit: the Mentor’s address', 'Experience Zone: Pleasure', 'Capacity battery', 'The Ikigai map', 'The slow dinner'],
 }
+
+/** The next flagship edition, open for requests (specimen). */
+export const FLAGSHIP_NEXT = {
+  id: 'ev7',
+  name: 'AIWO Joyspan 2028',
+  date: '2027-12-31',
+  to: '2028-01-05',
+  where: 'Fairmont Mumbai',
+  guests: 600,
+  confirmFrom: '2027-06-01',
+}
+
+/** What each person says in the specimen circle call, shown as live captions. People's own words stay in English. */
+export const CAPTIONS: Record<string, string> = {
+  Priya: 'Welcome, everyone. A minute of quiet first, then this week’s prompt. No one has to answer.',
+  Kavya: 'Mine is the good dinner set from our wedding. Later, apparently, is when the children visit.',
+  Nikhil: 'A trek in Ladakh. I have said “next year” for nine years now. I am putting a date on it tonight.',
+  Farah: 'My grandmother’s recipe book. I keep it wrapped up so it stays nice. It should be stained, really.',
+  Deepa: 'I am on audio again, sorry. Mine is a whole Sunday with no plans. Later is never, if I am honest.',
+  Shalini: 'The veena in the corner. I stopped playing when I started working. Fifteen minutes on Saturday.',
+  Vikram: 'Driving to the coast with my father while he still enjoys the drive. I am calling him after this.',
+  Thomas: 'I will listen this week, if that is all right. Thank you for the notes on last week.',
+}

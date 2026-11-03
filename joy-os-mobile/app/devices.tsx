@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { Platform, View } from 'react-native'
+import { Platform, Pressable, View } from 'react-native'
+import { router } from 'expo-router'
 import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg'
 import { Body, Button, Card, DaybreakButton, Divider, Eyebrow, Icon, type IconName, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Serif, Sheet, SpecimenTag, TermChip, Toggle } from '@/components'
 import { useTheme } from '@/theme/ThemeProvider'
+import { palettes } from '@/theme/tokens'
+import { useApp } from '@/lib/store'
+import { isSpecimenToday } from '@/screens/a/local'
+import { LEDGER_TAG } from '@/screens/b/i18n/common'
 import { DEVICES, HEALTHKIT_TYPES, WEAR_NIGHTS, type DeviceState } from '@/screens/b/accountData'
 import { devicesStore, useStore } from '@/screens/b/bStore'
 import { CheckLine, memberOnly } from '@/screens/b/parts'
@@ -240,6 +245,9 @@ function Devices() {
         </Card>
       </View>
 
+      {/* The watch: Joy Ledger complication with a quick add */}
+      <WatchComplication />
+
       {/* Also works with */}
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{t('also')}</SectionTitle>
@@ -360,5 +368,139 @@ function Devices() {
         <Body>{toast}</Body>
       </Sheet>
     </Screen>
+  )
+}
+
+// The watch face is a dark ground in both themes (warm Ink), like a real watch face.
+const FACE = palettes.dark
+const WATCH_TAGS = ['People', 'Food', 'Rest', 'Nature', 'Movement', 'Music']
+
+/**
+ * A simulated watch with the Joy Ledger complication. A tap opens the quick add; a tag adds a
+ * real entry to the Ledger in the app store (the same one the phone's Ledger shows).
+ */
+function WatchComplication() {
+  const { c, space } = useTheme()
+  const t = useDict(DEV)
+  const tx = useTx()
+  const { ledger, addLedger } = useApp()
+  const [stored, setStored] = useStore(devicesStore)
+  const on = stored.complication !== false
+  const [mode, setMode] = useState<'face' | 'pick' | 'kept'>('face')
+  const [kept, setKept] = useState<string | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
+  const today = ledger.filter(isSpecimenToday).length
+  const countLabel = today === 0 ? t('watchToday0') : today === 1 ? t('watchToday1') : t('watchTodayN', { n: today })
+  const tag = (tg: string) => tx(LEDGER_TAG[tg], tg)
+  const now = new Date()
+  const clock = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+
+  const add = (tg: string) => {
+    const h = new Date().getHours()
+    // The prompt of the day this moment answers: after lunch, late afternoon or the evening.
+    addLedger({ prompt: h < 15 ? 1 : h < 19 ? 2 : 3, tags: [tg] })
+    setKept(tg)
+    setMode('kept')
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(() => setMode('face'), 2600)
+  }
+
+  return (
+    <View style={{ gap: space.s2 }}>
+      <View style={{ gap: 8 }}>
+        <SectionTitle>{t('watchTitle')}</SectionTitle>
+        <SpecimenTag />
+      </View>
+      <Body tone="ink2">{t('watchBody')}</Body>
+      <Card tone="raised" style={{ gap: space.s2, alignItems: 'stretch' }}>
+        <View style={{ alignItems: 'center' }}>
+          {/* The watch */}
+          <View
+            accessible={mode === 'face'}
+            accessibilityLabel={t('watchA11y', { count: countLabel })}
+            style={{ width: 196, height: 232, borderRadius: 52, backgroundColor: FACE.inkGround, borderWidth: 6, borderColor: FACE.lineStrong, padding: 16, justifyContent: 'center' }}
+          >
+            {mode === 'face' ? (
+              <View style={{ alignItems: 'center', gap: 10 }}>
+                <Mono size={34} color={FACE.ink}>{clock}</Mono>
+                {on ? (
+                  <Pressable
+                    onPress={() => setMode('pick')}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${t('watchOpen')}. ${t('watchLedger')}, ${countLabel}`}
+                    style={({ pressed }) => ({ width: 92, height: 92, borderRadius: 46, borderWidth: 3, borderColor: c.termD, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? FACE.paperRaised : FACE.paper, gap: 2 })}
+                  >
+                    <Mono size={22} color={FACE.ink}>{String(today)}</Mono>
+                    <Meta size={11} color={FACE.ink2} align="center" numberOfLines={1}>
+                      {t('watchLedger')}
+                    </Meta>
+                  </Pressable>
+                ) : (
+                  <Meta size={12} color={FACE.ink3} align="center">
+                    {t('watchOff')}
+                  </Meta>
+                )}
+                {on ? (
+                  <Meta size={11} color={FACE.ink3} align="center">
+                    {t('watchTap')}
+                  </Meta>
+                ) : null}
+              </View>
+            ) : mode === 'pick' ? (
+              <View style={{ gap: 8 }}>
+                <Body size={14} color={FACE.ink} align="center">
+                  {t('watchAsk')}
+                </Body>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
+                  {WATCH_TAGS.map((tg) => (
+                    <Pressable
+                      key={tg}
+                      onPress={() => add(tg)}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('watchAddTag', { tag: tag(tg) })}
+                      style={({ pressed }) => ({ minWidth: 70, minHeight: 34, paddingHorizontal: 8, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? FACE.lineStrong : FACE.paperRaised })}
+                    >
+                      <Meta size={12} color={FACE.ink} numberOfLines={1}>
+                        {tag(tg)}
+                      </Meta>
+                    </Pressable>
+                  ))}
+                </View>
+                <Pressable onPress={() => setMode('face')} accessibilityRole="button" accessibilityLabel={t('watchCancel')} hitSlop={6} style={{ alignSelf: 'center', padding: 4 }}>
+                  <Icon name="x" size={16} color={FACE.ink2} />
+                </Pressable>
+              </View>
+            ) : (
+              <View style={{ alignItems: 'center', gap: 8 }} accessibilityLiveRegion="polite">
+                <Icon name="check" size={28} color={FACE.ink} />
+                <Body size={15} color={FACE.ink} align="center">
+                  {t('watchKept', { tag: kept ? tag(kept) : '' })}
+                </Body>
+              </View>
+            )}
+          </View>
+          <Meta size={13} tone="ink3" style={{ marginTop: 8 }}>
+            {t('watchSpecimen')}
+          </Meta>
+        </View>
+        {mode === 'kept' && kept ? (
+          <Meta accessibilityLiveRegion="polite">{t('watchSaved', { tag: tag(kept) })}</Meta>
+        ) : null}
+        <Divider />
+        <Toggle
+          checked={on}
+          onChange={(v) => {
+            setStored((st) => ({ ...st, complication: v }))
+            setMode('face')
+          }}
+          label={t('complication')}
+          description={t('complicationD')}
+        />
+        <Button variant="link" icon="book-open" onPress={() => router.push('/ledger')} style={{ alignSelf: 'flex-start' }}>
+          {t('openLedger')}
+        </Button>
+      </Card>
+    </View>
   )
 }

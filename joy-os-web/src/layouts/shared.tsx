@@ -1,5 +1,9 @@
-import { Moon, Phone, Sun } from 'lucide-react'
+import { Check, MessageCircle, Moon, Phone, Sun } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useApp } from '@/lib/store'
+import { DEFAULT_EMERGENCY } from '@/routes/member/account/_data'
+import { useData } from '@/routes/member/account/_i18n'
 import { Sheet } from '@/components/ui'
 import { TEAM } from '@/data/member'
 import { useDict } from '@/lib/i18n'
@@ -19,6 +23,20 @@ export function ThemeToggle() {
   )
 }
 
+type EmergencyContact = { name: string; relation: string; phone: string }
+/** The member's own consented emergency contact, as kept on Profile (joyos:acct:emergency).
+ *  Read when the sheet opens, so a change on Profile shows without a reload. */
+function readEmergencyContact(): EmergencyContact | null {
+  try {
+    const raw = localStorage.getItem('joyos:acct:emergency')
+    if (!raw) return DEFAULT_EMERGENCY
+    const v = JSON.parse(raw) as { contact?: EmergencyContact | null }
+    return v && 'contact' in v ? v.contact ?? null : DEFAULT_EMERGENCY
+  } catch {
+    return DEFAULT_EMERGENCY
+  }
+}
+
 /** P0 crisis pathway — a person and Tele-MANAS before any model runs (Memo p.24, p.27). */
 export function CrisisSheet() {
   const { crisisOpen, setCrisisOpen } = useApp()
@@ -26,6 +44,15 @@ export function CrisisSheet() {
   const sanjay = TEAM.find((p) => p.role === 'Psychologist')!
   // A voluntary tap is a choice, not an intercept: no "what you wrote", no one "has been told".
   const manual = crisisOpen === 'manual'
+  const dx = useData()
+  const [contact, setContact] = useState<EmergencyContact | null>(null)
+  const [told, setTold] = useState(false)
+  useEffect(() => {
+    if (!crisisOpen) return
+    setContact(readEmergencyContact())
+    setTold(false)
+  }, [crisisOpen])
+  const first = contact?.name.split(' ')[0] ?? ''
   return (
     <Sheet open={!!crisisOpen} onClose={() => setCrisisOpen(false)} title={t('crisisTitle')} side="center">
       <p className="text-[17px] text-ink-2">
@@ -47,6 +74,44 @@ export function CrisisSheet() {
             </span>
           </div>
         )}
+        <div className="rounded-card border border-line px-5 py-4">
+          <p className="eyebrow text-ink-3">{t('ecEyebrow')}</p>
+          {contact ? (
+            <>
+              <a href={`tel:${contact.phone.replace(/[^\d+]/g, '')}`} className="mt-2 flex items-center justify-between gap-3 rounded-lg text-ink focus-ring">
+                <span className="min-w-0">
+                  <span className="block text-[16px]">{t('ecCall', { name: first })}</span>
+                  <span className="block text-[14px] text-ink-2">{dx(contact.relation)} · <span className="num">{contact.phone}</span></span>
+                </span>
+                <Phone size={18} className="shrink-0" />
+              </a>
+              <div className="mt-3 border-t border-line pt-3" role="status">
+                {told ? (
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-1.5 text-[16px] text-ink"><Check size={16} className="shrink-0" /> {t('ecTold', { name: first })}</span>
+                      <span className="block text-[13px] text-ink-3">{t('ecToldSub')}</span>
+                    </span>
+                    <button type="button" onClick={() => setTold(false)} className="shrink-0 text-[14px] text-ink-2 underline underline-offset-4 hover:text-ink focus-ring">{t('ecUndo')}</button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setTold(true)} className="flex w-full items-center justify-between gap-3 rounded-lg text-left text-ink focus-ring">
+                    <span className="min-w-0">
+                      <span className="block text-[16px]">{t('ecTell', { name: first })}</span>
+                      <span className="block text-[14px] text-ink-2">{t('ecTellSub')}</span>
+                    </span>
+                    <MessageCircle size={18} className="shrink-0" />
+                  </button>
+                )}
+              </div>
+            </>
+          ) : (
+            <p className="mt-2 text-[15px] text-ink-2">
+              {t('ecNone')}{' '}
+              <Link to="/app/profile#emergency" onClick={() => setCrisisOpen(false)} className="text-ink underline underline-offset-4 focus-ring">{t('ecAdd')}</Link>
+            </p>
+          )}
+        </div>
         <a href="tel:112" className="flex items-center justify-between gap-3 rounded-card border border-line px-5 py-4 text-ink">
           <span className="text-[16px]">{t('emergency')}</span>
           <Phone size={18} className="shrink-0" />

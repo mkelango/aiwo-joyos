@@ -2,17 +2,19 @@ import clsx from 'clsx'
 import { ArrowRight, ArrowUpRight, Check, Copy, HeartHandshake, LogOut, MessageCircle, Pencil, Phone, ShieldCheck, Smartphone, UserRound, Watch } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { DaybreakButton, SpecimenTag, fmtDate } from '@/components/joy/primitives'
+import { DaybreakButton, SpecimenTag, TermChip, fmtDate } from '@/components/joy/primitives'
 import { Avatar, Button, Card, PageHeader, Pill, Sheet } from '@/components/ui'
 import { HOUSEHOLD, MEMBER } from '@/data/member'
 import { MEMBERSHIPS } from '@/data/platform'
-import { LANGS, useDict } from '@/lib/i18n'
+import { LANGS, useDict, useTermText } from '@/lib/i18n'
 import { useApp, type Lang } from '@/lib/store'
 import { AbhaCard } from './_abha'
 import { DEFAULT_EMERGENCY, DEFAULT_NOMINEE, DEVICES, HOUSEHOLD_MINOR } from './_data'
 import { Checkbox, Field, LinkButton, Section, Select } from './_parts'
-import { inputCls, rich, usePersisted, useToast } from './_util'
+import { inputCls, readPersisted, rich, usePersisted, useToast } from './_util'
 import { PROF, useData } from './_i18n'
+import { finishedOnboarding, setupContact } from './_onboarding'
+import { termByKey } from '@/data/terms'
 
 // PROFILE: the AIWO ID and the person behind it — name, age, city, language,
 // household, optional ABHA, a consented emergency contact, the nominee, connected
@@ -35,6 +37,12 @@ export default function Profile() {
   const emergency = ec.contact
   const [nominee] = usePersisted('nominee', DEFAULT_NOMINEE)
   const [wa] = usePersisted('wa', { consented: false })
+  // The choices made in onboarding: focus terms and the sign-in contact (the name is seeded into 'profile').
+  const [setup] = useState(() => finishedOnboarding())
+  const tt = useTermText()
+  // Lakshmi's family helper, as kept on the Household page (she can withdraw it). Read only:
+  // Household owns that record, so Profile never writes a partial copy of it.
+  const [elderHelper] = useState(() => readPersisted<{ elder?: { helper?: boolean } }>('household')?.elder?.helper !== false)
   const [editOpen, setEditOpen] = useState(false)
   const [ecOpen, setEcOpen] = useState(false)
   const [lifeOs, setLifeOs] = useState(false)
@@ -96,6 +104,38 @@ export default function Profile() {
             <p className="mt-4 text-[14px] text-ink-2">{rich(t('memberSince', { cohort: MEMBER.cohort }), { date: <span className="num">{fmtDate('2026-07-06')}</span> })}</p>
           </Card>
 
+          {/* From onboarding */}
+          {setup && (
+            <Card tone="sunk">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="eyebrow text-ink-3">{t('suEyebrow')}</p>
+                {setup.completedAt && <p className="text-[13px] text-ink-3">{rich(t('suFinished'), { date: <span className="num">{fmtDate(setup.completedAt.slice(0, 10))}</span> })}</p>}
+              </div>
+              <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <dt className="text-[14px] text-ink-2">{t('suFocus')}</dt>
+                  <dd className="mt-2">
+                    {setup.intents.length ? (
+                      <span className="flex flex-wrap gap-1.5">
+                        {setup.intents.map((k) => (
+                          <Link key={k} to={`/app/spaces/${termByKey(k).slug}`} aria-label={t('suSpaces', { space: tt.space(k) })} className="rounded-full focus-ring"><TermChip term={k} /></Link>
+                        ))}
+                      </span>
+                    ) : (
+                      <span className="text-[15px] text-ink-2">{t('suNoFocus')}</span>
+                    )}
+                  </dd>
+                </div>
+                {setupContact(setup) && (
+                  <div>
+                    <dt className="text-[14px] text-ink-2">{t('suSignIn')}</dt>
+                    <dd className="num mt-2 break-all text-[16px] text-ink">{setupContact(setup)}</dd>
+                  </div>
+                )}
+              </dl>
+            </Card>
+          )}
+
           {/* Household */}
           <Section id="household" eyebrow={t('household')} title={dx(MEMBER.household)} aside={<LinkButton to="/app/household" size="sm">{t('openHousehold')} <ArrowRight size={14} /></LinkButton>}>
             <Card className="!p-0">
@@ -107,7 +147,7 @@ export default function Profile() {
                       <span className="block text-[16px] text-ink">{p.name}</span>
                       <span className="text-[14px] text-ink-2">{dx(p.role)}</span>
                     </span>
-                    <span className="text-[13px] text-ink-3">{p.id === 'h_kavya' ? t('ownIndex') : p.id === 'h_lakshmi' ? t('herHelper') : t('notScored')}</span>
+                    <span className="text-[13px] text-ink-3">{p.id === 'h_kavya' ? t('ownIndex') : p.id === 'h_lakshmi' ? (elderHelper ? t('herHelper') : t('suNoHelper')) : t('notScored')}</span>
                   </li>
                 ))}
               </ul>

@@ -1,12 +1,12 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Bell, Check, Database, FileText, Globe2, KeyRound, Link2, Plus, Power, RefreshCw, ShieldCheck, Stethoscope, Timer, Undo2 } from 'lucide-react'
+import { Bell, Check, ChevronRight, Database, FileText, Globe2, KeyRound, Link2, Plus, Power, RefreshCw, Search, ShieldCheck, Stethoscope, Timer, Undo2 } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Bar, BarChart, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { DaybreakButton, Eyebrow, SpecimenTag, TermChip } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill, Sheet, Tabs, Toggle } from '@/components/ui'
-import { AI_TOOLS, AUDIT, CELLS, COSTS, HUMAN_REVIEW, JIT_REQUESTS, RED_TEAM, RELEASE_FLAGS, RIGHTS_JOBS, RIGHTS_STORES, SIGNAL_SOURCES, SLOS, TENANTS } from './_data'
-import { AccessNote, CardHead, ChartLead, Field, Kpi, Legend, Meter, ScrollTabs, StatusTag, Swatch, areaCls, fieldCls, pct, tabPanelProps, tick, tipLabel, tipStyle, useTabParam } from './_parts'
+import { AI_TOOLS, AUDIT, CELLS, COSTS, HUMAN_REVIEW, JIT_REQUESTS, RED_TEAM, RELEASE_FLAGS, RIGHTS_JOBS, RIGHTS_STORES, SIGNAL_SOURCES, SLOS, TENANTS, TRACES, TRACE_GUARD, TRACE_REVIEWERS, type Trace, type TraceFinding, type TraceGuard } from './_data'
+import { AccessNote, CardHead, ChartLead, Field, Kpi, Legend, Meter, Row, ScrollTabs, StatusTag, Swatch, areaCls, fieldCls, pct, tabPanelProps, tick, tipLabel, tipStyle, useTabParam, type StatusTone } from './_parts'
 
 // CONTROL PLANE (Architecture p.20, p.24–27; Memo p.15): flags and kill switches on every AI tool,
 // the evaluation plane, SLOs and error budgets, cost per member per service, tenants and region cells,
@@ -33,6 +33,8 @@ type ToolState = { on: boolean; killedFor: string[]; signoff: 'none' | 'requeste
 type Pending = { kind: 'tool' | 'flag' | 'signoff'; key: string; to: boolean; nonce: number }
 type Job = { id: string; kind: 'export' | 'erase' | 'withdraw'; opened: string; elapsedH: number; stores: number; done: number; status: 'running' | 'delivered'; note: string; escalated: boolean; retrying: boolean; notices: { at: string; text: string }[] }
 type RunState = 'idle' | 'running' | 'done'
+/** A human review asked for from the traces viewer this session; the reviewer answers a few seconds later. */
+type TraceReview = { status: 'requested' | 'done'; reviewer: string; note: string; at: string; finding?: TraceFinding }
 
 const SLA = { export: 72, erase: 24, withdraw: 24 } as const
 const KIND_LABEL = { export: 'Export', erase: 'Erase', withdraw: 'Withdraw consent' } as const
@@ -62,6 +64,7 @@ export default function Ops() {
   const [evalRun, setEvalRun] = useState<{ state: RunState; at?: string }>({ state: 'idle' })
   const [replay, setReplay] = useState<Record<string, RunState>>({})
   const [pending, setPending] = useState<Pending | null>(null)
+  const [traceReviews, setTraceReviews] = useState<Record<string, TraceReview>>({})
   const nonce = useRef(0)
   // Session clock: minutes after 21:00 on 28 Jan, one per logged action. Hours (and the day) roll over rather than
   // clamp, so the hash-chained trail keeps its order however long the session runs.
@@ -153,6 +156,15 @@ export default function Ops() {
       setEvalRun({ state: 'done', at })
     }, 1400)
   }
+  const requestTraceReview = (id: string, reviewer: string, note: string) => {
+    const { day, at } = log(`${id} · human review requested from ${reviewer}`, note)
+    setTraceReviews((r) => ({ ...r, [id]: { status: 'requested', reviewer, note, at: `${day} ${at}` } }))
+    // The reviewer reads the output against the eval rubric and records a finding on the trace.
+    window.setTimeout(() => {
+      const done = log(`${id} · reviewed by ${reviewer} · no issue`, 'Output read against the eval rubric; guard behaved as designed')
+      setTraceReviews((r) => (r[id]?.status === 'requested' ? { ...r, [id]: { ...r[id], status: 'done', finding: 'No issue', at: `${done.day} ${done.at}` } } : r))
+    }, 5000)
+  }
   const runReplay = (key: string, name: string) => {
     setReplay((r) => ({ ...r, [key]: 'running' }))
     window.setTimeout(() => {
@@ -207,7 +219,7 @@ export default function Ops() {
       <AnimatePresence mode="wait">
         <motion.div key={tab} {...tabPanelProps('ops', tab)} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
           {tab === 'flags' && <Flags tools={tools} flags={flags} changes={changes} ask={ask} />}
-          {tab === 'evals' && <Evals tools={tools} run={evalRun} onRun={runEvals} />}
+          {tab === 'evals' && <Evals tools={tools} run={evalRun} onRun={runEvals} reviews={traceReviews} onRequestReview={requestTraceReview} />}
           {tab === 'slos' && <Slos />}
           {tab === 'cost' && <Cost total={totalCost} costs={costs} offTools={killed} />}
           {tab === 'cells' && <Cells tools={tools} />}
@@ -385,7 +397,7 @@ function Flags({ tools, flags, changes, ask }: { tools: Record<string, ToolState
 
 // ─── Evaluation plane ────────────────────────────────────────────────────
 
-function Evals({ tools, run, onRun }: { tools: Record<string, ToolState>; run: { state: RunState; at?: string }; onRun: () => void }) {
+function Evals({ tools, run, onRun, reviews, onRequestReview }: { tools: Record<string, ToolState>; run: { state: RunState; at?: string }; onRun: () => void; reviews: Record<string, TraceReview>; onRequestReview: (id: string, reviewer: string, note: string) => void }) {
   const live = AI_TOOLS.filter((t) => tools[t.key].on)
   const data = live.map((t) => ({ name: t.key, EN: t.langs.EN * 100, TA: t.langs.TA ? t.langs.TA * 100 : null, HI: t.langs.HI ? t.langs.HI * 100 : null }))
   const below = live.flatMap((t) => (Object.entries(t.langs) as [string, number][]).filter(([, v]) => v > 0 && v < EVAL_BAR).map(([l, v]) => ({ tool: t.key, lang: l, v })))
@@ -460,8 +472,237 @@ function Evals({ tools, run, onRun }: { tools: Record<string, ToolState>; run: {
             <li key={f.kind} className="flex items-center justify-between text-[15px]"><span className="text-ink-2">{f.kind}</span><span className="num text-ink">{f.n}</span></li>
           ))}
         </ul>
-        <p className="mt-5 text-[14px] text-ink-2">Every output stores model, prompt version, tool, inputs hash and reviewer. No member data trains third-party models.</p>
+        <p className="mt-5 text-[14px] text-ink-2">Every output stores model, prompt version, tool, inputs hash and reviewer; open any call in the traces below. No member data trains third-party models.</p>
       </Card>
+
+      <Traces tools={tools} reviews={reviews} onRequestReview={onRequestReview} />
+    </div>
+  )
+}
+
+// ─── Evaluation plane · traces ───────────────────────────────────────────
+
+const GUARD_TONE: Record<TraceGuard, StatusTone> = { pass: 'ok', rewritten: 'info', held: 'watch', blocked: 'watch', intercepted: 'act' }
+const TRACE_TOOLS = Array.from(new Set(TRACES.map((t) => t.tool)))
+type ReviewedFilter = 'all' | 'reviewed' | 'unreviewed'
+
+/** The trace as it stands this session: a review asked for here overrides the stored reviewer once it is done. */
+function traceView(t: Trace, r?: TraceReview) {
+  if (!r) return { reviewer: t.reviewer, finding: t.finding, requested: false }
+  return r.status === 'done' ? { reviewer: r.reviewer, finding: r.finding ?? null, requested: false } : { reviewer: t.reviewer, finding: t.finding, requested: true }
+}
+
+/** Span waterfall for one call, derived from its total latency. A crisis intercept stops before any model runs. */
+function traceSpans(t: Trace): { name: string; start: number; ms: number }[] {
+  if (t.guard === 'intercepted') {
+    const scan = Math.min(26, t.latency - 4)
+    return [{ name: 'Crisis intercept · input scan', start: 0, ms: scan }, { name: 'Route to a person · sealed copy', start: scan, ms: t.latency - scan }]
+  }
+  const fixed = [
+    { name: 'Crisis intercept · input scan', ms: 12 },
+    { name: 'Consent and policy check', ms: 18 },
+    { name: 'Retrieval · book, notes, rubric', ms: Math.round(t.latency * 0.12) },
+  ]
+  const guard = { name: t.guard === 'held' ? 'Output guard · physician queue' : 'Output guard', ms: Math.round(t.latency * 0.06) }
+  const render = { name: 'Render · served', ms: 8 }
+  const model = { name: `Model · ${t.model}`, ms: t.latency - fixed.reduce((a, f) => a + f.ms, 0) - guard.ms - render.ms }
+  let at = 0
+  return [...fixed, model, guard, render].map((s) => { const out = { ...s, start: at }; at += s.ms; return out })
+}
+
+function Traces({ tools, reviews, onRequestReview }: { tools: Record<string, ToolState>; reviews: Record<string, TraceReview>; onRequestReview: (id: string, reviewer: string, note: string) => void }) {
+  const [q, setQ] = useState('')
+  const [tool, setTool] = useState('all')
+  const [lang, setLang] = useState('all')
+  const [guard, setGuard] = useState<'all' | TraceGuard>('all')
+  const [reviewed, setReviewed] = useState<ReviewedFilter>('all')
+  const [open, setOpen] = useState<string | null>(null)
+
+  const needle = q.trim().toLowerCase()
+  const rows = TRACES.filter((t) => {
+    const v = traceView(t, reviews[t.id])
+    if (tool !== 'all' && t.tool !== tool) return false
+    if (lang !== 'all' && t.lang !== lang) return false
+    if (guard !== 'all' && t.guard !== guard) return false
+    if (reviewed === 'reviewed' && !v.reviewer) return false
+    if (reviewed === 'unreviewed' && v.reviewer) return false
+    if (needle && ![t.id, t.inputsHash, t.prompt, t.model].some((x) => x.toLowerCase().includes(needle))) return false
+    return true
+  })
+  const filtered = needle || tool !== 'all' || lang !== 'all' || guard !== 'all' || reviewed !== 'all'
+  const clear = () => { setQ(''); setTool('all'); setLang('all'); setGuard('all'); setReviewed('all') }
+  const reviewedN = rows.filter((t) => traceView(t, reviews[t.id]).reviewer).length
+  const actedN = rows.filter((t) => t.guard !== 'pass').length
+  const sel = TRACES.find((t) => t.id === open) ?? null
+
+  return (
+    <Card className="lg:col-span-12">
+      <CardHead
+        eyebrow="Traces · individual AI calls"
+        title="Every call, with its model, prompt and reviewer"
+        lead="One row per call through the VIVA gateway in the last half hour of this specimen. A trace keeps a hash of the inputs, never the member’s words or health values, so it can be audited without being read as a record."
+      />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(12rem,1.4fr)_repeat(4,minmax(8rem,1fr))]">
+        <Field label="Search" htmlFor="tr-q">
+          <div className="relative">
+            <Search size={15} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-3" />
+            <input id="tr-q" type="search" className={clsx(fieldCls, 'pl-9 font-mono text-[14px]')} value={q} onChange={(e) => setQ(e.target.value)} placeholder="trace id, hash, prompt" autoComplete="off" />
+          </div>
+        </Field>
+        <Field label="Tool" htmlFor="tr-tool">
+          <select id="tr-tool" className={fieldCls} value={tool} onChange={(e) => setTool(e.target.value)}>
+            <option value="all">All tools</option>
+            {TRACE_TOOLS.map((k) => <option key={k} value={k}>{k}</option>)}
+          </select>
+        </Field>
+        <Field label="Language" htmlFor="tr-lang">
+          <select id="tr-lang" className={fieldCls} value={lang} onChange={(e) => setLang(e.target.value)}>
+            <option value="all">All languages</option>
+            {Object.entries(LANG_NAME).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+        </Field>
+        <Field label="Guardrail" htmlFor="tr-guard">
+          <select id="tr-guard" className={fieldCls} value={guard} onChange={(e) => setGuard(e.target.value as 'all' | TraceGuard)}>
+            <option value="all">Any result</option>
+            {(Object.keys(TRACE_GUARD) as TraceGuard[]).map((g) => <option key={g} value={g}>{TRACE_GUARD[g].label}</option>)}
+          </select>
+        </Field>
+        <Field label="Reviewer" htmlFor="tr-rev">
+          <select id="tr-rev" className={fieldCls} value={reviewed} onChange={(e) => setReviewed(e.target.value as ReviewedFilter)}>
+            <option value="all">Reviewed or not</option>
+            <option value="reviewed">Read by a person</option>
+            <option value="unreviewed">Not yet read</option>
+          </select>
+        </Field>
+      </div>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-[14px] text-ink-2" aria-live="polite">
+        <p><span className="num text-ink">{rows.length}</span> of <span className="num">{TRACES.length}</span> calls · <span className="num">{reviewedN}</span> read by a person · <span className="num">{actedN}</span> acted on by a guard</p>
+        {filtered && <Button variant="link" className="text-[13px]" onClick={clear}>Clear filters</Button>}
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="mt-4 rounded-card border border-dashed border-line-strong p-6 text-center text-[15px] text-ink-2">No calls match these filters. <button className="underline decoration-line-strong underline-offset-2 hover:text-ink focus-ring" onClick={clear}>Clear them</button> to see every call.</p>
+      ) : (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[1040px] border-collapse text-left text-[14px]">
+            <caption className="sr-only">AI call traces, newest first</caption>
+            <thead><tr className="border-b border-line">{['Time', 'Trace', 'Tool', 'Model', 'Prompt', 'Lang', 'Inputs hash', 'Guardrail', 'Reviewer'].map((h) => <th key={h} scope="col" className="eyebrow whitespace-nowrap py-3 pr-4 font-normal text-ink-3">{h}</th>)}</tr></thead>
+            <tbody>
+              {rows.map((t) => {
+                const v = traceView(t, reviews[t.id])
+                return (
+                  <tr key={t.id} className={clsx('border-b border-line/70 last:border-0', open === t.id && 'bg-paper-sunk/60')}>
+                    <td className="num whitespace-nowrap py-3 pr-4 text-[12px] text-ink-3">{t.at.slice(7)}</td>
+                    <th scope="row" className="py-3 pr-4 font-normal">
+                      <button className="inline-flex items-center gap-1 font-mono text-[13px] text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink focus-ring" onClick={() => setOpen(t.id)} aria-label={`Open trace ${t.id}`}>{t.id}<ChevronRight size={13} aria-hidden /></button>
+                    </th>
+                    <td className="py-3 pr-4"><code className="font-mono text-[13px] text-ink">{t.tool}</code></td>
+                    <td className="whitespace-nowrap py-3 pr-4 text-[13px] text-ink-2">{t.model}</td>
+                    <td className="py-3 pr-4"><code className="font-mono text-[12px] text-ink-2">{t.prompt === '—' ? '—' : t.prompt.split('@')[1]}</code></td>
+                    <td className="num py-3 pr-4 text-[13px] text-ink-2">{t.lang}</td>
+                    <td className="py-3 pr-4"><code className="font-mono text-[12px] text-ink-3">{t.inputsHash.slice(7, 19)}…</code></td>
+                    <td className="py-3 pr-4"><StatusTag tone={GUARD_TONE[t.guard]}>{TRACE_GUARD[t.guard].label}</StatusTag></td>
+                    <td className="py-3 pr-4 text-[13px] text-ink-2">{v.requested ? <span className="text-ink-3">Requested</span> : v.reviewer ? v.reviewer.split(' · ')[0] : <span className="text-ink-3">—</span>}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="mt-4 text-[13px] text-ink-3">Specimen traces. Production traces are kept 30 days, then only their hashes and guard results stay for the eval set; reading one in full needs just-in-time access.</p>
+
+      <Sheet open={!!sel} onClose={() => setOpen(null)} title={sel ? `Trace ${sel.id}` : ''}>
+        {sel && <TraceDetail key={sel.id} t={sel} tool={tools[sel.tool]} review={reviews[sel.id]} onRequestReview={onRequestReview} />}
+      </Sheet>
+    </Card>
+  )
+}
+
+function TraceDetail({ t, tool, review, onRequestReview }: { t: Trace; tool?: ToolState; review?: TraceReview; onRequestReview: (id: string, reviewer: string, note: string) => void }) {
+  const v = traceView(t, review)
+  const spans = traceSpans(t)
+  const [reviewer, setReviewer] = useState<string>(TRACE_REVIEWERS[t.guard === 'held' || t.tool === 'coach_digest' ? 2 : 0])
+  const [note, setNote] = useState('')
+  const [err, setErr] = useState<string | null>(null)
+  const tenant = TENANTS.find((x) => x.id === t.tenant)
+  const killedNow = tool && (!tool.on || tool.killedFor.includes(t.tenant))
+
+  const send = () => {
+    if (note.trim().length < 12) return setErr('Say what to look at, in a sentence. It is written to the audit trail.')
+    onRequestReview(t.id, reviewer, note.trim())
+  }
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-2">
+        <StatusTag tone={GUARD_TONE[t.guard]}>{TRACE_GUARD[t.guard].label}</StatusTag>
+        <code className="font-mono text-[13px] text-ink">{t.tool}</code>
+        <span className="num text-[12px] text-ink-3">{t.at}</span>
+      </div>
+      <p className="mt-3 text-[15px] text-ink-2">{TRACE_GUARD[t.guard].note}</p>
+      {killedNow && <p className="mt-2 text-[14px] text-ink-2">{t.tool} is killed {tool.on ? `for ${scopeLabel(t.tenant)}` : 'for every tenant'} right now; new calls get the rules-based version.</p>}
+
+      <dl className="mt-5">
+        <Row k="Model" v={<span className="text-[14px]">{t.model}</span>} />
+        <Row k="Prompt version" v={<code className="font-mono text-[13px]">{t.prompt}</code>} />
+        <Row k="Language" v={LANG_NAME[t.lang]} />
+        <Row k="Tenant" v={<span>{tenant?.name ?? t.tenant} <code className="font-mono text-[12px] text-ink-3">{t.tenant}</code></span>} />
+        <Row k="Inputs hash" v={<code className="break-all font-mono text-[12px]">{t.inputsHash}</code>} />
+        <Row k="Latency" v={<span className="num">{t.latency.toLocaleString('en-IN')} ms</span>} />
+        <Row k="Tokens in · out" v={<span className="num">{t.tokensIn.toLocaleString('en-IN')} · {t.tokensOut.toLocaleString('en-IN')}</span>} />
+      </dl>
+
+      <Eyebrow className="mt-6">Spans</Eyebrow>
+      <ol className="mt-3 space-y-2.5" aria-label={`Spans for ${t.id}`}>
+        {spans.map((s) => (
+          <li key={s.name}>
+            <div className="flex items-baseline justify-between gap-3 text-[13px]"><span className="text-ink-2">{s.name}</span><span className="num text-ink">{s.ms} ms</span></div>
+            <div className="relative mt-1 h-1.5 rounded-full bg-paper-sunk" aria-hidden>
+              <div className="absolute h-full rounded-full bg-ink" style={{ left: `${(s.start / t.latency) * 100}%`, width: `${Math.max(1, (s.ms / t.latency) * 100)}%` }} />
+            </div>
+          </li>
+        ))}
+      </ol>
+
+      <Eyebrow className="mt-6">Served to the member</Eyebrow>
+      <p className="mt-2 rounded-lg bg-paper-sunk p-3 text-[15px] leading-relaxed text-ink">{t.output}</p>
+      {t.lang !== 'EN' && t.guard !== 'intercepted' && <p className="mt-1.5 text-[12px] text-ink-3">Served in {LANG_NAME[t.lang]}; shown here as the reviewer’s English gloss.</p>}
+      {t.discarded && (
+        <>
+          <Eyebrow className="mt-4">Discarded by the output guard</Eyebrow>
+          <p className="mt-2 rounded-lg border border-dashed border-line-strong p-3 text-[14px] leading-relaxed text-ink-2">{t.discarded}</p>
+        </>
+      )}
+
+      <Eyebrow className="mt-6">Human review</Eyebrow>
+      {v.reviewer && !v.requested ? (
+        <div className="mt-2 text-[15px]" role="status">
+          <p className="text-ink"><Check size={14} className="mr-1 inline" aria-hidden />Read by {v.reviewer}</p>
+          <p className="mt-1 text-ink-2">Finding: {v.finding ?? 'No issue'}{review?.status === 'done' && <> · <span className="num">{review.at}</span></>}</p>
+          {review?.note && <p className="mt-1 text-[13px] text-ink-3">Asked: {review.note}</p>}
+        </div>
+      ) : v.requested && review ? (
+        <div className="mt-2 text-[15px]" role="status">
+          <p className="text-ink"><Timer size={14} className="mr-1 inline" aria-hidden />With {review.reviewer}</p>
+          <p className="mt-1 text-ink-2">Requested <span className="num">{review.at}</span>. The finding lands on this trace and in the audit trail.</p>
+          <p className="mt-1 text-[13px] text-ink-3">Asked: {review.note}</p>
+        </div>
+      ) : (
+        <div className="mt-2">
+          <p className="text-[14px] text-ink-2">Not in this week’s sample yet. Ask a reviewer to read it against the eval rubric.</p>
+          <Field label="Reviewer" htmlFor="tr-reviewer" className="mt-4">
+            <select id="tr-reviewer" className={fieldCls} value={reviewer} onChange={(e) => setReviewer(e.target.value)}>
+              {TRACE_REVIEWERS.map((r) => <option key={r}>{r}</option>)}
+            </select>
+          </Field>
+          <Field label="What to look at" htmlFor="tr-note" error={err} className="mt-4">
+            <textarea id="tr-note" rows={3} className={areaCls} value={note} onChange={(e) => { setNote(e.target.value); setErr(null) }} placeholder="e.g. Check the Tamil tone after the glossary change; the guard rewrote one claim" aria-invalid={!!err} aria-describedby={err ? 'tr-note-err' : undefined} />
+          </Field>
+          <Button variant="ink" className="mt-4" onClick={send}><Stethoscope size={15} aria-hidden /> Request review</Button>
+          <p className="mt-3 text-[13px] text-ink-3">Signed in as {ME}. Written to the audit trail with your note.</p>
+        </div>
+      )}
     </div>
   )
 }

@@ -11,6 +11,7 @@ import { Field, LinkButton, Section, Select, Toggle } from './_parts'
 import { rich, usePersisted, useToast } from './_util'
 import { useDict } from '@/lib/i18n'
 import { NOTIF, useData } from './_i18n'
+import { ReadAloud } from './_voice'
 
 // NOTIFICATIONS (Memo p.17, p.22): the notification centre. At most three pushes
 // a day across every channel, never in quiet hours, each type off in one tap.
@@ -117,6 +118,12 @@ export default function Notifications() {
             />
             <SpecimenTag />
           </div>
+          {/* Voice-first (Settings · Accessibility): the unread, read aloud. Hidden while it is off. */}
+          <ReadAloud
+            className="mb-5"
+            label={t('readUnread')}
+            text={unread.length ? unread.map((n) => `${dx(n.title).replace(/[^.?!]$/, '$&.')} ${dx(n.body)}`).join(' ') : `${t('caughtUp')}. ${t('caughtUpBody')}`}
+          />
 
           {visible.length === 0 ? (
             <EmptyState

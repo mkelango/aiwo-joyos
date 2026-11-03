@@ -837,3 +837,62 @@ export const ITINERARY_TEMPLATES: Record<string, { blockId: string; day: number;
     { blockId: 'b10', day: 6, start: '10:00' },
   ],
 }
+
+// ─── Concierge desk (coach & concierge console) ────────────────────────────
+// The concierge holds name, booking, dietary and schedule for a booked stay or visit: never
+// raw clinical values. A home draw is a time and an address, not the test that was ordered.
+
+export const RAVI = { name: 'Ravi Shankar', role: 'Concierge · Mumbai and South', initials: 'RS', tone: 'var(--ink-3)' }
+
+export interface ConciergeBooking { id: string; memberId: string; member: string; what: string; where: string; when: string; note: string; alts: string[] }
+
+export const CONCIERGE_BOOKINGS: ConciergeBooking[] = [
+  { id: 'bk1', memberId: 'm_0175', member: 'Thomas Mathew', what: 'Savourcation · 3 nights', where: 'Joyspan House Chennai', when: 'Fri 12 Feb – Mon 15 Feb', note: 'Two guests · one vegetarian · arriving by road from Kochi', alts: ['Fri 19 Feb – Mon 22 Feb', 'Fri 26 Feb – Mon 1 Mar'] },
+  { id: 'bk2', memberId: 'm_0256', member: 'Meenakshi Sundaram', what: 'Beautycation follow-up session · 90 min', where: 'Joyspan House Chennai', when: 'Sat 6 Feb · 10:00', note: 'Travelling from Madurai the evening before; asked for a ground-floor room', alts: ['Sat 6 Feb · 15:00', 'Sun 7 Feb · 10:00'] },
+  { id: 'bk3', memberId: 'm_0221', member: 'Ananya Krishnan', what: 'Mindcation · 4 nights', where: 'Rishikesh', when: 'Thu 18 Feb – Mon 22 Feb', note: 'Travelling alone · wants a quiet room away from the river terrace', alts: ['Thu 25 Feb – Mon 1 Mar'] },
+  { id: 'bk4', memberId: 'm_0001', member: 'Arjun Rao', what: 'Circle in person · Week 5', where: 'Fairmont Mumbai', when: 'Mon 1 Feb · 19:00', note: 'Flying in from Chennai that afternoon; Kavya joins', alts: [] },
+]
+/** Bookings already confirmed before tonight. */
+export const CONFIRMED_AT_START = new Set(['bk4'])
+
+export const PHLEBOTOMISTS = [
+  { id: 'ph1', name: 'Sunita Kale', partner: 'Thyrocare', area: 'Mumbai West' },
+  { id: 'ph2', name: 'Imran Shaikh', partner: 'Metropolis', area: 'Mumbai Central' },
+  { id: 'ph3', name: 'Lakshmi Ravi', partner: 'Neuberg', area: 'Chennai' },
+  { id: 'ph4', name: 'Harish Bhat', partner: 'Metropolis', area: 'Bengaluru' },
+  { id: 'ph5', name: 'Kiran Desai', partner: 'Thyrocare', area: 'Ahmedabad' },
+]
+export const DRAW_SLOTS = ['Tonight · within 2 h', 'Fri 29 Jan · 06:30', 'Fri 29 Jan · 07:30', 'Sat 30 Jan · 06:30', 'Mon 1 Feb · 07:00']
+
+export interface ConciergeDraw { id: string; memberId: string; member: string; city: string; reason: string; fasting: boolean; requested: string; by: string }
+/** Home draws already on the desk. Draws the clinical portal orders tonight join them live. */
+export const CONCIERGE_DRAWS: ConciergeDraw[] = [
+  { id: 'hd1', memberId: 'm_0002', member: 'Kavya Rao', city: 'Chennai', reason: 'Day 23 interim panel', fasting: true, requested: '28 Jan · 06:40', by: 'Clinical team' },
+  { id: 'hd2', memberId: 'm_0119', member: 'Vikram Patel', city: 'Ahmedabad', reason: 'Day 90 re-measure panel', fasting: true, requested: 'Fri 29 Jan · early morning', by: 'Re-measure window' },
+  { id: 'hd3', memberId: 'm_0287', member: 'Leela Thomas', city: 'Chennai', reason: 'Re-measure panel · window open Day 76–90', fasting: true, requested: 'This week', by: 'Re-measure window' },
+]
+/** Kavya's draw was done this morning (the sign-off note says so). */
+export const DRAWS_AT_START: Record<string, { status: 'at-lab'; phleb: string; slot: string; at: string }> = {
+  hd1: { status: 'at-lab', phleb: 'Lakshmi Ravi · Neuberg', slot: 'Thu 28 Jan · 06:30', at: '06:40' },
+}
+
+export const PRE_ARRIVAL_STEPS = ['Airport or road transfer booked', 'Dietary note sent to the venue', 'Room and pillow preferences sent', 'Day 1 schedule shared with the guest', 'App, consents and pass checked with the guest']
+
+export interface ConciergeArrival { id: string; memberId?: string; guest: string; cation: string; where: string; when: string; transfer: string; dietary: string; done: number[] }
+export const CONCIERGE_ARRIVALS: ConciergeArrival[] = [
+  { id: 'pa1', guest: 'Mr George Mathew', cation: 'Healthcation · 4 nights', where: 'Fairmont Mumbai', when: 'Tonight · 22:05 (flight delayed)', transfer: 'Re-time the car for the delayed flight', dietary: 'No shellfish', done: [1, 2, 4] },
+  { id: 'pa2', memberId: 'm_0119', guest: 'Vikram Patel and Anjali Patel', cation: 'Lovecation · 3 nights', where: 'Udaipur', when: 'Sat 30 Jan · 12:40', transfer: 'Airport pick-up, AI 471', dietary: 'Vegetarian · Anjali, no mushroom', done: [0] },
+  { id: 'pa3', memberId: 'm_0291', guest: 'Karthik Raman', cation: 'Healthcation · 4 nights', where: 'Fairmont Mumbai', when: 'Sun 31 Jan · 15:00', transfer: 'Road from Pune · own car, valet', dietary: 'No preference noted', done: [] },
+]
+
+export const TALK_SLOTS = ['Fri 29 Jan · 11:00', 'Fri 29 Jan · 17:30', 'Sat 30 Jan · 10:00', 'Mon 1 Feb · 12:00']
+export const TALK_OUTCOMES = ['Booked the suggested ’cation', 'Continuing as a Circle member', 'Thinking it over · follow up in a week', 'Pausing after Day 90', 'Wants to talk it through with the coach first']
+/** The Day 60 talk suggests the next step by the member's lowest term. */
+export const NEXT_BY_TERM: Record<TermKey, { cation: string; where: string }> = {
+  H: { cation: 'Healthcation', where: 'Fairmont Mumbai' },
+  P: { cation: 'Mindcation', where: 'Rishikesh' },
+  R: { cation: 'Lovecation', where: 'Udaipur' },
+  F: { cation: 'Wealthcation', where: 'Fairmont Mumbai' },
+  D: { cation: 'Savourcation', where: 'Joyspan House Chennai' },
+  B: { cation: 'Sleepcation', where: 'Coimbatore' },
+}

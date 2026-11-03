@@ -51,6 +51,40 @@ export const MEMBERSHIP = {
   kTaxable: { en: 'Taxable value', ta: 'வரிக்குரிய மதிப்பு', hi: 'कर-योग्य मूल्य' },
   kTotal: { en: 'Total', ta: 'மொத்தம்', hi: 'कुल' },
   kPaidBy: { en: 'Paid by', ta: 'செலுத்திய முறை', hi: 'भुगतान का तरीका' },
+  // Payments grace (demo), pay now, invoice share and print, pause
+  demoGrace: { en: 'Demo · payment grace state', ta: 'டெமோ · கட்டணச் சலுகைக் காலம்', hi: 'डेमो · भुगतान की मोहलत' },
+  demoGraceD: { en: 'Shows what happens when a renewal fails. Specimen only; nothing is charged.', ta: 'புதுப்பித்தல் தோல்வியடைந்தால் என்ன நடக்கும் என்று காட்டும். மாதிரி மட்டும்; எதுவும் வசூலிக்கப்படாது.', hi: 'रिन्यूअल न हो पाए तो क्या होता है, यह दिखाता है। सिर्फ़ नमूना; कुछ नहीं लिया जाता।' },
+  demoGracePaid: { en: 'February is paid, so the grace state is over.', ta: 'பிப்ரவரி செலுத்தப்பட்டுவிட்டது, எனவே சலுகைக் காலம் முடிந்தது.', hi: 'फ़रवरी का भुगतान हो गया, इसलिए मोहलत ख़त्म हो गई।' },
+  graceEyebrow: { en: 'Grace access · 14 days', ta: 'சலுகை அணுகல் · 14 நாட்கள்', hi: 'मोहलत · 14 दिन' },
+  graceTitle: { en: 'Your UPI payment for February didn’t go through. Nothing changes until ', ta: 'பிப்ரவரிக்கான உங்கள் UPI கட்டணம் செல்லவில்லை. இது வரை எதுவும் மாறாது: ', hi: 'फ़रवरी का आपका UPI भुगतान नहीं हो पाया। इस तारीख़ तक कुछ नहीं बदलेगा: ' },
+  graceBody: { en: 'Your spaces, circle and coach carry on as normal. After that, Plus pauses; your Index, Ledger and Trust centre never do.', ta: 'உங்கள் இடங்கள், வட்டம், பயிற்சியாளர் வழக்கம்போல் தொடரும். அதன் பிறகு Plus இடைநிறுத்தப்படும்; உங்கள் குறியீடு, லெட்ஜர், நம்பிக்கை மையம் ஒருபோதும் நிற்காது.', hi: 'आपके स्पेस, सर्कल और कोच पहले की तरह चलते रहेंगे। उसके बाद Plus रुक जाएगा; आपका इंडेक्स, लेजर और ट्रस्ट सेंटर कभी नहीं रुकते।' },
+  payUpi: { en: 'Pay ₹499 by UPI', ta: 'UPI மூலம் ₹499 செலுத்தவும்', hi: 'UPI से ₹499 दें' },
+  payBody: { en: 'A collect request goes to ••••@okhdfc for ₹499, February. Approve it in your UPI app; Joy OS never sees your UPI PIN.', ta: 'பிப்ரவரிக்கான ₹499-க்கு ••••@okhdfc-க்கு ஒரு கோரிக்கை செல்லும். உங்கள் UPI செயலியில் அதை அங்கீகரியுங்கள்; Joy OS உங்கள் UPI PIN-ஐ ஒருபோதும் பார்க்காது.', hi: '₹499, फ़रवरी के लिए ••••@okhdfc पर एक कलेक्ट रिक्वेस्ट जाएगी। उसे अपने UPI ऐप में मंज़ूर करें; Joy OS आपका UPI PIN कभी नहीं देखता।' },
+  sendCollect: { en: 'Send the request (specimen)', ta: 'கோரிக்கையை அனுப்பு (மாதிரி)', hi: 'रिक्वेस्ट भेजें (नमूना)' },
+  approving: { en: 'Waiting for your UPI app to approve…', ta: 'உங்கள் UPI செயலியின் அங்கீகாரத்துக்காகக் காத்திருக்கிறது…', hi: 'आपके UPI ऐप की मंज़ूरी का इंतज़ार…' },
+  paidA: { en: 'Paid. ', ta: 'செலுத்தப்பட்டது. ', hi: 'भुगतान हो गया। ' },
+  paidBody: { en: 'February is paid. Invoice {id} is in your list. Nothing changed while it was pending.', ta: 'பிப்ரவரி செலுத்தப்பட்டது. ரசீது {id} உங்கள் பட்டியலில் உள்ளது. நிலுவையில் இருந்தபோது எதுவும் மாறவில்லை.', hi: 'फ़रवरी का भुगतान हो गया। इनवॉइस {id} आपकी सूची में है। बाक़ी रहने के दौरान कुछ नहीं बदला।' },
+  dueBy: { en: 'Retrying · due by {date}', ta: 'மீண்டும் முயற்சிக்கிறது · {date}-க்குள் செலுத்த வேண்டும்', hi: 'फिर कोशिश जारी · {date} तक देय' },
+  payNow: { en: 'Pay now', ta: 'இப்போது செலுத்து', hi: 'अभी भुगतान करें' },
+  share: { en: 'Share', ta: 'பகிர்', hi: 'शेयर करें' },
+  print: { en: 'Print', ta: 'அச்சிடு', hi: 'प्रिंट करें' },
+  shared: { en: 'Shared.', ta: 'பகிரப்பட்டது.', hi: 'शेयर हो गया।' },
+  copied: { en: 'Copied to the clipboard.', ta: 'கிளிப்போர்டுக்கு நகலெடுக்கப்பட்டது.', hi: 'क्लिपबोर्ड पर कॉपी हो गया।' },
+  shareFailed: { en: 'Could not share from here. Try again.', ta: 'இங்கிருந்து பகிர முடியவில்லை. மீண்டும் முயலுங்கள்.', hi: 'यहाँ से शेयर नहीं हो सका। फिर कोशिश करें।' },
+  printNote: { en: 'On a phone, Print opens the share sheet; choose Print there.', ta: 'தொலைபேசியில், அச்சிடு பகிர்வுத் தாளைத் திறக்கும்; அங்கே “அச்சிடு” என்பதைத் தேர்ந்தெடுங்கள்.', hi: 'फ़ोन पर, प्रिंट शेयर शीट खोलता है; वहाँ प्रिंट चुनें।' },
+  pauseTitle: { en: 'Pause membership', ta: 'உறுப்பினர் நிலையை இடைநிறுத்து', hi: 'सदस्यता रोकें' },
+  pauseBody: { en: 'Billing and the circle pause for up to three months. Your record, Ledger and Index carry on, and nothing is deleted.', ta: 'கட்டணமும் வட்டமும் மூன்று மாதம் வரை இடைநிறுத்தப்படும். உங்கள் பதிவு, லெட்ஜர், குறியீடு தொடரும்; எதுவும் நீக்கப்படாது.', hi: 'बिलिंग और सर्कल तीन महीने तक रुक सकते हैं। आपका रिकॉर्ड, लेजर और इंडेक्स चलते रहते हैं, और कुछ डिलीट नहीं होता।' },
+  pauseFor: { en: 'Pause for', ta: 'இடைநிறுத்தும் காலம்', hi: 'कितने समय के लिए' },
+  months1: { en: '1 month', ta: '1 மாதம்', hi: '1 महीना' },
+  months2: { en: '2 months', ta: '2 மாதங்கள்', hi: '2 महीने' },
+  months3: { en: '3 months', ta: '3 மாதங்கள்', hi: '3 महीने' },
+  pauseWhen: { en: 'From {from} until {until}. Billing starts again on {until}.', ta: '{from} முதல் {until} வரை. {until} அன்று கட்டணம் மீண்டும் தொடங்கும்.', hi: '{from} से {until} तक। {until} को बिलिंग फिर शुरू होगी।' },
+  pauseConfirm: { en: 'Pause membership', ta: 'இடைநிறுத்து', hi: 'सदस्यता रोकें' },
+  pausedLine: { en: 'Paused from {from} until {until} · {ref}', ta: '{from} முதல் {until} வரை இடைநிறுத்தப்பட்டது · {ref}', hi: '{from} से {until} तक रुकी हुई · {ref}' },
+  resume: { en: 'Resume now', ta: 'இப்போதே மீண்டும் தொடங்கு', hi: 'अभी फिर शुरू करें' },
+  resumed: { en: 'Membership resumed. Nothing was lost while it was paused.', ta: 'உறுப்பினர் நிலை மீண்டும் தொடங்கியது. இடைநிறுத்தத்தின்போது எதுவும் இழக்கப்படவில்லை.', hi: 'सदस्यता फिर शुरू हुई। रुके रहने के दौरान कुछ नहीं खोया।' },
+  specimenWord: { en: 'specimen', ta: 'மாதிரி', hi: 'नमूना' },
+  pausedPill: { en: 'Paused', ta: 'இடைநிறுத்தம்', hi: 'रुकी हुई' },
 } satisfies Dict
 
 export const CADENCE: Record<string, L3> = {
@@ -89,6 +123,7 @@ export const ENTITLEMENT_USE: Record<string, L3> = {
 }
 
 export const INVOICE_ITEM: Record<string, L3> = {
+  'INV-2027-000531': { en: 'Joy OS Plus · February', ta: 'Joy OS Plus · பிப்ரவரி', hi: 'Joy OS Plus · फ़रवरी' },
   'INV-2027-000418': { en: 'Joy OS Plus · January', ta: 'Joy OS Plus · ஜனவரி', hi: 'Joy OS Plus · जनवरी' },
   'INV-2026-011872': { en: 'Circle membership · 2027', ta: 'Circle உறுப்பினர் கட்டணம் · 2027', hi: 'Circle सदस्यता · 2027' },
   'INV-2026-011203': { en: 'Joy OS Plus · December', ta: 'Joy OS Plus · டிசம்பர்', hi: 'Joy OS Plus · दिसंबर' },
@@ -99,4 +134,5 @@ export const PAY_WORD: Record<string, L3> = {
   Paid: { en: 'Paid', ta: 'செலுத்தப்பட்டது', hi: 'भुगतान हो गया' },
   Card: { en: 'Card', ta: 'கார்டு', hi: 'कार्ड' },
   UPI: { en: 'UPI', ta: 'UPI', hi: 'UPI' },
+  Retrying: { en: 'Retrying', ta: 'மீண்டும் முயற்சிக்கிறது', hi: 'फिर कोशिश जारी' },
 }

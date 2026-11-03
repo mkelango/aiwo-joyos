@@ -408,6 +408,7 @@ export const SET = {
   quietSame: { en: 'From and until are the same time, so there would be no quiet hours. Choose two different times.', ta: 'தொடக்கமும் முடிவும் ஒரே நேரம் என்பதால் அமைதி நேரம் இருக்காது. இரண்டு வெவ்வேறு நேரங்களைத் தேர்ந்தெடுக்கவும்.', hi: '‘से’ और ‘तक’ एक ही समय है, तो कोई शांत समय नहीं बचेगा। दो अलग समय चुनें।' },
   channels: { en: 'Channels', ta: 'வழிகள்', hi: 'माध्यम' },
   waNeeds: { en: 'WhatsApp needs its own consent before anything is sent — you give it once, and never get clinical content there.', ta: 'எதுவும் அனுப்பப்படுவதற்கு முன் WhatsApp-க்குத் தனி ஒப்புதல் தேவை — ஒருமுறை கொடுத்தால் போதும்; அங்கு மருத்துவத் தகவல் ஒருபோதும் வராது.', hi: 'कुछ भी भेजने से पहले WhatsApp के लिए अलग सहमति चाहिए — एक बार दें, और वहाँ कभी कोई क्लिनिकल जानकारी नहीं आएगी।' },
+  waSetup: { en: 'You chose WhatsApp during setup. It stays off until you give WhatsApp its own consent.', ta: 'அமைப்பின்போது WhatsApp-ஐத் தேர்ந்தெடுத்தீர்கள். WhatsApp-க்குத் தனி ஒப்புதல் அளிக்கும் வரை அது நிறுத்தத்திலேயே இருக்கும்.', hi: 'सेटअप में आपने WhatsApp चुना था। जब तक आप WhatsApp को अलग से सहमति नहीं देते, यह बंद रहेगा।' },
   waGive: { en: 'Give WhatsApp consent', ta: 'WhatsApp ஒப்புதல் அளிக்கவும்', hi: 'WhatsApp सहमति दें' },
   waGiven: { en: 'WhatsApp consent given. Withdraw it on the WhatsApp page, in the Trust centre, or by replying STOP.', ta: 'WhatsApp ஒப்புதல் அளிக்கப்பட்டது. WhatsApp பக்கத்தில், நம்பிக்கை மையத்தில், அல்லது STOP என்று பதில் அனுப்பி அதைத் திரும்பப் பெறலாம்.', hi: 'WhatsApp सहमति दी गई। इसे WhatsApp पेज पर, भरोसा केंद्र में, या STOP लिखकर वापस ले सकते हैं।' },
   secTitle: { en: 'Locked to you', ta: 'உங்களுக்கு மட்டுமே திறக்கும்', hi: 'सिर्फ़ आपके लिए खुलता है' },
@@ -470,6 +471,10 @@ export const SET = {
   pkIntro: { en: 'A passkey replaces a password on this device. You can remove it here at any time.', ta: 'இந்தச் சாதனத்தில் கடவுச்சொல்லுக்குப் பதிலாகப் பாஸ்கீ. இங்கே எப்போது வேண்டுமானாலும் நீக்கலாம்.', hi: 'इस डिवाइस पर पासवर्ड की जगह पासकी। इसे आप यहाँ कभी भी हटा सकते हैं।' },
   pkName: { en: 'Name this device', ta: 'இந்தச் சாதனத்துக்குப் பெயர்', hi: 'इस डिवाइस का नाम' },
   pkPlaceholder: { en: 'Work laptop', ta: 'அலுவலக லேப்டாப்', hi: 'ऑफ़िस लैपटॉप' },
+  vtTry: { en: 'Try a voice prompt', ta: 'ஒரு குரல் கேள்வியை முயன்று பார்க்கவும்', hi: 'एक आवाज़ वाला सवाल आज़माएँ' },
+  vtWhere: { en: 'You will hear prompts like this on Today, in your notifications and when you book a consult in Care.', ta: 'இது போன்ற கேள்விகளை இன்று திரையில், உங்கள் அறிவிப்புகளில், Care-இல் ஆலோசனை முன்பதிவு செய்யும்போது கேட்பீர்கள்.', hi: 'ऐसे सवाल आपको Today पर, अपनी सूचनाओं में और Care में परामर्श बुक करते समय सुनाई देंगे।' },
+  vtHeard: { en: 'Heard: “{text}”. In the app this goes straight into the box you are answering.', ta: 'கேட்டது: “{text}”. செயலியில் இது நீங்கள் பதிலளிக்கும் பெட்டியில் நேரே சேரும்.', hi: 'सुना गया: “{text}”। ऐप में यह सीधे उसी खाने में जाता है जिसका आप जवाब दे रहे हैं।' },
+  vtOffHint: { en: 'Turn on Voice-first to hear prompts read aloud.', ta: 'கேள்விகள் உரக்க வாசிக்கப்படுவதைக் கேட்க, குரல்-முதன்மையை இயக்கவும்.', hi: 'सवाल पढ़कर सुनने के लिए आवाज़-पहले चालू करें।' },
 } satisfies Dict
 
 export const ABHA = {
@@ -633,6 +638,7 @@ export const CARE = {
   camOff: { en: 'Turn camera off', ta: 'கேமராவை அணைக்கவும்', hi: 'कैमरा बंद करें' },
   camOn: { en: 'Turn camera on', ta: 'கேமராவை இயக்கவும்', hi: 'कैमरा चालू करें' },
   leave: { en: 'Leave', ta: 'வெளியேறவும்', hi: 'छोड़ें' },
+  crisisHeld: { en: 'We have held this booking so a person can reach you first. When you are ready, you can still confirm it.', ta: 'ஒருவர் முதலில் உங்களைத் தொடர்புகொள்ள, இந்த முன்பதிவை நிறுத்தி வைத்துள்ளோம். நீங்கள் தயாரானதும் இதை உறுதிசெய்யலாம்.', hi: 'हमने यह बुकिंग रोक ली है ताकि पहले कोई व्यक्ति आप तक पहुँच सके। जब आप तैयार हों, इसे फिर भी पक्का कर सकते हैं।' },
 } satisfies Dict
 
 export const MSG = {
@@ -723,6 +729,7 @@ export const NOTIF = {
   typeNowOff: { en: '· type now off', ta: '· இந்த வகை இப்போது நிறுத்தத்தில்', hi: '· यह प्रकार अभी बंद' },
   markReadAria: { en: 'Mark “{title}” as read', ta: '“{title}” படித்ததாகக் குறிக்கவும்', hi: '“{title}” को पढ़ा हुआ करें' },
   markRead: { en: 'Mark read', ta: 'படித்ததாகக் குறி', hi: 'पढ़ा हुआ करें' },
+  readUnread: { en: 'Read the unread aloud', ta: 'படிக்காதவற்றை உரக்க வாசிக்கவும்', hi: 'अनपढ़ी सूचनाएँ पढ़कर सुनाएँ' },
 } satisfies Dict
 
 export const DEV = {
@@ -812,6 +819,34 @@ export const DEV = {
   iosAsk: { en: 'iOS would now ask which HealthKit types to share.', ta: 'எந்த HealthKit வகைகளைப் பகிர வேண்டும் என்று iOS இப்போது கேட்கும்.', hi: 'अब iOS पूछेगा कि कौन-से HealthKit प्रकार साझा करने हैं।' },
   vendorSignIn: { en: 'You would now sign in on {name}’s site through Terra.', ta: 'இப்போது Terra வழியாக {name}-இன் தளத்தில் உள்நுழைவீர்கள்.', hi: 'अब आप Terra के ज़रिए {name} की साइट पर साइन इन करेंगे।' },
   vendorSpecimen: { en: 'Specimen · the vendor sign-in is not part of this demo.', ta: 'மாதிரி · நிறுவனத்தின் உள்நுழைவு இந்த டெமோவில் இல்லை.', hi: 'नमूना · कंपनी का साइन-इन इस डेमो का हिस्सा नहीं है।' },
+  wxEyebrow: { en: 'On your wrist', ta: 'உங்கள் மணிக்கட்டில்', hi: 'आपकी कलाई पर' },
+  wxTitle: { en: 'Watch · the Ledger complication', ta: 'கடிகாரம் · லெட்ஜர் குறுக்குவழி', hi: 'घड़ी · लेजर शॉर्टकट' },
+  wxLead: { en: 'One tap on the watch face, one tag, and the moment is in your Joy Ledger. No typing, no score, nothing counted if you skip.', ta: 'கடிகார முகப்பில் ஒரு தட்டு, ஒரு குறிச்சொல் — அந்தத் தருணம் உங்கள் ஜாய் லெட்ஜரில் சேரும். தட்டச்சு இல்லை, மதிப்பெண் இல்லை, தவிர்த்தால் எதுவும் கணக்கில் இல்லை.', hi: 'घड़ी के चेहरे पर एक टैप, एक टैग, और वह पल आपके जॉय लेजर में। न टाइपिंग, न स्कोर, छोड़ने पर कुछ नहीं गिना जाता।' },
+  wxSpecimen: { en: 'Simulated watch · what you add here is a real entry in your Ledger', ta: 'உருவகப்படுத்திய கடிகாரம் · இங்கே சேர்ப்பது உங்கள் லெட்ஜரில் உண்மையான பதிவாகும்', hi: 'नकली घड़ी · यहाँ जो जोड़ेंगे वह आपके लेजर में असली एंट्री बनेगा' },
+  wxName: { en: 'Apple Watch', ta: 'Apple Watch', hi: 'Apple Watch' },
+  wxPaired: { en: 'Paired with this iPhone', ta: 'இந்த iPhone உடன் இணைக்கப்பட்டது', hi: 'इस iPhone से जुड़ी' },
+  wxUnpaired: { en: 'No watch paired', ta: 'கடிகாரம் எதுவும் இணைக்கப்படவில்லை', hi: 'कोई घड़ी नहीं जुड़ी' },
+  wxPair: { en: 'Pair a watch', ta: 'கடிகாரத்தை இணைக்கவும்', hi: 'घड़ी जोड़ें' },
+  wxUnpair: { en: 'Unpair watch', ta: 'கடிகாரத்தைப் பிரிக்கவும்', hi: 'घड़ी हटाएँ' },
+  wxCompl: { en: 'Ledger complication on the watch face', ta: 'கடிகார முகப்பில் லெட்ஜர் குறுக்குவழி', hi: 'घड़ी के चेहरे पर लेजर शॉर्टकट' },
+  wxComplDesc: { en: 'A small + on the face. Tap it, pick a tag, done.', ta: 'முகப்பில் ஒரு சிறிய +. தட்டி, ஒரு குறிச்சொல்லைத் தேர்ந்தெடுத்தால் போதும்.', hi: 'चेहरे पर एक छोटा +। टैप करें, एक टैग चुनें, हो गया।' },
+  wxTapHint: { en: 'Tap + on the watch face to add a moment.', ta: 'ஒரு தருணத்தைச் சேர்க்க, கடிகார முகப்பில் உள்ள + ஐத் தட்டவும்.', hi: 'एक पल जोड़ने के लिए घड़ी के चेहरे पर + टैप करें।' },
+  wxNoFace: { en: 'Turn the complication on to add from the watch.', ta: 'கடிகாரத்திலிருந்து சேர்க்க, குறுக்குவழியை இயக்கவும்.', hi: 'घड़ी से जोड़ने के लिए शॉर्टकट चालू करें।' },
+  wxPairHint: { en: 'Pair a watch to try the complication.', ta: 'குறுக்குவழியை முயல, ஒரு கடிகாரத்தை இணைக்கவும்.', hi: 'शॉर्टकट आज़माने के लिए घड़ी जोड़ें।' },
+  wxAsk: { en: 'Anything good?', ta: 'ஏதாவது நல்லது?', hi: 'कुछ अच्छा?' },
+  wxSaved: { en: 'Saved', ta: 'சேமிக்கப்பட்டது', hi: 'सहेजा गया' },
+  wxSavedSub: { en: 'In your Ledger', ta: 'உங்கள் லெட்ஜரில்', hi: 'आपके लेजर में' },
+  wxToast: { en: 'Added from your watch: {tag}. It is in your Ledger.', ta: 'உங்கள் கடிகாரத்திலிருந்து சேர்க்கப்பட்டது: {tag}. இது உங்கள் லெட்ஜரில் உள்ளது.', hi: 'आपकी घड़ी से जोड़ा गया: {tag}। यह आपके लेजर में है।' },
+  wxToday: { en: 'Added from your wrist', ta: 'உங்கள் மணிக்கட்டிலிருந்து சேர்த்தவை', hi: 'आपकी कलाई से जोड़े गए' },
+  wxNone: { en: 'Nothing from the watch yet.', ta: 'கடிகாரத்திலிருந்து இன்னும் எதுவும் இல்லை.', hi: 'घड़ी से अभी कुछ नहीं।' },
+  wxSeeLedger: { en: 'See your Ledger', ta: 'உங்கள் லெட்ஜரைப் பார்க்கவும்', hi: 'अपना लेजर देखें' },
+  wxFaceAria: { en: 'Simulated watch face', ta: 'உருவகப்படுத்திய கடிகார முகப்பு', hi: 'नकली घड़ी का चेहरा' },
+  wxComplAria: { en: 'Add a Joy Ledger moment from the watch', ta: 'கடிகாரத்திலிருந்து ஒரு ஜாய் லெட்ஜர் தருணத்தைச் சேர்க்கவும்', hi: 'घड़ी से जॉय लेजर में एक पल जोड़ें' },
+  wxPairedToast: { en: 'Watch paired. The complication is on its face.', ta: 'கடிகாரம் இணைக்கப்பட்டது. குறுக்குவழி அதன் முகப்பில் உள்ளது.', hi: 'घड़ी जुड़ गई। शॉर्टकट उसके चेहरे पर है।' },
+  wxUnpairedToast: { en: 'Watch unpaired. Nothing is lost from your Ledger.', ta: 'கடிகாரம் பிரிக்கப்பட்டது. உங்கள் லெட்ஜரிலிருந்து எதுவும் இழக்கப்படவில்லை.', hi: 'घड़ी हट गई। आपके लेजर से कुछ नहीं खोया।' },
+  wxComplOn: { en: 'Complication on.', ta: 'குறுக்குவழி இயக்கப்பட்டது.', hi: 'शॉर्टकट चालू।' },
+  wxComplOff: { en: 'Complication off.', ta: 'குறுக்குவழி நிறுத்தப்பட்டது.', hi: 'शॉर्टकट बंद।' },
+  linkedInSetup: { en: 'Linked during setup', ta: 'அமைப்பின்போது இணைக்கப்பட்டது', hi: 'सेटअप में जोड़ा गया' },
 } satisfies Dict
 
 export const HH = {
@@ -833,7 +868,7 @@ export const HH = {
   largeType: { en: 'Large type', ta: 'பெரிய எழுத்து', hi: 'बड़े अक्षर' },
   voiceLower: { en: 'voice-first', ta: 'குரல்-முதன்மை', hi: 'आवाज़-पहले' },
   standardType: { en: 'Standard type and touch', ta: 'வழக்கமான எழுத்தும் தொடுதலும்', hi: 'सामान्य अक्षर और टच' },
-  elderDetail: { en: '{modes}. You help her as a family helper — by her consent, given on 8 Jan 2027, which she can withdraw.', ta: '{modes}. அவரது ஒப்புதலுடன் நீங்கள் குடும்ப உதவியாளராக அவருக்கு உதவுகிறீர்கள் — 8 Jan 2027 அன்று அளித்த அந்த ஒப்புதலை அவர் திரும்பப் பெறலாம்.', hi: '{modes}। आप उनकी सहमति से परिवार-सहायक के रूप में उनकी मदद करते हैं — 8 Jan 2027 को दी गई यह सहमति वे वापस ले सकती हैं।' },
+  elderDetail: { en: '{modes}. You help her as a family helper — by her consent, given on {date}, which she can withdraw.', ta: '{modes}. அவரது ஒப்புதலுடன் நீங்கள் குடும்ப உதவியாளராக அவருக்கு உதவுகிறீர்கள் — {date} அன்று அளித்த அந்த ஒப்புதலை அவர் திரும்பப் பெறலாம்.', hi: '{modes}। आप उनकी सहमति से परिवार-सहायक के रूप में उनकी मदद करते हैं — {date} को दी गई यह सहमति वे वापस ले सकती हैं।' },
   elderMode: { en: 'Elder mode', ta: 'முதியோர் பயன்முறை', hi: 'बुज़ुर्ग मोड' },
   helperArjun: { en: 'Helper: Arjun', ta: 'உதவியாளர்: Arjun', hi: 'सहायक: Arjun' },
   offSuffix: { en: ' · off', ta: ' · நிறுத்தம்', hi: ' · बंद' },
@@ -957,6 +992,38 @@ export const HH = {
   errIndexOffered: { en: 'You already offer your Index to Kavya.', ta: 'உங்கள் குறியீட்டை ஏற்கெனவே Kavya-வுக்கு அளித்துள்ளீர்கள்.', hi: 'आप अपना इंडेक्स पहले से Kavya को दे रहे हैं।' },
   errTermsOffered: { en: 'You already offer these to Kavya. Choose another term.', ta: 'இவற்றை ஏற்கெனவே Kavya-வுக்கு அளித்துள்ளீர்கள். வேறு அம்சத்தைத் தேர்ந்தெடுங்கள்.', hi: 'ये आप पहले से Kavya को दे रहे हैं। कोई और पहलू चुनें।' },
   sendProposal: { en: 'Send proposal to Kavya', ta: 'Kavya-வுக்கு முன்மொழிவை அனுப்பவும்', hi: 'Kavya को प्रस्ताव भेजें' },
+  pvOpen: { en: 'Preview Lakshmi’s app', ta: 'Lakshmi-யின் செயலியை முன்னோட்டம் பார்க்கவும்', hi: 'Lakshmi का ऐप देखें' },
+  pvTitle: { en: 'Lakshmi’s Today · preview', ta: 'Lakshmi-யின் இன்று · முன்னோட்டம்', hi: 'Lakshmi का आज · झलक' },
+  pvNote: { en: 'What she sees with these settings. On her phone it is in Tamil, her language.', ta: 'இந்த அமைப்புகளுடன் அவர் பார்ப்பது இதுதான். அவரது போனில் இது அவரது மொழியான தமிழில் இருக்கும்.', hi: 'इन सेटिंग्स के साथ उन्हें यही दिखता है। उनके फ़ोन पर यह उनकी भाषा, तमिल में है।' },
+  pvOnly: { en: 'Preview · nothing here is saved to anyone’s record', ta: 'முன்னோட்டம் · இங்கே எதுவும் யாருடைய பதிவிலும் சேமிக்கப்படாது', hi: 'झलक · यहाँ कुछ भी किसी के रिकॉर्ड में नहीं सहेजा जाता' },
+  pvGreeting: { en: 'Good morning, Lakshmi', ta: 'காலை வணக்கம், Lakshmi', hi: 'सुप्रभात, Lakshmi' },
+  pvOneThing: { en: 'Your one thing today', ta: 'இன்று உங்களுக்கான ஒரே விஷயம்', hi: 'आज आपका एक काम' },
+  pvAction: { en: 'Sit on the verandah for ten minutes after breakfast.', ta: 'காலை உணவுக்குப் பிறகு பத்து நிமிடம் திண்ணையில் அமருங்கள்.', hi: 'नाश्ते के बाद दस मिनट बरामदे में बैठिए।' },
+  pvDidIt: { en: 'I did it', ta: 'செய்துவிட்டேன்', hi: 'मैंने कर लिया' },
+  pvThanks: { en: 'Thank you. That is all for today.', ta: 'நன்றி. இன்றைக்கு இவ்வளவுதான்.', hi: 'धन्यवाद। आज के लिए बस इतना ही।' },
+  pvLedgerQ: { en: 'Anything good today?', ta: 'இன்று ஏதாவது நல்லது நடந்ததா?', hi: 'आज कुछ अच्छा हुआ?' },
+  pvSaved: { en: 'Kept for Lakshmi · {tag}', ta: 'Lakshmi-க்காக வைக்கப்பட்டது · {tag}', hi: 'Lakshmi के लिए रखा गया · {tag}' },
+  pvHear: { en: 'Hear today', ta: 'இன்றைக் கேளுங்கள்', hi: 'आज का सुनिए' },
+  pvHelper: { en: 'Arjun can help you', ta: 'Arjun உங்களுக்கு உதவுவார்', hi: 'Arjun आपकी मदद कर सकते हैं' },
+  pvCallHelper: { en: 'Call Arjun', ta: 'Arjun-ஐ அழைக்கவும்', hi: 'Arjun को फ़ोन करें' },
+  pvCalling: { en: 'Calling Arjun · preview, no call is made', ta: 'Arjun-ஐ அழைக்கிறது · முன்னோட்டம், அழைப்பு செய்யப்படாது', hi: 'Arjun को फ़ोन · झलक, कोई कॉल नहीं होती' },
+  pvNoHelper: { en: 'No family helper. Priya, your coach, is a message away.', ta: 'குடும்ப உதவியாளர் இல்லை. உங்கள் பயிற்சியாளர் Priya ஒரு செய்தி தூரத்தில் இருக்கிறார்.', hi: 'कोई परिवार-सहायक नहीं। आपकी कोच Priya एक संदेश की दूरी पर हैं।' },
+  pvSpoken: { en: 'Lakshmi said: “{text}”', ta: 'Lakshmi சொன்னது: “{text}”', hi: 'Lakshmi ने कहा: “{text}”' },
+  elNoHelper: { en: 'No family helper', ta: 'குடும்ப உதவியாளர் இல்லை', hi: 'कोई परिवार-सहायक नहीं' },
+  elDetailNone: { en: '{modes}. Lakshmi has no family helper at the moment. Her settings are hers alone.', ta: '{modes}. தற்போது Lakshmi-க்குக் குடும்ப உதவியாளர் இல்லை. அவரது அமைப்புகள் அவருக்கு மட்டுமே.', hi: '{modes}। अभी Lakshmi का कोई परिवार-सहायक नहीं है। उनकी सेटिंग्स सिर्फ़ उनकी हैं।' },
+  elWithdrawDemo: { en: 'Withdraw, as Lakshmi', ta: 'Lakshmi-யாக, திரும்பப் பெறவும்', hi: 'Lakshmi के रूप में वापस लें' },
+  elWithdrawQ: { en: 'Arjun will no longer help her answer or read her reminders. Her own settings stay as they are.', ta: 'அவர் பதிலளிக்கவோ நினைவூட்டல்களைப் படிக்கவோ Arjun இனி உதவ மாட்டார். அவரது அமைப்புகள் அப்படியே இருக்கும்.', hi: 'Arjun अब उन्हें जवाब देने या रिमाइंडर पढ़ने में मदद नहीं करेंगे। उनकी अपनी सेटिंग्स वैसी ही रहेंगी।' },
+  elWithdrawConfirm: { en: 'Yes, withdraw', ta: 'ஆம், திரும்பப் பெறவும்', hi: 'हाँ, वापस लें' },
+  elWithdrawn: { en: 'Lakshmi withdrew Arjun as her helper.', ta: 'Lakshmi, Arjun-ஐ உதவியாளர் பொறுப்பிலிருந்து நீக்கினார்.', hi: 'Lakshmi ने Arjun को सहायक से हटा दिया।' },
+  elDemoNote: { en: 'In this demo you act as Lakshmi. In real life only she can withdraw — on her phone, or by telling Priya.', ta: 'இந்த டெமோவில் நீங்கள் Lakshmi-யாகச் செயல்படுகிறீர்கள். உண்மையில் அவர் மட்டுமே திரும்பப் பெற முடியும் — அவரது போனில், அல்லது Priya-விடம் சொல்லி.', hi: 'इस डेमो में आप Lakshmi की जगह हैं। असल में सिर्फ़ वही वापस ले सकती हैं — अपने फ़ोन पर, या Priya को बताकर।' },
+  elNone: { en: 'Lakshmi has no family helper.', ta: 'Lakshmi-க்குக் குடும்ப உதவியாளர் இல்லை.', hi: 'Lakshmi का कोई परिवार-सहायक नहीं है।' },
+  elAsk: { en: 'Ask Lakshmi to add you again', ta: 'உங்களை மீண்டும் சேர்க்க Lakshmi-யிடம் கேட்கவும்', hi: 'Lakshmi से फिर जोड़ने को कहें' },
+  elAsked: { en: 'Asked. Lakshmi decides on her phone.', ta: 'கேட்கப்பட்டது. Lakshmi தன் போனில் முடிவு செய்வார்.', hi: 'पूछ लिया। Lakshmi अपने फ़ोन पर तय करेंगी।' },
+  elAskedToast: { en: 'Lakshmi has been asked. Nothing changes until she agrees.', ta: 'Lakshmi-யிடம் கேட்கப்பட்டது. அவர் ஒப்புக்கொள்ளும் வரை எதுவும் மாறாது.', hi: 'Lakshmi से पूछ लिया गया। उनकी सहमति तक कुछ नहीं बदलेगा।' },
+  elAgreeDemo: { en: 'Demo: Lakshmi agrees', ta: 'டெமோ: Lakshmi ஒப்புக்கொள்கிறார்', hi: 'डेमो: Lakshmi सहमत हैं' },
+  elAdded: { en: 'Lakshmi added Arjun as her helper again.', ta: 'Lakshmi மீண்டும் Arjun-ஐ உதவியாளராகச் சேர்த்தார்.', hi: 'Lakshmi ने Arjun को फिर से सहायक बनाया।' },
+  elHelperOnly: { en: 'Only her helper can change these here. Lakshmi can still change them on her phone.', ta: 'இங்கே அவரது உதவியாளர் மட்டுமே இவற்றை மாற்ற முடியும். Lakshmi தன் போனில் மாற்றலாம்.', hi: 'यहाँ इन्हें सिर्फ़ उनका सहायक बदल सकता है। Lakshmi अपने फ़ोन पर अब भी बदल सकती हैं।' },
+  fromSetup: { en: 'From your setup', ta: 'உங்கள் அமைப்பிலிருந்து', hi: 'आपके सेटअप से' },
 } satisfies Dict
 
 export const MEM = {
@@ -1138,6 +1205,13 @@ export const PROF = {
   ecConsent: { en: 'They may be called only if I am in crisis. I have told them.', ta: 'நான் நெருக்கடியில் இருந்தால் மட்டுமே இவர் அழைக்கப்படலாம். இதை நான் இவரிடம் சொல்லிவிட்டேன்.', hi: 'इन्हें सिर्फ़ तब फ़ोन किया जा सकता है जब मैं संकट में हूँ। मैंने इन्हें बता दिया है।' },
   removeContact: { en: 'Remove contact', ta: 'தொடர்பை நீக்கவும்', hi: 'संपर्क हटाएँ' },
   saveContact: { en: 'Save contact', ta: 'தொடர்பைச் சேமிக்கவும்', hi: 'संपर्क सहेजें' },
+  suEyebrow: { en: 'From your setup', ta: 'உங்கள் அமைப்பிலிருந்து', hi: 'आपके सेटअप से' },
+  suFinished: { en: 'Finished {date}', ta: '{date} அன்று முடிந்தது', hi: '{date} को पूरा हुआ' },
+  suFocus: { en: 'What you came for', ta: 'நீங்கள் வந்த காரணம்', hi: 'आप किसलिए आए' },
+  suSignIn: { en: 'You sign in with', ta: 'நீங்கள் உள்நுழைவது', hi: 'आप इससे साइन इन करते हैं' },
+  suNoFocus: { en: 'No focus chosen. Every space is open to you.', ta: 'எந்தக் கவனமும் தேர்ந்தெடுக்கப்படவில்லை. எல்லா இடங்களும் உங்களுக்குத் திறந்திருக்கின்றன.', hi: 'कोई फ़ोकस नहीं चुना। हर स्पेस आपके लिए खुला है।' },
+  suNoHelper: { en: 'No family helper', ta: 'குடும்ப உதவியாளர் இல்லை', hi: 'कोई परिवार-सहायक नहीं' },
+  suSpaces: { en: 'Open {space}', ta: '{space} ஐத் திறக்கவும்', hi: '{space} खोलें' },
 } satisfies Dict
 
 export const TRUST = {
@@ -1392,6 +1466,7 @@ export const WA = {
   consentOn: { en: 'On — Ledger prompts and reminders', ta: 'இயக்கத்தில் — லெட்ஜர் கேள்விகளும் நினைவூட்டல்களும்', hi: 'चालू — लेजर के सवाल और रिमाइंडर' },
   consentOff: { en: 'Off — nothing is sent to WhatsApp', ta: 'நிறுத்தத்தில் — WhatsApp-க்கு எதுவும் அனுப்பப்படுவதில்லை', hi: 'बंद — WhatsApp पर कुछ नहीं भेजा जाता' },
   given: { en: 'Given', ta: 'அளிக்கப்பட்டது', hi: 'दी गई' },
+  setupAsked: { en: 'You chose WhatsApp during setup. Prompts start only once you turn them on here.', ta: 'அமைப்பின்போது WhatsApp-ஐத் தேர்ந்தெடுத்தீர்கள். இங்கே நீங்கள் இயக்கிய பிறகே கேள்விகள் தொடங்கும்.', hi: 'सेटअप में आपने WhatsApp चुना था। संकेत तभी शुरू होंगे जब आप उन्हें यहाँ चालू करेंगे।' },
   notGiven: { en: 'Not given', ta: 'அளிக்கப்படவில்லை', hi: 'नहीं दी गई' },
   toNumber: { en: 'To {num}. A separate consent from Care and Data; withdraw it here, in the Trust centre, or by replying STOP.', ta: '{num} எண்ணுக்கு. கவனிப்பு, தரவு ஒப்புதல்களிலிருந்து தனி ஒப்புதல்; இங்கே, நம்பிக்கை மையத்தில், அல்லது STOP என்று பதில் அனுப்பித் திரும்பப் பெறலாம்.', hi: '{num} पर। देखभाल और डेटा से अलग सहमति; इसे यहाँ, भरोसा केंद्र में, या STOP लिखकर वापस लें।' },
   offToast: { en: 'WhatsApp prompts off. Takes effect everywhere within 24 h.', ta: 'WhatsApp கேள்விகள் நிறுத்தப்பட்டன. 24 மணி நேரத்துக்குள் எல்லா இடத்திலும் அமலுக்கு வரும்.', hi: 'WhatsApp सवाल बंद। 24 घंटे में हर जगह लागू।' },
@@ -1426,4 +1501,19 @@ export const WA = {
   agree: { en: 'I agree to receive these on WhatsApp. I can reply STOP at any time.', ta: 'இவற்றை WhatsApp-இல் பெற ஒப்புக்கொள்கிறேன். எப்போது வேண்டுமானாலும் STOP என்று பதில் அனுப்பலாம்.', hi: 'मैं इन्हें WhatsApp पर पाने के लिए सहमत हूँ। मैं कभी भी STOP लिख सकता/सकती हूँ।' },
   tick: { en: 'Tick the box to give this consent.', ta: 'இந்த ஒப்புதலை அளிக்கப் பெட்டியில் டிக் செய்யவும்.', hi: 'यह सहमति देने के लिए बॉक्स पर टिक करें।' },
   giveConsent: { en: 'Give consent', ta: 'ஒப்புதல் அளிக்கவும்', hi: 'सहमति दें' },
+  wtEyebrow: { en: 'And on your watch', ta: 'உங்கள் கடிகாரத்திலும்', hi: 'और आपकी घड़ी पर' },
+  wtTitle: { en: 'The Ledger, one tap from your wrist', ta: 'லெட்ஜர், உங்கள் மணிக்கட்டிலிருந்து ஒரு தட்டில்', hi: 'लेजर, आपकी कलाई से एक टैप पर' },
+  wtLead: { en: 'The same Joy Ledger without opening a chat. Try the watch face: it adds a real entry.', ta: 'அரட்டையைத் திறக்காமலேயே அதே ஜாய் லெட்ஜர். கடிகார முகப்பை முயன்று பாருங்கள்: அது உண்மையான பதிவைச் சேர்க்கும்.', hi: 'चैट खोले बिना वही जॉय लेजर। घड़ी का चेहरा आज़माइए: यह असली एंट्री जोड़ता है।' },
+  wtManage: { en: 'Watch settings in Devices', ta: 'சாதனங்களில் கடிகார அமைப்புகள்', hi: 'डिवाइस में घड़ी की सेटिंग्स' },
+} satisfies Dict
+
+/** Voice-first controls (read aloud, answer by speaking) shared by the account screens. */
+export const VOICE = {
+  readAloud: { en: 'Read aloud', ta: 'உரக்க வாசிக்கவும்', hi: 'पढ़कर सुनाएँ' },
+  stopReading: { en: 'Stop', ta: 'நிறுத்தவும்', hi: 'रोकें' },
+  readingAloud: { en: 'Reading aloud', ta: 'உரக்க வாசிக்கப்படுகிறது', hi: 'पढ़कर सुनाया जा रहा है' },
+  noSpeech: { en: 'This browser cannot speak here, so the words are shown instead.', ta: 'இந்த உலாவியால் இங்கே பேச முடியாது, அதனால் சொற்கள் காட்டப்படுகின்றன.', hi: 'यह ब्राउज़र यहाँ बोल नहीं सकता, इसलिए शब्द दिखाए जा रहे हैं।' },
+  speakAnswer: { en: 'Answer by speaking', ta: 'பேசிப் பதில் சொல்லவும்', hi: 'बोलकर जवाब दें' },
+  listening: { en: 'Listening… tap to stop', ta: 'கேட்கிறது… நிறுத்தத் தட்டவும்', hi: 'सुन रहा है… रोकने के लिए टैप करें' },
+  listeningSpecimen: { en: 'Specimen · no microphone is used in this demo', ta: 'மாதிரி · இந்த டெமோவில் மைக்ரோஃபோன் பயன்படுத்தப்படுவதில்லை', hi: 'नमूना · इस डेमो में माइक्रोफ़ोन इस्तेमाल नहीं होता' },
 } satisfies Dict

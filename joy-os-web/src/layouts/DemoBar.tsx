@@ -5,12 +5,16 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { Role } from '@/domain/types'
 import { useApp } from '@/lib/store'
+import { grantActs, isLive, standingRequest, useAccessRequests } from '@/routes/console/care/_accessStore'
+import { actsAt, deskOf, deskRoleOf, roleOption } from '@/routes/console/care/_gate'
+import { consoleNowMs } from '@/routes/console/care/_parts'
 
 // Demo surface switcher — moves a reviewer between the member app and the consoles.
 // Specimen only; real access is role-gated by the Platform Core.
 export const DEMO_ROLES: { role: Role; label: string; to: string; who: string }[] = [
   { role: 'member', label: 'Member', to: '/app', who: 'Arjun Rao · Day 23 of 90' },
   { role: 'coach', label: 'Coach', to: '/console/coach', who: 'Priya Natarajan' },
+  { role: 'concierge', label: 'Concierge', to: '/console/coach?desk=concierge', who: 'Ravi Shankar' },
   { role: 'clinician', label: 'Clinician', to: '/console/clinical', who: 'Dr Meera Iyer' },
   { role: 'partner', label: 'Partner venue', to: '/console/partner', who: 'Fairmont Mumbai' },
   { role: 'tenant', label: 'Tenant admin', to: '/console/tenant', who: 'Northwind Capital' },
@@ -23,13 +27,13 @@ export function DemoBar() {
   const [open, setOpen] = useState(false)
   const { role, setRole } = useApp()
   const nav = useNavigate()
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
   const rootRef = useRef<HTMLDivElement>(null)
   const toggleRef = useRef<HTMLButtonElement>(null)
   const panelId = useId()
 
   // Any navigation closes the menu.
-  useEffect(() => { setOpen(false) }, [pathname])
+  useEffect(() => { setOpen(false) }, [pathname, search])
 
   // Escape or a press outside the bar closes it too.
   useEffect(() => {
@@ -50,6 +54,20 @@ export function DemoBar() {
     }
   }, [open])
 
+  // On a console the role in use must agree with the screen's own gate (useConsoleAccess): if the
+  // current role cannot act at this desk (or no console role is chosen yet), say so and offer the
+  // desk's own role. The coach console is two desks, so ?desk= is read the same way it is there.
+  const requests = useAccessRequests()
+  const desk = deskOf(pathname + search, role)
+  const here = desk ? desk.split('#')[0] : null
+  const now = consoleNowMs()
+  const grant = here && roleOption(role) ? standingRequest(requests, here, role, now) : null
+  // A grant is for the console's main desk, never for a second desk inside it.
+  const opens = !!desk && (actsAt(desk, role) || (!!grant && desk === here && isLive(grant, now) && grantActs(grant)))
+  const offered = desk && !opens ? deskRoleOf(desk) : null
+  const offeredOpt = offered && offered !== role ? roleOption(offered) : null
+  const current = DEMO_ROLES.find((r) => r.role === role)
+
   if (pathname.startsWith('/creds') || pathname.startsWith('/app/index/take')) return null
   return (
     // Above the member tab bar inside /app; near the corner everywhere else.
@@ -64,6 +82,16 @@ export function DemoBar() {
             exit={{ opacity: 0, y: 8 }}
             className="mb-3 w-[290px] rounded-card border border-line bg-paper-raised p-3 shadow-lift"
           >
+            {here && !opens && (
+              <div className="mb-2 rounded-lg border border-line-strong px-3 py-2.5 text-[13px] text-ink-2">
+                <p>{!roleOption(role) ? `No console role chosen. This ${desk !== here ? 'desk' : 'console'} is view only.` : `As ${current?.label.toLowerCase() ?? role} this ${desk !== here ? 'desk' : 'console'} is view only.`}</p>
+                {offeredOpt && (
+                  <button onClick={() => { setRole(offeredOpt.value); setOpen(false) }} className="mt-1.5 text-[13px] text-ink underline underline-offset-4 focus-ring">
+                    Act here as {offeredOpt.label.toLowerCase()} · {offeredOpt.person}
+                  </button>
+                )}
+              </div>
+            )}
             <p className="eyebrow px-2 pb-2 pt-1 text-ink-3">Explore as</p>
             <ul>
               {DEMO_ROLES.map((r) => (
@@ -97,6 +125,7 @@ export function DemoBar() {
         className="ml-auto flex h-11 items-center gap-2 rounded-full border border-line bg-paper-raised px-3 text-[13px] text-ink shadow-lift focus-ring lg:px-4"
       >
         {open ? <X size={16} aria-hidden /> : <Layers size={16} aria-hidden />} Demo
+        {current && <span className="hidden text-ink-3 sm:inline">· {here && !opens ? 'view only' : current.label}</span>}
       </button>
     </div>
   )

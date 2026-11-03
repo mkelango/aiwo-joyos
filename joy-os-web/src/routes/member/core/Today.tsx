@@ -1,17 +1,45 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowRight, Clock, Info, Sparkles, Users } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { ArrowRight, Check, Clock, CloudOff, CreditCard, Info, Sparkles, Users, Volume2, VolumeX, Watch } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
-import { BandLabel, DaybreakButton, Delta, Eyebrow, MethodLine, SpecimenTag, TermChip, TermDot } from '@/components/joy/primitives'
+import { BandLabel, DaybreakButton, Delta, Eyebrow, MethodLine, SpecimenTag, TermChip, TermDot, fmtDate } from '@/components/joy/primitives'
 import { Button, Card, LoopRing, Sheet } from '@/components/ui'
 import { CIRCLE } from '@/data/platform'
-import { INDEX_HISTORY, MEMBER, TODAY_ACTION } from '@/data/member'
+import { INDEX_HISTORY, MEMBER, PAYMENTS_GRACE, TODAY_ACTION } from '@/data/member'
+import type { Action, TermKey } from '@/domain/types'
 import { termByKey } from '@/data/terms'
 import { useApp } from '@/lib/store'
 import { useT } from '@/lib/i18n'
 import { ACTION_TEXT, fmtLocal, rich, useCore } from './_i18n'
-import { liveLedger, specimenWeek, useLedgerRemoved, useLocal, weekCounts } from './_store'
+import { SPECIMEN_TODAY, liveLedger, specimenWeek, useLedgerRemoved, useLocal, useSignalsDown, weekCounts } from './_store'
+import { useA11yPrefs } from '@/routes/member/account/_prefs'
+import { actionsFor } from '@/routes/member/spaces/_data'
+import { useSpaceText } from '@/routes/member/spaces/_i18n'
+
+const TERMS: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
+
+/** The actions a member added from a space's three actions. Read from the spaces' own record
+ *  (joyos:spaces:actions.<term>.added.v1, { [actionId]: true }); Today never rewrites it. */
+function readAddedActions(): Action[] {
+  const out: Action[] = []
+  for (const k of TERMS) {
+    let added: Record<string, boolean> = {}
+    try {
+      const raw = localStorage.getItem(`joyos:spaces:actions.${k}.added.v1`)
+      const v: unknown = raw ? JSON.parse(raw) : {}
+      if (v && typeof v === 'object' && !Array.isArray(v)) added = v as Record<string, boolean>
+    } catch {
+      added = {}
+    }
+    // Today's one action already has its own card above; the pool holds the rest.
+    for (const a of actionsFor(k)) if (added[a.id] && a.id !== TODAY_ACTION.id) out.push(a)
+  }
+  return out
+}
+
+const canSpeak = () => typeof window !== 'undefined' && 'speechSynthesis' in window && typeof window.SpeechSynthesisUtterance === 'function'
+const SPEECH_LANG = { en: 'en-IN', ta: 'ta-IN', hi: 'hi-IN' } as const
 
 const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve']
 
@@ -20,7 +48,19 @@ const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eig
 export default function Today() {
   const t = useT()
   const { t: c, lang, name, space, pick, tag, when } = useCore()
-  const { actionDone, setActionDone, ledger } = useApp()
+  const { actionDone, setActionDone, ledger, offline, syncQueue, queueSync, unqueueSync, paymentsGrace } = useApp()
+  const { d: spaceData } = useSpaceText()
+  const { voice } = useA11yPrefs()
+  const signalsDown = useSignalsDown()
+  // The pool: actions added from the spaces, read once per visit (the spaces are another screen).
+  const [pool] = useState(readAddedActions)
+  const [poolDone, setPoolDone] = useLocal<Record<string, boolean>>(`pool-done:${SPECIMEN_TODAY}`, {})
+  const poolDoneCount = pool.filter((a) => poolDone[a.id]).length
+  const actionQueueId = `action:${SPECIMEN_TODAY}`
+  const actionQueued = syncQueue.some((q) => q.id === actionQueueId)
+  const [speaking, setSpeaking] = useState(false)
+  const speakable = useRef(canSpeak()).current
+  useEffect(() => () => { if (canSpeak()) window.speechSynthesis.cancel() }, [])
   const [whyOpen, setWhyOpen] = useState(false)
   // "Not today" is kept like "Done": a reload never brings back an action the member declined.
   const [skipped, setSkipped] = useLocal<boolean>('today-skipped', false)
@@ -42,6 +82,41 @@ export default function Today() {
   const actionTitle = pick(at?.title, action.title)
   const lowName = name(lowest.key)
   const tagWord = (s: string) => (lang === 'en' ? s.toLowerCase() : tag(s))
+  // Offline, the action's state waits in the sync queue; Undo takes it back out.
+  const markAction = (done: boolean, skip: boolean) => {
+    setActionDone(done)
+    setSkipped(skip)
+    if (done || skip) queueSync({ id: actionQueueId, kind: 'action' })
+    else unqueueSync(actionQueueId)
+  }
+  const togglePool = (id: string) => {
+    const on = !poolDone[id]
+    setPoolDone((p) => ({ ...p, [id]: on }))
+    if (on) queueSync({ id: `pool:${SPECIMEN_TODAY}:${id}`, kind: 'action' })
+    else unqueueSync(`pool:${SPECIMEN_TODAY}:${id}`)
+  }
+  const readAloud = () => {
+    if (!speakable) return
+    const synth = window.speechSynthesis
+    if (speaking) {
+      synth.cancel()
+      setSpeaking(false)
+      return
+    }
+    const parts = [
+      c('tdSpeakIndex', { v: latest.value, term: lowName }),
+      !actionDone && !skipped ? c('tdSpeakAction', { title: actionTitle }) : '',
+      pool.length > 0 ? c('tdSpeakPool', { list: pool.map((a) => spaceData(a.title).replace(/[.।]$/, '')).join(', ') }) : '',
+      c('tdSpeakDay', { n: MEMBER.dayOfLoop }),
+    ].filter(Boolean)
+    const u = new window.SpeechSynthesisUtterance(parts.join(' '))
+    u.lang = SPEECH_LANG[lang]
+    u.onend = () => setSpeaking(false)
+    u.onerror = () => setSpeaking(false)
+    synth.cancel()
+    synth.speak(u)
+    setSpeaking(true)
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr] lg:gap-8">
@@ -50,7 +125,18 @@ export default function Today() {
       <Card className="relative overflow-hidden lg:row-span-2" tone="raised">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <Eyebrow>{t('yourJoyspan')} · {t('dayOf', { n: MEMBER.dayOfLoop })}</Eyebrow>
-          <SpecimenTag className="shrink-0 text-[10px] sm:text-[11px]" />
+          <span className="flex shrink-0 items-center gap-2">
+            {voice && (
+              speakable ? (
+                <Button variant="ghost" size="sm" onClick={readAloud} aria-pressed={speaking}>
+                  {speaking ? <VolumeX size={15} /> : <Volume2 size={15} />} {speaking ? c('tdStopReading') : c('tdReadAloud')}
+                </Button>
+              ) : (
+                <span className="text-[13px] text-ink-3">{c('tdReadUnavailable')}</span>
+              )
+            )}
+            <SpecimenTag className="shrink-0 text-[10px] sm:text-[11px]" />
+          </span>
         </div>
         <div className="mt-4 flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="order-2 sm:order-1">
@@ -88,6 +174,11 @@ export default function Today() {
           <MethodLine method={latest.method} grade={latest.grade} next={latest.nextMeasure} />
           <Link to="/app/trust" className="eyebrow text-ink-3 underline-offset-4 hover:text-ink hover:underline">{t('trust')}</Link>
         </div>
+        {signalsDown && (
+          <Link to="/app/index" className="mt-4 flex items-center gap-2 rounded-card bg-paper-sunk px-4 py-2.5 text-[14px] text-ink-2 hover:text-ink focus-ring">
+            <Watch size={15} className="shrink-0 text-ink-3" aria-hidden /> {c('tdSignalsDown')} <ArrowRight size={14} className="ml-auto shrink-0" />
+          </Link>
+        )}
       </Card>
 
       {/* The one action */}
@@ -106,8 +197,8 @@ export default function Today() {
                 <Info size={15} /> {c('tdWhyQ')}
               </button>
               <div className="mt-auto flex flex-col gap-2 pt-6">
-                <DaybreakButton onClick={() => { setActionDone(true); setSkipped(false) }} className="w-full">{t('doneForToday')}</DaybreakButton>
-                <Button variant="ghost" onClick={() => { setSkipped(true); setActionDone(false) }} className="self-center">{t('notToday')}</Button>
+                <DaybreakButton onClick={() => markAction(true, false)} className="w-full">{t('doneForToday')}</DaybreakButton>
+                <Button variant="ghost" onClick={() => markAction(false, true)} className="self-center">{t('notToday')}</Button>
               </div>
             </motion.div>
           ) : (
@@ -118,7 +209,8 @@ export default function Today() {
               <p className="mt-2 text-[15px] text-ink-2">
                 {skipped ? c('tdSkippedNote') : c('tdDoneNote')}
               </p>
-              <Button variant="link" className="mt-auto self-start pt-6" onClick={() => { setActionDone(false); setSkipped(false) }}>{c('undo')}</Button>
+              {(actionQueued || offline) && <p className="mt-2 flex items-center gap-1.5 text-[13px] text-ink-3"><CloudOff size={13} aria-hidden className="shrink-0" /> {c('tdQueued')}</p>}
+              <Button variant="link" className="mt-auto self-start pt-6" onClick={() => markAction(false, false)}>{c('undo')}</Button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -167,12 +259,67 @@ export default function Today() {
         </Card>
       </div>
 
+      {/* Today's pool: actions added from the spaces' three actions */}
+      <Card className="lg:col-span-2">
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+          <Eyebrow>{c('tdPool')}</Eyebrow>
+          {pool.length > 0 && <span className="num text-[13px] text-ink-3">{c('tdPoolCount', { d: poolDoneCount, n: pool.length })}</span>}
+        </div>
+        {pool.length === 0 ? (
+          <p className="mt-3 text-[15px] text-ink-2">
+            {c('tdPoolEmpty')}{' '}
+            <Link to="/app/spaces" className="inline-flex items-center gap-1 text-ink underline-offset-4 hover:underline focus-ring">{c('tdPoolSpaces')} <ArrowRight size={14} /></Link>
+          </p>
+        ) : (
+          <>
+            <p className="mt-2 text-[15px] text-ink-2">{c('tdPoolSub')}</p>
+            <ul className="mt-4 divide-y divide-line">
+              {pool.map((a) => {
+                const done = !!poolDone[a.id]
+                const title = spaceData(a.title)
+                return (
+                  <li key={a.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                    <button
+                      type="button"
+                      onClick={() => togglePool(a.id)}
+                      aria-pressed={done}
+                      aria-label={c('tdPoolMark', { title: title.replace(/[.।]$/, '') })}
+                      className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border focus-ring ${done ? 'border-ink bg-ink text-paper' : 'border-line-strong'}`}
+                    >
+                      {done && <Check size={13} aria-hidden />}
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-[16px] ${done ? 'text-ink-2' : 'text-ink'}`}>{title}</p>
+                      <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-3">
+                        <span className="inline-flex items-center gap-1.5"><TermDot term={a.term} /> {space(a.term)}</span>
+                        <span className="inline-flex items-center gap-1"><Clock size={12} aria-hidden /> {c('min', { n: a.minutes })}</span>
+                        <span>{a.shared ? c('tdTogether') : c('tdSoloShort')}</span>
+                        {done && <span className="text-ink-2">{c('tdPoolDone')}</span>}
+                      </p>
+                    </div>
+                    <Link to={`/app/spaces/${termByKey(a.term).slug}`} className="hidden shrink-0 text-[13px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring sm:inline">
+                      {c('tdPoolManage', { space: space(a.term) })}
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          </>
+        )}
+      </Card>
+
       {/* The loop */}
       <Card tone="outline" className="lg:col-span-2">
         <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
           <div>
             <Eyebrow>{c('tdNinety')}</Eyebrow>
             <p className="mt-2 text-[17px] text-ink">{c('tdLoopLine', { n: MEMBER.dayOfLoop })}</p>
+            {paymentsGrace && (
+              <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px] text-ink-2">
+                <CreditCard size={14} aria-hidden className="shrink-0 text-ink-3" /> {c('tdGrace', { date: fmtDate(PAYMENTS_GRACE.until, lang) })}
+                <Link to="/app/membership" className="text-ink underline-offset-4 hover:underline focus-ring">{c('tdGraceLink')}</Link>
+              </p>
+            )}
           </div>
           <ol className="flex flex-wrap gap-2" aria-label={c('tdMilestones')}>
             {([['0', 'msMeasured'], ['15', 'msReview'], ['45', 'msReview'], ['60', 'msNext'], ['76', 'msRemeasure'], ['90', 'msSigned']] as const).map(([d, l]) => {

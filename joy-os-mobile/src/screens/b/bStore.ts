@@ -172,6 +172,14 @@ export interface AccountState {
   elder: { largeType: boolean; voice: boolean; helper: boolean }
   /** Household share grants (proposed, agreed and revoked), on top of the specimen's. */
   grants: Grant[]
+  /** Pass codes added to the phone's wallet (specimen). */
+  wallet?: string[]
+  /** A request for a place at the next flagship edition; withdrawn sets it back to null. */
+  flagshipRequest?: { ref: string; guests: 1 | 2; note: string; at: string } | null
+  /** Invoices paid on this phone (the February renewal paid during grace). */
+  paidInvoices?: { id: string; date: string; item: string; total: number; method: string; status: string; ref: string }[]
+  /** A membership pause: billing and the circle stop; the record, Ledger and Index carry on. */
+  pause?: { months: 1 | 2 | 3; from: string; until: string; ref: string } | null
 }
 export const accountStore = createStore<AccountState>('account', {
   plan: 'Plus',
@@ -196,6 +204,40 @@ export interface TrustState {
 }
 export const trustStore = createStore<TrustState>('trust', { consents: {}, research: true, eraseScheduled: false })
 
+// ─── Trust centre: nominee (DPDP Act) and ABHA ────────────────────────────────
+
+export interface NomineeState {
+  name: string
+  relation: 'Spouse' | 'Child' | 'Parent' | 'Sibling' | 'Friend' | 'Other'
+  email: string
+  savedAt?: string
+}
+export const nomineeStore = createStore<NomineeState>('nominee', { name: 'Kavya Rao', relation: 'Spouse', email: 'kavya.rao@example.in' })
+export const abhaStore = createStore<{ linked: boolean; address: string; since: string }>('abha', { linked: true, address: 'arjun.rao@abdm', since: '2026-10-04' })
+
+// ─── Accessibility and security (Settings) ─────────────────────────────────
+
+export interface A11yState {
+  /** Captions on by default in circle calls; each call can still turn them off. */
+  captions: boolean
+}
+export const a11yStore = createStore<A11yState>('a11y', { captions: false })
+
+export interface LockState {
+  /** Ask for Face ID, Touch ID or the device PIN when Joy OS opens (specimen: nothing is checked). */
+  appLock: boolean
+  after: 'now' | '1m' | '5m' | '15m'
+  passkeys: { id: string; name: string; added: string }[]
+}
+export const lockStore = createStore<LockState>('lock', {
+  appLock: false,
+  after: '5m',
+  passkeys: [
+    { id: 'pk1', name: 'This iPhone', added: '2026-10-04' }, // shown as ts('pkThisIphone') in Settings
+    { id: 'pk2', name: 'MacBook Air · iCloud Keychain', added: '2026-11-12' },
+  ],
+})
+
 // ─── Devices: connections, HealthKit reads and the mindful-minutes write-back ───
 
 export interface DevicesState {
@@ -204,8 +246,10 @@ export interface DevicesState {
   /** HealthKit type id → read on/off over the specimen HEALTHKIT_TYPES. */
   hk: Record<string, boolean>
   writeBack: boolean
+  /** The Joy Ledger complication on the watch face (specimen watch). */
+  complication?: boolean
 }
-export const devicesStore = createStore<DevicesState>('devices', { states: {}, hk: {}, writeBack: true })
+export const devicesStore = createStore<DevicesState>('devices', { states: {}, hk: {}, writeBack: true, complication: true })
 
 export const refCode = (prefix: string) => `${prefix}-${Date.now().toString(36).toUpperCase().slice(-6)}`
 export const maskPhone = (p: string) => (p.length >= 10 ? `+91 ${p.slice(0, 2)}••• ••${p.slice(-3)}` : p)

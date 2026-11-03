@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { HITL_QUEUE, MD_CONFIG, SAFETY_ALERTS, SCREEN_QUEUE, SIGNOFF_QUEUE, type SafetyAlert } from './_data'
 import { coach, getCoachTasks, isClinicalTask } from './_store'
+import { consoleNowMs } from './_parts'
 
 // A small store for the clinical portal, in the same pattern as the coach store (_store.ts),
 // so alerts, sign-offs, AI reviews, screen routing, the Medical Director's signed config and
@@ -15,6 +16,23 @@ export type MdHistory = (typeof MD_CONFIG.history)[number]
 export type Sent = { rx: string; drug: string; dose: string; freq: string; sentAt: number; reason?: string }
 export type Order = { test: string; when: string; status: string }
 export type RecordWork = { sent: Sent[]; adjusted: Record<string, string>; orders: Order[] }
+/**
+ * One line of the clinical audit: who, in what role, did or read what, on whose record, for
+ * what purpose, and when (console clock). Append-only: a reset of the specimen keeps it.
+ */
+export type ClinicalAudit = {
+  id: string
+  ms: number
+  /** "YYYY-MM-DD HH:mm" IST, the format the member's trust centre uses. */
+  at: string
+  who: string
+  role: string
+  what: string
+  purpose: string
+  kind: 'read' | 'action' | 'refused'
+  memberId?: string
+  member?: string
+}
 
 type State = {
   alerts: SafetyAlert[]
@@ -25,6 +43,7 @@ type State = {
   mdHistory: MdHistory[]
   records: Record<string, RecordWork>
   rxSeq: number
+  audit: ClinicalAudit[]
 }
 
 const KEY = 'joyos:care:clinical:v1'
@@ -46,6 +65,7 @@ const seed = (): State => ({
   mdHistory: MD_CONFIG.history.map((h) => ({ ...h })),
   records: {},
   rxSeq: 41,
+  audit: [],
 })
 
 function load(): State {
@@ -63,6 +83,7 @@ function load(): State {
       mdHistory: Array.isArray(p.mdHistory) ? p.mdHistory : fresh.mdHistory,
       records: p.records && typeof p.records === 'object' ? p.records : {},
       rxSeq: typeof p.rxSeq === 'number' ? p.rxSeq : fresh.rxSeq,
+      audit: Array.isArray(p.audit) ? p.audit : [],
     }
   } catch {
     return fresh
@@ -146,7 +167,48 @@ export const clinical = {
     emit({ ...state, rxSeq: n + 1 })
     return `RX-2027-0128-0${String(n).padStart(2, '0')}`
   },
-  reset() {
-    emit(seed())
+  /**
+   * Write one audit line. A read repeated within a few seconds (the same person, record and
+   * view, as when a view mounts twice) is written once.
+   */
+  log(e: Omit<ClinicalAudit, 'id' | 'ms' | 'at'> & { ms?: number }) {
+    const ms = e.ms ?? consoleNowMs()
+    const last = state.audit[0]
+    if (e.kind === 'read' && last && last.kind === 'read' && last.who === e.who && last.memberId === e.memberId && last.what === e.what && Math.abs(ms - last.ms) < 5000) return
+    const entry: ClinicalAudit = { ...e, ms, at: stampOf(ms), id: `au-${state.audit.length + 1}-${ms.toString(36)}` }
+    emit({ ...state, audit: [entry, ...state.audit] })
   },
+  /** Back to the specimen start. The audit is append-only, so it stays, and the reset is written to it. */
+  reset(by?: { who: string; role: string }) {
+    const audit = state.audit
+    emit({ ...seed(), audit })
+    if (by) clinical.log({ ...by, what: 'Reset the clinical specimen to its start', purpose: 'Specimen reset', kind: 'action' })
+  },
+}
+
+/** "YYYY-MM-DD HH:mm" in IST, from a console-clock time. */
+export function stampOf(ms: number) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date(ms)).map((x) => [x.type, x.value]))
+  return `${p.year}-${p.month}-${p.day} ${p.hour === '24' ? '00' : p.hour}:${p.minute}`
+}
+
+/**
+ * P0 reach against SLA, from the store: each P0 acknowledged within its own window counts as
+ * met; acknowledged late, or still open past its window, counts as missed; still open and
+ * inside its window is not decided yet.
+ */
+export function p0Sla(alerts: SafetyAlert[], now: number) {
+  let met = 0, missed = 0, waiting = 0
+  for (const a of alerts) {
+    if (a.priority !== 'P0') continue
+    const window = a.slaMinutes * 60000
+    const opened = +new Date(a.openedAt)
+    if (a.ackAt) {
+      if (+new Date(a.ackAt) - opened <= window) met++
+      else missed++
+    } else if (a.status === 'open' && now > opened + window) missed++
+    else if (a.status === 'open') waiting++
+  }
+  const decided = met + missed
+  return { met, missed, waiting, decided, pct: decided ? Math.round((met / decided) * 100) : null }
 }

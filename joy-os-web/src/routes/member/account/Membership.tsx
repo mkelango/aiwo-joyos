@@ -1,16 +1,17 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, CalendarClock, Check, CreditCard, Download, FileText, Info, Pause, Play, Plus, Smartphone, Stamp } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { DaybreakButton, SpecimenTag, fmtDate } from '@/components/joy/primitives'
 import { Button, Card, DataTable, PageHeader, Pill, Sheet } from '@/components/ui'
-import { MEMBER } from '@/data/member'
+import { MEMBER, PAYMENTS_GRACE } from '@/data/member'
 import { MEMBERSHIPS } from '@/data/platform'
 import { ENTITLEMENTS, GSTIN_AIWO, GST_RATE, INVOICES } from './_data'
 import { Section, Segmented, Toggle } from './_parts'
 import { inr, rich, useMemberProfile, usePersisted, useToast } from './_util'
 import { useDict, useLang } from '@/lib/i18n'
+import { useApp } from '@/lib/store'
 import { MEM, useData } from './_i18n'
 
 // MEMBERSHIP (module 12 Commerce): Joy OS Plus + Circle, entitlements, the
@@ -34,7 +35,7 @@ function addMonths(iso: string, n: number) {
   d.setUTCMonth(d.getUTCMonth() + n)
   return d.toISOString().slice(0, 10)
 }
-const FEB_INVOICE = 'INV-2027-000531'
+const FEB_INVOICE = PAYMENTS_GRACE.invoice
 interface Pending { plan: string; kind: 'up' | 'down'; from: string; today?: number }
 
 export default function Membership() {
@@ -42,7 +43,8 @@ export default function Membership() {
   const dx = useData()
   const lang = useLang()
   const [toast, showToast] = useToast()
-  const [grace, setGrace] = useState(false)
+  // Payments grace is app-wide state (store key 'paymentsGrace'), so other screens can show it too.
+  const { paymentsGrace: grace, setPaymentsGrace: setGrace } = useApp()
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [plan, setPlan] = useState<string | null>(null)
   const [addMethod, setAddMethod] = useState(false)
@@ -70,6 +72,7 @@ export default function Membership() {
   // Once February is paid the grace state is over; the demo switch can no longer bring it back.
   const febPaid = extraInvoices.some((i) => i.id === FEB_INVOICE)
   const inGrace = grace && !febPaid
+  useEffect(() => { if (febPaid && grace) setGrace(false) }, [febPaid, grace, setGrace])
   const invoiceRows: Invoice[] = inGrace
     ? [{ id: FEB_INVOICE, date: '2027-02-01', item: 'Joy OS Plus · February', total: 499, method: 'UPI', status: 'Retrying' }, ...extraInvoices, ...INVOICES]
     : [...extraInvoices, ...INVOICES]
@@ -99,7 +102,7 @@ export default function Membership() {
               <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
                 <div className="max-w-2xl">
                   <p className="eyebrow text-daybreak-ink">{t('graceEyebrow')}</p>
-                  <p className="mt-2 text-[1.3rem] font-light leading-snug text-ink">{rich(t('graceTitle'), { date: <span className="num">{fmtDate('2027-02-15')}</span> })}</p>
+                  <p className="mt-2 text-[1.3rem] font-light leading-snug text-ink">{rich(t('graceTitle'), { date: <span className="num">{fmtDate(PAYMENTS_GRACE.until)}</span> })}</p>
                   <p className="mt-2 text-[15px] text-ink-2">{t('graceBody')}</p>
                 </div>
                 <DaybreakButton onClick={() => { setGrace(false); setExtraInvoices((x) => (x.some((i) => i.id === FEB_INVOICE) ? x : [{ id: FEB_INVOICE, date: '2027-02-01', item: 'Joy OS Plus · February', total: 499, method: 'UPI', status: 'Paid' }, ...x])); showToast(t('paidToast')) }} className="shrink-0">{t('payUpi')}</DaybreakButton>

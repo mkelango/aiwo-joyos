@@ -44,6 +44,40 @@ export const KIT = {
   },
   messageOnCall: { en: 'Message the on-call clinician', ta: 'பணியில் உள்ள மருத்துவருக்குச் செய்தி அனுப்பவும்', hi: 'ड्यूटी पर मौजूद क्लिनिशियन को संदेश भेजें' },
 
+  // CrisisSheet: your people, made actionable. Pre-approved copy.
+  callOnCall: { en: 'Message Dr Sanjay Menon now', ta: 'Dr Sanjay Menon-க்கு இப்போதே செய்தி அனுப்பவும்', hi: 'Dr Sanjay Menon को अभी संदेश भेजें' },
+  callOnCallHint: { en: 'Opens a new message to the on-call clinician', ta: 'பணியில் உள்ள மருத்துவருக்குப் புதிய செய்தியைத் திறக்கும்', hi: 'ड्यूटी पर मौजूद क्लिनिशियन के लिए नया संदेश खोलता है' },
+  tellContact: { en: 'Ask us to tell {name}', ta: '{name}-இடம் தெரிவிக்கச் சொல்லுங்கள்', hi: 'हमसे कहें कि {name} को बताएँ' },
+  tellContactHint: { en: 'We tell your emergency contact that you asked for support. Nothing else is shared.', ta: 'நீங்கள் உதவி கேட்டீர்கள் என்று மட்டும் உங்கள் அவசரத் தொடர்புக்குத் தெரிவிப்போம். வேறு எதுவும் பகிரப்படாது.', hi: 'हम आपकी इमरजेंसी संपर्क को बस इतना बताएँगे कि आपने सहारा माँगा है। और कुछ साझा नहीं होता।' },
+  toldContact: { en: 'We are telling {name} now that you asked for support. Nothing else is shared.', ta: 'நீங்கள் உதவி கேட்டீர்கள் என்று {name}-இடம் இப்போது தெரிவிக்கிறோம். வேறு எதுவும் பகிரப்படாது.', hi: 'हम अभी {name} को बता रहे हैं कि आपने सहारा माँगा है। और कुछ साझा नहीं होता।' },
+  undoTell: { en: 'Don’t tell {name}', ta: '{name}-இடம் சொல்ல வேண்டாம்', hi: '{name} को न बताएँ' },
+  callContact: { en: 'Call {name}', ta: '{name}-ஐ அழைக்கவும்', hi: '{name} को कॉल करें' },
+  callContactHint: { en: 'Calls your emergency contact', ta: 'உங்கள் அவசரத் தொடர்பை அழைக்கும்', hi: 'आपकी इमरजेंसी संपर्क को कॉल करता है' },
+  emergencyContact: { en: 'Emergency contact · {relation}', ta: 'அவசரத் தொடர்பு · {relation}', hi: 'इमरजेंसी संपर्क · {relation}' },
+
+  // App-wide banners: offline with its sync queue, and payments grace.
+  offlineNone: { en: 'Offline. Anything you add is kept on this phone and sent when you are back.', ta: 'இணையம் இல்லை. நீங்கள் சேர்ப்பது இந்தத் தொலைபேசியில் வைக்கப்பட்டு, இணைப்பு வந்ததும் அனுப்பப்படும்.', hi: 'ऑफ़लाइन। आप जो भी जोड़ें, इसी फ़ोन पर रहेगा और वापस जुड़ने पर भेजा जाएगा।' },
+  offlineOne: { en: 'Offline · 1 change kept on this phone, sent when you are back.', ta: 'இணையம் இல்லை · 1 மாற்றம் இந்தத் தொலைபேசியில் உள்ளது, இணைப்பு வந்ததும் அனுப்பப்படும்.', hi: 'ऑफ़लाइन · 1 बदलाव इसी फ़ोन पर रखा है, वापस जुड़ने पर भेजा जाएगा।' },
+  offlineMany: { en: 'Offline · {n} changes kept on this phone, sent when you are back.', ta: 'இணையம் இல்லை · {n} மாற்றங்கள் இந்தத் தொலைபேசியில் உள்ளன, இணைப்பு வந்ததும் அனுப்பப்படும்.', hi: 'ऑफ़लाइन · {n} बदलाव इसी फ़ोन पर रखे हैं, वापस जुड़ने पर भेजे जाएँगे।' },
+  offlineLedger: { en: '{n} of them in your Joy Ledger.', ta: 'அவற்றில் {n} உங்கள் மகிழ்ச்சி லெட்ஜரில்.', hi: 'इनमें से {n} आपके जॉय लेजर में।' },
+  goOnline: { en: 'I’m back online', ta: 'இணைப்பு திரும்பியது', hi: 'मैं फिर ऑनलाइन हूँ' },
+  syncing: { en: 'Back online · sending {n} kept on this phone…', ta: 'இணைப்பு திரும்பியது · தொலைபேசியில் இருந்த {n} அனுப்பப்படுகிறது…', hi: 'फिर ऑनलाइन · फ़ोन पर रखे {n} भेजे जा रहे हैं…' },
+  synced: { en: 'Synced · {n} sent. Nothing was lost.', ta: 'ஒத்திசைந்தது · {n} அனுப்பப்பட்டது. எதுவும் இழக்கப்படவில்லை.', hi: 'सिंक हो गया · {n} भेजे गए। कुछ नहीं खोया।' },
+  graceBanner: { en: 'Your February payment didn’t go through. Nothing changes until {date}.', ta: 'உங்கள் பிப்ரவரி கட்டணம் செல்லவில்லை. {date} வரை எதுவும் மாறாது.', hi: 'आपका फ़रवरी का भुगतान नहीं हो पाया। {date} तक कुछ नहीं बदलेगा।' },
+  gracePay: { en: 'Pay ₹499 by UPI', ta: 'UPI மூலம் ₹499 செலுத்தவும்', hi: 'UPI से ₹499 चुकाएँ' },
+  gracePayHint: { en: 'Opens Membership', ta: 'உறுப்பினர் பக்கத்தைத் திறக்கும்', hi: 'सदस्यता खोलता है' },
+
+  // Error boundary: a screen that failed is never blank.
+  errEyebrow: { en: 'Something went wrong', ta: 'ஏதோ தவறாகிவிட்டது', hi: 'कुछ गड़बड़ हो गई' },
+  errTitleA: { en: 'This screen ', ta: 'இந்தத் திரை ', hi: 'यह स्क्रीन ' },
+  errTitleSerif: { en: 'stumbled', ta: 'தடுமாறியது', hi: 'लड़खड़ा गई' },
+  errTitleB: { en: '. Your data is safe.', ta: '. உங்கள் தரவு பாதுகாப்பாக உள்ளது.', hi: '। आपका डेटा सुरक्षित है।' },
+  errLead: { en: 'Nothing you saved is lost: your Ledger, answers and settings are kept on this phone. Try again, or go back to Today.', ta: 'நீங்கள் சேமித்த எதுவும் இழக்கப்படவில்லை: உங்கள் லெட்ஜர், பதில்கள், அமைப்புகள் இந்தத் தொலைபேசியில் உள்ளன. மீண்டும் முயலுங்கள், அல்லது இன்றைய பக்கத்துக்குத் திரும்புங்கள்.', hi: 'आपका सहेजा कुछ भी नहीं खोया: आपका लेजर, जवाब और सेटिंग इसी फ़ोन पर हैं। फिर से कोशिश करें, या आज पर लौटें।' },
+  errRetry: { en: 'Try again', ta: 'மீண்டும் முயலவும்', hi: 'फिर से कोशिश करें' },
+  errHome: { en: 'Go to Today', ta: 'இன்றைய பக்கத்துக்குச் செல்லவும்', hi: 'आज पर जाएँ' },
+  errDetail: { en: 'What happened', ta: 'என்ன நடந்தது', hi: 'क्या हुआ' },
+  errCrisis: { en: 'If you need someone now: Tele-MANAS 14416, free, any time.', ta: 'இப்போதே யாராவது தேவைப்பட்டால்: Tele-MANAS 14416, இலவசம், எந்த நேரத்திலும்.', hi: 'अगर अभी किसी की ज़रूरत है: Tele-MANAS 14416, मुफ़्त, कभी भी।' },
+
   // LoopRing
   loopDay: { en: 'Day {n} of {of}', ta: '{of} இல் நாள் {n}', hi: '{of} में से दिन {n}' },
 

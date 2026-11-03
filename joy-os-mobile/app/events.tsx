@@ -1,15 +1,15 @@
 import { router } from 'expo-router'
 import { useState } from 'react'
 import { View } from 'react-native'
-import { ArrowLink, Body, Button, Card, DaybreakButton, Eyebrow, Icon, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Serif, Sheet, TermChip, TermDot, Title, Toggle, fmtDate } from '@/components'
-import { INDEX_HISTORY, MEMBER } from '@/shared/member'
-import { EVENTS } from '@/shared/platform'
+import { ArrowLink, BandLabel, Body, Button, Card, DaybreakButton, Eyebrow, Icon, JoyspanWheel, Meta, MethodLine, Mono, Pill, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, SpecimenTag, TermChip, TermDot, Title, Toggle, fmtDate } from '@/components'
+import { HOUSEHOLD, INDEX_HISTORY, MEMBER, TEAM } from '@/shared/member'
+import { COHORTS, EVENTS } from '@/shared/platform'
 import { useTheme } from '@/theme/ThemeProvider'
-import { EVENT_DATES, PASSES, SESSIONS_OPEN, SESSION_SCHEDULE, ZONES } from '@/screens/b/journeyData'
+import { EVENT_DATES, FLAGSHIP_NEXT, FLAGSHIP_RECAP, PASSES, SESSIONS_OPEN, SESSION_SCHEDULE, ZONES } from '@/screens/b/journeyData'
 import { accountStore, refCode, useStore } from '@/screens/b/bStore'
-import { Done, KeyValue, SpecimenQR, TimelineStep, fmtWhen, memberOnly } from '@/screens/b/parts'
+import { Done, Field, KeyValue, SpecimenQR, TimelineStep, fmtWhen, memberOnly, useSheetCrisisGuard } from '@/screens/b/parts'
 import { useDict, useTermText } from '@/lib/i18n'
-import { EVENTS_T, PASS_STATUS, EVENT_KIND, PASS_TEXT, SCHEDULE_TEXT, ZONE_TEXT, SESSION_OPEN_TEXT } from '@/screens/b/i18n/journey'
+import { EVENTS_T, PASS_STATUS, EVENT_KIND, PASS_TEXT, RECAP_SESSION_TEXT, SCHEDULE_TEXT, ZONE_TEXT, SESSION_OPEN_TEXT } from '@/screens/b/i18n/journey'
 import { useCommon, useTx } from '@/screens/b/i18n/common'
 
 // EVENTS AND PASSES (Memo p.22): your passes with a QR, the day's schedule, Experience Zones
@@ -18,16 +18,30 @@ import { useCommon, useTx } from '@/screens/b/i18n/common'
 
 type Open = (typeof SESSIONS_OPEN)[number]
 
+const CONCIERGE = TEAM.find((p) => p.role === 'Concierge')!.name.split(' ')[0]
+const PARTNER = HOUSEHOLD.find((p) => p.role === 'Partner')!.name.split(' ')[0]
+
 export default memberOnly(Events)
 
 function Events() {
   const { c, space } = useTheme()
   const [acct, setAcct] = useStore(accountStore)
   const [walletFor, setWalletFor] = useState<string | null>(null)
-  const [walletAdded, setWalletAdded] = useState<string[]>([])
+  // Wallet passes, the flagship request and bookings are kept on the phone (accountStore).
+  const walletAdded = acct.wallet ?? []
   const [book, setBook] = useState<Open | null>(null)
   const [bookedRef, setBookedRef] = useState<string | null>(null)
+  const [cancelFor, setCancelFor] = useState<Open | null>(null)
+  const [cancelledNote, setCancelledNote] = useState<string | null>(null)
+  const [reqOpen, setReqOpen] = useState(false)
+  const [reqGuests, setReqGuests] = useState<'1' | '2'>('2')
+  const [reqNote, setReqNote] = useState('')
+  const [withdrawn, setWithdrawn] = useState(false)
+  const guard = useSheetCrisisGuard()
+  const req = acct.flagshipRequest ?? null
   const latest = INDEX_HISTORY[0]
+  const flagship = EVENTS.find((e) => e.kind === 'Flagship')!
+  const flagshipIndex = INDEX_HISTORY.find((x) => x.takenOn === FLAGSHIP_RECAP.indexOn) ?? latest
   const t = useDict(EVENTS_T)
   const tc = useCommon()
   const tx = useTx()
@@ -42,6 +56,22 @@ function Events() {
     const ref = refCode('JS')
     setAcct((a) => ({ ...a, bookings: [...a.bookings, { id: book.id, ref, at: new Date().toISOString() }] }))
     setBookedRef(ref)
+    setCancelledNote(null)
+  }
+  const confirmCancel = () => {
+    if (!cancelFor) return
+    const s = cancelFor
+    setAcct((a) => ({ ...a, bookings: a.bookings.filter((b) => b.id !== s.id) }))
+    setCancelFor(null)
+    setCancelledNote(t('cancelled', { session: t('sessionCity', { city: s.city }) }))
+  }
+  const sendRequest = () => {
+    const note = reqNote.trim()
+    // Emergency intercept first: the note never reaches the concierge until support has been offered.
+    if (note && !guard(note, () => setReqOpen(false))) return
+    setAcct((a) => ({ ...a, flagshipRequest: { ref: refCode('AJ28-REQ'), guests: reqGuests === '1' ? 1 : 2, note, at: new Date().toISOString() } }))
+    setWithdrawn(false)
+    setReqOpen(false)
   }
 
   return (
@@ -102,7 +132,12 @@ function Events() {
               </View>
               {valid ? (
                 walletAdded.includes(p.code) ? (
-                  <Done>{t('inWallet')}</Done>
+                  <View style={{ gap: 2 }}>
+                    <Done>{t('inWallet')}</Done>
+                    <Button variant="link" onPress={() => setAcct((a) => ({ ...a, wallet: (a.wallet ?? []).filter((x) => x !== p.code) }))} style={{ alignSelf: 'flex-start' }}>
+                      {t('removeWallet')}
+                    </Button>
+                  </View>
                 ) : (
                   <Button variant="secondary" size="sm" icon="credit-card" onPress={() => setWalletFor(p.code)}>
                     {t('addWallet')}
@@ -160,6 +195,91 @@ function Events() {
         })}
       </View>
 
+      {/* Recap of the flagship you attended */}
+      <View style={{ gap: space.s2 }}>
+        <View style={{ gap: 8 }}>
+          <SectionTitle>{t('recapTitle', { name: flagship.name })}</SectionTitle>
+          <SpecimenTag />
+        </View>
+        <Card tone="raised" style={{ gap: space.s2 }}>
+          <Eyebrow>{t('indexIssued', { where: flagship.where })}</Eyebrow>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s2, flexWrap: 'wrap' }}>
+            <JoyspanWheel terms={flagshipIndex.terms} size={120} animate={false} />
+            <View style={{ flex: 1, minWidth: 140, gap: 6 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
+                <Mono size={44} tone="ink">{String(flagshipIndex.value)}</Mono>
+                <BandLabel band={flagshipIndex.band} />
+              </View>
+              <Meta>{t('measuredBody', { d: fmtDate(flagshipIndex.takenOn), c: fmtDate(FLAGSHIP_RECAP.cardHanded), term: tt.name(flagshipIndex.lowestTerm) })}</Meta>
+            </View>
+          </View>
+          <MethodLine method={flagshipIndex.method} grade={flagshipIndex.grade} takenOn={flagshipIndex.takenOn} next={flagshipIndex.nextMeasure} signedBy={flagshipIndex.signedBy} />
+        </Card>
+        <Card tone="sunk" style={{ gap: space.s1 }}>
+          <Eyebrow>{t('attended')}</Eyebrow>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Icon name="check" size={15} color={c.ink3} />
+            <Body style={{ flex: 1 }}>{t('circleFormedOn', { d: fmtDate(FLAGSHIP_RECAP.circleFormed) })}</Body>
+          </View>
+          {FLAGSHIP_RECAP.sessionsAttended.map((x, i) => (
+            <View key={x} style={{ flexDirection: 'row', gap: 8 }}>
+              <Icon name="check" size={15} color={c.ink3} />
+              <Body tone="ink2" style={{ flex: 1 }}>{tx(RECAP_SESSION_TEXT[i], x)}</Body>
+            </View>
+          ))}
+          <Meta size={14} tone="ink3">{t('cohortNote', { n: COHORTS[0]?.n ?? FLAGSHIP_RECAP.guests })}</Meta>
+        </Card>
+      </View>
+
+      {/* The next edition: request a place */}
+      <View style={{ gap: space.s2 }}>
+        <SectionTitle>{t('upcomingTitle')}</SectionTitle>
+        <Card tone="raised" style={{ gap: space.s1 }}>
+          <Eyebrow tone="daybreak">{t('atNewYear')}</Eyebrow>
+          <Title size={24}>{FLAGSHIP_NEXT.name}</Title>
+          <Mono tone="ink2">{fmtWhen({ date: FLAGSHIP_NEXT.date, to: FLAGSHIP_NEXT.to })}</Mono>
+          <Meta>{FLAGSHIP_NEXT.where}</Meta>
+          <Body tone="ink2">{t('flagWhat')}</Body>
+          <Meta size={14} tone="ink3">{t('flagMeta', { date: fmtDate(FLAGSHIP_NEXT.confirmFrom), n: FLAGSHIP_NEXT.guests })}</Meta>
+          {req ? (
+            <Card tone="sunk" padding={16} style={{ gap: 6 }}>
+              <Done>{req.guests === 1 ? t('reqReceived1') : t('reqReceived2')}</Done>
+              <Meta>{t('reqBody', { c: CONCIERGE, date: fmtDate(FLAGSHIP_NEXT.confirmFrom), ref: req.ref })}</Meta>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s2 }}>
+                <Button variant="link" onPress={() => router.push('/messages')}>
+                  {t('messageC', { c: CONCIERGE })}
+                </Button>
+                <Button
+                  variant="link"
+                  onPress={() => {
+                    setAcct((a) => ({ ...a, flagshipRequest: null }))
+                    setWithdrawn(true)
+                  }}
+                >
+                  {t('withdrawRequest')}
+                </Button>
+              </View>
+            </Card>
+          ) : (
+            <>
+              {withdrawn ? (
+                <Meta accessibilityLiveRegion="polite">{t('withdrawn', { date: fmtDate(FLAGSHIP_NEXT.confirmFrom) })}</Meta>
+              ) : null}
+              <Button
+                variant="secondary"
+                icon="calendar"
+                onPress={() => {
+                  setReqNote('')
+                  setReqOpen(true)
+                }}
+              >
+                {t('requestPlace')}
+              </Button>
+            </>
+          )}
+        </Card>
+      </View>
+
       {/* Index on site */}
       <Card tone="sunk" style={{ gap: space.s1 }}>
         <Eyebrow>{t('onSite')}</Eyebrow>
@@ -186,7 +306,12 @@ function Events() {
               <Mono tone="ink2">{fmtWhen(s)}</Mono>
               <Meta>{`${openWhere(s)} · ${openPrice(s)}`}</Meta>
               {b ? (
-                <Done>{t('passAppears', { ref: b.ref })}</Done>
+                <View style={{ gap: 2 }}>
+                  <Done>{t('passAppears', { ref: b.ref })}</Done>
+                  <Button variant="link" accessibilityLabel={`${t('sessionCity', { city: s.city })}, ${t('cancelBooking')}`} onPress={() => setCancelFor(s)} style={{ alignSelf: 'flex-start' }}>
+                    {t('cancelBooking')}
+                  </Button>
+                </View>
               ) : (
                 <Button variant="secondary" size="sm" accessibilityLabel={`${t('sessionCity', { city: s.city })}, ${t('book')}`} onPress={() => { setBookedRef(null); setBook(s) }}>
                   {t('book')}
@@ -195,6 +320,9 @@ function Events() {
             </Card>
           )
         })}
+        {cancelledNote ? (
+          <Meta accessibilityLiveRegion="polite">{cancelledNote}</Meta>
+        ) : null}
         {firstOpen ? (
           <DaybreakButton icon="calendar" onPress={() => { setBookedRef(null); setBook(firstOpen) }}>
             {t('bookCity', { city: firstOpen.city })}
@@ -214,7 +342,7 @@ function Events() {
             block
             icon="credit-card"
             onPress={() => {
-              if (walletFor) setWalletAdded((w) => [...w, walletFor])
+              if (walletFor) setAcct((a) => ({ ...a, wallet: [...(a.wallet ?? []).filter((x) => x !== walletFor), walletFor] }))
               setWalletFor(null)
             }}
           >
@@ -269,6 +397,48 @@ function Events() {
             </>
           )
         ) : null}
+      </Sheet>
+
+      <Sheet
+        open={!!cancelFor}
+        onClose={() => setCancelFor(null)}
+        title={t('cancelTitle')}
+        footer={
+          <View style={{ gap: 8 }}>
+            <Button variant="ink" block onPress={confirmCancel}>
+              {t('confirmCancel')}
+            </Button>
+            <Button variant="secondary" block onPress={() => setCancelFor(null)}>
+              {t('keepBooking')}
+            </Button>
+          </View>
+        }
+      >
+        {cancelFor ? <Body>{t('cancelBody', { session: t('sessionCity', { city: cancelFor.city }), when: fmtWhen(cancelFor) })}</Body> : null}
+      </Sheet>
+
+      <Sheet
+        open={reqOpen}
+        onClose={() => setReqOpen(false)}
+        title={t('requestPlace')}
+        footer={
+          <Button variant="ink" block onPress={sendRequest}>
+            {t('sendRequest')}
+          </Button>
+        }
+      >
+        <Body>{`${FLAGSHIP_NEXT.name} · ${fmtWhen({ date: FLAGSHIP_NEXT.date, to: FLAGSHIP_NEXT.to })}`}</Body>
+        <Eyebrow>{t('places')}</Eyebrow>
+        <Segmented<'1' | '2'>
+          value={reqGuests}
+          onChange={setReqGuests}
+          items={[
+            { value: '1', label: t('justMe') },
+            { value: '2', label: t('meAnd', { p: PARTNER }) },
+          ]}
+        />
+        <Field label={t('noteFor', { c: CONCIERGE })} value={reqNote} onChangeText={setReqNote} placeholder={t('notePh')} maxLength={240} multiline />
+        <Meta size={14} tone="ink3">{t('noPayment')}</Meta>
       </Sheet>
     </Screen>
   )

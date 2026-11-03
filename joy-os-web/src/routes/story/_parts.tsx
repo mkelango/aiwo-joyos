@@ -57,6 +57,26 @@ export function TermLabel({ term, className }: { term: TermKey | 'ALL'; classNam
   )
 }
 
+/** A term chip that is a control: pressing it traces the term (Platform map). Same face as TermLabel. */
+export function TermTraceButton({ term, pressed, onClick, label, className }: { term: TermKey; pressed: boolean; onClick: () => void; label?: string; className?: string }) {
+  const t = termByKey(term)
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      aria-label={label}
+      onClick={onClick}
+      className={clsx(
+        'inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[13px] text-ink transition-colors focus-ring',
+        pressed ? 'border-ink bg-paper-sunk' : 'border-line bg-paper-raised hover:border-line-strong',
+        className,
+      )}
+    >
+      <TermDot term={term} /> {t.space} · {t.name}
+    </button>
+  )
+}
+
 /** Section wrapper for the long story pages. */
 export function StorySection({ id, eyebrow, title, lead, children, className, aside }: { id?: string; eyebrow: ReactNode; title: ReactNode; lead?: ReactNode; children: ReactNode; className?: string; aside?: ReactNode }) {
   return (

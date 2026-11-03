@@ -101,6 +101,19 @@ export const INDEX_HISTORY: IndexScore[] = [
   },
 ]
 
+/**
+ * History across methods (matches the web). The July 2026 baseline and the October measure
+ * predate Method v1.0 (published 22 Oct 2026); they were scored with the pilot weights and are
+ * shown as recorded, never recomputed.
+ */
+export const HISTORY_METHOD: Record<string, { method: string; pilot?: boolean }> = {
+  ix_001: { method: 'v0.9 pilot', pilot: true },
+  ix_002: { method: 'v0.9 pilot', pilot: true },
+}
+export const METHOD_V10_PUBLISHED = '2026-10-22'
+/** The method a recorded measure was made with (the pilot for anything before v1.0). */
+export const methodOf = (r: Pick<IndexScore, 'id' | 'method'>) => HISTORY_METHOD[r.id]?.method ?? r.method
+
 /** The Day-90 re-measure specimen where the number went down (Memo p.18 screen 04). */
 export const DAY90_SPECIMEN = {
   from: 64,

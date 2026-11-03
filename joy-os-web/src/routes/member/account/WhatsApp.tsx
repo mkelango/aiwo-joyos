@@ -7,10 +7,11 @@ import { Button, Card, PageHeader, Pill, Sheet, Tabs } from '@/components/ui'
 import { CONSENTS, INDEX_HISTORY, LEDGER_WEEK } from '@/data/member'
 import { termByKey } from '@/data/terms'
 import { interceptsCrisis, useApp } from '@/lib/store'
-import { Checkbox, Section } from './_parts'
+import { Checkbox, LinkButton, Section } from './_parts'
 import { readNotifPrefs, rich, syncWhatsAppChannel, useMemberProfile, usePersisted, useToast } from './_util'
 import { INSTRUMENT_NOTE, fill, useDict, useLang, useTermText } from '@/lib/i18n'
 import { WA, useLookup } from './_i18n'
+import { WatchComplication } from './_watch'
 
 // WHATSAPP (Memo p.17, p.22, J5): a simulated WhatsApp Business chat for the Check,
 // Joy Ledger prompts and reminders — consented, at most three a day, quiet hours,
@@ -95,9 +96,9 @@ export default function WhatsApp() {
   const seq = useRef(0)
   const timers = useRef<number[]>([])
   const scroller = useRef<HTMLDivElement>(null)
-  const [wa, setWa] = usePersisted('wa', { consented: CONSENTS.find((c) => c.id === 'c_wa')!.granted })
+  const [wa, setWa] = usePersisted('wa', { consented: CONSENTS.find((c) => c.id === 'c_wa')!.granted, requested: false })
   const consented = wa.consented
-  const setConsented = (v: boolean) => { setWa({ consented: v }); syncWhatsAppChannel(v) }
+  const setConsented = (v: boolean) => { setWa({ consented: v, requested: false }); syncWhatsAppChannel(v) }
   const [quiet] = useState(() => { const p = readNotifPrefs(); return `${p.quietFrom} – ${p.quietTo}` })
   const [consentOpen, setConsentOpen] = useState(false)
 
@@ -295,6 +296,7 @@ export default function WhatsApp() {
             <p className="mt-3 text-[15px] text-ink-2">
               {rich(tw('toNumber'), { num: <span className="num text-ink">+91 98••• ••417</span> })}
             </p>
+            {!consented && wa.requested && <p className="mt-2 text-[15px] text-ink-2">{tw('setupAsked')}</p>}
             <div className="mt-5">
               {consented ? (
                 <Button variant="secondary" onClick={() => { setConsented(false); showToast(tw('offToast')) }}>{tw('turnOff')}</Button>
@@ -336,6 +338,13 @@ export default function WhatsApp() {
               ))}
             </dl>
             <p className="mt-4 text-[14px] text-ink-3">{tw('tryNote')}</p>
+          </Section>
+
+          {/* The watch half of "WhatsApp and watch": the same Ledger, from the wrist. */}
+          <Section id="watch" eyebrow={tw('wtEyebrow')} title={tw('wtTitle')} lead={tw('wtLead')} aside={<LinkButton to="/app/devices#watch" size="sm">{tw('wtManage')}</LinkButton>}>
+            <Card tone="outline">
+              <WatchComplication compact onToast={showToast} />
+            </Card>
           </Section>
         </div>
       </div>

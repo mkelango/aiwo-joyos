@@ -39,6 +39,28 @@ export const METHOD = {
   tryB: { en: ' only.', ta: ' மட்டும்.', hi: ' स्तर।' },
   tryBtn: { en: 'Try the method on yourself', ta: 'இந்த முறையை உங்கள் மீது முயன்று பாருங்கள்', hi: 'यह तरीका ख़ुद पर आज़माएँ' },
   published: { en: 'Published by the AIWO Science Office. Weights and λ are configuration, reviewed quarterly, with results published up and down.', ta: 'AIWO அறிவியல் அலுவலகம் வெளியிட்டது. எடைகளும் λ-வும் அமைப்பு மதிப்புகள், காலாண்டுதோறும் மறுஆய்வு செய்யப்படுகின்றன; முடிவுகள் ஏற்றமோ இறக்கமோ வெளியிடப்படுகின்றன.', hi: 'AIWO साइंस ऑफ़िस द्वारा प्रकाशित। वज़न और λ कॉन्फ़िगरेशन हैं, हर तिमाही समीक्षा होती है, और नतीजे ऊपर-नीचे दोनों प्रकाशित होते हैं।' },
+  // Six terms: framework, within-term weights (the formula) and instruments, as on the web
+  tmWeights: { en: 'Weights', ta: 'எடைகள்', hi: 'वज़न' },
+  tmWeightA11y: { en: '{part}, weight {w}', ta: '{part}, எடை {w}', hi: '{part}, वज़न {w}' },
+  tmLambda: { en: 'Across terms: the five positive terms combine by geometric mean, so no term can make up for another; Burden is subtracted at λ = {lambda}.', ta: 'அம்சங்களுக்கு இடையே: ஐந்து நேர்மறை அம்சங்களும் பெருக்கல் சராசரியால் இணைகின்றன, அதனால் ஒன்று மற்றொன்றை ஈடுசெய்ய முடியாது; சுமை λ = {lambda} அளவில் கழிக்கப்படுகிறது.', hi: 'पहलुओं के बीच: पाँचों सकारात्मक पहलू ज्यामितीय माध्य से जुड़ते हैं, इसलिए कोई एक दूसरे की कमी पूरी नहीं कर सकता; बोझ λ = {lambda} पर घटाया जाता है।' },
+  tmTitle: { en: 'Each term has a framework, a formula and its instruments.', ta: 'ஒவ்வொரு அம்சத்துக்கும் ஒரு கட்டமைப்பு, ஒரு சூத்திரம், அதன் அளவுகோல்கள் உள்ளன.', hi: 'हर पहलू का एक ढाँचा, एक सूत्र और उसके माप-उपकरण हैं।' },
+  tmLead: { en: 'Weights inside each term are configuration, not code. They are published here and change only with a new method version.', ta: 'ஒவ்வொரு அம்சத்துக்குள்ளும் உள்ள எடைகள் அமைப்புகள், நிரல் அல்ல. அவை இங்கே வெளியிடப்படுகின்றன; புதிய முறைப் பதிப்பில் மட்டுமே மாறும்.', hi: 'हर पहलू के भीतर के वज़न कॉन्फ़िगरेशन हैं, कोड नहीं। ये यहाँ प्रकाशित हैं और सिर्फ़ नए पद्धति संस्करण के साथ बदलते हैं।' },
+  tmSpace: { en: '{space} space', ta: '{space} இடம்', hi: '{space} स्पेस' },
+  tmInstruments: { en: 'Instruments', ta: 'அளவுகோல்கள்', hi: 'माप-उपकरण' },
+  tmWhatMoves: { en: 'What moves it:', ta: 'இதை நகர்த்துவது:', hi: 'इसे क्या बदलता है:' },
+  tmInverse: { en: '. Burden falls as Ease rises; shown with a minus.', ta: '. நிம்மதி உயரும்போது சுமை குறைகிறது; கழித்தல் குறியுடன் காட்டப்படும்.', hi: '। सहजता बढ़ने पर बोझ घटता है; माइनस के साथ दिखाया जाता है।' },
+  fw_H: { en: 'WHO intrinsic capacity · AHA Life’s Essential 8 · LONGEVIS engine', ta: 'WHO உள்ளார்ந்த திறன் · AHA Life’s Essential 8 · LONGEVIS எஞ்சின்', hi: 'WHO आंतरिक क्षमता · AHA Life’s Essential 8 · LONGEVIS इंजन' },
+  wm_H: { en: 'LE8, capacity, signals trend, panel delta', ta: 'LE8, திறன், சமிக்ஞைப் போக்கு, பரிசோதனை மாற்றம்', hi: 'LE8, क्षमता, सिग्नल का रुझान, पैनल में बदलाव' },
+  fw_P: { en: 'Ikigai in its original sense · Frankl · Seven Practices', ta: 'இகிகாய், அதன் மூல அர்த்தத்தில் · ஃபிராங்கல் · ஏழு பயிற்சிகள்', hi: 'इकिगाई, अपने मूल अर्थ में · फ़्रैंकल · सात अभ्यास' },
+  wm_P: { en: 'Ikigai-9, MLQ-Presence', ta: 'Ikigai-9, MLQ-Presence', hi: 'Ikigai-9, MLQ-Presence' },
+  fw_R: { en: 'Social Fitness (structure, function, quality) · Gottman for couples · Dunbar circles', ta: 'சமூக உடற்தகுதி (அமைப்பு, செயல்பாடு, தரம்) · தம்பதிகளுக்கு காட்மன் · டன்பார் வட்டங்கள்', hi: 'सामाजिक फ़िटनेस (संरचना, कार्य, गुणवत्ता) · जोड़ों के लिए गॉटमैन · डनबार सर्कल' },
+  wm_R: { en: 'UCLA-3, LSNS-6, support, CSI-4 per partner', ta: 'UCLA-3, LSNS-6, ஆதரவு, ஒவ்வொரு துணைக்கும் CSI-4', hi: 'UCLA-3, LSNS-6, सहारा, हर साथी के लिए CSI-4' },
+  fw_F: { en: 'Freedom Triad (Time, Money, Choice) on Self-Determination Theory and Sen', ta: 'சுதந்திர முக்கோணம் (நேரம், பணம், தேர்வு), சுயநிர்ணயக் கோட்பாடு மற்றும் சென் அடிப்படையில்', hi: 'स्वतंत्रता त्रय (समय, पैसा, चुनाव), आत्मनिर्णय सिद्धांत और सेन पर आधारित' },
+  wm_F: { en: 'Autonomy, time affluence, CFPB financial wellbeing', ta: 'சுயாட்சி, நேர வளம், CFPB நிதி நலம்', hi: 'स्वायत्तता, समय की भरपूरता, CFPB वित्तीय कल्याण' },
+  fw_D: { en: 'Experienced wellbeing (Kahneman) · savouring (Bryant) · SPANE', ta: 'அனுபவ நலம் (கானமன்) · ரசித்தல் (பிரையன்ட்) · SPANE', hi: 'अनुभूत कल्याण (काह्नमैन) · रस लेना (ब्रायंट) · SPANE' },
+  wm_D: { en: 'SPANE balance, joy moments per day, savouring', ta: 'SPANE சமநிலை, நாளொன்றுக்கு மகிழ்ச்சித் தருணங்கள், ரசித்தல்', hi: 'SPANE संतुलन, रोज़ के आनंद के पल, रस लेना' },
+  fw_B: { en: 'The Second Arrow, via acceptance and commitment therapy · PHQ-4, ISI, PSS-4', ta: 'இரண்டாம் அம்பு, ஏற்பு மற்றும் அர்ப்பணிப்புச் சிகிச்சை (ACT) வழியாக · PHQ-4, ISI, PSS-4', hi: 'दूसरा तीर, स्वीकृति और प्रतिबद्धता थेरेपी (ACT) के ज़रिए · PHQ-4, ISI, PSS-4' },
+  wm_B: { en: 'Burden falling: mood, sleep, stress, pain, avoidance', ta: 'சுமை குறைதல்: மனநிலை, தூக்கம், மன அழுத்தம், வலி, தவிர்த்தல்', hi: 'घटता बोझ: मनोदशा, नींद, तनाव, दर्द, टालना' },
 } satisfies Dict
 
 export const GRADE_TEXT: Record<string, { name: L3; what: L3; who: L3 }> = {
@@ -85,4 +107,39 @@ export const METHOD_LABEL: Record<string, L3> = {
   'v1.0': { en: 'Method v1.0', ta: 'முறை v1.0', hi: 'तरीका v1.0' },
   'v1.1': { en: 'Method v1.1 (calibration)', ta: 'முறை v1.1 (அளவுதிருத்தம்)', hi: 'तरीका v1.1 (कैलिब्रेशन)' },
   'v2.0': { en: 'Index v2 (adaptive, <₹100)', ta: 'குறியீடு v2 (தகவமைப்பு, <₹100)', hi: 'इंडेक्स v2 (अनुकूली, <₹100)' },
+}
+
+/** Instrument names in the six-terms table; codes (LE8, UCLA-3, PHQ-4…) stay as they are. */
+export const INSTR_TEXT: Record<string, { ta: string; hi: string }> = {
+  'Capacity battery': { ta: 'திறன் சோதனைத் தொகுப்பு', hi: 'क्षमता जाँच' },
+  'Self-rated health': { ta: 'சுய மதிப்பீட்டு உடல்நலம்', hi: 'ख़ुद आँकी गई सेहत' },
+  'AIWO panels (clinical)': { ta: 'AIWO பரிசோதனைகள் (மருத்துவம்)', hi: 'AIWO पैनल (क्लिनिकल)' },
+  'Support items': { ta: 'ஆதரவுக் கேள்விகள்', hi: 'सहारे के सवाल' },
+  'CSI-4 (couples)': { ta: 'CSI-4 (தம்பதிகள்)', hi: 'CSI-4 (जोड़े)' },
+  'BPNSFS autonomy': { ta: 'BPNSFS சுயாட்சி', hi: 'BPNSFS स्वायत्तता' },
+  'Time affluence': { ta: 'நேர வளம்', hi: 'समय की भरपूरता' },
+  'CFPB Financial Well-Being': { ta: 'CFPB நிதி நலம்', hi: 'CFPB वित्तीय कल्याण' },
+  'Joy Ledger density': { ta: 'ஜாய் லெட்ஜர் அடர்த்தி', hi: 'जॉय लेजर घनत्व' },
+  'Savouring scale': { ta: 'ரசித்தல் அளவுகோல்', hi: 'रस लेने का पैमाना' },
+  'Pain': { ta: 'வலி', hi: 'दर्द' },
+  'Avoidance': { ta: 'தவிர்த்தல்', hi: 'टालना' },
+  'LE8 self-report': { ta: 'LE8 சுய அறிக்கை', hi: 'LE8 स्व-रिपोर्ट' },
+}
+
+/** Weight-table row labels parsed from the term formulas. Instrument codes (LE8, Ikigai-9, MLQ-P,
+ *  UCLA-3, LSNS-6, SPANE-B) are brand names and stay as they are; the plain-word parts translate. */
+export const PART_TEXT: Record<string, { ta: string; hi: string }> = {
+  Capacity: { ta: 'திறன்', hi: 'क्षमता' },
+  'Self-rated': { ta: 'சுய மதிப்பீடு', hi: 'ख़ुद का आकलन' },
+  Support: { ta: 'ஆதரவு', hi: 'सहारा' },
+  Autonomy: { ta: 'சுயாட்சி', hi: 'स्वायत्तता' },
+  Time: { ta: 'நேரம்', hi: 'समय' },
+  'Financial WB': { ta: 'நிதி நலம்', hi: 'वित्तीय कल्याण' },
+  'Joy moments': { ta: 'மகிழ்ச்சித் தருணங்கள்', hi: 'ख़ुशी के पल' },
+  Savouring: { ta: 'ரசித்தல்', hi: 'रस लेना' },
+  Mood: { ta: 'மனநிலை', hi: 'मनोदशा' },
+  Sleep: { ta: 'உறக்கம்', hi: 'नींद' },
+  Stress: { ta: 'மன அழுத்தம்', hi: 'तनाव' },
+  Pain: { ta: 'வலி', hi: 'दर्द' },
+  Avoidance: { ta: 'தவிர்த்தல்', hi: 'टालना' },
 }

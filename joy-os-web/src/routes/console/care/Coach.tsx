@@ -1,14 +1,15 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, CalendarClock, Check, ChevronRight, Lock, Users, Video } from 'lucide-react'
-import { useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useMemo, useState, type ReactNode } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { DaybreakButton, Delta, Eyebrow, SpecimenTag } from '@/components/joy/primitives'
 import { Avatar, Button, Card, LoopRing, PageHeader, Sheet } from '@/components/ui'
 import { DRIFT_RULES } from '@/data/platform'
 import type { DriftTask } from '@/domain/types'
-import { CIRCLES_LED, CIRCLE_ROSTER, COACH_CASELOAD, DAY_N, PRIYA } from './_data'
-import { PreviewBanner, useConsoleAccess } from './_gate'
+import { CIRCLES_LED, CIRCLE_ROSTER, COACH_CASELOAD, DAY_N, PRIYA, RAVI } from './_data'
+import { ConciergeDesk } from './_concierge'
+import { PreviewBanner, coachDeskOf, useConsoleAccess, useConsoleRole } from './_gate'
 import { coach, isClinicalTask, isMyTask, taskLabel, useCoachState, type CoachTask } from './_store'
 import { AccessNote, CardHead, ConsoleTermChip, Kpi, PriorityTag, ScrollTabs, SlaChip, areaCls, fieldCls, fmtClock, fmtOpened, labelCls, parseIst, useConsoleNow } from './_parts'
 
@@ -23,7 +24,40 @@ const deadlineOf = (t: DriftTask) => parseIst(t.openedAt) + t.slaHours * 3600_00
 
 const OUTCOMES = ['Reached · plan adjusted', 'Reached · no change needed', 'Message left · will retry', 'Handed to clinician', 'Member asked for space this week']
 
-export default function Coach() {
+type Desk = 'coach' | 'concierge'
+
+/**
+ * The console is two desks: the coach's (drift, digests, circles) and the concierge's
+ * (bookings, home draws, pre-arrival, the Day 60 talk). Each role lands on its own desk;
+ * ?desk= keeps a view linkable. Either role can look at the other desk but not act on it.
+ */
+export default function CoachConsole() {
+  const { role } = useConsoleRole()
+  const [params, setParams] = useSearchParams()
+  const raw = params.get('desk')
+  const desk: Desk = coachDeskOf(raw, role)
+  const setDesk = (d: Desk) => {
+    const next = new URLSearchParams(params)
+    next.set('desk', d)
+    setParams(next, { replace: true })
+  }
+  const deskSwitch = (
+    <div className="mb-6">
+      <ScrollTabs<Desk>
+        label="Desk"
+        value={desk}
+        onChange={setDesk}
+        items={[
+          { value: 'coach', label: <>Coach · {PRIYA.name}</> },
+          { value: 'concierge', label: <>Concierge · {RAVI.name}</> },
+        ]}
+      />
+    </div>
+  )
+  return desk === 'concierge' ? <ConciergeDesk deskSwitch={deskSwitch} /> : <Coach deskSwitch={deskSwitch} />
+}
+
+function Coach({ deskSwitch }: { deskSwitch: ReactNode }) {
   const navigate = useNavigate()
   const now = useConsoleNow()
   const { tasks, circles } = useCoachState()
@@ -108,6 +142,7 @@ export default function Coach() {
           </div>
         }
       />
+      {deskSwitch}
 
       <PreviewBanner path="/console/coach" />
 

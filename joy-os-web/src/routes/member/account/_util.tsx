@@ -3,6 +3,8 @@ import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } fr
 import { DEFAULT_NOTIF_PREFS, type NotifPrefs } from './_data'
 import { MEMBER } from '@/data/member'
 import { activeLang } from '@/lib/store'
+import { seedFromOnboarding } from './_onboarding'
+import { ACCT_CHANGED } from './_prefs'
 
 // Plain helpers for the account lane (kept apart from components for fast refresh).
 
@@ -68,9 +70,11 @@ export function useToast() {
   return [node, show] as const
 }
 
-/** Per-viewer convenience state in localStorage (same pattern as the app store). */
+/** Per-viewer convenience state in localStorage (same pattern as the app store).
+ *  A finished onboarding is merged into the account records first, once (see _onboarding). */
 export function usePersisted<T>(key: string, initial: T) {
   const [v, setV] = useState<T>(() => {
+    seedFromOnboarding()
     try {
       const raw = localStorage.getItem(`joyos:acct:${key}`)
       return raw ? ({ ...(initial as object), ...JSON.parse(raw) } as T) : initial
@@ -84,8 +88,25 @@ export function usePersisted<T>(key: string, initial: T) {
     } catch {
       /* storage unavailable — keep in memory */
     }
+    // Readers elsewhere on the page (useA11yPrefs) follow the change.
+    try {
+      window.dispatchEvent(new CustomEvent(ACCT_CHANGED, { detail: key }))
+    } catch {
+      /* no DOM events — readers pick it up on their next mount */
+    }
   }, [key, v])
   return [v, setV] as const
+}
+
+/** Read another screen's account record without writing it back (null when absent or unreadable). */
+export function readPersisted<T>(key: string): T | null {
+  seedFromOnboarding()
+  try {
+    const raw = localStorage.getItem(`joyos:acct:${key}`)
+    return raw ? (JSON.parse(raw) as T) : null
+  } catch {
+    return null
+  }
 }
 
 /** The member's own name and city as edited on Profile (falls back to the specimen member). */
@@ -115,6 +136,7 @@ export function applyReducedMotion(on: boolean) {
 
 /** Read the stored notification prefs (shared by Settings and the notification centre). */
 export function readNotifPrefs(): NotifPrefs {
+  seedFromOnboarding()
   try {
     const raw = localStorage.getItem('joyos:acct:notifs')
     return raw ? { ...DEFAULT_NOTIF_PREFS, ...JSON.parse(raw) } : DEFAULT_NOTIF_PREFS

@@ -11,14 +11,36 @@ import { CONSOLE_NOW } from './_data'
 
 const BASE = new Date(CONSOLE_NOW).getTime()
 
-/** The console clock: the specimen "now", advancing in real time once the page is open. */
+// One console clock for the whole browser session, so a time one console writes (an
+// acknowledgement, a grant, an audit line) reads true in the header and in every other console.
+const CLOCK_KEY = 'joyos:care:clock:v1'
+let START: number | null = null
+function clockStart() {
+  if (START !== null) return START
+  let s = Date.now()
+  try {
+    const raw = Number(sessionStorage.getItem(CLOCK_KEY))
+    if (raw > 0 && raw <= s) s = raw
+    else sessionStorage.setItem(CLOCK_KEY, String(s))
+  } catch {
+    /* storage unavailable: the clock starts with this page */
+  }
+  START = s
+  return s
+}
+
+/** The specimen "now" on the console clock, outside React (stores stamp their writes with it). */
+export function consoleNowMs() {
+  return BASE + (Date.now() - clockStart())
+}
+
+/** The console clock: the specimen "now", advancing in real time once the consoles are open. */
 export function useConsoleNow(tickMs = 1000) {
-  const [start] = useState(() => Date.now())
-  const [now, setNow] = useState(BASE)
+  const [now, setNow] = useState(consoleNowMs)
   useEffect(() => {
-    const id = window.setInterval(() => setNow(BASE + (Date.now() - start)), tickMs)
+    const id = window.setInterval(() => setNow(consoleNowMs()), tickMs)
     return () => window.clearInterval(id)
-  }, [start, tickMs])
+  }, [tickMs])
   return now
 }
 

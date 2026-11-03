@@ -7,6 +7,7 @@ import {
   Button,
   Card,
   DaybreakButton,
+  Delta,
   Divider,
   Eyebrow,
   Icon,
@@ -21,6 +22,7 @@ import {
   SpecimenTag,
   TermDot,
   Title,
+  fmtDate,
 } from '@/components'
 import { INDEX_HISTORY } from '@/shared/member'
 import { CIRCLE, PRACTICE_WEEKS } from '@/shared/platform'
@@ -30,13 +32,17 @@ import { PRACTICE_CONTENT, PRACTICE_PULSE } from '@/screens/b/journeyData'
 import { practiceStore, useStore } from '@/screens/b/bStore'
 import { AudioPlayer, PrimaryChip } from '@/screens/b/parts'
 import { Rich, useA } from '@/screens/a/i18n'
+import { useLocal } from '@/screens/a/local'
 import { SPACE_TODAY, SPACE_TODAY_INDEX } from '@/screens/a/spacesData'
+import type { TermKey } from '@/shared/types'
+import type { MeasuredIndex } from '@/shared/indexScoring'
 
 // THE JOYSPIRATION PRACTICE (Memo p.21): eight weeks; five-minute audio in the Mentor's
 // voice, a science note from the faculty, one practice daily / weekly / yearly, the weekly
 // circle, and the Index before and after. One Daybreak: “Practised today”.
 
 const CURRENT = CIRCLE.week
+
 const PRACTISED = [true, true, false, true, false, false, false]
 
 export default function Practice() {
@@ -45,6 +51,10 @@ export default function Practice() {
   const week = PRACTICE_WEEKS.find((w) => w.week === CURRENT)!
   const content = PRACTICE_CONTENT.find((p) => p.week === CURRENT)!
   const before = INDEX_HISTORY[0]
+  // The after column: the Index the member re-took on this phone (saved by Take the Index),
+  // measured the same way, or null before they do. Never hidden when it falls.
+  const [measured] = useLocal<MeasuredIndex>('measuredIndex', null)
+  const after = measured ? { ji: Math.round(measured.ji), terms: Object.fromEntries(Object.entries(measured.terms).map(([k, v]) => [k, Math.round(v)])) as Record<TermKey, number> } : null
   const [prac, setPrac] = useStore(practiceStore)
   // The specimen is pinned to Thursday 28 Jan 2027, the same day Today and the spaces call today,
   // so the week strip and "Practised today" never follow the device clock.
@@ -218,24 +228,38 @@ export default function Practice() {
         <Card tone="raised" style={{ gap: 0 }}>
           <View style={{ flexDirection: 'row', paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: c.line }}>
             <Eyebrow style={{ flex: 1 }}>{t('Term')}</Eyebrow>
-            <Eyebrow style={{ width: 76, textAlign: 'right' }}>{t('Before W1')}</Eyebrow>
-            <Eyebrow style={{ width: 70, textAlign: 'right' }}>{t('After W8')}</Eyebrow>
+            <Eyebrow style={{ width: 72, textAlign: 'right' }}>{t('Before W1')}</Eyebrow>
+            <Eyebrow style={{ width: 96, textAlign: 'right' }}>{t('After W8')}</Eyebrow>
           </View>
-          <View accessible accessibilityLabel={t('Joyspan Index {n} before; after not yet measured', { n: before.value })} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.line }}>
+          <View
+            accessible
+            accessibilityLabel={after ? t('Joyspan Index {a} before, {b} after', { a: before.value, b: after.ji }) : t('Joyspan Index {n} before; after not yet measured', { n: before.value })}
+            style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.line }}
+          >
             <Body style={{ flex: 1 }} weight="medium">
               {t('Joyspan Index')}
             </Body>
-            <Mono size={20} tone="ink" style={{ width: 76, textAlign: 'right' }}>
+            <Mono size={20} tone="ink" style={{ width: 72, textAlign: 'right' }}>
               {String(before.value)}
             </Mono>
-            <Mono size={20} tone="ink3" style={{ width: 70, textAlign: 'right' }}>
-              —
-            </Mono>
+            <View style={{ width: 96, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
+              {after ? <Delta value={after.ji - before.value} size={13} /> : null}
+              <Mono size={20} tone={after ? 'ink' : 'ink3'}>
+                {after ? String(after.ji) : '—'}
+              </Mono>
+            </View>
           </View>
           {before.terms.map((x) => {
             const shown = x.key === 'B' ? `−${x.value}` : String(x.value)
+            const a = after ? after.terms[x.key] : undefined
+            const minus = x.key === 'B' ? t('minus ') : ''
             return (
-              <View key={x.key} accessible accessibilityLabel={t('{name} {minus}{v} before; after not yet measured', { name: name(x.key), minus: x.key === 'B' ? t('minus ') : '', v: String(x.value) })} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.line }}>
+              <View
+                key={x.key}
+                accessible
+                accessibilityLabel={a !== undefined ? t('{name} {minus}{a} before, {minus}{b} after', { name: name(x.key), minus, a: String(x.value), b: String(a) }) : t('{name} {minus}{v} before; after not yet measured', { name: name(x.key), minus, v: String(x.value) })}
+                style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: c.line }}
+              >
                 <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <TermDot term={x.key} />
                   <View style={{ flex: 1, gap: 4 }}>
@@ -243,16 +267,21 @@ export default function Practice() {
                     {x.key === before.lowestTerm ? <Pill tone="daybreak">{t('Week 4')}</Pill> : null}
                   </View>
                 </View>
-                <Mono tone="ink" style={{ width: 76, textAlign: 'right' }}>
+                <Mono tone="ink" style={{ width: 72, textAlign: 'right' }}>
                   {shown}
                 </Mono>
-                <Mono tone="ink3" style={{ width: 70, textAlign: 'right' }}>
-                  —
-                </Mono>
+                <View style={{ width: 96, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
+                  {a !== undefined ? <Delta value={x.value === null ? null : a - x.value} inverse={x.key === 'B'} size={12} /> : null}
+                  <Mono tone={a !== undefined ? 'ink' : 'ink3'}>{a === undefined ? '—' : x.key === 'B' ? `−${a}` : String(a)}</Mono>
+                </View>
               </View>
             )
           })}
-          <Meta style={{ marginTop: space.s2 }}>{t('The after column fills when you re-take the Index in Week 8. It will be shown whether it rises or falls, with the same method.')}</Meta>
+          <Meta style={{ marginTop: space.s2 }}>
+            {measured
+              ? t('Re-taken {date} on this phone, with the same method. Shown as it is, whether it rose or fell.', { date: fmtDate(measured.at, lang) })
+              : t('The after column fills when you re-take the Index in Week 8. It will be shown whether it rises or falls, with the same method.')}
+          </Meta>
           <MethodLine style={{ marginTop: space.s1 }} method={before.method} grade={before.grade} takenOn={before.takenOn} next={before.nextMeasure} />
         </Card>
 

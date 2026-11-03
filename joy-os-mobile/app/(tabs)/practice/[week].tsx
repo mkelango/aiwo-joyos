@@ -9,6 +9,9 @@ import { PRACTICE_CONTENT } from '@/screens/b/journeyData'
 import { practiceStore, useStore } from '@/screens/b/bStore'
 import { AudioPlayer, Field, PrimaryChip, useCrisisGuard } from '@/screens/b/parts'
 import { localDate, Rich, useA } from '@/screens/a/i18n'
+import { useLocal } from '@/screens/a/local'
+import type { MeasuredIndex } from '@/shared/indexScoring'
+import { INDEX_HISTORY } from '@/shared/member'
 import { SPACE_TODAY, SPACE_TODAY_INDEX, localDay } from '@/screens/a/spacesData'
 
 // PRACTICE WEEK (Memo p.21): one week in full — audio, the practice, the science note,
@@ -28,6 +31,7 @@ function WeekView({ n }: { n: string }) {
   const week = PRACTICE_WEEKS.find((w) => w.week === num)
   const content = PRACTICE_CONTENT.find((p) => p.week === num)
   const guard = useCrisisGuard()
+  const [measured] = useLocal<MeasuredIndex>('measuredIndex', null)
   const [prac, setPrac] = useStore(practiceStore)
   const stored = prac.reflections[String(num)]
   const [reflection, setReflection] = useState(stored?.text ?? '')
@@ -123,6 +127,12 @@ function WeekView({ n }: { n: string }) {
           <Card tone="raised" padding={16} style={{ gap: space.s1 }}>
             <Body weight="medium">{t('This week, you take the Index again.')}</Body>
             <Meta>{t('About twenty minutes, saved as you go. Like for like with your baseline, then a signed delta at Day 90.')}</Meta>
+            {measured ? (
+              <View style={{ gap: 4 }} accessibilityLiveRegion="polite">
+                <Meta tone="ink">{t('Re-taken {date}: {a} before, {b} after.', { date: fmtDate(measured.at, lang), a: INDEX_HISTORY[0].value, b: Math.round(measured.ji) })}</Meta>
+                <ArrowLink onPress={() => router.push('/practice')}>{t('See before and after')}</ArrowLink>
+              </View>
+            ) : null}
             <Button variant="ink" icon="refresh-cw" onPress={() => router.push('/index-take')}>
               {t('Re-take the Index')}
             </Button>

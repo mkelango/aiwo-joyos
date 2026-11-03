@@ -7,6 +7,7 @@ import { useApp } from '@/lib/store'
 import { useTheme } from '@/theme/ThemeProvider'
 import { DEMO_ACCOUNTS, SPECIMEN_AIWO_ID, SPECIMEN_OTP } from '@/screens/b/_data'
 import { sessionStore, useStore } from '@/screens/b/bStore'
+import { onboardingAccountStore } from '@/lib/onboardingAccount'
 import { Done, Field, StepHead } from '@/screens/b/parts'
 import { useDict } from '@/lib/i18n'
 import { SIGNIN } from '@/screens/b/i18n/entry'
@@ -64,9 +65,12 @@ export default function SignIn() {
     if (passkeyTimer.current) clearTimeout(passkeyTimer.current)
   }, [])
 
-  // The greeting follows the AIWO ID that was entered; an ID outside the specimen accounts
-  // greets as Arjun, the specimen member whose data the app shows.
-  const nameFor = (id: string) => DEMO_ACCOUNTS.find((a) => a.aiwoId === id)?.name.split(' ')[0] ?? 'Arjun'
+  // The greeting follows the AIWO ID that was entered: the one made in onboarding on this
+  // phone greets by the name given there; an ID outside the specimen accounts greets as Arjun,
+  // the specimen member whose data the app shows.
+  const [made] = useStore(onboardingAccountStore)
+  const nameFor = (id: string) =>
+    made.aiwoId && made.aiwoId === id && made.name.trim() ? made.name.trim() : DEMO_ACCOUNTS.find((a) => a.aiwoId === id)?.name.split(' ')[0] ?? 'Arjun'
 
   const finish = (m: 'passkey' | 'otp' | 'email' | 'demo', name = nameFor(aiwoId)) => {
     setWho(name)

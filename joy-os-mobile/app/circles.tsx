@@ -1,10 +1,14 @@
-import { useState } from 'react'
-import { View } from 'react-native'
-import { Avatar, Body, Button, Card, DaybreakButton, Eyebrow, Icon, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, TermChip, Title, Toggle, fmtDate } from '@/components'
+import { useEffect, useState } from 'react'
+import { Modal, Pressable, ScrollView, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Avatar, Body, Button, Card, DaybreakButton, Eyebrow, Icon, type IconName, InkSurface, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, TermChip, Title, Toggle, fmtDate } from '@/components'
 import { CIRCLE } from '@/shared/platform'
+import { MEMBER } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
-import { CIRCLE_NEXT, CIRCLE_SESSIONS, OTHER_CIRCLES, PRACTICE_CONTENT, SALONS } from '@/screens/b/journeyData'
-import { accountStore, useStore } from '@/screens/b/bStore'
+import { palettes } from '@/theme/tokens'
+import { useReduceMotion } from '@/lib/store'
+import { CAPTIONS, CIRCLE_NEXT, CIRCLE_SESSIONS, OTHER_CIRCLES, PRACTICE_CONTENT, SALONS } from '@/screens/b/journeyData'
+import { a11yStore, accountStore, useStore } from '@/screens/b/bStore'
 import { CheckLine, Done, TimelineStep, fmtWhen, memberOnly } from '@/screens/b/parts'
 import { useDict } from '@/lib/i18n'
 import { CIRCLES, OTHER_CIRCLE_TEXT, CIRCLE_STATUS, SALON_TITLE, CIRCLE_PROMPT } from '@/screens/b/i18n/journey'
@@ -19,6 +23,9 @@ export default memberOnly(Circles)
 function Circles() {
   const { c, space } = useTheme()
   const [joinOpen, setJoinOpen] = useState(false)
+  // The call room: the waiting room before Monday 18:50, then the call itself (specimen preview).
+  const [room, setRoom] = useState<RoomMode | null>(null)
+  const [left, setLeft] = useState<RoomMode | null>(null)
   const [acct, setAcct] = useStore(accountStore)
   const setCircle = (p: Partial<typeof acct.circle>) => setAcct((a) => ({ ...a, circle: { ...a.circle, ...p } }))
   const [requested, setRequested] = useState<Record<string, boolean>>({})
@@ -76,9 +83,20 @@ function Circles() {
             <Serif>“{tx(CIRCLE_PROMPT[prompt.week], prompt.circlePrompt)}”</Serif>
           </Body>
         </Card>
-        <DaybreakButton icon="video" onPress={() => setJoinOpen(true)}>
+        <DaybreakButton icon="video" onPress={() => { setLeft(null); setJoinOpen(true) }}>
           {t('join')}
         </DaybreakButton>
+        {left ? (
+          <Card tone="sunk" padding={16} style={{ gap: 6 }}>
+            <View style={{ flexDirection: 'row', gap: 8 }} accessibilityLiveRegion="polite">
+              <Icon name="check" size={16} color={c.ink2} />
+              <Body style={{ flex: 1 }}>{left === 'live' ? t('leftLive') : t('leftWaiting')}</Body>
+            </View>
+            <Button variant="link" onPress={() => setLeft(null)} style={{ alignSelf: 'flex-start' }}>
+              {t('dismiss')}
+            </Button>
+          </Card>
+        ) : null}
         <Meta align="center" size={14}>
           {t('roomOpens')}
         </Meta>
@@ -171,7 +189,30 @@ function Circles() {
         ))}
       </View>
 
-      <Sheet open={joinOpen} onClose={() => setJoinOpen(false)} title={t('sheetTitle')} footer={<Button variant="ink" block onPress={() => setJoinOpen(false)}>{acct.circle.mode === 'audio' ? t('doneAudio') : t('doneSee')}</Button>}>
+      <Sheet
+        open={joinOpen}
+        onClose={() => setJoinOpen(false)}
+        title={t('sheetTitle')}
+        footer={
+          <View style={{ gap: 8 }}>
+            <Button
+              variant="ink"
+              block
+              icon="video"
+              onPress={() => {
+                setJoinOpen(false)
+                // iOS cannot present the room while the sheet is still dismissing.
+                setTimeout(() => setRoom('waiting'), 350)
+              }}
+            >
+              {t('openWaiting')}
+            </Button>
+            <Button variant="secondary" block onPress={() => setJoinOpen(false)}>
+              {acct.circle.mode === 'audio' ? t('doneAudio') : t('doneSee')}
+            </Button>
+          </View>
+        }
+      >
         <Body>{t('roomAt', { date: fmtDate(CIRCLE_NEXT.date), coach: CIRCLE.coach.split(' ')[0] })}</Body>
         <Card tone="sunk" padding={16} style={{ gap: 6 }}>
           <Eyebrow>{t('room')}</Eyebrow>
@@ -202,6 +243,234 @@ function Circles() {
         )}
         <Meta>{t('cantMake')}</Meta>
       </Sheet>
+
+      {room ? (
+        <CallRoom
+          mode={room}
+          audioOnly={acct.circle.mode === 'audio'}
+          onMode={setRoom}
+          onLeave={() => {
+            setLeft(room)
+            setRoom(null)
+          }}
+        />
+      ) : null}
     </Screen>
+  )
+}
+
+type RoomMode = 'waiting' | 'live'
+
+// The call room is a dark stage in both themes (warm Ink), so its text uses the dark palette.
+const ROOM = palettes.dark
+
+/** The circle call (specimen): no camera or microphone is opened; the room is simulated on this phone. */
+function CallRoom({ mode, audioOnly, onMode, onLeave }: { mode: RoomMode; audioOnly: boolean; onMode: (m: RoomMode) => void; onLeave: () => void }) {
+  const { space, radius } = useTheme()
+  const insets = useSafeAreaInsets()
+  const reduce = useReduceMotion()
+  const t = useDict(CIRCLES)
+  const tx = useTx()
+  const [a11y] = useStore(a11yStore)
+  const live = mode === 'live'
+  const [mic, setMic] = useState(false)
+  const [cam, setCam] = useState(!audioOnly)
+  const [hand, setHand] = useState(false)
+  // Captions start from the member's Accessibility choice in Settings; this toggle is for this call only.
+  const [captions, setCaptions] = useState(a11y.captions)
+  const [speaker, setSpeaker] = useState(0)
+  const [level, setLevel] = useState(0)
+  const coach = CIRCLE.coach.split(' ')[0]
+  const prompt = PRACTICE_CONTENT.find((p) => p.week === CIRCLE_NEXT.week)!
+  const others = CIRCLE.members.filter((m) => m !== MEMBER.firstName)
+  // Thomas sends his apologies this week; Deepa is on audio from a train.
+  const present = others.filter((m) => m !== 'Thomas')
+  const you = { name: MEMBER.firstName, coach: false, you: true }
+  const tiles = live ? [{ name: coach, coach: true, you: false }, ...present.map((m) => ({ name: m, coach: false, you: false })), you] : [you]
+
+  // Whoever is speaking moves round the circle (everyone but you).
+  useEffect(() => {
+    if (!live) return
+    const id = setInterval(() => setSpeaker((s) => (s + 1) % (tiles.length - 1)), 3200)
+    return () => clearInterval(id)
+  }, [live, tiles.length])
+  // Mic check: a simulated input level while the mic is on.
+  useEffect(() => {
+    if (!mic) {
+      setLevel(0)
+      return
+    }
+    const id = setInterval(() => setLevel(0.2 + Math.random() * 0.8), 180)
+    return () => clearInterval(id)
+  }, [mic])
+
+  const speakerName = tiles[speaker]?.name ?? ''
+  const caption = CAPTIONS[speakerName] ?? ''
+  const tileBg = 'rgba(242,238,232,0.08)'
+  const disc = { backgroundColor: ROOM.paperRaised, borderWidth: 1, borderColor: ROOM.lineStrong }
+
+  return (
+    <Modal visible transparent={false} animationType={reduce ? 'none' : 'fade'} onRequestClose={onLeave} statusBarTranslucent>
+      <InkSurface.Provider value>
+        <View
+          accessibilityViewIsModal
+          accessibilityLabel={live ? t('roomLive') : t('roomWait')}
+          style={{ flex: 1, backgroundColor: ROOM.paper, paddingTop: insets.top + space.s1, paddingBottom: insets.bottom + space.s1 }}
+        >
+          <View style={{ paddingHorizontal: space.gutter, gap: 8 }}>
+            <Eyebrow tone="ink3">{tx(CIRCLES.eyebrow, CIRCLE.name)}</Eyebrow>
+            <Body weight="medium" accessibilityRole="header">
+              {live ? t('roomLive') : t('roomWait')}
+            </Body>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+              {[t('recordingOff'), t('coachModerated'), t('firstNamesOnly'), t('specimen')].map((x) => (
+                <View key={x} style={{ borderWidth: 1, borderColor: ROOM.lineStrong, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 }}>
+                  <Meta size={12} tone="ink2">{x}</Meta>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <ScrollView contentContainerStyle={{ padding: space.gutter, gap: space.s2 }}>
+            {live ? (
+              <View style={{ backgroundColor: tileBg, borderRadius: radius.card, padding: 14, gap: 4 }}>
+                <Eyebrow tone="ink3">{t('promptLabel')}</Eyebrow>
+                <Body>{tx(CIRCLE_PROMPT[prompt.week], prompt.circlePrompt)}</Body>
+              </View>
+            ) : (
+              <View style={{ backgroundColor: tileBg, borderRadius: radius.card, padding: 14, gap: 10 }}>
+                <Eyebrow tone="ink3">{t('waitingRoom')}</Eyebrow>
+                <Body>{t('waitingOpens')}</Body>
+                <Pressable
+                  onPress={() => onMode('live')}
+                  accessibilityRole="button"
+                  style={({ pressed }) => ({ alignSelf: 'flex-start', minHeight: 44, paddingHorizontal: 16, borderRadius: 22, borderWidth: 1, borderColor: ROOM.lineStrong, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: pressed ? ROOM.paperRaised : undefined })}
+                >
+                  <Icon name="play" size={15} color={ROOM.ink} />
+                  <Body size={15}>{t('previewCall')}</Body>
+                </Pressable>
+              </View>
+            )}
+
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {tiles.map((tile, i) => {
+                const talking = live && i === speaker && !tile.you
+                const off = tile.you ? !cam : tile.name === 'Deepa'
+                const micOn = tile.you ? mic : true
+                return (
+                  <View
+                    key={tile.name}
+                    accessible
+                    accessibilityLabel={`${talking ? t('speaking', { name: tile.name }) : tile.name}${tile.you ? t('youSuffix') : ''}${tile.coach ? t('coachSuffix') : ''}. ${micOn ? t('micOn') : t('micMuted')}. ${off ? t('camOff') : t('camOn')}.${tile.you && hand ? ` ${t('handRaised')}` : ''}`}
+                    style={{
+                      width: live ? '48.5%' : '100%',
+                      aspectRatio: live ? 1.15 : 1.4,
+                      borderRadius: radius.card,
+                      backgroundColor: off ? ROOM.paperSunk : tileBg,
+                      borderWidth: 2,
+                      borderColor: talking ? ROOM.daybreak : 'transparent',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {/* Avatars are neutral: first initial only, never a Spectrum colour. */}
+                    <View style={[{ width: live ? 56 : 96, height: live ? 56 : 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center' }, disc]}>
+                      <Mono size={live ? 20 : 32} tone="ink2">{tile.name[0]}</Mono>
+                    </View>
+                    <View style={{ position: 'absolute', left: 8, bottom: 8, right: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Icon name={micOn ? 'mic' : 'mic-off'} size={12} color={ROOM.ink2} />
+                      <Meta size={12} tone="ink" numberOfLines={1} style={{ flexShrink: 1 }}>
+                        {`${tile.name}${tile.you ? t('youSuffix') : ''}${tile.coach ? t('coachSuffix') : ''}`}
+                      </Meta>
+                    </View>
+                    {off ? (
+                      <View style={{ position: 'absolute', right: 8, top: 8 }}>
+                        <Icon name="video-off" size={13} color={ROOM.ink3} />
+                      </View>
+                    ) : null}
+                    {tile.you && hand ? (
+                      <View style={{ position: 'absolute', left: 8, top: 8, backgroundColor: ROOM.ink, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
+                        <Meta size={12} color={ROOM.paper}>{t('lHand')}</Meta>
+                      </View>
+                    ) : null}
+                  </View>
+                )
+              })}
+            </View>
+
+            {!live ? (
+              <View style={{ gap: 8 }} accessibilityLiveRegion="polite">
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Icon name={cam ? 'video' : 'video-off'} size={15} color={ROOM.ink2} />
+                  <Meta tone="ink">{cam ? t('camWorking') : t('camOff')}</Meta>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Icon name={mic ? 'mic' : 'mic-off'} size={15} color={ROOM.ink2} />
+                  <Meta tone="ink">{mic ? t('micOn') : t('micMuted')}</Meta>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2, height: 12, width: 96 }} importantForAccessibility="no-hide-descendants">
+                    {Array.from({ length: 10 }, (_, i) => (
+                      <View key={i} style={{ flex: 1, height: `${30 + i * 7}%`, borderRadius: 1, backgroundColor: i / 10 < level ? ROOM.ink : ROOM.line }} />
+                    ))}
+                  </View>
+                </View>
+              </View>
+            ) : null}
+
+            {live && hand ? (
+              <Meta tone="ink" accessibilityLiveRegion="polite">
+                {t('handRaised')}
+              </Meta>
+            ) : null}
+          </ScrollView>
+
+          {live && captions ? (
+            <View style={{ marginHorizontal: space.gutter, marginBottom: space.s1, backgroundColor: ROOM.inkGround, borderRadius: radius.card, paddingHorizontal: 14, paddingVertical: 10, gap: 4 }} accessibilityLiveRegion="polite">
+              <Body size={15} align="center">
+                <Body size={15} tone="ink3">{`${speakerName}: `}</Body>
+                {caption}
+              </Body>
+              <Meta size={12} tone="ink3" align="center">
+                {t('captionsNote')}
+              </Meta>
+            </View>
+          ) : null}
+
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: space.s1, paddingHorizontal: space.gutter, paddingTop: space.s1 }}>
+            <CallButton on={mic} icon={mic ? 'mic' : 'mic-off'} label={mic ? t('mute') : t('unmute')} short={t('lMic')} onPress={() => setMic((v) => !v)} />
+            <CallButton on={cam} icon={cam ? 'video' : 'video-off'} label={cam ? t('camOffBtn') : t('camOnBtn')} short={t('lCam')} onPress={() => setCam((v) => !v)} />
+            {live ? <CallButton on={hand} icon="arrow-up-circle" label={hand ? t('lowerHand') : t('raiseHand')} short={t('lHand')} onPress={() => setHand((v) => !v)} /> : null}
+            {live ? <CallButton on={captions} icon="type" label={captions ? t('hideCaptions') : t('showCaptions')} short={t('lCaptions')} onPress={() => setCaptions((v) => !v)} /> : null}
+            <View style={{ alignItems: 'center', gap: 4 }}>
+              <Pressable
+                onPress={onLeave}
+                accessibilityRole="button"
+                accessibilityLabel={live ? t('leave') : t('leaveWaiting')}
+                style={({ pressed }) => ({ height: 52, paddingHorizontal: 18, borderRadius: 26, borderWidth: 1, borderColor: ROOM.lineStrong, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: pressed ? ROOM.paperRaised : undefined })}
+              >
+                <Icon name="phone-off" size={18} color={ROOM.ink} />
+                <Body size={15}>{t('leave')}</Body>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </InkSurface.Provider>
+    </Modal>
+  )
+}
+
+function CallButton({ on, icon, label, short, onPress }: { on: boolean; icon: IconName; label: string; short: string; onPress: () => void }) {
+  return (
+    <View style={{ alignItems: 'center', gap: 4 }}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="switch"
+        accessibilityLabel={label}
+        accessibilityState={{ checked: on }}
+        style={({ pressed }) => ({ width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? ROOM.ink : pressed ? ROOM.paperRaised : 'rgba(242,238,232,0.14)' })}
+      >
+        <Icon name={icon} size={20} color={on ? ROOM.paper : ROOM.ink} />
+      </Pressable>
+      <Meta size={12} tone="ink2">{short}</Meta>
+    </View>
   )
 }

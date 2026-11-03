@@ -4,12 +4,12 @@ import { ArrowRight, BookOpen, Calendar, Check, FlaskConical, Users } from 'luci
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Bar, BarChart, LabelList, ResponsiveContainer, XAxis, YAxis } from 'recharts'
-import { DaybreakButton, Eyebrow, MethodLine, SpecimenTag, TermDot } from '@/components/joy/primitives'
+import { DaybreakButton, Eyebrow, MethodLine, SpecimenTag, TermDot, useFmtDate } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill, SectionTitle } from '@/components/ui'
 import { CIRCLE, PRACTICE_WEEKS } from '@/data/platform'
 import { INDEX_HISTORY, TEAM } from '@/data/member'
 import { PRACTICE_CONTENT, PRACTICE_PULSE } from './_data'
-import { AudioPlayer, PrimaryChip, Quote, fade } from './_parts'
+import { AudioPlayer, PrimaryChip, Quote, fade, useAfterIndex } from './_parts'
 import { practisedToday, togglePractisedToday, useJourney, weekPractised } from './_store'
 import { useJ } from './_i18n'
 
@@ -24,6 +24,8 @@ export default function Practice() {
   const week = PRACTICE_WEEKS.find((w) => w.week === CURRENT)!
   const content = PRACTICE_CONTENT.find((p) => p.week === CURRENT)!
   const before = INDEX_HISTORY[0]
+  const after = useAfterIndex()
+  const fmtDate = useFmtDate()
   const journey = useJourney()
   const doneToday = practisedToday(journey)
   const days = journey.practisedDays
@@ -173,18 +175,23 @@ export default function Practice() {
               <span className="eyebrow text-right text-ink-3">{t('afterW8')}</span>
               <span className="text-[16px] text-ink">{t('joyspanIndex')}</span>
               <span className="num text-right text-[1.8rem] font-light leading-none text-ink">{before.value}</span>
-              <span className="num text-right text-[1.8rem] font-light leading-none text-ink-3">—</span>
+              <span className={clsx('num text-right text-[1.8rem] font-light leading-none', after.measured ? 'text-ink' : 'text-ink-3')}>{after.ji}</span>
               {before.terms.map((x) => {
                 return (
                   <div key={x.key} className="contents">
                     <span className="flex flex-wrap items-center gap-2 border-t border-line pt-3 text-[15px] text-ink-2"><TermDot term={x.key} /> {term.name(x.key)}{x.key === before.lowestTerm && <Pill tone="daybreak" className="ml-1">{t('weekN', { n: 4 })}</Pill>}</span>
                     <span className="num border-t border-line pt-3 text-right text-[15px] text-ink">{x.key === 'B' ? `−${x.value}` : x.value}</span>
-                    <span className="num border-t border-line pt-3 text-right text-[15px] text-ink-3">—</span>
+                    <span className={clsx('num border-t border-line pt-3 text-right text-[15px]', after.value(x.key) === null ? 'text-ink-3' : 'text-ink')}>{after.cell(x.key)}</span>
                   </div>
                 )
               })}
             </div>
-            <p className="mt-5 text-[14px] text-ink-2">{t('afterFills')}</p>
+            {after.measured ? (
+              <p className="mt-5 text-[14px] text-ink-2">{t('afterTaken', { d: fmtDate(`${after.measured.takenOn}T12:00:00`) })}{after.measured.preview && ` ${t('afterPreview')}`}</p>
+            ) : (
+              <p className="mt-5 text-[14px] text-ink-2">{t('afterFills')}</p>
+            )}
+            <Link to={after.measured ? '/app/index/take' : '/app/practice/week/8'} className="mt-3 inline-flex items-center gap-1.5 text-[15px] text-ink underline-offset-4 hover:underline focus-ring">{t(after.measured ? 'retakeAgain' : 'toWeek8')} <ArrowRight size={15} /></Link>
             <MethodLine className="mt-3" method={before.method} grade={before.grade} takenOn={before.takenOn} next={before.nextMeasure} />
           </Card>
           <Card tone="sunk">

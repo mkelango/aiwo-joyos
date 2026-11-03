@@ -501,3 +501,91 @@ export const NS_TREND = [
   { q: 'Q2 FY27', perLakh: 2.1, remeasure: 0.71, pilot: true },
   { q: 'Q3 FY27', perLakh: 2.9, remeasure: 0.74, pilot: false },
 ]
+
+// ─── Evaluation plane · traces (specimen) ────────────────────────────────
+// One row per AI call through the VIVA gateway. A trace stores the model, the prompt version, the tool, a hash of the
+// inputs and who reviewed it; never the member's words or health values. Output excerpts are the model's own text,
+// redacted of anything a member supplied, and shown in English for review (TA/HI outputs carry a reviewer's gloss).
+
+export type TraceGuard = 'pass' | 'rewritten' | 'held' | 'blocked' | 'intercepted'
+export const TRACE_GUARD: Record<TraceGuard, { label: string; note: string }> = {
+  pass: { label: 'Passed', note: 'Input and output guards passed; the answer was served as written.' },
+  rewritten: { label: 'Rewritten', note: 'The output guard replaced a refused word or a claim with sealed copy before serving.' },
+  held: { label: 'Held for review', note: 'This language is below the eval floor for this tool, so the answer waited in the physician queue before serving.' },
+  blocked: { label: 'Blocked', note: 'The output guard discarded the model text; the member got the rules-based version and sealed copy.' },
+  intercepted: { label: 'Crisis intercept', note: 'Crisis language was found before any model ran. No model call was made; the member was routed to a person and Tele-MANAS 14416.' },
+}
+export const TRACE_FINDINGS = ['No issue', 'Tone, too brisk', 'Claims rewrite', 'Wrong term named', 'Safety'] as const
+export type TraceFinding = (typeof TRACE_FINDINGS)[number]
+export const TRACE_REVIEWERS = ['Dr Sanjay Menon · psychologist', 'Dr Lakshmi Raghavan · psychologist', 'Dr Arvind Natesan · physician'] as const
+
+const TRACE_TOOL: Record<string, { model: string; prompt: string; excerpt: string; sealed?: string }> = {
+  index_explainer: { model: 'viva-large · 2026-01', prompt: 'v14', excerpt: 'Your Index sits in the Steady band. Freedom is the lowest term this quarter, so this week’s actions lean there.', sealed: 'Your Index is in the Steady band. Your lowest term is shown below.' },
+  next_best_action: { model: 'viva-small · 2026-01', prompt: 'v22', excerpt: 'Chosen because Recovery has slipped for three nights and this takes ten minutes before bed.', sealed: 'Today’s action was chosen from your lowest term.' },
+  ikigai_coach: { model: 'viva-large · 2026-01', prompt: 'v9', excerpt: 'You named teaching twice this week. What would tomorrow look like with an hour of it?', sealed: 'What is one thing you would like tomorrow to hold?' },
+  couples_prompt: { model: 'viva-large · 2026-01', prompt: 'v7', excerpt: 'Ask each other: what is one small thing that made this week feel shared?', sealed: 'Take turns: one thing that felt shared this week.' },
+  second_arrow_reflection: { model: 'viva-large · 2026-01', prompt: 'v11', excerpt: 'It sounds like the meeting stung, and then the replaying stung again. Both are there; you do not have to fix either tonight.', sealed: 'Thank you for writing this down. It is saved, and only you can see it.' },
+  ledger_weekly_story: { model: 'viva-small · 2026-01', prompt: 'v6', excerpt: 'Most of this week’s joy came from people: two dinners and a long call. Pleasure rose with it.', sealed: 'Here are this week’s entries, grouped by term.' },
+  time_audit_summary: { model: 'viva-small · 2026-01', prompt: 'v5', excerpt: 'About a third of your waking week went to commuting and email. The hours you chose for yourself were mostly on Sunday.', sealed: 'Here is your week, grouped by how you spent it.' },
+  practice_companion: { model: 'viva-large · 2026-01', prompt: 'v12', excerpt: 'Week 3 asks for one unhurried meal a day. Chapter 4 suggests starting with breakfast, phone in another room.', sealed: 'This week’s practice and its chapter are below.' },
+  coach_digest: { model: 'viva-large · 2026-01', prompt: 'v4', excerpt: 'Quarter in brief: Index up one band; Recovery steady; two missed sessions in week 6, both rescheduled by the member.' },
+}
+
+// [id, time, tool, lang, tenant, guard, reviewer index or -1, finding index or -1, latency ms, tokens in, tokens out]
+type TraceRow = [string, string, string, 'EN' | 'TA' | 'HI', string, TraceGuard, number, number, number, number, number]
+const TRACE_ROWS: TraceRow[] = [
+  ['tr_9f3a21', '28 Jan 21:06:41', 'next_best_action', 'EN', 'tnt_aiwo', 'pass', -1, -1, 412, 860, 64],
+  ['tr_9f3a0c', '28 Jan 21:05:58', 'second_arrow_reflection', 'TA', 'tnt_aiwo', 'held', 1, 0, 1840, 1210, 142],
+  ['tr_9f39e7', '28 Jan 21:05:12', 'index_explainer', 'HI', 'tnt_northwind', 'pass', 2, 0, 690, 1040, 96],
+  ['tr_9f39b2', '28 Jan 21:04:30', 'second_arrow_reflection', 'EN', 'tnt_aiwo', 'intercepted', 0, 0, 38, 0, 0],
+  ['tr_9f3988', '28 Jan 21:03:47', 'ledger_weekly_story', 'EN', 'tnt_house_chn', 'pass', -1, -1, 380, 720, 58],
+  ['tr_9f3951', '28 Jan 21:02:19', 'practice_companion', 'TA', 'tnt_aiwo', 'rewritten', 1, 2, 1120, 1480, 118],
+  ['tr_9f3920', '28 Jan 21:01:03', 'next_best_action', 'HI', 'tnt_northwind', 'pass', -1, -1, 455, 880, 61],
+  ['tr_9f38f6', '28 Jan 20:59:40', 'couples_prompt', 'EN', 'tnt_aiwo', 'blocked', 0, 0, 920, 940, 0],
+  ['tr_9f38c1', '28 Jan 20:58:14', 'ikigai_coach', 'TA', 'tnt_house_chn', 'pass', 1, 1, 840, 1160, 88],
+  ['tr_9f3897', '28 Jan 20:56:52', 'time_audit_summary', 'EN', 'tnt_northwind', 'rewritten', -1, -1, 510, 990, 77],
+  ['tr_9f3862', '28 Jan 20:55:31', 'index_explainer', 'EN', 'tnt_aiwo', 'pass', -1, -1, 640, 1020, 92],
+  ['tr_9f3830', '28 Jan 20:54:07', 'second_arrow_reflection', 'HI', 'tnt_northwind', 'pass', 0, 1, 1010, 1190, 131],
+  ['tr_9f37fb', '28 Jan 20:52:48', 'practice_companion', 'EN', 'tnt_house_chn', 'pass', -1, -1, 980, 1520, 124],
+  ['tr_9f37c4', '28 Jan 20:51:22', 'coach_digest', 'EN', 'tnt_aiwo', 'pass', 2, 0, 2310, 3880, 210],
+  ['tr_9f3790', '28 Jan 20:49:55', 'next_best_action', 'TA', 'tnt_aiwo', 'pass', -1, -1, 470, 900, 66],
+  ['tr_9f375a', '28 Jan 20:48:30', 'ledger_weekly_story', 'HI', 'tnt_northwind', 'rewritten', 2, 3, 420, 760, 60],
+  ['tr_9f3726', '28 Jan 20:47:02', 'practice_companion', 'HI', 'tnt_aiwo', 'blocked', -1, -1, 1060, 1500, 0],
+  ['tr_9f36f1', '28 Jan 20:45:41', 'ikigai_coach', 'EN', 'tnt_northwind', 'pass', -1, -1, 790, 1100, 84],
+  ['tr_9f36bd', '28 Jan 20:44:13', 'second_arrow_reflection', 'TA', 'tnt_house_chn', 'held', -1, -1, 1760, 1230, 138],
+  ['tr_9f3688', '28 Jan 20:42:50', 'index_explainer', 'TA', 'tnt_aiwo', 'pass', -1, -1, 710, 1060, 98],
+  ['tr_9f3652', '28 Jan 20:41:26', 'couples_prompt', 'TA', 'tnt_aiwo', 'pass', 1, 0, 860, 920, 54],
+  ['tr_9f361e', '28 Jan 20:39:58', 'time_audit_summary', 'HI', 'tnt_aiwo', 'pass', -1, -1, 530, 1010, 79],
+  ['tr_9f35e9', '28 Jan 20:38:34', 'next_best_action', 'EN', 'tnt_house_chn', 'pass', -1, -1, 398, 850, 62],
+  ['tr_9f35b3', '28 Jan 20:37:09', 'ikigai_coach', 'HI', 'tnt_northwind', 'intercepted', 0, 0, 41, 0, 0],
+]
+
+const hex = (seed: string, salt: number) => {
+  let h = 2166136261 ^ salt
+  for (const c of seed) h = Math.imul(h ^ c.charCodeAt(0), 16777619)
+  return (h >>> 0).toString(16).padStart(8, '0')
+}
+
+export const TRACES = TRACE_ROWS.map(([id, at, tool, lang, tenant, guard, rv, fd, latency, tokensIn, tokensOut]) => {
+  const t = TRACE_TOOL[tool]
+  const intercepted = guard === 'intercepted'
+  return {
+    id,
+    at,
+    tool,
+    lang,
+    tenant,
+    guard,
+    model: intercepted ? '—' : t.model,
+    prompt: intercepted ? '—' : `${tool}@${t.prompt}`,
+    inputsHash: `sha256:${hex(id, 1)}${hex(id, 2)}…${hex(id, 3).slice(0, 4)}`,
+    reviewer: rv >= 0 ? (TRACE_REVIEWERS[rv] as string) : null,
+    finding: fd >= 0 ? (TRACE_FINDINGS[fd] as TraceFinding) : null,
+    latency,
+    tokensIn,
+    tokensOut,
+    output: intercepted ? 'No model text. Sealed crisis copy shown, with a person and Tele-MANAS 14416.' : guard === 'blocked' ? t.sealed ?? t.excerpt : t.excerpt,
+    discarded: guard === 'blocked' ? t.excerpt : undefined,
+  }
+})
+export type Trace = (typeof TRACES)[number]

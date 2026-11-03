@@ -11,7 +11,9 @@ import {
   Delta,
   Divider,
   Eyebrow,
+  HistoryGlyph,
   Icon,
+  IndexHistoryChart,
   JoyspanWheel,
   Meta,
   MethodLine,
@@ -27,12 +29,15 @@ import {
   fmtDate,
 } from '@/components'
 import { NOT_YET_EXAMPLE, TERM_DETAIL } from '@/screens/a/coreData'
-import { H2 } from '@/screens/a/local'
-import { Sparkline } from '@/screens/a/parts'
+import { H2, useLocal, usePlanned } from '@/screens/a/local'
+import { actionsFor } from '@/screens/a/spacesData'
 import { joyspanIndex } from '@/shared/indexEngine'
-import { INDEX_HISTORY, MEMBER } from '@/shared/member'
+import { measuredScore, type MeasuredIndex } from '@/shared/indexScoring'
+import { HISTORY_METHOD, INDEX_HISTORY, MEMBER, METHOD_V10_PUBLISHED, methodOf } from '@/shared/member'
 import { termByKey } from '@/shared/terms'
-import type { TermKey } from '@/shared/types'
+import type { Band, TermKey } from '@/shared/types'
+import { BAND, useTx } from '@/screens/b/i18n/common'
+import { kit } from '@/components/_i18n'
 import { useTheme } from '@/theme/ThemeProvider'
 import { memberOnly } from '@/screens/b/parts'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
@@ -40,21 +45,34 @@ import { RESULT } from '@/screens/b/i18n/indexResult'
 import { txFor } from '@/screens/a/i18n'
 
 // INDEX DETAIL (Memo p.10–11, p.18; Plan §4B): the number, how it is made, each petal on
-// tap (survey vs signals, what moved), three measures of history, and how a gap is shown.
+// tap (survey vs signals, what moved), the six terms by band, the lowest term with one
+// concrete next step, history across methods (with the v1.0 marker), and how a gap is shown.
+// A sitting taken on this phone (useLocal('measuredIndex')) is the newest entry when present.
+// One Daybreak: plan the next step for today.
 
 export default memberOnly(IndexResult)
 
 function IndexResult() {
   const th = useTheme()
   const { c, space } = th
-  const latest = INDEX_HISTORY[0]
-  const previous = INDEX_HISTORY[1]
-  const [sel, setSel] = useState<TermKey>(latest.lowestTerm)
+  const [measured, setMeasured] = useLocal<MeasuredIndex>('measuredIndex', null)
+  const [confirmClear, setConfirmClear] = useState(false)
+  // Newest first: the measure taken on this phone, then the recorded ones.
+  const rows = measured ? [measuredScore(measured), ...INDEX_HISTORY] : INDEX_HISTORY
+  const latest = rows[0]
+  const previous = rows[1]
+  const [selRaw, setSel] = useState<TermKey | null>(null)
+  const sel = selRaw ?? latest.lowestTerm
+  const { planned, plan } = usePlanned()
+  const low = latest.lowestTerm
+  const lowScore = latest.terms.find((x) => x.key === low)!
+  const nextStep = actionsFor(low)[0]
+  const isPlanned = !!nextStep && planned[low] === nextStep.id
   const term = termByKey(sel)
   const s = latest.terms.find((x) => x.key === sel)!
   const detail = TERM_DETAIL[sel]
   const calc = joyspanIndex(latest.terms)!
-  const history = [...INDEX_HISTORY].reverse()
+  const history = [...rows].reverse()
   const inverse = sel === 'B'
   const [openMeasure, setOpenMeasure] = useState<string | null>(null)
   const [cardOpen, setCardOpen] = useState(false)
@@ -64,6 +82,8 @@ function IndexResult() {
   const lang = useLang()
   const locale = lang === 'ta' ? 'ta-IN' : lang === 'hi' ? 'hi-IN' : 'en-GB'
   const ax = (x: string) => txFor(lang, x)
+  const tk = useTx()
+  const bandWord = (b: Band) => (b === 'not-yet-measured' ? kit(lang, 'bandNone') : tk(BAND[b], b))
 
   return (
     <Screen>
@@ -77,6 +97,38 @@ function IndexResult() {
         }
         lead={t('lead')}
       />
+
+      {measured ? (
+        <Card tone="soft" style={{ gap: space.s1 }}>
+          <Eyebrow tone="daybreak">{t('phoneMeasured', { date: fmtDate(measured.at) })}</Eyebrow>
+          <Meta>{t('phoneBody')}</Meta>
+          {confirmClear ? (
+            <View style={{ gap: 4 }} accessibilityLiveRegion="polite">
+              <Meta tone="ink">{t('clearQ')}</Meta>
+              <View style={{ flexDirection: 'row', gap: space.s1, flexWrap: 'wrap' }}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onPress={() => {
+                    setMeasured(null)
+                    setConfirmClear(false)
+                    setSel(null)
+                  }}
+                >
+                  {t('yesRemove')}
+                </Button>
+                <Button variant="ghost" size="sm" onPress={() => setConfirmClear(false)}>
+                  {t('keepIt')}
+                </Button>
+              </View>
+            </View>
+          ) : (
+            <Button variant="link" onPress={() => setConfirmClear(true)}>
+              {t('clearMeasured')}
+            </Button>
+          )}
+        </Card>
+      ) : null}
 
       {/* The number */}
       <Card tone="raised" style={{ gap: space.s2 }}>
@@ -102,7 +154,7 @@ function IndexResult() {
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 8, rowGap: 4 }}>
             <Mono tone="ink" size={17}>{`GM ${calc.gm.toFixed(1)}`}</Mono>
             <Mono tone="ink3" size={17}>−</Mono>
-            <Mono tone="ink" size={17}>{`0.25 × ${latest.terms.find((x) => x.key === 'B')!.value}`}</Mono>
+            <Mono tone="ink" size={17}>{`${calc.lambda} × ${latest.terms.find((x) => x.key === 'B')!.value}`}</Mono>
             <Mono tone="ink3" size={17}>=</Mono>
             <Mono tone="ink" size={17} weight="medium">{`${(calc.gm - calc.burden).toFixed(1)} → ${calc.value}`}</Mono>
           </View>
@@ -129,7 +181,7 @@ function IndexResult() {
                 accessibilityRole="tab"
                 accessibilityState={{ selected: on }}
                 aria-selected={on}
-                accessibilityLabel={`${tt.space(x.key)}, ${tt.name(x.key)} ${x.key === 'B' ? t('minus') : ''}${x.value}`}
+                accessibilityLabel={`${tt.space(x.key)}, ${tt.name(x.key)} ${x.key === 'B' ? t('minus') : ''}${x.value}, ${bandWord(x.band)}`}
                 style={({ pressed }) => ({ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderRadius: 999, borderWidth: on ? 2 : 1, borderColor: on ? c.ink : c.line, backgroundColor: pressed ? c.paperSunk : undefined })}
               >
                 <TermDot term={x.key} />
@@ -150,6 +202,7 @@ function IndexResult() {
                 {inverse ? `−${s.value}` : String(s.value)}
               </Mono>
               <Delta value={s.delta} inverse={inverse} />
+              <BandLabel band={s.band} />
             </View>
           </View>
           <Body>{ax(detail.sentence)}</Body>
@@ -203,29 +256,123 @@ function IndexResult() {
             {term.instruments.join(' · ')}
           </Meta>
         </View>
-        <DaybreakButton onPress={() => router.push(`/spaces/${term.slug}`)} accessibilityHint={t('opensSpace', { space: tt.space(sel) })}>
+        <Button variant="secondary" block icon="arrow-right" onPress={() => router.push(`/spaces/${term.slug}`)} accessibilityHint={t('opensSpace', { space: tt.space(sel) })}>
           {t('openSpace', { space: tt.space(sel) })}
-        </DaybreakButton>
+        </Button>
       </Card>
+
+      {/* The six terms, by band */}
+      <Card tone="raised" style={{ gap: space.s2 }}>
+        <Eyebrow {...H2}>{t('bandsTitle')}</Eyebrow>
+        <Meta size={14}>{t('bandsBody')}</Meta>
+        <View style={{ gap: space.s1 }}>
+          {latest.terms.map((x) => {
+            const inv = x.key === 'B'
+            const v = x.value ?? 0
+            // Band edges on the bar: 50 and 70, or 30 and 50 for Burden (lower is better).
+            const edges = inv ? [30, 50] : [50, 70]
+            return (
+              <Pressable
+                key={x.key}
+                onPress={() => setSel(x.key)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: x.key === sel }}
+                accessibilityLabel={`${tt.space(x.key)}, ${tt.name(x.key)}, ${x.value === null ? bandWord(x.band) : `${inv ? t('minus') : ''}${x.value}, ${bandWord(x.band)}`}`}
+                style={({ pressed }) => ({ gap: 6, paddingVertical: 4, opacity: pressed ? 0.7 : 1 })}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <TermDot term={x.key} />
+                  <Body style={{ flex: 1 }} weight={x.key === low ? 'semibold' : 'regular'}>{tt.space(x.key)}</Body>
+                  <Mono size={15} tone="ink">{x.value === null ? '—' : `${inv ? '−' : ''}${x.value}`}</Mono>
+                  <BandLabel band={x.band} style={{ minWidth: 72, alignItems: 'flex-end' }} />
+                </View>
+                <View style={{ height: 8, borderRadius: 4, backgroundColor: c.paperSunk, overflow: 'hidden' }}>
+                  <View style={{ width: `${Math.max(0, Math.min(100, v))}%`, height: '100%', backgroundColor: th.term(x.key).main, borderRadius: 4 }} />
+                  {edges.map((e) => (
+                    <View key={e} style={{ position: 'absolute', left: `${e}%`, top: 0, bottom: 0, width: 1, backgroundColor: c.paper }} />
+                  ))}
+                </View>
+              </Pressable>
+            )
+          })}
+        </View>
+      </Card>
+
+      {/* The lowest term, and one concrete next step */}
+      {nextStep ? (
+        <Card tone="sunk" style={{ gap: space.s2 }}>
+          <Eyebrow tone="daybreak" {...H2}>{t('nextEyebrow', { space: tt.space(low) })}</Eyebrow>
+          <Body size={20}>{t('lowestIs', { name: tt.name(low), v: `${low === 'B' ? '−' : ''}${lowScore.value}` })}</Body>
+          <Card tone="raised" style={{ gap: space.s1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+              <TermChip term={low} withSpace={termByKey(low).name !== termByKey(low).space} />
+              <Mono size={13} tone="ink3">{t('minutes', { n: nextStep.minutes })}</Mono>
+            </View>
+            <Body weight="medium">{ax(nextStep.title)}</Body>
+            <Meta tone="ink">{ax(nextStep.detail)}</Meta>
+            <Meta size={14}>{ax(nextStep.why)}</Meta>
+          </Card>
+          {isPlanned ? (
+            <View style={{ gap: 4 }} accessibilityLiveRegion="polite">
+              <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
+                <Icon name="check" size={18} color={c.ink} />
+                <Body style={{ flex: 1 }}>{t('planned')}</Body>
+              </View>
+              <View style={{ flexDirection: 'row', gap: space.s1, flexWrap: 'wrap' }}>
+                <Button variant="secondary" size="sm" icon="sun" onPress={() => router.replace('/')}>
+                  {t('goToday')}
+                </Button>
+                <Button variant="ghost" size="sm" onPress={() => plan(low, null)}>
+                  {t('unplan')}
+                </Button>
+              </View>
+            </View>
+          ) : (
+            <DaybreakButton icon="plus" onPress={() => plan(low, nextStep.id)} accessibilityHint={t('planHint')}>
+              {t('planToday')}
+            </DaybreakButton>
+          )}
+        </Card>
+      ) : null}
 
       {/* History */}
       <Card tone="raised" style={{ gap: space.s2 }}>
-        <Eyebrow {...H2}>{t('threeMeasures')}</Eyebrow>
+        <Eyebrow {...H2}>{rows.length === 3 ? t('threeMeasures') : t('nMeasures', { n: rows.length })}</Eyebrow>
         <Meta>
           {t('historyA')}<Mono tone="ink">{String(history[0].value)}</Mono>{t('historyB')}<Mono tone="ink">{String(latest.value)}</Mono>{t('historyC')}
         </Meta>
-        <Sparkline
-          values={history.map((h) => h.value)}
-          labels={[fmtDate(history[0].takenOn), fmtDate(latest.takenOn)]}
-          color={c.ink}
-          min={50}
-          max={70}
-          showDots
-          height={110}
-          label={t('historyA11y', { list: history.map((h) => `${fmtDate(h.takenOn)} ${h.value}`).join(', ') })}
+        <IndexHistoryChart
+          points={history.map((h) => ({ date: h.takenOn, value: h.value, grade: h.grade }))}
+          markers={[
+            { date: METHOD_V10_PUBLISHED, label: 'v1.0' },
+            { date: latest.nextMeasure, label: t('nextShort'), solid: true },
+          ]}
+          min={Math.min(50, Math.floor((Math.min(...history.map((h) => h.value)) - 4) / 5) * 5)}
+          max={Math.max(70, Math.ceil((Math.max(...history.map((h) => h.value)) + 4) / 5) * 5)}
+          height={130}
+          edgeLabels={[fmtDate(history[0].takenOn), fmtDate(latest.nextMeasure)]}
+          label={t('historyA11y', { list: history.map((h) => t('historyItemA11y', { date: fmtDate(h.takenOn), v: h.value, m: methodOf(h) })).join(', ') })}
         />
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s2, rowGap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <HistoryGlyph kind="index" />
+            <Meta size={13}>{t('indexGrade')}</Meta>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <HistoryGlyph kind="clinical" />
+            <Meta size={13}>{t('legClinical')}</Meta>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <HistoryGlyph kind="method" />
+            <Meta size={13}>{t('legMethod', { date: fmtDate(METHOD_V10_PUBLISHED) })}</Meta>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <HistoryGlyph kind="next" />
+            <Meta size={13}>{t('legNext')}</Meta>
+          </View>
+        </View>
         <View>
-          {INDEX_HISTORY.map((h, i) => {
+          {rows.map((h, i) => {
             const isOpen = openMeasure === h.id
             return (
               <View key={h.id} style={{ borderTopWidth: i === 0 ? 0 : 1, borderTopColor: c.line }}>
@@ -240,7 +387,7 @@ function IndexResult() {
                   <View style={{ flex: 1, gap: 2 }}>
                     <Body>{fmtDate(h.takenOn)}</Body>
                     <Meta size={14} tone="ink3">
-                      {h.grade === 'clinical' ? t('clinicalSigned', { by: h.signedBy ?? '' }) : t('indexGrade')} · {h.engineBuild}
+                      {h.id === 'ix_phone' ? t('onPhone') : h.grade === 'clinical' ? t('clinicalSigned', { by: h.signedBy ?? '' }) : t('indexGrade')} · {methodOf(h)} · {h.engineBuild.replace('engine ', '')}
                     </Meta>
                   </View>
                   <Mono size={22} weight="light" tone="ink">
@@ -265,6 +412,11 @@ function IndexResult() {
             )
           })}
         </View>
+        {rows.some((h) => HISTORY_METHOD[h.id]?.pilot) ? (
+          <Meta size={13} tone="ink3">
+            {t('pilotNote')}
+          </Meta>
+        ) : null}
         <ArrowLink icon="moon" onPress={() => router.push('/day-90')}>
           {t('seeDay90')}
         </ArrowLink>

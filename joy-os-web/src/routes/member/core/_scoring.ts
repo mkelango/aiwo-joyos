@@ -32,7 +32,21 @@ export interface SittingResult {
   survey: Record<TermKey, number | null>
   lowest: TermKey
   phqFlag: boolean
+  /** No wearable signal was used for any term: the Index rests on the answers and what the member logged in the app. */
+  surveyOnly: boolean
 }
+
+/** Every confirmable signal id across the six terms. */
+export const ALL_SIGNAL_IDS: string[] = ORDER.flatMap((k) => signalSources(k).map((_, i) => signalId(k, i)))
+
+// Sources read from a connected device (/app/devices). Ledger moments, the calendar audit,
+// sit-to-stand and savouring prompts are logged in the app, so they stay readable without one.
+const WEARABLE_SOURCE = /^(Oura|Apple Health|Health Connect|WHOOP|Garmin|Ultrahuman)\b/
+/** The signal ids that need a device: with no device connected these, and only these, are off. */
+export const WEARABLE_SIGNAL_IDS: string[] = ORDER.flatMap((k) =>
+  signalSources(k).flatMap((src, i) => (WEARABLE_SOURCE.test(src) ? [signalId(k, i)] : [])),
+)
+export const isWearableSignal = (id: string) => WEARABLE_SIGNAL_IDS.includes(id)
 
 export function scoreAnswers(answers: Record<string, number>, signalsOff: string[] = []): SittingResult {
   const latest = INDEX_HISTORY[0]
@@ -66,5 +80,6 @@ export function scoreAnswers(answers: Record<string, number>, signalsOff: string
   const a = (id: string) => answers[id] ?? 0
   // PHQ-4: either two-item subscale at 3 or more is the clinician-review threshold.
   const phqFlag = a('phq-24') + a('phq-25') >= 3 || a('phq-26') + a('phq-27') >= 3
-  return { terms, engine, survey, lowest: lowestTerm(terms), phqFlag }
+  const surveyOnly = WEARABLE_SIGNAL_IDS.every((id) => off.has(id))
+  return { terms, engine, survey, lowest: lowestTerm(terms), phqFlag, surveyOnly }
 }

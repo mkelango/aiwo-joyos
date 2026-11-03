@@ -1,18 +1,28 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Platform } from 'react-native'
+import { AccessibilityInfo, Platform } from 'react-native'
 import { LEDGER } from '../shared/member'
 import type { LedgerEntry } from '../shared/types'
 
 // App state for the member app. Offline-first: everything the member does is kept on the
 // device (AsyncStorage) and would sync through the outbox when the BFF exists.
-// Persisted: theme preference, text size, language, today's action state, the Joy Ledger.
-// In memory only: crisisOpen, offline.
+// Persisted: theme preference, text size, language, today's action state, the Joy Ledger,
+// offline (the simulated flight mode) with its sync queue, payments grace and reduce motion.
+// In memory only: crisisOpen, the sync state of the last reconnect.
 
 export type ThemePref = 'system' | 'light' | 'dark'
 export type TextSize = 'default' | 'large' | 'xlarge'
 export type Lang = 'en' | 'ta' | 'hi'
 export type ActionState = 'todo' | 'done' | 'skipped'
+/** What was changed while offline and waits on this phone for the connection to come back. */
+export type SyncKind = 'ledger' | 'ledger-remove' | 'action' | 'index'
+export interface SyncItem {
+  id: string
+  kind: SyncKind
+  at: string
+}
+/** idle: nothing moving · syncing: back online, sending the queue · synced: just finished. */
+export type SyncState = 'idle' | 'syncing' | 'synced'
 
 interface AppState {
   hydrated: boolean
@@ -32,6 +42,21 @@ interface AppState {
   addLedger: (e: Omit<LedgerEntry, 'id' | 'at'>) => void
   offline: boolean
   setOffline: (v: boolean) => void
+  /** Changes kept on this phone while offline (specimen: nothing leaves the device). */
+  syncQueue: SyncItem[]
+  /** Queue a change (deduplicated by id). Only queues while offline. */
+  queueSync: (item: { id: string; kind: SyncKind }) => void
+  /** Drop a queued change, e.g. an entry added offline and then removed before sync. */
+  unqueueSync: (id: string) => void
+  syncState: SyncState
+  /** How many changes the last reconnect sent. */
+  syncedCount: number
+  /** Payments grace: a failed renewal, 14 days of unchanged access (specimen demo switch). */
+  paymentsGrace: boolean
+  setPaymentsGrace: (v: boolean) => void
+  /** The member's own Reduce motion setting; the system setting is honoured as well (useReduceMotion). */
+  reduceMotion: boolean
+  setReduceMotion: (v: boolean) => void
   crisisOpen: boolean
   setCrisisOpen: (v: boolean) => void
 }
@@ -68,7 +93,7 @@ function usePersisted<T>(key: string, initial: T, ready: Record<string, unknown>
   return [v, setV] as const
 }
 
-const KEYS = ['themePref', 'textSize', 'lang', 'actionState', 'ledger'] as const
+const KEYS = ['themePref', 'textSize', 'lang', 'actionState', 'ledger', 'offline', 'syncQueue', 'paymentsGrace', 'reduceMotion'] as const
 
 // The member's language for plain formatters (fmtDate and friends) that run outside a hook.
 // Set on every AppProvider render, so it always matches the context value children read.
@@ -107,14 +132,56 @@ export function AppProvider({ children }: { children: ReactNode }) {
   ACTIVE_LANG = lang
   const [actionState, setActionState] = usePersisted<ActionState>('actionState', 'todo', stored)
   const [ledger, setLedger] = usePersisted<LedgerEntry[]>('ledger', LEDGER, stored)
-  const [offline, setOffline] = useState(false)
+  const [offline, setOffline] = usePersisted<boolean>('offline', false, stored)
+  const [syncQueue, setSyncQueue] = usePersisted<SyncItem[]>('syncQueue', [], stored)
+  const [syncState, setSyncState] = useState<SyncState>('idle')
+  const [syncedCount, setSyncedCount] = useState(0)
+  const [paymentsGrace, setPaymentsGrace] = usePersisted<boolean>('paymentsGrace', false, stored)
+  const [reduceMotion, setReduceMotion] = usePersisted<boolean>('reduceMotion', false, stored)
   const [crisisOpen, setCrisisOpen] = useState(false)
   const [override] = useState(urlThemeOverride)
   const themePref = override ?? themePrefStored
 
+  const queueSync = useCallback(
+    (item: { id: string; kind: SyncKind }) => {
+      if (!offline) return
+      setSyncQueue((q) => (q.some((x) => x.id === item.id) ? q : [...q, { ...item, at: new Date().toISOString() }]))
+    },
+    [offline, setSyncQueue],
+  )
+  const unqueueSync = useCallback((id: string) => setSyncQueue((q) => q.filter((x) => x.id !== id)), [setSyncQueue])
+
+  // Reconnect: queued → syncing → synced. A specimen sync: nothing is sent anywhere; the queue
+  // clears after a short, honest pause and the banner says how many went.
+  const queued = syncQueue.length
+  useEffect(() => {
+    if (offline) {
+      setSyncState('idle')
+      return
+    }
+    if (queued === 0) return
+    setSyncState('syncing')
+    const t = setTimeout(() => {
+      setSyncQueue([])
+      setSyncedCount(queued)
+      setSyncState('synced')
+    }, 1800)
+    return () => clearTimeout(t)
+  }, [offline, queued, setSyncQueue])
+  useEffect(() => {
+    if (syncState !== 'synced') return
+    const t = setTimeout(() => setSyncState('idle'), 4500)
+    return () => clearTimeout(t)
+  }, [syncState])
+
   const addLedger = useCallback(
-    (e: Omit<LedgerEntry, 'id' | 'at'>) => setLedger((l) => [{ ...e, id: `l${Date.now()}`, at: new Date().toISOString() }, ...l]),
-    [setLedger],
+    (e: Omit<LedgerEntry, 'id' | 'at'>) => {
+      const id = `l${Date.now()}`
+      setLedger((l) => [{ ...e, id, at: new Date().toISOString() }, ...l])
+      // Written offline: kept here and counted in the banner until the connection is back.
+      queueSync({ id, kind: 'ledger' })
+    },
+    [setLedger, queueSync],
   )
   const setActionDone = useCallback((v: boolean) => setActionState(v ? 'done' : 'todo'), [setActionState])
 
@@ -135,12 +202,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
       addLedger,
       offline,
       setOffline,
+      syncQueue,
+      queueSync,
+      unqueueSync,
+      syncState,
+      syncedCount,
+      paymentsGrace,
+      setPaymentsGrace,
+      reduceMotion,
+      setReduceMotion,
       crisisOpen,
       setCrisisOpen,
     }),
-    [stored, themePref, setThemePref, textSize, setTextSize, lang, setLang, actionState, setActionState, setActionDone, ledger, addLedger, offline, crisisOpen],
+    [stored, themePref, setThemePref, textSize, setTextSize, lang, setLang, actionState, setActionState, setActionDone, ledger, addLedger, offline, setOffline, syncQueue, queueSync, unqueueSync, syncState, syncedCount, paymentsGrace, setPaymentsGrace, reduceMotion, setReduceMotion, crisisOpen],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
+}
+
+/** Reduce motion: the member's own setting, or the system one (iOS Reduce Motion, Android remove animations). */
+export function useReduceMotion() {
+  const { reduceMotion } = useApp()
+  const [system, setSystem] = useState(false)
+  useEffect(() => {
+    let alive = true
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((v) => alive && setSystem(v))
+      .catch(() => {})
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', (v) => setSystem(v))
+    return () => {
+      alive = false
+      sub?.remove?.()
+    }
+  }, [])
+  return reduceMotion || system
 }
 
 export function useApp() {

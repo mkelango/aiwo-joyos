@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Pressable, ScrollView, View } from 'react-native'
 import type { ScrollViewInstance } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Body, Button, Card, DaybreakButton, Eyebrow, Icon, Meta, Mono, Pill, Segmented, Serif, Sheet, TermDot, Toggle, Title } from '@/components'
+import { Body, Button, Card, DaybreakButton, Eyebrow, Icon, Meta, Mono, Pill, Segmented, Serif, Sheet, TermDot, Toggle, Title, fmtDate } from '@/components'
 import { LANGS, useDict, useTermText } from '@/lib/i18n'
 import { ONB, INTENT_TEXT, CONSENT_TEXT, DEVICE_TEXT } from '@/screens/b/i18n/onboarding'
 import { LANG_LABEL, useCommon, useTx, usePrefsError, perDayKey } from '@/screens/b/i18n/common'
@@ -11,19 +11,34 @@ import { useApp } from '@/lib/store'
 import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { DEVICES, INTENTS, type DeviceId } from '@/screens/b/entryData'
-import { notifPrefsStore, onboardingStore, sessionStore, useStore, validatePrefs, type NotifPrefs, type OnboardingDraft } from '@/screens/b/bStore'
+import { accountStore, notifPrefsStore, onboardingStore, refCode, sessionStore, useStore, validatePrefs, type NotifPrefs, type OnboardingDraft } from '@/screens/b/bStore'
+import { accountProblems, contactLabel, migrateOnboardingDraft, newAiwoId, onboardingAccountStore, onboardingLayoutStore, type OnboardingAccount } from '@/lib/onboardingAccount'
 import { SPECIMEN_AIWO_ID } from '@/screens/b/_data'
-import { CheckLine, ChoiceCard, Done, KeyValue, StepHead, StepProgress, TimeStepper, TimelineStep } from '@/screens/b/parts'
+import { CheckLine, ChoiceCard, Done, Field, KeyValue, StepHead, StepProgress, TimeStepper, TimelineStep, useCrisisGuard } from '@/screens/b/parts'
+import { SPECIMEN_NOW } from '@/screens/b/accountData'
 
-// ONBOARDING (Plan §4B; intent first, device last): intent tiles → language → three
-// consents → device → quiet hours → "Your ninety days begin" → the baseline Index.
+// ONBOARDING (Plan §4B; intent first, device last): language → AIWO ID (name, contact, a
+// passkey or a one-time code) → intent tiles → three consents → device → quiet hours →
+// household invites (optional) → "Your ninety days begin" → the baseline Index.
 // Back / next with validation; saved as you go on this phone (resumes at the saved step).
 // Quiet hours and channels are the same preferences Settings and Notifications show.
 // One Daybreak per step.
 
 // Language comes first, so everything after it reads in the member's language.
-const STEPS = ['Language', 'Intent', 'Consents', 'Device', 'Quiet hours', 'Begin'] as const
-const STEP_KEY = { Intent: 'sIntent', Language: 'sLanguage', Consents: 'sConsents', Device: 'sDevice', 'Quiet hours': 'sQuiet', Begin: 'sBegin' } as const
+const STEPS = ['Language', 'Account', 'Intent', 'Consents', 'Device', 'Quiet hours', 'Household', 'Begin'] as const
+const STEP_KEY = { Intent: 'sIntent', Language: 'sLanguage', Account: 'sAccount', Consents: 'sConsents', Device: 'sDevice', 'Quiet hours': 'sQuiet', Household: 'sHousehold', Begin: 'sBegin' } as const
+const RELATIONS = [
+  { value: 'Partner', key: 'hhRelPartner' },
+  { value: 'Parent', key: 'hhRelParent' },
+  { value: 'Child', key: 'hhRelChild' },
+  { value: 'Other', key: 'hhRelOther' },
+] as const
+// Labels match the Household screen's invite sheet, so an invite made here reads the same there.
+const AGES = [
+  { value: 'adult', label: 'Adult', key: 'hhAgeAdult' },
+  { value: 'elder', label: 'Elder mode', key: 'hhAgeElder' },
+  { value: 'minor', label: 'Under 18', key: 'hhAgeMinor' },
+] as const
 type Consents = { care: boolean; data: boolean; publishing: boolean }
 
 const SAMPLE = {
@@ -44,8 +59,27 @@ export default function Onboarding() {
   const { lang, setLang } = useApp()
   const scroll = useRef<ScrollViewInstance>(null)
   const [draft, setDraft] = useStore(onboardingStore)
+  // Re-render once a draft saved under the older step layout has been moved to this one.
+  const [layout] = useStore(onboardingLayoutStore)
   const [prefs, setPrefs] = useStore(notifPrefsStore)
   const [, setSession] = useStore(sessionStore)
+  const [account, setAccount] = useStore(onboardingAccountStore)
+  const [acct, setAcct] = useStore(accountStore)
+  const guard = useCrisisGuard()
+  // AIWO ID: how it is being secured right now (the account itself is saved as you go).
+  const [secure, setSecure] = useState<'choose' | 'passkey-waiting' | 'code'>('choose')
+  const [code, setCode] = useState('')
+  const [codeErr, setCodeErr] = useState<string | null>(null)
+  const [fieldsNote, setFieldsNote] = useState(false)
+  const [touched, setTouched] = useState<{ name?: boolean; contact?: boolean }>({})
+  const passkeyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Household: the invite being written.
+  const [invName, setInvName] = useState('')
+  const [invRelation, setInvRelation] = useState<(typeof RELATIONS)[number]['value']>('Partner')
+  const [invAge, setInvAge] = useState<(typeof AGES)[number]['value']>('adult')
+  const [invConsent, setInvConsent] = useState(false)
+  const [invErr, setInvErr] = useState<{ name?: string; consent?: string }>({})
+  const [invAdded, setInvAdded] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [tomorrowOpen, setTomorrowOpen] = useState(false)
@@ -55,6 +89,7 @@ export default function Onboarding() {
   const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => {
     if (exitTimer.current) clearTimeout(exitTimer.current)
+    if (passkeyTimer.current) clearTimeout(passkeyTimer.current)
   }, [])
   const t = useDict(ONB)
   const tc = useCommon()
@@ -93,15 +128,25 @@ export default function Onboarding() {
 
   // Resume where the member left off, once the saved draft has been read.
   useEffect(() => {
-    if (resumeChecked.current || !onboardingStore.hydrated()) return
+    if (resumeChecked.current || !migrateOnboardingDraft()) return
     resumeChecked.current = true
-    if (draft.started && draft.step > 0 && !draft.completedAt) setResumed(t('resumed', { step: stepLabel(STEPS[step]) }))
-  }, [draft, step]) // eslint-disable-line react-hooks/exhaustive-deps
+    // Read the draft fresh: the layout move above may have just changed its step.
+    const d = onboardingStore.get()
+    if (d.started && d.step > 0 && !d.completedAt) setResumed(t('resumed', { step: stepLabel(STEPS[Math.min(d.step, STEPS.length - 1)]) }))
+  }, [draft, step, layout]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const name = STEPS[step]
 
   const validate = (): string | null => {
     switch (name) {
+      case 'Account': {
+        const p = accountProblems(account)
+        if (p.name || p.contact) {
+          setTouched({ name: true, contact: true })
+          return t(p.name ?? p.contact!)
+        }
+        return account.verified ? null : t('acErrVerified')
+      }
       case 'Intent':
         return intents.length ? null : t('errIntent')
       case 'Consents':
@@ -116,11 +161,18 @@ export default function Onboarding() {
     }
   }
   const go = (n: number) => {
+    if (passkeyTimer.current) {
+      clearTimeout(passkeyTimer.current)
+      passkeyTimer.current = null
+      setSecure('choose')
+    }
     setStep(n)
     setResumed(null)
     requestAnimationFrame(() => scroll.current?.scrollTo({ y: 0, animated: false }))
   }
   const next = () => {
+    // Free text passes the crisis intercept first: a match opens the crisis sheet and stays here.
+    if (name === 'Account' && !guard(account.name)) return
     const err = validate()
     if (err) return setError(err)
     setError(null)
@@ -150,10 +202,75 @@ export default function Onboarding() {
   }
   const complete = () => {
     setDraft((d) => ({ ...d, completedAt: new Date().toISOString(), step: 0 }))
-    // SPECIMEN: mobile onboarding has no Account step yet (the web build collects name, contact
-    // and verification). Finishing here signs the member in as the specimen AIWO ID shown on the
-    // Begin step, so Sign in later has an ID to use. A real Account step is a parity follow-up.
-    setSession((s) => ({ ...s, signedIn: true, onboarded: true, at: s.at ?? new Date().toISOString() }))
+    // SPECIMEN: finishing signs the member in with the AIWO ID made on the AIWO ID step (passkey
+    // or one-time code, both simulated). Sign in recognises that ID afterwards.
+    setSession((s) => ({ ...s, signedIn: true, onboarded: true, method: account.verified === 'code' ? 'otp' : 'passkey', at: new Date().toISOString() }))
+  }
+
+  // ── AIWO ID ──
+  const setAcc = (patch: Partial<OnboardingAccount>, contactChange = false) => {
+    setError(null)
+    // A change to who you are un-secures the ID: verify again.
+    setAccount((a) => ({ ...a, ...patch, ...(contactChange || 'name' in patch ? { verified: null, aiwoId: null } : {}) }))
+    if (contactChange || 'name' in patch) setSecure((s) => (s === 'code' ? 'choose' : s))
+  }
+  const probs = accountProblems(account)
+  const fieldsOk = !probs.name && !probs.contact
+  const showErr = (k: 'name' | 'contact') => ((touched[k] || fieldsNote) && probs[k] ? t(probs[k]!) : null)
+  const verified = (how: 'passkey' | 'code') => setAccount((a) => ({ ...a, verified: how, aiwoId: a.aiwoId ?? newAiwoId() }))
+  const createPasskey = () => {
+    if (!fieldsOk) return setFieldsNote(true)
+    if (!guard(account.name)) return
+    setFieldsNote(false)
+    setSecure('passkey-waiting')
+    passkeyTimer.current = setTimeout(() => {
+      passkeyTimer.current = null
+      verified('passkey')
+      setSecure('choose')
+      setError(null)
+    }, 1400)
+  }
+  const sendCode = () => {
+    if (!fieldsOk) return setFieldsNote(true)
+    if (!guard(account.name)) return
+    setFieldsNote(false)
+    setCode('')
+    setCodeErr(null)
+    setSecure('code')
+  }
+  const verifyCode = () => {
+    if (code.replace(/\D/g, '').length < 6) return setCodeErr(t('acAllSix'))
+    verified('code')
+    setSecure('choose')
+    setError(null)
+  }
+
+  // ── Household ──
+  const invites = acct.invites.filter((iv) => account.invited.includes(iv.id))
+  const relLabel = (v: string) => t(RELATIONS.find((r) => r.value === v)?.key ?? 'hhRelOther')
+  const ageLabel = (label: string) => t(AGES.find((a) => a.label === label)?.key ?? 'hhAgeAdult')
+  const addInvite = () => {
+    setInvAdded(null)
+    if (!guard(invName)) return
+    const e: typeof invErr = {}
+    if (invName.trim().length < 2) e.name = t('hhErrName')
+    if (invAge === 'minor' && !invConsent) e.consent = t('hhErrConsent')
+    setInvErr(e)
+    if (Object.keys(e).length) return
+    const expires = new Date(Date.parse(SPECIMEN_NOW) + 7 * 86400000).toISOString().slice(0, 10)
+    const iv = { id: refCode('INV'), name: invName.trim(), relation: invRelation, age: AGES.find((a) => a.value === invAge)!.label, expires }
+    // The same invitations the Household screen lists and can cancel.
+    setAcct((a) => ({ ...a, invites: [...a.invites, iv] }))
+    setAccount((a) => ({ ...a, invited: [...a.invited, iv.id] }))
+    setInvAdded(t('hhAdded', { name: iv.name }))
+    setInvName('')
+    setInvConsent(false)
+    setInvAge('adult')
+  }
+  const removeInvite = (id: string) => {
+    setAcct((a) => ({ ...a, invites: a.invites.filter((x) => x.id !== id) }))
+    setAccount((a) => ({ ...a, invited: a.invited.filter((x) => x !== id) }))
+    setInvAdded(null)
   }
   const toggleIntent = (k: TermKey) => {
     setError(null)
@@ -164,7 +281,7 @@ export default function Onboarding() {
     setTimeout(() => setLinked((l) => ({ ...l, [device]: 'linked' })), 1200)
   }
 
-  const nextLabel = name === 'Device' && device !== 'none' && linked[device] !== 'linked' ? t('linkLater') : tc('continue')
+  const nextLabel = name === 'Device' && device !== 'none' && linked[device] !== 'linked' ? t('linkLater') : name === 'Household' && invites.length === 0 ? t('hhSkip') : tc('continue')
   const dev = DEVICES.find((d) => d.id === device)!
   const devName = tx(DEVICE_TEXT[dev.id]?.name, dev.name)
 
@@ -263,6 +380,153 @@ export default function Onboarding() {
             </View>
             <Card tone="sunk" padding={16}>
               <Meta>{t('langNote')}</Meta>
+            </Card>
+          </>
+        ) : null}
+
+        {name === 'Account' ? (
+          <>
+            <StepHead
+              eyebrow={t('sAccount')}
+              title={
+                <>
+                  {t('acTitleA')}<Serif>{t('acTitleSerif')}</Serif>{t('acTitleB')}
+                </>
+              }
+              lead={t('acLead')}
+            />
+            <Card tone="raised" style={{ gap: space.s2 }}>
+              <Field
+                label={t('acFirstName')}
+                value={account.name}
+                onChangeText={(v) => setAcc({ name: v })}
+                onBlur={() => setTouched((x) => ({ ...x, name: true }))}
+                autoComplete="given-name"
+                textContentType="givenName"
+                autoCapitalize="words"
+                placeholder="Arjun"
+                editable={secure !== 'passkey-waiting'}
+                error={showErr('name')}
+                help={t('acNameHelp')}
+              />
+              <View style={{ gap: space.s1 }}>
+                <Meta tone="ink">{t('acReach')}</Meta>
+                <Segmented<'phone' | 'email'>
+                  value={account.via}
+                  onChange={(v) => {
+                    setAcc({ via: v }, true)
+                    setTouched((x) => ({ ...x, contact: false }))
+                  }}
+                  items={[
+                    { value: 'phone', label: t('acMobile') },
+                    { value: 'email', label: t('acEmail') },
+                  ]}
+                />
+              </View>
+              {account.via === 'phone' ? (
+                <Field
+                  label={t('acMobileNumber')}
+                  value={account.phone}
+                  onChangeText={(v) => setAcc({ phone: v.replace(/[^\d +]/g, '') }, true)}
+                  onBlur={() => setTouched((x) => ({ ...x, contact: true }))}
+                  keyboardType="phone-pad"
+                  autoComplete="tel"
+                  textContentType="telephoneNumber"
+                  placeholder="98400 12345"
+                  editable={secure !== 'passkey-waiting'}
+                  error={showErr('contact')}
+                  help={t('acContactHelp')}
+                />
+              ) : (
+                <Field
+                  label={t('acEmail')}
+                  value={account.email}
+                  onChangeText={(v) => setAcc({ email: v }, true)}
+                  onBlur={() => setTouched((x) => ({ ...x, contact: true }))}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  textContentType="emailAddress"
+                  placeholder="you@example.com"
+                  editable={secure !== 'passkey-waiting'}
+                  error={showErr('contact')}
+                  help={t('acContactHelp')}
+                />
+              )}
+            </Card>
+            <Card tone="sunk" style={{ gap: space.s2 }}>
+              <Eyebrow>{t('acSecure')}</Eyebrow>
+              <View accessibilityLiveRegion="polite" style={{ gap: space.s2 }}>
+                {account.verified && account.aiwoId ? (
+                  <View style={{ flexDirection: 'row', gap: space.s2, alignItems: 'flex-start' }}>
+                    <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.ink, alignItems: 'center', justifyContent: 'center' }}>
+                      <Icon name="check" size={20} color={c.paper} />
+                    </View>
+                    <View style={{ flex: 1, gap: 6 }}>
+                      <Body weight="medium">{account.verified === 'passkey' ? t('acPkCreated') : t('acCodeVerified')}</Body>
+                      <Mono tone="ink" size={20} accessibilityLabel={t('acIdA11y', { id: account.aiwoId.split('').join(' ') })}>{account.aiwoId}</Mono>
+                      <Meta size={14}>{t('acYourId', { id: account.aiwoId, name: account.name.trim(), contact: contactLabel(account) })}</Meta>
+                      <Button variant="link" onPress={() => setAccount((a) => ({ ...a, verified: null, aiwoId: null }))}>
+                        {t('acDiffMethod')}
+                      </Button>
+                    </View>
+                  </View>
+                ) : secure === 'code' ? (
+                  <View style={{ gap: space.s2 }}>
+                    <Body>{t('acEnterCode', { c: contactLabel(account) })}</Body>
+                    <Field
+                      label={t('acCodeLabel')}
+                      value={code}
+                      onChangeText={(v) => {
+                        setCode(v.replace(/\D/g, '').slice(0, 6))
+                        setCodeErr(null)
+                      }}
+                      onSubmitEditing={verifyCode}
+                      keyboardType="number-pad"
+                      autoComplete="one-time-code"
+                      textContentType="oneTimeCode"
+                      maxLength={6}
+                      placeholder="••••••"
+                      error={codeErr}
+                      help={t('acAnySix')}
+                      style={{ maxWidth: 260 }}
+                    />
+                    <View style={{ flexDirection: 'row', gap: space.s1, flexWrap: 'wrap' }}>
+                      <Button variant="ink" icon="check" onPress={verifyCode}>
+                        {t('acVerifyCode')}
+                      </Button>
+                      <Button variant="ghost" onPress={() => setSecure('choose')}>
+                        {tc('back')}
+                      </Button>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={{ gap: space.s2 }}>
+                    <View style={{ flexDirection: 'row', gap: space.s2, alignItems: 'flex-start' }}>
+                      <View style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: c.lineStrong, alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name={secure === 'passkey-waiting' ? 'loader' : 'key'} size={20} color={c.ink} />
+                      </View>
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <Body>{secure === 'passkey-waiting' ? t('acWaiting') : t('acPkPrompt')}</Body>
+                        <Meta size={14}>{secure === 'passkey-waiting' ? t('acConfirmDevice') : t('acPkLives')}</Meta>
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: space.s1, flexWrap: 'wrap' }}>
+                      <Button variant="ink" icon="key" onPress={createPasskey} disabled={secure === 'passkey-waiting'}>
+                        {t('acCreatePk')}
+                      </Button>
+                      <Button variant="ghost" onPress={sendCode} disabled={secure === 'passkey-waiting'}>
+                        {t('acUseCode')}
+                      </Button>
+                    </View>
+                    {fieldsNote && !fieldsOk ? (
+                      <Meta tone="error" accessibilityRole="alert">
+                        {t(account.via === 'phone' ? 'acFieldsPhone' : 'acFieldsEmail')}
+                      </Meta>
+                    ) : null}
+                  </View>
+                )}
+              </View>
             </Card>
           </>
         ) : null}
@@ -410,6 +674,80 @@ export default function Onboarding() {
           </>
         ) : null}
 
+        {name === 'Household' ? (
+          <>
+            <StepHead
+              eyebrow={t('sHousehold')}
+              title={
+                <>
+                  {t('hhTitleA')}<Serif>{t('hhTitleSerif')}</Serif>{t('hhTitleB')}
+                </>
+              }
+              lead={t('hhLead')}
+            />
+            <Card tone="raised" style={{ gap: space.s2 }}>
+              <Eyebrow>{t('hhInvite')}</Eyebrow>
+              <Field
+                label={t('hhName')}
+                value={invName}
+                onChangeText={(v) => {
+                  setInvName(v)
+                  setInvErr((e) => ({ ...e, name: undefined }))
+                }}
+                autoCapitalize="words"
+                autoComplete="off"
+                placeholder="Kavya"
+                error={invErr.name}
+              />
+              <View style={{ gap: space.s1 }}>
+                <Meta tone="ink">{t('hhRelation')}</Meta>
+                <Segmented<(typeof RELATIONS)[number]['value']> value={invRelation} onChange={setInvRelation} items={RELATIONS.map((r) => ({ value: r.value, label: t(r.key) }))} />
+              </View>
+              <View style={{ gap: space.s1 }}>
+                <Meta tone="ink">{t('hhAgeLabel')}</Meta>
+                <Segmented<(typeof AGES)[number]['value']>
+                  value={invAge}
+                  onChange={(v) => {
+                    setInvAge(v)
+                    setInvErr((e) => ({ ...e, consent: undefined }))
+                  }}
+                  items={AGES.map((a) => ({ value: a.value, label: t(a.key) }))}
+                />
+              </View>
+              {invAge === 'minor' ? (
+                <View style={{ gap: 4 }}>
+                  <Toggle checked={invConsent} onChange={(v) => { setInvConsent(v); setInvErr((e) => ({ ...e, consent: undefined })) }} label={t('hhConsent')} description={t('hhConsentD')} />
+                  {invErr.consent ? <Meta tone="error" accessibilityLiveRegion="polite">{invErr.consent}</Meta> : null}
+                </View>
+              ) : null}
+              <Button variant="secondary" icon="user-plus" onPress={addInvite}>
+                {t('hhAdd')}
+              </Button>
+              <Meta size={14}>{t('hhInvHelp')}</Meta>
+            </Card>
+            {invAdded ? <Done>{invAdded}</Done> : null}
+            <Card tone="sunk" style={{ gap: space.s1 }}>
+              <Eyebrow>{t('hhInvList')}</Eyebrow>
+              {invites.length === 0 ? (
+                <Meta>{t('hhNone')}</Meta>
+              ) : (
+                invites.map((iv, i) => (
+                  <View key={iv.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: c.line, paddingVertical: 6 }}>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Body weight="medium">{iv.name}</Body>
+                      <Meta size={14}>{t('hhLine', { relation: relLabel(iv.relation), age: ageLabel(iv.age), date: fmtDate(iv.expires) })}</Meta>
+                    </View>
+                    <Button variant="ghost" size="sm" onPress={() => removeInvite(iv.id)} accessibilityLabel={t('hhRemoveA11y', { name: iv.name })}>
+                      {t('hhRemove')}
+                    </Button>
+                  </View>
+                ))
+              )}
+            </Card>
+            <Meta size={14}>{t('hhPrivate')}</Meta>
+          </>
+        ) : null}
+
         {name === 'Begin' ? (
           <>
             <StepHead
@@ -455,11 +793,17 @@ export default function Onboarding() {
                 </View>
               </KeyValue>
               <KeyValue k="AIWO ID">
-                <Mono tone="ink" size={17}>{SPECIMEN_AIWO_ID}</Mono>
+                <View style={{ gap: 2 }}>
+                  <Mono tone="ink" size={17}>{account.aiwoId ?? SPECIMEN_AIWO_ID}</Mono>
+                  {account.aiwoId ? (
+                    <Meta size={14}>{`${account.name.trim()} · ${contactLabel(account)} · ${account.verified === 'passkey' ? t('acVPasskey') : account.verified === 'code' ? t('acVCode') : t('acVNone')}`}</Meta>
+                  ) : null}
+                </View>
               </KeyValue>
               <KeyValue k={tc('language')}>{LANGS.find((l) => l.value === lang)!.native}</KeyValue>
               <KeyValue k={t('kConsents')}>{`${t('consSum')}${consents.publishing ? t('consPub') : t('consNoPub')}`}</KeyValue>
               <KeyValue k={t('kDevice')}>{device === 'none' ? t('noneForNow') : `${devName}${linked[device] === 'linked' ? t('devLinked') : t('devLater')}`}</KeyValue>
+              <KeyValue k={t('kHousehold')}>{invites.length ? t('hhSum', { names: invites.map((iv) => iv.name).join(tc('and')) }) : t('hhSumNone')}</KeyValue>
               <KeyValue k={tc('quietHours')} last>
                 <Mono tone="ink" size={17}>{`${quiet.from} – ${quiet.to} · ${t('aDay', { n: perDay })}`}</Mono>
               </KeyValue>

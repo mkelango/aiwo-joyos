@@ -11,6 +11,7 @@ import { CAPTIONS, CIRCLE_NEXT, CIRCLE_SESSIONS, OTHER_CIRCLES, PRACTICE_CONTENT
 import { fade, useFocusTrap } from './_parts'
 import { TODAY, holderName, setCalendar, setCircleRequest, setSalon, useJourney } from './_store'
 import { useJ } from './_i18n'
+import { useA11yPrefs } from '@/routes/member/account/_prefs'
 
 // JOY CIRCLES (Memo p.21): eight members and a coach, a 30-minute call every
 // Monday for ninety days; video in the app, recordings off by default,
@@ -261,7 +262,9 @@ function CallRoom({ mode, onMode, onLeave }: { mode: RoomMode; onMode: (m: RoomM
   const [mic, setMic] = useState(false)
   const [cam, setCam] = useState(true)
   const [hand, setHand] = useState(false)
-  const [captions, setCaptions] = useState(true)
+  // Captions start from the member's Accessibility choice in Settings; the room toggle overrides it for this call.
+  const captionsPref = useA11yPrefs().captions
+  const [captions, setCaptions] = useState(captionsPref)
   const [speaker, setSpeaker] = useState(0)
   const [level, setLevel] = useState(0)
   const rootRef = useRef<HTMLDivElement>(null)

@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics'
 import type { ReactNode } from 'react'
 import { Platform, Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native'
+import { useReduceMotion } from '../lib/store'
 import { useTheme } from '../theme/ThemeProvider'
 import { Icon, type IconName } from './Icon'
 import { useToneColor } from './Text'
@@ -26,6 +27,7 @@ interface DaybreakProps {
  */
 export function DaybreakButton({ children, onPress, disabled, icon, block = true, accessibilityHint, style }: DaybreakProps) {
   const t = useTheme()
+  const reduce = useReduceMotion()
   const fs = 19 * t.textScale
   return (
     <Pressable
@@ -53,7 +55,7 @@ export function DaybreakButton({ children, onPress, disabled, icon, block = true
           alignSelf: block ? 'stretch' : 'flex-start',
           maxWidth: '100%',
           opacity: disabled ? 0.5 : 1,
-          transform: [{ scale: pressed ? 0.985 : 1 }],
+          transform: [{ scale: pressed && !reduce ? 0.985 : 1 }],
         },
         style,
       ]}

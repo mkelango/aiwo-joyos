@@ -10,6 +10,8 @@ import { CIRCLE, COHORTS, EVENTS } from '@/data/platform'
 import { HOUSEHOLD, INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
 import { FLAGSHIP_NEXT, FLAGSHIP_RECAP, PASSES, SALONS, SESSIONS_ALLOWANCE, SESSIONS_OPEN, SESSION_SCHEDULE, ZONES } from './_data'
 import { QRCode, SheetFocus, fade } from './_parts'
+// One shared emergency intercept for every member free-text field (Memo p.24).
+import { useCrisisGuard } from '@/routes/member/spaces/_SpaceShell'
 import { addPass, cancelPass, holderName, passCode, setFlagshipRequest, setSalon, setSchedule, useJourney } from './_store'
 import { useJ, type JourneyKey } from './_i18n'
 
@@ -275,11 +277,16 @@ function UpcomingAtAiwo() {
   const [open, setOpen] = useState(false)
   const [guests, setGuests] = useState<'1' | '2'>('2')
   const [note, setNote] = useState('')
+  const [held, setHeld] = useState(false)
+  const guard = useCrisisGuard()
   const req = journey.flagshipRequest
   const { t, r, tx, term } = useJ()
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
+    // Emergency intercept first: the note never reaches the concierge until support has been offered.
+    if (guard(note)) { setHeld(true); return }
+    setHeld(false)
     setFlagshipRequest({ ref: `AJ28-REQ-${MEMBER.id.slice(-4)}`, guests: Number(guests), note: note.trim() })
     setOpen(false)
   }
@@ -320,12 +327,13 @@ function UpcomingAtAiwo() {
                   </div>
                   <div>
                     <label htmlFor={`${id}-n`} className="text-[15px] text-ink">{t('noteFor', { c: CONCIERGE })} <span className="text-ink-3">{t('optional')}</span></label>
-                    <textarea id={`${id}-n`} rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={240} placeholder={t('notePh')} className="mt-2 w-full resize-none rounded-card border border-line-strong bg-paper-raised px-3.5 py-2.5 text-[15px] text-ink placeholder:text-ink-3 focus-ring" />
+                    <textarea id={`${id}-n`} rows={2} value={note} onChange={(e) => { setNote(e.target.value); setHeld(false) }} maxLength={240} placeholder={t('notePh')} className="mt-2 w-full resize-none rounded-card border border-line-strong bg-paper-raised px-3.5 py-2.5 text-[15px] text-ink placeholder:text-ink-3 focus-ring" />
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button variant="ink" type="submit">{t('sendRequest')}</Button>
                     <Button variant="ghost" onClick={() => setOpen(false)}>{t('notNow')}</Button>
                   </div>
+                  {held && <p className="text-[14px] text-ink-2" role="status">{t('heldForSupport')}</p>}
                   <p className="text-[12px] text-ink-3">{t('noPaymentVenues')}</p>
                 </motion.form>
               ) : (

@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDict } from '../lib/i18n'
 import { useTheme } from '../theme/ThemeProvider'
 import { KIT } from './_i18n'
+import { AppBanners } from './AppBanners'
 import { Icon } from './Icon'
 import { Body, Eyebrow, Title } from './Text'
 
@@ -35,6 +36,8 @@ export function Screen({ children, scroll = true, inTabs = false, top, contentSt
   return (
     <View style={{ flex: 1, backgroundColor: c.paper, paddingTop: insets.top }}>
       {top}
+      {/* Offline (with its sync queue) and payments grace, on every screen. */}
+      <AppBanners />
       {scroll ? (
         // automaticallyAdjustKeyboardInsets (iOS) scrolls a focused Field above the keyboard;
         // Android resizes the window itself.

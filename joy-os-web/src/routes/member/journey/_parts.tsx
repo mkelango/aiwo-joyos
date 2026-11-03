@@ -8,6 +8,7 @@ import type { TermKey } from '@/domain/types'
 import type { ItemKind } from './_data'
 import { useJ } from './_i18n'
 import { setOffline as setOfflineWeek, useJourney } from './_store'
+import { useMeasured } from '@/routes/member/core/_store'
 
 const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 
@@ -264,4 +265,16 @@ export function SheetFocus() {
     return () => { document.removeEventListener('keydown', onKey); if (prev && document.contains(prev)) prev.focus() }
   }, [])
   return <span ref={ref} hidden />
+}
+
+/** The Index re-taken at /app/index/take (core lane's measured record, read-only here):
+ *  fills the After (W8) column. `cell` renders a term like the Before column (B as −n). */
+export function useAfterIndex() {
+  const [m] = useMeasured()
+  const value = (k: TermKey) => m?.terms.find((x) => x.key === k)?.value ?? null
+  const cell = (k: TermKey) => {
+    const v = value(k)
+    return v === null ? '—' : k === 'B' ? `−${v}` : String(v)
+  }
+  return { measured: m, ji: m ? String(m.value) : '—', value, cell }
 }

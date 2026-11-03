@@ -29,6 +29,10 @@ export const MEMBER = {
   remainingLifeExpectancy: 30,
 }
 
+/** Specimen payments grace: the February UPI charge is retrying. Access holds until `until`;
+ *  paying `invoice` ends the grace state. One date for the banner, Today and Membership. */
+export const PAYMENTS_GRACE = { until: '2027-02-15', invoice: 'INV-2027-000531' } as const
+
 export const INDEX_HISTORY: IndexScore[] = [
   {
     id: 'ix_003',

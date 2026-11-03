@@ -31,6 +31,7 @@ import { useTheme } from '@/theme/ThemeProvider'
 import { CLAIMS_LOG, EXPORTS_PAST, EXTRA_ACCESS } from '@/screens/b/accountData'
 import { trustStore, useStore } from '@/screens/b/bStore'
 import { ChoiceCard, Done, Field, FilterChips, TimelineStep, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
+import { AbhaCard, MethodCard, NomineeCard } from '@/screens/b/trustCards'
 import { useDict } from '@/lib/i18n'
 import { TRUST, SCOPE_TEXT, CONSENT_T, ACCESS_T, EXPORT_T, CLAIM_STATE, CLAIM_BY, CLAIM_T } from '@/screens/b/i18n/trust'
 import { ROLE, useCommon, useTx } from '@/screens/b/i18n/common'
@@ -83,6 +84,11 @@ function Trust() {
   // iOS cannot present the toast Modal while the confirm Sheet is still dismissing.
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current) }, [])
+  // A card's sheet closes first; its toast follows once the sheet has gone.
+  const toastLater = (msg: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(msg), 350)
+  }
   const granted = Object.values(consent).filter((x) => x.on).length
   const groups = (['core', 'cohort', 'device', 'calendar', 'whatsapp', 'partner'] as const).map((g) => ({ g, items: CONSENTS.filter((x) => x.scope === g) })).filter((x) => x.items.length)
 
@@ -430,6 +436,13 @@ function Trust() {
           </Meta>
         </View>
       </View>
+
+      {/* Nominee and ABHA */}
+      <NomineeCard onToast={toastLater} />
+      <AbhaCard onToast={toastLater} />
+
+      {/* The method and its versions */}
+      <MethodCard />
 
       {/* Withdraw a core consent */}
       <Sheet

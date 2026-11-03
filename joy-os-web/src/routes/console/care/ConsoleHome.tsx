@@ -2,14 +2,16 @@ import clsx from 'clsx'
 import { motion, useReducedMotion } from 'framer-motion'
 import { ArrowRight, Check, Eye, FileLock2, KeyRound, Lock, Minus, ScrollText, ShieldCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { DaybreakButton, Eyebrow, SpecimenTag } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill } from '@/components/ui'
 import { CONSOLES } from '@/layouts/ConsoleLayout'
 import { ACCESS_LOG } from '@/data/member'
 import { AccessRequestSheet } from './_access'
-import { GATE, ROLE_OPTIONS, useConsoleRole } from './_gate'
-import { AccessNote } from './_parts'
+import { DECLINE_REASONS, access, isLive, standingRequest, lastSettled, statusLabel, useAccessRequests, type AccessRequest } from './_accessStore'
+import { useClinicalState } from './_clinicalStore'
+import { GATE, ROLE_OPTIONS, specimenRoleOf, useConsoleRole } from './_gate'
+import { AccessNote, fmtClock, fmtDuration, useConsoleNow } from './_parts'
 
 // ALL CONSOLES (Memo p.16; Architecture p21, p25): who uses each console, the access rule
 // it enforces, how role gating works, and the audit promise. Role-gated, fail closed.
@@ -51,24 +53,43 @@ export default function ConsoleHome() {
   const { role, setRole, chosen, roleLabel, person } = useConsoleRole()
   const navigate = useNavigate()
   const reduce = useReducedMotion()
-  // No console role chosen (the member default): nothing is locked or requested; each console
-  // opens as its own specimen person, exactly as the console gate treats that visitor.
+  // No console role chosen (the member default): every console is view only until a role is
+  // picked. Opening one from a card signs the visitor in as its specimen person, so it can act.
   const activeRole = chosen ? role : null
   const home = (activeRole && CONSOLES.find((c) => GATE[c.to]?.includes(activeRole))) || CONSOLES[0]
   const [requesting, setRequesting] = useState<(typeof CONSOLES)[number] | null>(null)
-  const [requested, setRequested] = useState<Record<string, string>>({})
+  // Requests persist for the session (_accessStore) and resolve to a grant or a decline.
+  const requests = useAccessRequests()
+  const now = useConsoleNow(15_000)
   const [params, setParams] = useSearchParams()
+  const { hash } = useLocation()
+  const { audit } = useClinicalState()
+
+  // Opening a console as its specimen person signs the visitor in as that person, so the
+  // Demo switcher and the console agree. Once a role is chosen a card never changes it.
+  const enter = (to: string) => { if (!activeRole) { const r = specimenRoleOf(to); if (r) setRole(r) } }
 
   // Arriving from a console's preview banner (?request=/console/…) opens that request directly.
   const requestParam = params.get('request')
   useEffect(() => {
     if (!requestParam) return
     const target = CONSOLES.find((c) => c.to === requestParam)
-    if (target && activeRole && !GATE[target.to]?.includes(activeRole) && !requested[target.to]) setRequesting(target)
+    if (target && activeRole && !GATE[target.to]?.includes(activeRole) && !standingRequest(requests, target.to, activeRole, now)) setRequesting(target)
     const next = new URLSearchParams(params)
     next.delete('request')
     setParams(next, { replace: true })
   }, [requestParam]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // "See the request" from a console lands on the list of requests.
+  useEffect(() => {
+    if (hash === '#access-requests') document.getElementById('access-requests')?.scrollIntoView({ block: 'start' })
+  }, [hash])
+
+  // Arjun's reads: this session's clinical portal reads of his record first, then the record so far.
+  const arjunReads = [
+    ...audit.filter((e) => e.memberId === 'm_0001' && e.kind === 'read').map((e) => ({ id: e.id, at: e.at, who: e.who, role: e.role, what: e.what, purpose: e.purpose })),
+    ...ACCESS_LOG,
+  ]
 
   return (
     <div>
@@ -91,7 +112,7 @@ export default function ConsoleHome() {
               </p>
             ) : (
               <p className="mt-1 text-[15px] text-ink-2">
-                No console role chosen · each console opens as its own specimen person. Choose a role to see which consoles it can open and which stay locked.
+                No console role chosen · every console is view only until you pick one. Opening a console from its card signs you in as its own specimen person; or choose a role to see which consoles it opens and which stay locked.
               </p>
             )}
             <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Demo role">
@@ -109,10 +130,10 @@ export default function ConsoleHome() {
             </div>
           </div>
           <div className="flex flex-col items-start gap-2 lg:items-end">
-            <DaybreakButton onClick={() => navigate(home.to)}>
+            <DaybreakButton onClick={() => { enter(home.to); navigate(home.to) }}>
               Open {home.label.toLowerCase()} <ArrowRight size={18} />
             </DaybreakButton>
-            <span className="text-[13px] text-ink-3">Reason for access is asked when you open a member.</span>
+            <span className="text-[13px] text-ink-3">{activeRole ? 'Reason for access is asked when you open a member.' : <>Signs you in as {ROLE_OPTIONS.find((r) => r.value === specimenRoleOf(home.to))?.person ?? 'its specimen person'}.</>}</span>
           </div>
         </div>
       </Card>
@@ -127,6 +148,9 @@ export default function ConsoleHome() {
           {CONSOLES.map((c, i) => {
             const open = !!activeRole && !!GATE[c.to]?.includes(activeRole)
             const specimen = !activeRole
+            const standing = activeRole && !open ? standingRequest(requests, c.to, activeRole, now) : null
+            const settled = activeRole && !open && !standing ? lastSettled(requests, c.to, activeRole, now) : null
+            const granted = standing && isLive(standing, now) ? standing : null
             const Icon = c.icon
             return (
               <motion.li
@@ -140,7 +164,7 @@ export default function ConsoleHome() {
                   <span className={clsx('flex h-11 w-11 items-center justify-center rounded-full', open || specimen ? 'bg-paper-sunk text-ink' : 'bg-paper-sunk text-ink-3')}>
                     <Icon size={20} strokeWidth={1.6} aria-hidden />
                   </span>
-                  {open ? <Pill tone="ink"><Check size={12} aria-hidden /> Your role</Pill> : specimen ? <Pill><Eye size={12} aria-hidden /> Opens as specimen</Pill> : <Pill><Lock size={12} aria-hidden /> {c.to === '/console/ops' ? 'JIT only' : 'Locked'}</Pill>}
+                  {open ? <Pill tone="ink"><Check size={12} aria-hidden /> Your role</Pill> : granted ? <Pill tone="ink"><KeyRound size={12} aria-hidden /> Granted</Pill> : specimen ? <Pill><Eye size={12} aria-hidden /> Opens as specimen</Pill> : <Pill><Lock size={12} aria-hidden /> {c.to === '/console/ops' ? 'JIT only' : 'Locked'}</Pill>}
                 </div>
                 <h3 className="mt-4 text-[1.25rem] font-light text-ink">{c.label}</h3>
                 <p className="mt-1 text-[15px] text-ink-2">{c.who}</p>
@@ -155,13 +179,16 @@ export default function ConsoleHome() {
                   </div>
                 </dl>
                 <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-2 pt-5">
-                  <Link to={c.to} className="inline-flex items-center gap-1.5 whitespace-nowrap text-[15px] text-ink underline-offset-4 hover:underline focus-ring">
-                    {open ? 'Open' : specimen ? 'Open as specimen' : 'Preview as specimen'} <ArrowRight size={15} aria-hidden />
+                  <Link to={c.to} onClick={() => enter(c.to)} className="inline-flex items-center gap-1.5 whitespace-nowrap text-[15px] text-ink underline-offset-4 hover:underline focus-ring">
+                    {open ? 'Open' : granted ? 'Open under grant' : specimen ? 'Open as specimen' : 'Preview as specimen'} <ArrowRight size={15} aria-hidden />
                   </Link>
-                  {!open && !specimen && (requested[c.to] ? (
-                    <span className="text-[12px] text-ink-2">Requested · <span className="num">{requested[c.to]}</span></span>
+                  {!open && !specimen && (standing ? (
+                    <a href="#access-requests" className="text-[12px] text-ink-2 underline-offset-4 hover:underline focus-ring">{granted ? <>Granted · <span className="num">{fmtDuration((granted.expiresAt ?? now) - now)}</span> left</> : <>Requested · <span className="num">{standing.ref}</span> · awaiting</>}</a>
                   ) : (
-                    <Button size="sm" variant="secondary" className="whitespace-nowrap" onClick={() => setRequesting(c)}>{c.to === '/console/ops' ? 'JIT request' : 'Request from DPO'}</Button>
+                    <span className="flex flex-wrap items-center gap-2">
+                      {settled?.status === 'declined' && <span className="text-[12px] text-ink-3">Declined · <span className="num">{settled.ref}</span></span>}
+                      <Button size="sm" variant="secondary" className="whitespace-nowrap" onClick={() => setRequesting(c)}>{settled?.status === 'declined' ? 'Ask again' : c.to === '/console/ops' ? 'JIT request' : 'Request from DPO'}</Button>
+                    </span>
                   ))}
                 </div>
               </motion.li>
@@ -177,6 +204,8 @@ export default function ConsoleHome() {
           </li>
         </ul>
       </section>
+
+      {requests.length > 0 && <AccessRequests requests={requests} now={now} />}
 
       {/* How gating works */}
       <section className="mt-12 grid gap-6 2xl:grid-cols-[1fr_1.6fr]" aria-labelledby="gating-h">
@@ -272,7 +301,7 @@ export default function ConsoleHome() {
             <Eye size={16} className="text-ink-3" aria-hidden />
           </div>
           <ul className="space-y-3.5">
-            {ACCESS_LOG.slice(0, 4).map((e) => (
+            {arjunReads.slice(0, 4).map((e) => (
               <li key={e.id} className="border-b border-line pb-3 last:border-0 last:pb-0">
                 <p className="num text-[12px] text-ink-3">{e.at}</p>
                 <p className="text-[15px] text-ink">{e.who} <span className="text-ink-3">· {e.role}</span></p>
@@ -286,11 +315,88 @@ export default function ConsoleHome() {
 
       <AccessRequestSheet
         console={requesting}
+        role={role}
         roleLabel={roleLabel}
         person={person}
         onClose={() => setRequesting(null)}
-        onSent={(to, ref) => setRequested((r) => ({ ...r, [to]: ref }))}
       />
     </div>
+  )
+}
+
+// ─── Access requests: sent, decided, granted, expired ─────────────────────
+
+/**
+ * Every request sent this session, newest first. Nobody can approve their own request; in
+ * this specimen the reviewer plays the DPO (or the second engineer, for the control plane).
+ */
+function AccessRequests({ requests, now }: { requests: AccessRequest[]; now: number }) {
+  const [declining, setDeclining] = useState<string | null>(null)
+  const [reason, setReason] = useState(DECLINE_REASONS[0])
+  return (
+    <section id="access-requests" className="mt-12 scroll-mt-24" aria-labelledby="acc-h">
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="acc-h" className="eyebrow text-ink-3">Your access requests · <span className="num">{requests.length}</span></h2>
+        <span className="text-[13px] text-ink-3">Specimen · kept for this browser session</span>
+      </div>
+      <Card className="min-w-0">
+        <ul className="divide-y divide-[color:var(--line)]">
+          {requests.map((r) => {
+            const live = isLive(r, now)
+            const jit = r.to === '/console/ops'
+            const decider = jit ? 'second engineer' : 'DPO'
+            return (
+              <li key={r.ref} className="grid gap-3 py-4 first:pt-0 last:pb-0 md:grid-cols-[1fr_auto] md:gap-6">
+                <div className="min-w-0">
+                  <p className="flex flex-wrap items-center gap-2 text-[16px] text-ink">
+                    <span className="num text-[13px] text-ink-3">{r.ref}</span>
+                    {r.label}
+                    <Pill tone={live ? 'ink' : undefined}>{statusLabel(r, now)}</Pill>
+                  </p>
+                  <p className="mt-1 text-[14px] text-ink-2">{r.person} · {r.roleLabel} · {r.purpose} · {r.scope} · {r.duration}</p>
+                  <p className="mt-1 text-[14px] text-ink-2">“{r.why}”</p>
+                  <p className="mt-1.5 text-[13px] text-ink-3">
+                    Sent <span className="num">{fmtClock(r.sentAt)}</span>
+                    {r.decidedAt !== undefined && r.status !== 'pending' && <> · {r.status === 'withdrawn' ? 'withdrawn' : r.status === 'revoked' ? 'revoked' : `${r.status} by ${r.decidedBy}`} <span className="num">{fmtClock(r.decidedAt)}</span></>}
+                    {live && <> · ends <span className="num">{fmtClock(r.expiresAt ?? now)}</span> (<span className="num">{fmtDuration((r.expiresAt ?? now) - now)}</span> left)</>}
+                    {r.status === 'granted' && !live && <> · ended <span className="num">{fmtClock(r.expiresAt ?? now)}</span></>}
+                  </p>
+                  {r.status === 'declined' && r.reason && <p className="mt-1 text-[14px] text-ink"><span className="eyebrow mr-2 text-ink-3">Reason</span>{r.reason}</p>}
+                  {live && r.scope.startsWith('No member data') && <p className="mt-1 text-[13px] text-ink-3">Structure only: the console opens to look, never to act on a member.</p>}
+                </div>
+                <div className="flex flex-wrap items-center gap-2 md:flex-col md:items-end">
+                  {r.status === 'pending' && declining !== r.ref && (
+                    <>
+                      <Button size="sm" variant="ink" onClick={() => access.decide(r.ref, 'granted')}>Approve as {decider} (specimen)</Button>
+                      <Button size="sm" variant="secondary" onClick={() => { setDeclining(r.ref); setReason(DECLINE_REASONS[0]) }}>Decline as {decider}</Button>
+                      <Button size="sm" variant="ghost" onClick={() => access.withdraw(r.ref)}>Withdraw</Button>
+                    </>
+                  )}
+                  {r.status === 'pending' && declining === r.ref && (
+                    <form onSubmit={(e) => { e.preventDefault(); access.decide(r.ref, 'declined', reason); setDeclining(null) }} className="flex w-full flex-col gap-2 md:w-[320px]">
+                      <label htmlFor={`dec-${r.ref}`} className="eyebrow text-ink-3">Reason the {decider} gives</label>
+                      <select id={`dec-${r.ref}`} value={reason} onChange={(e) => setReason(e.target.value)} className="h-9 rounded-full border border-line-strong bg-paper-raised px-3 text-[13px] text-ink focus-ring">
+                        {DECLINE_REASONS.map((x) => <option key={x}>{x}</option>)}
+                      </select>
+                      <span className="flex justify-end gap-2">
+                        <Button size="sm" variant="ghost" onClick={() => setDeclining(null)}>Cancel</Button>
+                        <Button size="sm" variant="ink" type="submit">Decline</Button>
+                      </span>
+                    </form>
+                  )}
+                  {live && (
+                    <>
+                      <Link to={r.to} className="inline-flex items-center gap-1.5 text-[14px] text-ink underline-offset-4 hover:underline focus-ring">Open {r.label.toLowerCase()} <ArrowRight size={14} aria-hidden /></Link>
+                      <Button size="sm" variant="ghost" onClick={() => access.revoke(r.ref)}>End grant now</Button>
+                    </>
+                  )}
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+        <AccessNote icon="shield" className="mt-5">A grant opens one console for one role, for the time asked, and ends on its own. Every action taken under it carries its reference in the audit.</AccessNote>
+      </Card>
+    </section>
   )
 }
