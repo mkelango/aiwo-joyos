@@ -1,21 +1,27 @@
+import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowDown, ArrowRight, BookOpen, CircleDashed, FlaskConical, Printer, RotateCcw, ShieldCheck, Watch, X } from 'lucide-react'
+import { ArrowDown, ArrowRight, CircleDashed, FileText, History, Mail, Pencil, RotateCcw, ShieldCheck, Watch, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
+import { JoyspanWheel, WheelGhostKey } from '@/components/joy/JoyspanWheel'
 import { BandLabel, DaybreakButton, Delta, Eyebrow, MethodLine, SpecimenTag, TermChip, TermDot, useBandText, useFmtDate } from '@/components/joy/primitives'
-import { Button, Card, DataTable, PageHeader, Pill, SectionTitle, Tabs } from '@/components/ui'
+import { Button, Card, DataTable, PageHeader, Pill, SectionTitle, Sheet, Tabs } from '@/components/ui'
 import { INDEX_HISTORY, MEMBER, TODAY_ACTION } from '@/data/member'
 import { INSTRUMENTS } from '@/data/platform'
 import { termByKey, termColor } from '@/data/terms'
-import { METHODS, bandFor, jaly, joyspanIndex, lowestTerm } from '@/domain/indexEngine'
+import { METHODS, bandFor, joyspanIndex, lowestTerm } from '@/domain/indexEngine'
 import type { IndexScore, TermKey } from '@/domain/types'
-import { HISTORY_METHOD, METHOD_V10_PUBLISHED, NOT_YET_EXAMPLE, TERM_DETAIL } from './_data'
+import { HISTORY_METHOD, METHOD_V10_PUBLISHED, NOT_YET_EXAMPLE, SITTINGS, TERM_DETAIL } from './_data'
 import { KV, PrintOnly, TICK, TOOLTIP_STYLE } from './_parts'
-import { useMeasured, useSignalsDown, type MeasuredIndex } from './_store'
+import { SPECIMEN_TODAY, amendedAnswers, useMeasured, useSignalsDown, type Amendment, type MeasuredIndex } from './_store'
+import { scaleOf, scoreAnswers } from './_scoring'
+import { IndexCardView } from './_card'
+import { RemeasureCard } from './_remeasure'
+import { useX } from './_i18nX'
+import { SHARED } from '@/components/_i18n'
 import { ACTION_TEXT, CONFIDENCE_KEY, SIGNAL_SOURCE_TEXT, TERM_DETAIL_TEXT, fmtLocal, rich, useCore } from './_i18n'
-import { useT } from '@/lib/i18n'
+import { useDict, useT } from '@/lib/i18n'
 import type { Lang } from '@/lib/store'
 
 // MY INDEX (Memo p.11, p.18; Plan §4B "Index result & history").
@@ -60,6 +66,9 @@ export default function IndexHome() {
       />
 
       {measured && <MeasuredBanner m={measured} onClear={() => setMeasured(null)} />}
+
+      {/* The re-measure chain: Day-76 invite → Clinical grade → sign-off → Day-90 card. */}
+      <RemeasureCard className="mb-6 lg:mb-8" />
 
       {/* Signals down: the Index can only be survey-only, and says so (never a fault colour). */}
       {signalsDown && (
@@ -171,11 +180,12 @@ export default function IndexHome() {
       <HistoryCard />
 
       {/* ─── Index card + notes ──────────────────────────────────────────── */}
-      <div className="mt-6 grid gap-6 lg:mt-8 lg:grid-cols-[1.35fr_1fr] lg:gap-8">
+      <div className="mt-6 lg:mt-8">
         <IndexCard />
-        <div className="flex flex-col gap-6">
+      </div>
+      <div className="mt-6 grid gap-6 md:grid-cols-2 lg:mt-8 lg:gap-8 xl:grid-cols-3">
           <NotYetMeasured />
-          <JalyNote value={latest.value} />
+          <PrintedForYou />
           <Card tone="outline">
             <Eyebrow>{c('ixWhenDown')}</Eyebrow>
             <p className="mt-3 text-[17px] text-ink">{c('ixWhenDownBody')}</p>
@@ -183,7 +193,6 @@ export default function IndexHome() {
               {c('ixSeeDay90')} <ArrowRight size={15} />
             </Link>
           </Card>
-        </div>
       </div>
     </div>
   )
@@ -521,13 +530,16 @@ function HistoryCard() {
 function MeasuredBanner({ m, onClear }: { m: MeasuredIndex; onClear: () => void }) {
   const latest = INDEX_HISTORY[0]
   const [confirming, setConfirming] = useState(false)
+  const [amending, setAmending] = useState(false)
   const { t: c, name } = useCore()
+  const x = useX()
   const fmtDate = useFmtDate()
+  const amends = m.amendments ?? []
   return (
     <Card tone="soft" className="mb-6 lg:mb-8" aria-label={c('mbAria')}>
       <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-4">
-          <JoyspanWheel terms={m.terms} size={84} animate={false} guide={false} />
+          <JoyspanWheel terms={m.terms} size={96} animate={false} guide={false} baseline={latest.terms} />
           <div className="min-w-0">
             <Eyebrow tone="daybreak">{c('mbMeasured', { kind: c(m.preview ? 'mbPreview' : 'mbRemeasure'), date: fmtDate(m.takenOn) })}</Eyebrow>
             <div className="mt-1 flex flex-wrap items-end gap-x-3 gap-y-1">
@@ -544,9 +556,18 @@ function MeasuredBanner({ m, onClear }: { m: MeasuredIndex; onClear: () => void 
                 <Pill tone="neutral">{c('soPill')}</Pill> {c('soBanner')}
               </p>
             )}
+            {amends.length > 0 && (
+              <p className="mt-2 flex flex-wrap items-center gap-2 text-[14px] text-ink-2">
+                <Pill tone="neutral">{x('amAmendedPill')}</Pill>
+                {rich(x(amends.length === 1 ? 'amAmendedOne' : 'amAmendedMany'), { n: <span className="num">{amends.length}</span>, v: <span className="num">{m.original?.value ?? m.value}</span> })}
+              </p>
+            )}
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <Button size="sm" variant="secondary" onClick={() => setAmending(true)}>
+            <Pencil size={14} /> {x('amCorrect')}
+          </Button>
           {m.preview ? (
             <Link to="/app/index/take" className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line-strong px-3 text-[14px] text-ink hover:bg-paper-sunk focus-ring">
               {c('mbTakeAgain')}
@@ -581,67 +602,174 @@ function MeasuredBanner({ m, onClear }: { m: MeasuredIndex; onClear: () => void 
           )
         })}
       </ul>
-      <MethodLine className="mt-3" method="v1.0" grade="index" takenOn={m.takenOn} next={latest.nextMeasure} />
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <MethodLine method="v1.0" grade="index" takenOn={m.takenOn} next={latest.nextMeasure} />
+        <WheelGhostKey />
+      </div>
+      <Sheet open={amending} onClose={() => setAmending(false)} title={x('amTitle')} side="right">
+        <AmendPanel m={m} />
+      </Sheet>
     </Card>
   )
 }
 
-// ─── The printable Index card ───────────────────────────────────────────────
+// ─── Correct right: append-only amendments after scoring (Architecture p26) ──
+const ALL_ITEMS = SITTINGS.flatMap((sit) => sit.blocks.flatMap((block) => block.sample.map((item) => ({ block, item }))))
+
+function AmendPanel({ m }: { m: MeasuredIndex }) {
+  const [, setMeasured] = useMeasured()
+  const x = useX()
+  const { t: c } = useCore()
+  const fmtDate = useFmtDate()
+  const amends = m.amendments ?? []
+  const current = m.answers ? amendedAnswers(m.answers, amends) : null
+  const [itemId, setItemId] = useState<string>(ALL_ITEMS[0]?.item.id ?? '')
+  const [to, setTo] = useState<number | null>(null)
+  const [reason, setReason] = useState('')
+  const [done, setDone] = useState<number | null>(null)
+  const sel = ALL_ITEMS.find((r) => r.item.id === itemId)
+  const scale = sel ? scaleOf(sel.block, sel.item) : []
+  const labelOf = (id: string, v: number | undefined) => {
+    const r = ALL_ITEMS.find((a) => a.item.id === id)
+    return r ? scaleOf(r.block, r.item).find((o) => o.value === v)?.label ?? '—' : '—'
+  }
+  const textOf = (id: string) => ALL_ITEMS.find((a) => a.item.id === id)?.item.text ?? id
+  const when = (at: string) => `${fmtDate(at.slice(0, 10))} · ${at.slice(11, 16)}`
+
+  if (!current) return <p className="text-[15px] text-ink-2">{x('amNoAnswers')}</p>
+
+  const was = current[itemId]
+  const same = to !== null && to === was
+  const append = () => {
+    if (to === null || same || !m.answers) return
+    const nextAnswers = { ...current, [itemId]: to }
+    const r = scoreAnswers(nextAnswers, m.signalsOff ?? [])
+    // On the specimen clock, like a Ledger entry: the specimen day at the real local time.
+    const now = new Date()
+    const at = `${SPECIMEN_TODAY}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
+    const a: Amendment = { id: `am_${Date.now().toString(36)}`, itemId, from: was, to, reason: reason.trim(), at, before: m.value, after: r.engine.value }
+    setMeasured((prev) =>
+      prev
+        ? {
+            ...prev,
+            original: prev.original ?? { value: prev.value, terms: prev.terms, lowestTerm: prev.lowestTerm },
+            value: r.engine.value,
+            gm: r.engine.gm,
+            burden: r.engine.burden,
+            terms: r.terms,
+            lowestTerm: r.lowest,
+            phqFlag: r.phqFlag,
+            amendments: [...(prev.amendments ?? []), a],
+          }
+        : prev,
+    )
+    setDone(r.engine.value)
+    setTo(null)
+    setReason('')
+  }
+
+  return (
+    <div>
+      <p className="text-[15px] leading-relaxed text-ink-2">{x('amLead')}</p>
+      <p className="mt-2 text-[13px] text-ink-3">{x('amBefore')}</p>
+
+      <label className="mt-5 block">
+        <span className="eyebrow text-ink-3">{x('amWhich')}</span>
+        <select
+          value={itemId}
+          onChange={(e) => {
+            setItemId(e.target.value)
+            setTo(null)
+            setDone(null)
+          }}
+          className="mt-1.5 block w-full rounded-lg border border-line-strong bg-paper-raised px-3 py-2.5 text-[15px] text-ink focus-ring"
+        >
+          {SITTINGS.map((sit) => (
+            <optgroup key={sit.n} label={c('ovSitting', { n: sit.n })}>
+              {sit.blocks.flatMap((b) => b.sample.map((item) => (
+                <option key={item.id} value={item.id} lang="en">{b.code} · {item.position} · {item.text.length > 64 ? `${item.text.slice(0, 62)}…` : item.text}</option>
+              )))}
+            </optgroup>
+          ))}
+        </select>
+      </label>
+
+      {sel && (
+        <div className="mt-4 rounded-card border border-line p-4">
+          <div className="flex items-center gap-2"><TermDot term={sel.block.term} /> <span lang="en" className="eyebrow text-ink-3">{sel.block.code} · {sel.block.timeframe}</span></div>
+          {sel.item.stem && <p lang="en" className="mt-2 text-[14px] text-ink-2">{sel.item.stem}</p>}
+          <p lang="en" className="mt-1 text-[17px] text-ink">{sel.item.text}</p>
+          <p className="mt-2 text-[14px] text-ink-2">{x('amYour')} <span lang="en" className="text-ink">{labelOf(itemId, was)}</span></p>
+          <fieldset className="mt-4">
+            <legend className="eyebrow mb-2 text-ink-3">{x('amNew')}</legend>
+            <div className="space-y-2">
+              {scale.map((o) => {
+                const on = to === o.value
+                return (
+                  <label key={o.value} className={clsx('flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-[15px] focus-within:ring-2 focus-within:ring-daybreak', on ? 'border-ink text-ink' : 'border-line text-ink-2')}>
+                    <input type="radio" name="amend-to" className="sr-only" checked={on} onChange={() => { setTo(o.value); setDone(null) }} />
+                    <span className={clsx('flex h-4 w-4 shrink-0 items-center justify-center rounded-full border', on ? 'border-ink' : 'border-line-strong')}>{on && <span className="h-2 w-2 rounded-full bg-ink" />}</span>
+                    <span lang="en">{o.label}</span>
+                    {o.value === was && <span className="ml-auto text-[13px] text-ink-3">{x('amCurrent')}</span>}
+                  </label>
+                )
+              })}
+            </div>
+          </fieldset>
+          <label className="mt-4 block">
+            <span className="eyebrow text-ink-3">{x('amWhy')}</span>
+            <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} maxLength={200} placeholder={x('amWhyPh')} className="mt-1.5 block w-full rounded-lg border border-line-strong bg-paper-raised px-3 py-2 text-[15px] text-ink placeholder:text-ink-3 focus-ring" />
+          </label>
+          {same && <p className="mt-2 text-[14px] text-ink-2">{x('amSame')}</p>}
+          <Button variant="ink" className="mt-4 w-full" onClick={append} disabled={to === null || same}>{x('amAppend')}</Button>
+          {done !== null && <p role="status" className="mt-3 text-[14px] text-ink-2">{rich(x('amAdded'), { v: <span className="num text-ink">{done}</span> })}</p>}
+        </div>
+      )}
+
+      <section className="mt-6" aria-label={x('amHistory')}>
+        <p className="eyebrow mb-2 flex items-center gap-2 text-ink-3"><History size={13} aria-hidden /> {x('amHistory')} <Pill tone="neutral">{x('amAppendOnly')}</Pill></p>
+        <ol className="divide-y divide-line rounded-card border border-line">
+          <li className="px-4 py-3 text-[14px] text-ink-2">
+            {rich(x('amScored'), { v: <span className="num text-ink">{m.original?.value ?? m.value}</span>, date: <span className="num">{fmtDate(m.takenOn)}</span> })}
+          </li>
+          {amends.map((a, i) => (
+            <li key={a.id} className="px-4 py-3">
+              <p className="num text-[12px] text-ink-3">{String(i + 1).padStart(2, '0')} · {when(a.at)}</p>
+              <p lang="en" className="mt-1 text-[14px] text-ink">{textOf(a.itemId)}</p>
+              <p className="mt-0.5 text-[14px] text-ink-2"><span lang="en">{labelOf(a.itemId, a.from)}</span> → <span lang="en" className="text-ink">{labelOf(a.itemId, a.to)}</span></p>
+              {a.reason && <p className="mt-0.5 text-[13px] text-ink-3">“{a.reason}”</p>}
+              <p className="mt-0.5 text-[13px] text-ink-2">{rich(x('amIndexMoved'), { a: <span className="num">{a.before}</span>, b: <span className="num text-ink">{a.after}</span> })}</p>
+            </li>
+          ))}
+          {amends.length === 0 && <li className="px-4 py-3 text-[14px] text-ink-3">{x('amNone')}</li>}
+        </ol>
+      </section>
+    </div>
+  )
+}
+
+// ─── The printable Index card (Playbook p59) ────────────────────────────────
 function IndexCard() {
   const latest = INDEX_HISTORY[0]
-  const engine = joyspanIndex(latest.terms, latest.method)!
-  const { t: c, name, pick } = useCore()
-  const band = useBandText()
+  const { pick } = useCore()
   const at = ACTION_TEXT[TODAY_ACTION.id]
+  const step = `${pick(at?.title, TODAY_ACTION.title)} ${pick(at?.detail, TODAY_ACTION.detail)}`
   return (
-    <Card tone="outline" className="bg-paper-raised" id="joy-index-card" as="article" aria-label={c('icAria')}>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="house text-ink">AIWO · Joy OS</p>
-          <p className="eyebrow mt-1 text-ink-3">{c('icTitle')}</p>
-        </div>
-        <Button variant="secondary" size="sm" onClick={() => window.print()} data-noprint>
-          <Printer size={15} /> {c('icPrint')}
-        </Button>
-      </div>
-
-      <div className="mt-6 grid items-center gap-6 sm:grid-cols-[auto_1fr]">
-        <div className="flex justify-center">
-          <JoyspanWheel terms={latest.terms} size={170} value={latest.value} animate={false} />
-        </div>
-        <div>
-          <p className="text-[19px] text-ink">{MEMBER.firstName} {MEMBER.lastName}</p>
-          <p className="num text-[13px] text-ink-3">{MEMBER.aiwoId} · {MEMBER.city}</p>
-          <dl className="mt-4">
-            {ORDER.map((k) => {
-              const s = latest.terms.find((t) => t.key === k)!
-              return (
-                <div key={k} className="flex items-center justify-between gap-3 border-b border-line/70 py-1.5 last:border-0">
-                  <dt className="flex min-w-0 items-center gap-2 text-[14px] text-ink"><TermDot term={k} /> <span className="min-w-0 break-words">{name(k)}</span></dt>
-                  <dd className="flex items-center gap-3">
-                    <span className="eyebrow text-ink-3">{band(s.band)}</span>
-                    <span className="num w-9 text-right text-[14px] text-ink">{k === 'B' ? `−${s.value}` : s.value}</span>
-                  </dd>
-                </div>
-              )
-            })}
-          </dl>
-        </div>
-      </div>
-
-      <div className="mt-5 rounded-card bg-paper-sunk px-4 py-3">
-        <p className="num text-[13px] text-ink">
-          {c('icGm', { gm: engine.gm.toFixed(1), l: engine.lambda, b: latest.terms.find((t) => t.key === 'B')!.value ?? '', v: latest.value, band: band(latest.band).toUpperCase() })}
-        </p>
-        <p className="mt-1 text-[13px] text-ink-2">{c('icNext', { term: name(latest.lowestTerm), title: pick(at?.title, TODAY_ACTION.title) })}</p>
-      </div>
-      <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
-        <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />
-        <SpecimenTag />
-      </div>
-      <p className="mt-3 text-[13px] text-ink-3">
-        {c('icNote')}
-      </p>
+    <Card tone="outline" className="bg-paper-raised">
+      <IndexCardView
+        className="mx-auto max-w-[860px]"
+        id="joy-index-card"
+        value={latest.value}
+        terms={latest.terms}
+        takenOn={latest.takenOn}
+        method={latest.method}
+        grade={latest.grade}
+        next={latest.nextMeasure}
+        lowest={latest.lowestTerm}
+        step={step}
+        signedBy={latest.signedBy}
+        signedOn={latest.takenOn}
+      />
     </Card>
   )
 }
@@ -667,26 +795,22 @@ function NotYetMeasured() {
   )
 }
 
-// ─── JALY research note ─────────────────────────────────────────────────────
-function JalyNote({ value }: { value: number }) {
-  const j = jaly(MEMBER.remainingLifeExpectancy, value)
-  const { t: c } = useCore()
+// ─── Printed for you: the card, the Day-40 page, the Letter (Memo p17) ──────
+function PrintedForYou() {
+  const x = useX()
+  const sh = useDict(SHARED)
   return (
     <Card tone="sunk">
-      <div className="flex items-center gap-2">
-        <FlaskConical size={16} className="text-ink-3" aria-hidden />
-        <Eyebrow>{c('jaTitle')}</Eyebrow>
+      <Eyebrow>{x('prTitle')}</Eyebrow>
+      <p className="mt-3 text-[15px] text-ink-2">{x('prBody')}</p>
+      <div className="mt-4 flex flex-col gap-2">
+        <Link to="/app/day-40" className="inline-flex items-center gap-2 text-[15px] text-ink underline-offset-4 hover:underline focus-ring">
+          <FileText size={15} aria-hidden /> {sh('day40')} <ArrowRight size={14} />
+        </Link>
+        <Link to="/app/letter" className="inline-flex items-center gap-2 text-[15px] text-ink underline-offset-4 hover:underline focus-ring">
+          <Mail size={15} aria-hidden /> {sh('letter')} <ArrowRight size={14} />
+        </Link>
       </div>
-      <p className="mt-3 text-[15px] text-ink-2">
-        {rich(c('jaBody'), { f: <span className="num text-ink">JALY = RLE × JI ÷ 100</span>, calc: <span className="num text-ink">{MEMBER.remainingLifeExpectancy} × {value} ÷ 100 = {j}</span> })}
-      </p>
-      <p className="mt-2 text-[14px] text-ink-3">
-        {c('jaResearch')}
-      </p>
-      <Link to="/app/method" className="mt-3 inline-flex items-center gap-1.5 text-[14px] text-ink underline-offset-4 hover:underline focus-ring">
-        <BookOpen size={14} /> {c('methodPage')}
-      </Link>
     </Card>
   )
 }
-

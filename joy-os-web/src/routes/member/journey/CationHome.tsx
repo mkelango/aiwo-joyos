@@ -4,19 +4,21 @@ import { ArrowRight, Check, CreditCard, MapPin, Quote as QuoteIcon, Stethoscope 
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Delta, Eyebrow, MethodLine, SpecimenTag, TermChip, TermDot, useFmtDate } from '@/components/joy/primitives'
-import { Avatar, Button, Card, EmptyState, LoopRing, PageHeader, Pill, SectionTitle, Tabs } from '@/components/ui'
+import { Avatar, Button, Card, EmptyState, LoopRing, PageHeader, Pill, SectionTitle, Tabs, Toggle } from '@/components/ui'
 import { CATIONS, CATION_PHASES, CIRCLE } from '@/data/platform'
 import { INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
 import { TERMS } from '@/data/terms'
 import type { TermKey } from '@/domain/types'
 import { MY_CATION, SIGNAL_READINGS } from './_data'
-import { HereMarker, PrimaryChip, fade } from './_parts'
-import { addDays, useJourney } from './_store'
+import { HereMarker, OccasionsCard, PrimaryChip, fade } from './_parts'
+import { addDays, setDemoNoCation, useJourney } from './_store'
 import { useJ } from './_i18n'
 
 // ’CATION HOME (Memo p.20): the member's current ’cation journey — before, during,
 // after; the hand-off, readings from Signal Points, the named outcome, the 90 days;
 // then the ’cation for the lowest term and the catalogue of ten. One Daybreak.
+// A specimen switch shows the tab for a member with no ’cation yet: the empty
+// state invites the ’cation for the lowest term (Memo p.17, Tab 3).
 
 type Filter = 'all' | 'ALL' | TermKey
 
@@ -29,8 +31,7 @@ const phaseState = (key: string): 'done' | 'now' | 'next' => {
 }
 
 export default function CationHome() {
-  const [filter, setFilter] = useState<Filter>('all')
-  const { t, r, tx, term, status } = useJ()
+  const { t, r, tx, term } = useJ()
   const fmtDate = useFmtDate()
   const latest = INDEX_HISTORY[0]
   const lowestName = term.name(latest.lowestTerm)
@@ -43,11 +44,8 @@ export default function CationHome() {
   const reviewOn = addDays(MEMBER.loopStarted, 45)
   const journey = useJourney()
   const suggestedReq = journey.cationRequests.find((r) => r.slug === suggested.slug)
-  const lowestCations = CATIONS.filter((c) => c.primary === latest.lowestTerm)
-  /** A request already sent for a ’cation of the lowest term: the empty state points to it, not to “Start with”. */
-  const lowestReq = journey.cationRequests.find((x) => lowestCations.some((c) => c.slug === x.slug))
-  const shown = CATIONS.filter((c) => filter === 'all' || c.primary === filter)
-  const groups: (TermKey | 'ALL')[] = ['ALL', 'H', 'P', 'R', 'F', 'D', 'B']
+
+  if (journey.demoNoCation) return <NoCation />
 
   return (
     <div>
@@ -57,6 +55,8 @@ export default function CationHome() {
         lead={t('homeLead', { venue: MY_CATION.venue, date: fmtDate(MY_CATION.checkedOut) })}
         actions={<><Button variant="secondary" onClick={() => document.getElementById('catalogue')?.scrollIntoView({ behavior: 'smooth' })}>{t('browseTen')}</Button><Link to="/app/passport" className="inline-flex h-11 items-center gap-2 rounded-full px-4 text-[15px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring"><CreditCard size={16} /> {t('joyPassport')}</Link></>}
       />
+
+      <DemoSwitch />
 
       {/* Timeline */}
       <Card tone="raised" className="overflow-hidden">
@@ -240,7 +240,29 @@ export default function CationHome() {
         </Card>
       </section>
 
-      {/* Catalogue */}
+      <OccasionsCard />
+
+      <Catalogue suggestedSlug={suggested.slug} />
+    </div>
+  )
+}
+
+/** The catalogue of ten, filterable by term. `noCation` hides the line for the ’cation the specimen member took. */
+function Catalogue({ suggestedSlug, noCation = false }: { suggestedSlug: string; noCation?: boolean }) {
+  const [filter, setFilter] = useState<Filter>('all')
+  const { t, r, tx, term, status } = useJ()
+  const journey = useJourney()
+  const latest = INDEX_HISTORY[0]
+  const lowestName = term.name(latest.lowestTerm)
+  const suggested = CATIONS.find((c) => c.slug === suggestedSlug)!
+  const lowestCations = CATIONS.filter((c) => c.primary === latest.lowestTerm)
+  /** A request already sent for a ’cation of the lowest term: the empty state points to it, not to “Start with”. */
+  const lowestReq = journey.cationRequests.find((x) => lowestCations.some((c) => c.slug === x.slug))
+  const shown = CATIONS.filter((c) => filter === 'all' || c.primary === filter)
+  const groups: (TermKey | 'ALL')[] = ['ALL', 'H', 'P', 'R', 'F', 'D', 'B']
+
+  // Catalogue
+  return (
       <section id="catalogue" className="mt-12 scroll-mt-24" aria-labelledby="cat-title">
         <div className="mb-6 flex flex-col gap-4">
           <div>
@@ -281,7 +303,7 @@ export default function CationHome() {
                   <span className="eyebrow shrink-0 text-ink-3">{t('nightsN', { n: parseInt(c.nights, 10) })}</span>
                 </p>
                 <p className="mt-1 text-[15px] text-ink-2">{tx(c.promise)}</p>
-                {c.slug === MY_CATION.slug && <p className="mt-3 text-[13px] text-daybreak-ink">{t('youTookThis', { venue: MY_CATION.venue })}</p>}
+                {!noCation && c.slug === MY_CATION.slug && <p className="mt-3 text-[13px] text-daybreak-ink">{t('youTookThis', { venue: MY_CATION.venue })}</p>}
                 {c.primary === latest.lowestTerm && <p className="mt-3 text-[13px] text-daybreak-ink">{t('forLowest')}</p>}
                 {journey.cationRequests.some((x) => x.slug === c.slug) && <p className="mt-2"><Pill tone="daybreak">{t(c.status === 'FY28' ? 'interestNoted' : 'requested')}</Pill></p>}
                 <p className="mt-4 text-[13px] text-ink-3"><span className="eyebrow">{t('day90Dot')}</span>{tx(c.day90Measure)}</p>
@@ -295,6 +317,74 @@ export default function CationHome() {
         </ul>
         <p className="mt-6 flex items-center gap-2 text-[13px] text-ink-3"><Stethoscope size={14} className="shrink-0" /> {t('everyCation')}</p>
       </section>
+  )
+}
+
+/** Specimen switch between Arjun's ’Cation tab and the tab of a member who has not taken one yet. */
+function DemoSwitch() {
+  const { t } = useJ()
+  const on = useJourney().demoNoCation
+  return (
+    <div className="mb-6 flex flex-col gap-2 rounded-card border border-dashed border-line px-4 py-3 sm:flex-row sm:items-center sm:gap-4">
+      <SpecimenTag className="self-start sm:self-center" />
+      <div className="min-w-0 flex-1">
+        <Toggle checked={on} onChange={setDemoNoCation} label={<span className="text-[15px]">{t('demoSwitch')}</span>} description={t('demoSwitchDesc')} />
+      </div>
+    </div>
+  )
+}
+
+/** The ’Cation tab for a member with no ’cation yet: the empty state invites the ’cation for the lowest term. */
+function NoCation() {
+  const { t, r, tx, term } = useJ()
+  const journey = useJourney()
+  const latest = INDEX_HISTORY[0]
+  const lowest = latest.lowestTerm
+  const lowestName = term.name(lowest)
+  const lowestCations = CATIONS.filter((c) => c.primary === lowest)
+  // The invitation leads with the ’cation already suggested for this term, else the first open one for it.
+  const invite = lowestCations.find((c) => c.slug === 'savourcation') ?? lowestCations.find((c) => c.status !== 'FY28') ?? lowestCations[0]
+  const others = lowestCations.filter((c) => c.slug !== invite?.slug)
+  const req = invite ? journey.cationRequests.find((x) => x.slug === invite.slug) : undefined
+  const score = latest.terms.find((x) => x.key === lowest)?.value ?? ''
+
+  return (
+    <div>
+      <PageHeader
+        eyebrow={t('noneEyebrow')}
+        title={r('homeTitle')}
+        lead={t('noneLead')}
+        actions={<Button variant="secondary" onClick={() => document.getElementById('catalogue')?.scrollIntoView({ behavior: 'smooth' })}>{t('browseTen')}</Button>}
+      />
+
+      <DemoSwitch />
+
+      {invite && (
+        <section aria-labelledby="none-invite">
+          <EmptyState
+            title={<span id="none-invite" className="flex flex-col items-center gap-3"><TermChip term={lowest} withSpace size="md" /><span className="text-[1.6rem] font-light leading-tight">{t('noneTitle', { name: invite.name })}</span></span>}
+            body={<>{r('noneBody', { lowest: lowestName, v: { n: score }, cation: invite.name, promise: tx(invite.promise) })}<span className="mt-3 block text-[14px] text-ink-3">{t('day90Colon', { m: tx(invite.day90Measure) })} · {t('nightsN', { n: parseInt(invite.nights, 10) })} · {r('fromLower', { p: { n: invite.priceFrom } })}</span>{others.length > 0 && <span className="mt-1 block text-[14px] text-ink-3">{t('noneMore', { lowest: lowestName, list: others.map((c) => c.name).join(t('andJoin')) })}</span>}</>}
+            action={
+              <div className="flex flex-col items-center gap-2">
+                {req && <Pill tone="daybreak">{r('requestedRef', { ref: { n: req.ref } })}</Pill>}
+                <Link to={`/app/cation/${invite.slug}${req ? '#request' : ''}`} className="btn-daybreak">{req ? t('seeYourRequest') : t('noneSee', { name: invite.name })} <ArrowRight size={16} /></Link>
+              </div>
+            }
+          />
+        </section>
+      )}
+
+      <Card tone="sunk" className="mt-8">
+        <Eyebrow>{t('promiseTitle')}</Eyebrow>
+        <ul className="mt-4 grid gap-x-8 gap-y-3 text-[15px] text-ink md:grid-cols-2">
+          {(['promise1', 'promise2', 'promise3', 'promise4'] as const).map((k) => <li key={k} className="flex gap-3"><Check size={15} className="mt-1 shrink-0 text-ink-3" /> {t(k)}</li>)}
+        </ul>
+        <MethodLine className="mt-5" method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />
+      </Card>
+
+      <OccasionsCard />
+
+      <Catalogue suggestedSlug={invite?.slug ?? 'savourcation'} noCation />
     </div>
   )
 }

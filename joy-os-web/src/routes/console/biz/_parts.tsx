@@ -1,10 +1,43 @@
 import clsx from 'clsx'
 import { Lock, ShieldCheck } from 'lucide-react'
-import { useId, type KeyboardEvent, type ReactNode } from 'react'
+import { useCallback, useId, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 // Shared parts for the platform consoles (Tenant, Science, Control plane, Leadership).
 // Local to this lane by design; built on the shared kit's tokens only.
+
+/** Read a JSON value from localStorage; any failure (private window, blocked storage, bad JSON) gives the fallback. */
+export function readStored<T>(key: string, fallback: T): T {
+  try {
+    const raw = window.localStorage.getItem(key)
+    return raw === null ? fallback : (JSON.parse(raw) as T)
+  } catch {
+    return fallback
+  }
+}
+
+export function writeStored(key: string, value: unknown) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    /* storage unavailable: the console keeps working for this session */
+  }
+}
+
+/** useState that survives a reload. Specimen consoles only: there is no back end. */
+export function useStored<T>(key: string, init: T | (() => T)): [T, (v: T | ((prev: T) => T)) => void] {
+  const [value, setValue] = useState<T>(() => readStored<T>(key, typeof init === 'function' ? (init as () => T)() : init))
+  const set = useCallback(
+    (v: T | ((prev: T) => T)) =>
+      setValue((prev) => {
+        const next = typeof v === 'function' ? (v as (p: T) => T)(prev) : v
+        writeStored(key, next)
+        return next
+      }),
+    [key],
+  )
+  return [value, set]
+}
 
 /** Tabs whose selection lives in the URL (?tab=) so each view is linkable. */
 export function useTabParam<T extends string>(values: readonly T[], fallback: T, key = 'tab'): [T, (v: T) => void] {

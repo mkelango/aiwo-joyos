@@ -65,6 +65,7 @@ export const CHECK = {
   door3Body: { en: 'Free Index, Joy Ledger and one practice, with your lowest term already named.', ta: 'இலவச குறியீடு, ஜாய் லெட்ஜர், ஒரு பயிற்சி; உங்கள் மிகக் குறைந்த அம்சம் ஏற்கெனவே சுட்டப்பட்டிருக்கும்.', hi: 'मुफ़्त इंडेक्स, जॉय लेजर और एक अभ्यास, आपके सबसे कमज़ोर पहलू के नाम के साथ।' },
   setUp: { en: 'Set up Joy OS', ta: 'Joy OS-ஐ அமையுங்கள்', hi: 'Joy OS सेट करें' },
   again: { en: 'Take the Check again', ta: 'செக்கை மீண்டும் எடுங்கள்', hi: 'चेक दोबारा करें' },
+  readLetter: { en: 'Read a recent Letter', ta: 'சமீபத்திய கடிதத்தைப் படியுங்கள்', hi: 'हाल का लेटर पढ़ें' },
 } satisfies Dict
 
 export const NEXT_STEP_TEXT: Record<TermKey, { step: L3; why: L3 }> = {

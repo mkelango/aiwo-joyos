@@ -367,17 +367,6 @@ export const CORE = {
     hi: 'अगर किसी पहलू के पर्याप्त जवाब नहीं हैं, तो उसकी पंखुड़ी बिंदुदार रेखा में बनती है और उसे {nym} कहा जाता है। उसका अनुमान कभी नहीं लगाया जाता। यहाँ {free} के बिना, जब तक वह पहलू पूरा न हो, इंजन {r} लौटाता है।',
   },
   nyNoIndex: { en: 'no Index', ta: 'குறியீடு இல்லை', hi: 'कोई इंडेक्स नहीं' },
-  jaTitle: { en: 'JALY · a research note', ta: 'JALY · ஒரு ஆய்வுக் குறிப்பு', hi: 'JALY · एक शोध नोट' },
-  jaBody: {
-    en: 'Joy-adjusted life years count joyful years for the cohort’s research: {f}. On this specimen, {calc}.',
-    ta: 'மகிழ்ச்சி-சரிசெய்த வாழ்நாள் ஆண்டுகள் (JALY), குழுவின் ஆய்வுக்காக மகிழ்ச்சியான ஆண்டுகளைக் கணக்கிடுகின்றன: {f}. இந்த மாதிரியில், {calc}.',
-    hi: 'आनंद-समायोजित जीवन वर्ष (JALY) समूह के शोध के लिए ख़ुशहाल वर्षों को गिनते हैं: {f}। इस नमूने पर, {calc}।',
-  },
-  jaResearch: {
-    en: 'A research metric only. It is never a claim, a promise or a headline until it is validated and audited.',
-    ta: 'இது ஆய்வுக்கான அளவீடு மட்டுமே. சரிபார்த்துத் தணிக்கை செய்யப்படும் வரை இது ஒரு கூற்றோ, வாக்குறுதியோ, தலைப்புச் செய்தியோ அல்ல.',
-    hi: 'यह सिर्फ़ शोध का पैमाना है। जब तक इसकी पुष्टि और ऑडिट न हो, यह कोई दावा, वादा या सुर्ख़ी नहीं है।',
-  },
   methodPage: { en: 'The method page', ta: 'முறை விளக்கப் பக்கம்', hi: 'पद्धति का पेज' },
 
   // ─── Take the Index ─────────────────────────────────────────────────────
@@ -995,12 +984,6 @@ export const CORE = {
     en: 'The geometric mean fell from {a} to {b}, mostly through {term}; Burden added {c}.',
     ta: 'பெருக்கல் சராசரி {a} இலிருந்து {b} ஆகக் குறைந்தது, பெரும்பாலும் {term} காரணமாக; சுமை {c} சேர்த்தது.',
     hi: 'ज्यामितीय औसत {a} से घटकर {b} हुआ, ज़्यादातर {term} की वजह से; बोझ ने {c} जोड़ा।',
-  },
-  d9Research: { en: 'Research only · JALY', ta: 'ஆய்வுக்கு மட்டும் · JALY', hi: 'सिर्फ़ शोध · JALY' },
-  d9Jaly: {
-    en: 'Change in joy-adjusted life years, ΔJALY = RLE × ΔJI ÷ 100 = {calc}. Recorded for the cohort’s research, never shown as a claim.',
-    ta: 'மகிழ்ச்சி-சரிசெய்த வாழ்நாள் ஆண்டுகளில் மாற்றம், ΔJALY = RLE × ΔJI ÷ 100 = {calc}. குழுவின் ஆய்வுக்காகப் பதிவு செய்யப்படுகிறது; ஒரு கூற்றாக ஒருபோதும் காட்டப்படாது.',
-    hi: 'आनंद-समायोजित जीवन वर्षों में बदलाव, ΔJALY = RLE × ΔJI ÷ 100 = {calc}। समूह के शोध के लिए दर्ज, कभी दावे के रूप में नहीं दिखाया जाता।',
   },
   d9NoRecompute: { en: '{method} · λ {l} · no recomputation across methods', ta: '{method} · λ {l} · முறைகளுக்கு இடையே மறுகணக்கீடு இல்லை', hi: '{method} · λ {l} · पद्धतियों के बीच दोबारा गणना नहीं' },
 } satisfies Dict

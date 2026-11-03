@@ -193,3 +193,74 @@ export const DEVICES = [
 ] as const
 
 export type DeviceId = (typeof DEVICES)[number]['id']
+
+// ─── The Joyspan Letter (Memo p17; Playbook p63) ───────────────────────────
+// Monthly, in the Mentor's voice, with real numbers: his own Index, published when it falls
+// too. The letters are his words and stay as written. SPECIMEN issues: illustrative numbers.
+
+export interface LetterIssue {
+  n: number
+  date: string
+  title: string
+  /** The numbers row, mono: label and value. */
+  stats: [string, string][]
+  body: string[]
+  /** The one thing he is changing before his next measure. */
+  change: string
+}
+
+export const LETTER_AUTHOR = { name: 'C. Sivasankaran', role: 'Mentor, AIWO Limited · creator of Joyspiration' }
+
+export const LETTER_ISSUES: LetterIssue[] = [
+  {
+    n: 3,
+    date: '2027-01-03',
+    title: 'What I learnt from my own number',
+    stats: [
+      ['OCT', '+3'],
+      ['JAN', '−1'],
+      ['INDEX', '66'],
+    ],
+    body: [
+      'In October my Index rose by three. This month it fell by one. I am printing both, because a practice that reports only good news is not a practice.',
+      'Freedom carried the fall. I said yes to too many evenings in December, and my ring noticed before I did. Pleasure held, mostly because of a long walk on Sunday mornings that I refuse to give up.',
+      'Write back and tell me yours. I read every reply, and I quote no one without asking.',
+    ],
+    change: 'Two evenings a week with nothing in them, written in the calendar like a meeting.',
+  },
+  {
+    n: 2,
+    date: '2026-12-06',
+    title: 'The number can go down',
+    stats: [
+      ['SEP', '+1'],
+      ['OCT', '+3'],
+      ['INDEX', '67'],
+    ],
+    body: [
+      'Every Index card we print carries the same line along the foot: the number can go down. People ask why we would put that on something we hand to a member.',
+      'Because it is true, and because a measure that can only rise is a flatterer. When mine falls, a person tells me why, and the next ninety days start from there.',
+    ],
+    change: 'Tea on the verandah before the phone, every morning this month.',
+  },
+  {
+    n: 1,
+    date: '2026-11-01',
+    title: 'Why one number',
+    stats: [
+      ['JUL', '62'],
+      ['SEP', '+1'],
+      ['INDEX', '63'],
+    ],
+    body: [
+      'A life going well has six parts, and none of them can make up for another. That is why the Index multiplies rather than adds: a zero anywhere is felt everywhere.',
+      'This letter will come once a month. It will carry my own numbers, honestly, and one thing I am changing.',
+    ],
+    change: 'A weekly call with three old friends, on Sunday at six.',
+  },
+]
+
+// ─── The Day-40 page (Memo p17) ────────────────────────────────────────────
+// Printed at Day 40 of the loop (5 Jan + 40 days). The coach's note is her own words.
+export const DAY40_DATES = { day40: '2027-02-14', day45: '2027-02-19', day76: '2027-03-22', day90: '2027-04-05' }
+export const DAY40_COACH_NOTE = 'Forty days in, the evenings are the story. Keep the verandah tea, and let us protect two evenings a week before we talk on Day 45.'

@@ -1,10 +1,11 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Check, Clock, CloudOff, Pencil, ShieldCheck, Watch, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Clock, CloudOff, Droplet, Hourglass, Pencil, ShieldCheck, Timer, Watch, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AiwoMark } from '@/components/joy/Brand'
-import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
+import { JoyspanWheel, WheelGhostKey } from '@/components/joy/JoyspanWheel'
+import { playSound } from '@/lib/sound'
 import { BandLabel, DaybreakButton, Delta, Eyebrow, MethodLine, SpecimenTag, TermChip, TermDot } from '@/components/joy/primitives'
 import { Button, Card, Pill, Progress } from '@/components/ui'
 import { INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
@@ -14,7 +15,10 @@ import type { TermKey } from '@/domain/types'
 import { SIGNAL_READINGS, SITTINGS, TERM_DETAIL, type InstrumentBlock, type SampleItem } from './_data'
 import { HumanWritten, Switch } from './_parts'
 import { ALL_SIGNAL_IDS, ORDER, WEARABLE_SIGNAL_IDS, isWearableSignal, scaleOf, scoreAnswers, signalId, signalSources } from './_scoring'
-import { IN_REMEASURE_WINDOW, REMEASURE_OPENS, SPECIMEN_TODAY, addDays, useMeasured, useSignalsDown } from './_store'
+import { IN_REMEASURE_WINDOW, REMEASURE_OPENS, REMEASURE_TAKEN, SPECIMEN_TODAY, addDays, useMeasured, useRemeasure, useSignalsDown } from './_store'
+import { DAY90_DATES } from './_data'
+import { SIGNER } from './_remeasure'
+import { useX } from './_i18nX'
 import { BLOCK_TEXT, SIGNAL_READING_TEXT, SIGNAL_SOURCE_TEXT, SITTING_TITLE, fmtLocal, rich, useCore } from './_i18n'
 import { INSTRUMENT_NOTE, useT } from '@/lib/i18n'
 import { useApp } from '@/lib/store'
@@ -30,9 +34,13 @@ type Step =
   | { type: 'signals'; s: number }
   | { type: 'break'; s: number }
 
-type Stage = 'overview' | 'step' | 'review' | 'saved' | 'scoring'
+type Stage = 'overview' | 'step' | 'clinical' | 'review' | 'saved' | 'scoring'
 
 const DRAFT_KEY = 'joyos:index-draft:v2'
+// The Clinical-grade re-measure keeps its own draft, so a preview sitting never mixes in.
+const CLINICAL_DRAFT_KEY = 'joyos:index-draft:clinical:v1'
+/** Home draw slots in the re-measure window (specimen, two days in). */
+const DRAW_SLOTS = [`${addDays(DAY90_DATES.day0, 78)}T06:30`, `${addDays(DAY90_DATES.day0, 79)}T06:30`, `${addDays(DAY90_DATES.day0, 80)}T07:00`]
 const TOTAL = SITTINGS.reduce((a, s) => a + s.total, 0)
 const ITEM_COUNT = SITTINGS.reduce((a, s) => a + s.blocks.reduce((b, x) => b + x.sample.length, 0), 0)
 const SITTING_TERMS: TermKey[][] = SITTINGS.map((s) => [...new Set(s.blocks.map((b) => b.term))])
@@ -50,6 +58,19 @@ function buildSteps(): Step[] {
   return steps
 }
 
+/** The Clinical-grade additions: the home draw and the capacity battery (re-measure only). */
+interface ClinicalParts {
+  slot: string | null
+  sitToStand: string
+  consent: boolean
+}
+const NO_CLINICAL: ClinicalParts = { slot: null, sitToStand: '', consent: false }
+const sitSeconds = (v: string) => {
+  const n = Number(v.replace(',', '.'))
+  return Number.isFinite(n) && n >= 4 && n <= 60 ? Math.round(n * 10) / 10 : null
+}
+const clinicalReady = (p: ClinicalParts) => !!p.slot && sitSeconds(p.sitToStand) !== null && p.consent
+
 interface Draft {
   cursor: number
   answers: Record<string, number>
@@ -57,31 +78,73 @@ interface Draft {
   signalsOff: string[]
   confirmed: number[]
   savedAt: string
+  clinical?: ClinicalParts
 }
-function readDraft(): Draft | null {
+function readDraft(key: string = DRAFT_KEY): Draft | null {
   try {
-    const raw = localStorage.getItem(DRAFT_KEY)
+    const raw = localStorage.getItem(key)
     if (!raw) return null
     const d = JSON.parse(raw) as Partial<Draft>
-    return { cursor: d.cursor ?? 0, answers: d.answers ?? {}, stage: d.stage === 'review' ? 'review' : 'step', signalsOff: d.signalsOff ?? [], confirmed: d.confirmed ?? [], savedAt: d.savedAt ?? '' }
+    return { cursor: d.cursor ?? 0, answers: d.answers ?? {}, stage: d.stage === 'review' ? 'review' : 'step', signalsOff: d.signalsOff ?? [], confirmed: d.confirmed ?? [], savedAt: d.savedAt ?? '', clinical: d.clinical ? { ...NO_CLINICAL, ...d.clinical } : undefined }
   } catch {
     return null
   }
 }
-function writeDraft(d: Draft | null) {
+function writeDraft(d: Draft | null, key: string = DRAFT_KEY) {
   try {
-    if (d) localStorage.setItem(DRAFT_KEY, JSON.stringify(d))
-    else localStorage.removeItem(DRAFT_KEY)
+    if (d) localStorage.setItem(key, JSON.stringify(d))
+    else localStorage.removeItem(key)
   } catch {
     /* storage unavailable: answers stay in memory for this sitting */
   }
 }
 
 export default function TakeIndex() {
+  const [params] = useSearchParams()
+  const clinical = params.get('grade') === 'clinical'
+  const [rec, setRec] = useRemeasure()
+  const x = useX()
+  // Decided on arrival only: submitting moves the record on, and the scoring screen must stay.
+  const [gate] = useState<null | 'closed' | 'submitted'>(() => (!clinical ? null : !rec ? 'closed' : rec.status === 'awaiting' || rec.status === 'signed' ? 'submitted' : null))
+  if (gate) return <ClinicalGate submitted={gate === 'submitted'} />
+  return <TakeFlow clinical={clinical} key={clinical ? 'clinical' : 'index'} onClinicalStart={() => setRec((r) => (r && r.status === 'invited' ? { ...r, status: 'in-progress', startedAt: new Date().toISOString() } : r))} onClinicalSubmit={(patch) => setRec((r) => (r ? { ...r, ...patch } : r))} x={x} />
+}
+
+type X = ReturnType<typeof useX>
+type RemeasurePatch = Partial<NonNullable<ReturnType<typeof useRemeasure>[0]>>
+
+/** The Clinical-grade take, opened without its invite (or after it was submitted). */
+function ClinicalGate({ submitted }: { submitted: boolean }) {
+  const x = useX()
+  const { t: c } = useCore()
+  return (
+    <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-2xl flex-col">
+      <div className="flex items-center justify-between gap-3 pb-5">
+        <div className="flex items-center gap-3">
+          <AiwoMark size={20} />
+          <span className="eyebrow text-ink-3">{c('tkBrand')}</span>
+        </div>
+        <Link to="/app/index" className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[14px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring" aria-label={c('tkCloseAria')}>
+          <X size={16} /> {c('close')}
+        </Link>
+      </div>
+      <Eyebrow tone="daybreak">{c('gradeFullClinical')}</Eyebrow>
+      <h1 className="mt-3 break-words text-[2.2rem] font-light leading-tight text-ink">{rich(x(submitted ? 'tkClDoneTitle' : 'tkClGateTitle'))}</h1>
+      <p className="mt-4 text-[17px] leading-relaxed text-ink-2">{x(submitted ? 'tkClDoneBody' : 'tkClGateBody', { who: SIGNER.name })}</p>
+      <div className="mt-auto flex flex-col gap-2 pt-10">
+        <Link to={submitted ? '/app/index/day-90' : '/app'} className="btn-daybreak w-full focus-ring">{submitted ? c('scSeeDay90') : x('tkClGateToday')}</Link>
+      </div>
+    </div>
+  )
+}
+
+function TakeFlow({ clinical, onClinicalStart, onClinicalSubmit, x }: { clinical: boolean; onClinicalStart: () => void; onClinicalSubmit: (patch: RemeasurePatch) => void; x: X }) {
+  const draftKey = clinical ? CLINICAL_DRAFT_KEY : DRAFT_KEY
   const steps = useMemo(buildSteps, [])
   const navigate = useNavigate()
   const [, setMeasured] = useMeasured()
-  const [draft, setDraftSnapshot] = useState(readDraft)
+  const [draft, setDraftSnapshot] = useState(() => readDraft(draftKey))
+  const [parts, setParts] = useState<ClinicalParts>(draft?.clinical ?? NO_CLINICAL)
   const [stage, setStage] = useState<Stage>('overview')
   const [cursor, setCursor] = useState(draft?.cursor ?? 0)
   const [answers, setAnswers] = useState<Record<string, number>>(draft?.answers ?? {})
@@ -118,8 +181,9 @@ export default function TakeIndex() {
 
   useEffect(() => {
     if (stage === 'step' || stage === 'review')
-      writeDraft({ cursor, answers, stage: stage === 'review' || fromReview ? 'review' : 'step', signalsOff, confirmed, savedAt: new Date().toISOString() })
-  }, [cursor, answers, stage, fromReview, signalsOff, confirmed])
+      writeDraft({ cursor, answers, stage: stage === 'review' || fromReview ? 'review' : 'step', signalsOff, confirmed, savedAt: new Date().toISOString(), clinical: clinical ? parts : undefined }, draftKey)
+    if (stage === 'clinical') writeDraft({ cursor, answers, stage: 'review', signalsOff, confirmed, savedAt: new Date().toISOString(), clinical: parts }, draftKey)
+  }, [cursor, answers, stage, fromReview, signalsOff, confirmed, parts, clinical, draftKey])
 
   useEffect(() => {
     topRef.current?.focus({ preventScroll: true })
@@ -128,7 +192,11 @@ export default function TakeIndex() {
 
   const go = (n: number) => {
     cancelAuto()
-    if (n >= steps.length) return setStage('review')
+    if (n >= steps.length) {
+      setCursor(steps.length - 1)
+      // Clinical grade: the home draw and capacity battery come before the review.
+      return setStage(clinical && !clinicalReady(parts) ? 'clinical' : 'review')
+    }
     setCursor(Math.max(0, n))
     setStage('step')
   }
@@ -156,8 +224,8 @@ export default function TakeIndex() {
   }
   const saveLater = () => {
     cancelAuto()
-    const at: 'step' | 'review' = stage === 'review' || fromReview ? 'review' : 'step'
-    writeDraft({ cursor, answers, stage: at, signalsOff, confirmed, savedAt: new Date().toISOString() })
+    const at: 'step' | 'review' = stage === 'review' || stage === 'clinical' || fromReview ? 'review' : 'step'
+    writeDraft({ cursor, answers, stage: at, signalsOff, confirmed, savedAt: new Date().toISOString(), clinical: clinical ? parts : undefined }, draftKey)
     setFromReview(false)
     setSavedStage(at)
     setStage('saved')
@@ -165,7 +233,7 @@ export default function TakeIndex() {
   const resume = (at: 'step' | 'review') => {
     cancelAuto()
     setFromReview(false)
-    if (at === 'review' || cursor >= steps.length) setStage('review')
+    if (at === 'review' || cursor >= steps.length) setStage(clinical && !clinicalReady(parts) ? 'clinical' : 'review')
     else setStage('step')
   }
 
@@ -181,7 +249,7 @@ export default function TakeIndex() {
           <AiwoMark size={20} />
           <span className="eyebrow text-ink-3">{c('tkBrand')}</span>
         </div>
-        {stage === 'step' || stage === 'review' ? (
+        {stage === 'step' || stage === 'review' || stage === 'clinical' ? (
           <Button variant="ghost" size="sm" onClick={saveLater}>
             <X size={16} /> <span className="hidden sm:inline">{c('tkSaveLater')}</span><span className="sm:hidden">{c('tkSaveShort')}</span>
           </Button>
@@ -223,9 +291,15 @@ export default function TakeIndex() {
                 resumable={resumable}
                 resumeLabel={draft ? describeCursor(c, steps[draft.cursor], draft.stage) : ''}
                 answered={answeredCount}
-                onStart={() => (resumable && draft ? resume(draft.stage) : go(0))}
+                clinical={clinical}
+                onStart={() => {
+                  if (clinical) onClinicalStart()
+                  return resumable && draft ? resume(draft.stage) : go(0)
+                }}
                 onRestart={() => {
-                  writeDraft(null)
+                  if (clinical) onClinicalStart()
+                  writeDraft(null, draftKey)
+                  setParts(NO_CLINICAL)
                   setDraftSnapshot(null)
                   setAnswers({})
                   setSignalsOff([])
@@ -262,12 +336,31 @@ export default function TakeIndex() {
               />
             )}
             {stage === 'step' && step?.type === 'break' && <SittingBreak onContinue={next} onLater={saveLater} />}
+            {stage === 'clinical' && (
+              <ClinicalStep
+                parts={parts}
+                onChange={setParts}
+                fromReview={fromReview}
+                onContinue={() => {
+                  setFromReview(false)
+                  setStage('review')
+                }}
+                onBack={() => go(steps.length - 1)}
+                x={x}
+              />
+            )}
             {stage === 'review' && (
               <Review
                 answers={answers}
                 answered={answeredCount}
                 signalsOff={effectiveOff}
                 confirmed={confirmed}
+                clinical={clinical ? parts : null}
+                onEditClinical={() => {
+                  setFromReview(true)
+                  setStage('clinical')
+                }}
+                x={x}
                 onEdit={(id) => {
                   const i = steps.findIndex((s) => s.type === 'item' && s.item.id === id)
                   setFromReview(true)
@@ -282,10 +375,30 @@ export default function TakeIndex() {
                   // Score and keep the result before the draft is cleared, so leaving
                   // during the scoring animation never loses a finished sitting.
                   const r = scoreAnswers(answers, effectiveOff)
-                  setMeasured({ takenOn: SPECIMEN_TODAY, value: r.engine.value, gm: r.engine.gm, burden: r.engine.burden, terms: r.terms, lowestTerm: r.lowest, preview: !IN_REMEASURE_WINDOW, phqFlag: r.phqFlag, surveyOnly: r.surveyOnly })
-                  // Offline: the result is kept here and joins the sync queue the banner counts.
-                  queueSync({ id: `index:${SPECIMEN_TODAY}`, kind: 'index' })
-                  writeDraft(null)
+                  if (clinical) {
+                    // Clinical grade: drafted for the physician, never final until signed.
+                    onClinicalSubmit({
+                      status: 'awaiting',
+                      submittedAt: new Date().toISOString(),
+                      takenOn: REMEASURE_TAKEN,
+                      value: r.engine.value,
+                      gm: r.engine.gm,
+                      burden: r.engine.burden,
+                      terms: r.terms,
+                      lowestTerm: r.lowest,
+                      answers,
+                      signalsOff: effectiveOff,
+                      draw: { slot: parts.slot! },
+                      capacity: { sitToStand: sitSeconds(parts.sitToStand)! },
+                    })
+                    queueSync({ id: `index:clinical:${REMEASURE_TAKEN}`, kind: 'index' })
+                  } else {
+                    setMeasured({ takenOn: SPECIMEN_TODAY, value: r.engine.value, gm: r.engine.gm, burden: r.engine.burden, terms: r.terms, lowestTerm: r.lowest, preview: !IN_REMEASURE_WINDOW, phqFlag: r.phqFlag, surveyOnly: r.surveyOnly, answers, signalsOff: effectiveOff, amendments: [] })
+                    // Offline: the result is kept here and joins the sync queue the banner counts.
+                    queueSync({ id: `index:${SPECIMEN_TODAY}`, kind: 'index' })
+                  }
+                  playSound('complete')
+                  writeDraft(null, draftKey)
                   setDraftSnapshot(null)
                   setStage('scoring')
                 }}
@@ -297,14 +410,16 @@ export default function TakeIndex() {
                 answers={answers}
                 signalsOff={effectiveOff}
                 offline={offline}
-                onSee={() => navigate(IN_REMEASURE_WINDOW ? '/app/index/day-90' : '/app/index')}
+                clinical={clinical}
+                x={x}
+                onSee={() => navigate(IN_REMEASURE_WINDOW || clinical ? '/app/index/day-90' : '/app/index')}
               />
             )}
           </motion.div>
         </AnimatePresence>
       </div>
 
-      {(stage === 'step' || stage === 'review') && (
+      {(stage === 'step' || stage === 'review' || stage === 'clinical') && (
         <p className="mt-10 flex items-center justify-center gap-2 text-center text-[13px] text-ink-3">
           <CloudOff size={14} aria-hidden className="shrink-0" /> {c('tkOffline')}
         </p>
@@ -327,13 +442,14 @@ function describeCursor(c: Tr, step: Step | undefined, stage: 'step' | 'review' 
 }
 
 // ─── Overview ───────────────────────────────────────────────────────────────
-function Overview({ resumable, resumeLabel, answered, onStart, onRestart }: { resumable: boolean; resumeLabel: string; answered: number; onStart: () => void; onRestart: () => void }) {
+function Overview({ resumable, resumeLabel, answered, clinical, onStart, onRestart }: { resumable: boolean; resumeLabel: string; answered: number; clinical: boolean; onStart: () => void; onRestart: () => void }) {
   const { t: c, lang, pick, method } = useCore()
   const tr = useT()
+  const x = useX()
   return (
     <div className="flex flex-1 flex-col">
       <Eyebrow tone="daybreak">
-        {c('ovEyebrow', { kind: c(IN_REMEASURE_WINDOW ? 'mbRemeasure' : 'mbPreview'), grade: c('gradeFullIndex'), method: method('v1.0'), day: tr('dayOf', { n: MEMBER.dayOfLoop }) })}
+        {c('ovEyebrow', { kind: c(IN_REMEASURE_WINDOW || clinical ? 'mbRemeasure' : 'mbPreview'), grade: c(clinical ? 'gradeFullClinical' : 'gradeFullIndex'), method: method('v1.0'), day: clinical ? tr('dayOf', { n: 76 }) : tr('dayOf', { n: MEMBER.dayOfLoop }) })}
       </Eyebrow>
       <h1 className="mt-3 text-[2.2rem] font-light leading-tight text-ink md:text-[2.8rem]">
         {rich(c('ovTitle'), { n: <span className="num">20</span> })}
@@ -341,7 +457,12 @@ function Overview({ resumable, resumeLabel, answered, onStart, onRestart }: { re
       <p className="mt-4 text-[17px] leading-relaxed text-ink-2">
         {rich(c('ovBody'), { n: <span className="num">{TOTAL}</span> })}
       </p>
-      {!IN_REMEASURE_WINDOW && (
+      {clinical && (
+        <p className="mt-3 flex gap-2 rounded-card border border-line px-4 py-3 text-[15px] text-ink-2">
+          <Hourglass size={16} className="mt-1 shrink-0 text-ink-3" aria-hidden /> <span>{x('ovClinicalAdds', { who: SIGNER.name })}</span>
+        </p>
+      )}
+      {!IN_REMEASURE_WINDOW && !clinical && (
         <p className="mt-3 text-[15px] text-ink-2">
           {rich(c('ovOpens'), { n: <span className="num">76</span>, date: fmtLocal(new Date(`${REMEASURE_OPENS}T12:00`), lang, { day: 'numeric', month: 'short' }) })}
         </p>
@@ -367,6 +488,11 @@ function Overview({ resumable, resumeLabel, answered, onStart, onRestart }: { re
                 <li className="inline-flex items-center gap-2 rounded-full border border-dashed border-line px-2.5 py-1 text-[13px] text-ink-2">
                   <Watch size={13} aria-hidden /> {c('ovSignalsCheck')}
                 </li>
+                {clinical && s.n === SITTINGS.length && (
+                  <li className="inline-flex items-center gap-2 rounded-full border border-dashed border-line px-2.5 py-1 text-[13px] text-ink-2">
+                    <Droplet size={13} aria-hidden /> {x('clChip')}
+                  </li>
+                )}
               </ul>
             </Card>
           </li>
@@ -593,9 +719,82 @@ function SittingBreak({ onContinue, onLater }: { onContinue: () => void; onLater
   )
 }
 
+// ─── Clinical grade: the home draw and the capacity battery ─────────────────
+function slotText(iso: string, lang: Parameters<typeof fmtLocal>[1]) {
+  return `${fmtLocal(new Date(iso), lang, { weekday: 'short', day: 'numeric', month: 'short' })} · ${iso.slice(11, 16)}`
+}
+
+function ClinicalStep({ parts, onChange, fromReview, onContinue, onBack, x }: { parts: ClinicalParts; onChange: (p: ClinicalParts) => void; fromReview: boolean; onContinue: () => void; onBack: () => void; x: X }) {
+  const { t: c, lang } = useCore()
+  const secs = sitSeconds(parts.sitToStand)
+  const [touched, setTouched] = useState(false)
+  const ready = clinicalReady(parts)
+  const set = (p: Partial<ClinicalParts>) => onChange({ ...parts, ...p })
+  return (
+    <div className="flex flex-1 flex-col">
+      <Eyebrow tone="daybreak">{x('clEyebrow')}</Eyebrow>
+      <h1 className="mt-3 break-words text-[2.2rem] font-light leading-tight text-ink">{rich(x('clTitle'))}</h1>
+      <p className="mt-4 text-[17px] leading-relaxed text-ink-2">{x('clBody')}</p>
+
+      <Card tone="raised" as="div" className="mt-6 !p-5">
+        <fieldset>
+          <legend className="flex items-center gap-2 text-[17px] text-ink"><Droplet size={16} className="text-ink-3" aria-hidden /> {x('clDraw')}</legend>
+          <p className="mt-1 text-[14px] text-ink-2">{x('clDrawBody')}</p>
+          <div className="mt-4 space-y-2">
+            {DRAW_SLOTS.map((slot) => {
+              const on = parts.slot === slot
+              return (
+                <label key={slot} className={clsx('flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-[15px] focus-within:ring-2 focus-within:ring-daybreak', on ? 'border-ink text-ink' : 'border-line text-ink-2')}>
+                  <input type="radio" name="draw-slot" className="sr-only" checked={on} onChange={() => set({ slot })} />
+                  <span className={clsx('flex h-4 w-4 shrink-0 items-center justify-center rounded-full border', on ? 'border-ink' : 'border-line-strong')}>{on && <span className="h-2 w-2 rounded-full bg-ink" />}</span>
+                  <span className="num">{slotText(slot, lang)}</span>
+                  <span className="ml-auto text-[13px] text-ink-3">{x('clAtHome')}</span>
+                </label>
+              )
+            })}
+          </div>
+        </fieldset>
+      </Card>
+
+      <Card tone="raised" as="div" className="mt-4 !p-5">
+        <p className="flex items-center gap-2 text-[17px] text-ink"><Timer size={16} className="text-ink-3" aria-hidden /> {x('clCapacity')}</p>
+        <p className="mt-1 text-[14px] text-ink-2">{x('clCapacityBody')}</p>
+        <label className="mt-4 block">
+          <span className="text-[15px] text-ink">{x('clSeconds')}</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            min={4}
+            max={60}
+            step={0.1}
+            value={parts.sitToStand}
+            onChange={(e) => set({ sitToStand: e.target.value })}
+            onBlur={() => setTouched(true)}
+            aria-invalid={touched && parts.sitToStand !== '' && secs === null}
+            aria-describedby="sit-hint"
+            className="num mt-1.5 block h-12 w-36 rounded-lg border border-line-strong bg-paper-raised px-3 text-[17px] text-ink focus-ring"
+          />
+          <span id="sit-hint" className={clsx('mt-1 block text-[13px]', touched && parts.sitToStand !== '' && secs === null ? 'text-error' : 'text-ink-3')}>{x('clSecondsHint')}</span>
+        </label>
+      </Card>
+
+      <label className="mt-5 flex cursor-pointer items-start gap-3 text-[15px] text-ink-2">
+        <input type="checkbox" checked={parts.consent} onChange={(e) => set({ consent: e.target.checked })} className="mt-1 h-4 w-4 shrink-0 accent-[var(--ink)]" />
+        <span>{x('clConsent', { who: SIGNER.name })}</span>
+      </label>
+
+      <div className="mt-auto flex flex-col gap-2 pt-10">
+        {!ready && touched && <p role="alert" className="text-center text-[14px] text-ink-2">{x('clNeedAll')}</p>}
+        <DaybreakButton onClick={() => (ready ? onContinue() : setTouched(true))} className="w-full">{fromReview ? c('itBackReview') : x('clContinue')}</DaybreakButton>
+        <Button variant="ghost" onClick={onBack} className="self-center"><ArrowLeft size={15} /> {c('back')}</Button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Review and edit before submit ──────────────────────────────────────────
-function Review({ answers, answered, signalsOff, confirmed, onEdit, onEditSignals, onSubmit }: { answers: Record<string, number>; answered: number; signalsOff: string[]; confirmed: number[]; onEdit: (id: string) => void; onEditSignals: (s: number) => void; onSubmit: () => void }) {
-  const complete = answered >= ITEM_COUNT
+function Review({ answers, answered, signalsOff, confirmed, clinical, onEditClinical, x, onEdit, onEditSignals, onSubmit }: { answers: Record<string, number>; answered: number; signalsOff: string[]; confirmed: number[]; clinical: ClinicalParts | null; onEditClinical: () => void; x: X; onEdit: (id: string) => void; onEditSignals: (s: number) => void; onSubmit: () => void }) {
+  const complete = answered >= ITEM_COUNT && (!clinical || clinicalReady(clinical))
   const firstMissing = SITTINGS.flatMap((s) => s.blocks.flatMap((b) => b.sample)).find((i) => answers[i.id] === undefined)
   const { t: c, lang, pick } = useCore()
   return (
@@ -650,6 +849,25 @@ function Review({ answers, answered, signalsOff, confirmed, onEdit, onEditSignal
             </section>
           )
         })}
+        {clinical && (
+          <section aria-label={c('gradeFullClinical')}>
+            <p className="eyebrow mb-2 text-ink-3">{c('gradeFullClinical')} · {x('clEyebrowShort')}</p>
+            <div className="flex items-start gap-3 rounded-card border border-line bg-paper-raised px-4 py-3">
+              <Droplet size={15} className="mt-1 shrink-0 text-ink-3" aria-hidden />
+              <div className="min-w-0 flex-1">
+                <p className="text-[15px] text-ink">{x('clDraw')} · {x('clCapacity')}</p>
+                <p className="mt-0.5 text-[13px] text-ink-3">
+                  {clinical.slot ? <span className="num text-ink-2">{slotText(clinical.slot, lang)}</span> : <span className="text-error">{x('clNoSlot')}</span>}
+                  {' · '}
+                  {sitSeconds(clinical.sitToStand) !== null ? <span className="num text-ink-2">{x('clSecondsShort', { s: sitSeconds(clinical.sitToStand)! })}</span> : <span className="text-error">{x('clNoSeconds')}</span>}
+                </p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={onEditClinical} aria-label={x('clEditAria')}>
+                <Pencil size={14} /> {c('rvEdit')}
+              </Button>
+            </div>
+          </section>
+        )}
       </div>
       <div className="mt-auto flex flex-col gap-2 pt-10">
         {!complete && (
@@ -658,7 +876,7 @@ function Review({ answers, answered, signalsOff, confirmed, onEdit, onEditSignal
             {firstMissing && <button onClick={() => onEdit(firstMissing.id)} className="underline underline-offset-4 focus-ring">{c('rvFirst')}</button>}
           </p>
         )}
-        <DaybreakButton onClick={onSubmit} disabled={!complete} className="w-full">{c('rvSubmit')}</DaybreakButton>
+        <DaybreakButton onClick={onSubmit} disabled={!complete} className="w-full">{clinical ? x('rvSubmitClinical') : c('rvSubmit')}</DaybreakButton>
       </div>
     </div>
   )
@@ -688,7 +906,7 @@ function Saved({ where, answered, onResume }: { where: string; answered: number;
 }
 
 // ─── Scoring with method v1.0, from the answers, then hand-off to the result ──
-function Scoring({ answers, signalsOff, offline, onSee }: { answers: Record<string, number>; signalsOff: string[]; offline: boolean; onSee: () => void }) {
+function Scoring({ answers, signalsOff, offline, clinical, x, onSee }: { answers: Record<string, number>; signalsOff: string[]; offline: boolean; clinical: boolean; x: X; onSee: () => void }) {
   const reduce = useReducedMotion()
   const latest = INDEX_HISTORY[0]
   const result = useMemo(() => scoreAnswers(answers, signalsOff), [answers, signalsOff])
@@ -709,7 +927,7 @@ function Scoring({ answers, signalsOff, offline, onSee }: { answers: Record<stri
   const finished = done >= STAGES.length
   const lowest = termByKey(result.lowest)
   const coachFirst = TEAM.find((p) => p.id === 'p_priya')?.name.split(' ')[0] ?? c('scYourCoach')
-  const next = IN_REMEASURE_WINDOW ? addDays(SPECIMEN_TODAY, 90) : MEMBER.nextMeasure
+  const next = clinical ? addDays(DAY90_DATES.day90, 90) : IN_REMEASURE_WINDOW ? addDays(SPECIMEN_TODAY, 90) : MEMBER.nextMeasure
 
   return (
     <div className="flex flex-1 flex-col">
@@ -731,7 +949,10 @@ function Scoring({ answers, signalsOff, offline, onSee }: { answers: Record<stri
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24 }} className="mt-8">
             <Card tone="raised">
               <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
-                <JoyspanWheel terms={result.terms} size={180} />
+                <div className="flex flex-col items-center gap-2">
+                  <JoyspanWheel terms={result.terms} size={180} baseline={latest.terms} />
+                  <WheelGhostKey />
+                </div>
                 <div className="text-center sm:text-left">
                   <div className="flex items-end justify-center gap-3 sm:justify-start">
                     <span className="num text-[5rem] font-light leading-[0.85] text-ink" aria-label={c('jiAria', { v: engine.value })}>{engine.value}</span>
@@ -760,7 +981,7 @@ function Scoring({ answers, signalsOff, offline, onSee }: { answers: Record<stri
                 })}
               </ul>
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <MethodLine method={latest.method} grade="index" takenOn={SPECIMEN_TODAY} next={next} />
+                <MethodLine method={latest.method} grade={clinical ? 'clinical' : 'index'} takenOn={clinical ? REMEASURE_TAKEN : SPECIMEN_TODAY} next={next} />
                 <SpecimenTag />
               </div>
               {result.surveyOnly && (
@@ -770,7 +991,12 @@ function Scoring({ answers, signalsOff, offline, onSee }: { answers: Record<stri
                 </div>
               )}
               {offline && <p role="status" className="mt-3 flex items-center gap-2 text-[14px] text-ink-2"><CloudOff size={14} aria-hidden className="shrink-0" /> {c('oqIndex')}</p>}
-              {!IN_REMEASURE_WINDOW && (
+              {clinical && (
+                <p role="status" className="mt-4 flex items-start gap-2.5 rounded-card border border-line px-4 py-2.5 text-[14px] text-ink-2">
+                  <Hourglass size={15} aria-hidden className="mt-0.5 shrink-0" /> <span>{x('scAwaiting', { who: SIGNER.name })}</span>
+                </p>
+              )}
+              {!IN_REMEASURE_WINDOW && !clinical && (
                 <p className="mt-3 text-[14px] text-ink-2">{rich(c('scPreviewDay'), { d: <span className="num">{MEMBER.dayOfLoop}</span>, v: <span className="num">{latest.value}</span> })}</p>
               )}
             </Card>
@@ -785,8 +1011,8 @@ function Scoring({ answers, signalsOff, offline, onSee }: { answers: Record<stri
       </AnimatePresence>
 
       <div className="mt-auto flex flex-col gap-2 pt-10">
-        <DaybreakButton onClick={onSee} disabled={!finished} className="w-full">{IN_REMEASURE_WINDOW ? c('scSeeDay90') : c('scSeeIndex')}</DaybreakButton>
-        {finished && !IN_REMEASURE_WINDOW && (
+        <DaybreakButton onClick={onSee} disabled={!finished} className="w-full">{IN_REMEASURE_WINDOW || clinical ? c('scSeeDay90') : c('scSeeIndex')}</DaybreakButton>
+        {finished && !IN_REMEASURE_WINDOW && !clinical && (
           <Link to="/app/index/day-90" className="inline-flex items-center justify-center gap-1.5 self-center py-2 text-[15px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring">
             {c('scHowDay90')} <ArrowRight size={14} />
           </Link>

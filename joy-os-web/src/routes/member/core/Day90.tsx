@@ -2,16 +2,18 @@ import clsx from 'clsx'
 import { ArrowRight, CalendarClock, Check, FileSignature, Hourglass, MessageCircle, ShieldCheck } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
+import { JoyspanWheel, WheelGhostKey } from '@/components/joy/JoyspanWheel'
 import { BandLabel, DaybreakButton, Delta, Eyebrow, MethodLine, SpecimenTag, TermDot, useFmtDate } from '@/components/joy/primitives'
 import { Avatar, Button, Card, PageHeader, Pill, Sheet, Tabs } from '@/components/ui'
 import { DAY90_SPECIMEN, INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
 import { termByKey } from '@/data/terms'
 import { METHODS, bandFor, joyspanIndex, lowestTerm } from '@/domain/indexEngine'
-import type { Grade, TermKey } from '@/domain/types'
+import type { Grade, TermKey, TermScore } from '@/domain/types'
 import { DAY90_DATES, DAY90_TERMS, DAY90_WHY, NEXT_90 } from './_data'
-import { INK_GROUND } from './_parts'
-import { IN_REMEASURE_WINDOW, REMEASURE_OPENS, addDays } from './_store'
+import { INK_GROUND, PAPER_GROUND } from './_parts'
+import { IN_REMEASURE_WINDOW, REMEASURE_OPENS, addDays, useRemeasure } from './_store'
+import { IndexCardView } from './_card'
+import { useX } from './_i18nX'
 import { DAY90_SPECIMEN_TEXT, DAY90_WHY_TEXT, NEXT90_TEXT, rich, useCore } from './_i18n'
 import { useT } from '@/lib/i18n'
 
@@ -23,16 +25,35 @@ const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 const SLOTS = ['Thursday 8 April · 18:30', 'Friday 9 April · 08:00', 'Saturday 10 April · 11:00']
 const weekdayOf = (slot: string) => slot.split(' ')[0]
 const NEXT_MEASURE = addDays(DAY90_DATES.day90, 90)
+const FIVE: TermKey[] = ['H', 'P', 'R', 'F', 'D']
+
+/** The terms that moved most between Day 0 and Day 90 (largest change first, up to three). */
+function movedOf(before: TermScore[], after: TermScore[]) {
+  return FIVE.map((k) => ({ key: k, from: before.find((t) => t.key === k)?.value ?? 0, to: after.find((t) => t.key === k)?.value ?? 0 }))
+    .filter((m) => m.to !== m.from)
+    .sort((a, b) => Math.abs(b.to - b.from) - Math.abs(a.to - a.from))
+    .slice(0, 3)
+}
 
 export default function Day90() {
   const day0 = INDEX_HISTORY[0]
+  // The member's own Clinical-grade re-measure, when the chain has reached sign-off;
+  // otherwise the specimen quarter that fell, shown with its "Show as" states.
+  const [rec] = useRemeasure()
+  const own = !!rec && (rec.status === 'awaiting' || rec.status === 'signed') && Array.isArray(rec.terms) && rec.terms.length === 6
+  const terms90 = own ? rec!.terms! : DAY90_TERMS
   const before = joyspanIndex(day0.terms, day0.method)!
-  const after = joyspanIndex(DAY90_TERMS, 'v1.0')!
+  const after = joyspanIndex(terms90, 'v1.0')!
   const meera = TEAM.find((p) => p.id === 'p_meera')!
   const priya = TEAM.find((p) => p.id === 'p_priya')!
-  const newLowest = termByKey(lowestTerm(DAY90_TERMS))
+  const newLowest = termByKey(lowestTerm(terms90))
   const [open, setOpen] = useState(false)
-  const [grade, setGrade] = useState<GradeState>('awaiting')
+  const [tab, setGrade] = useState<GradeState>('awaiting')
+  const grade: GradeState = own ? (rec!.status === 'signed' ? 'signed' : 'awaiting') : tab
+  const signer = own ? rec!.signedBy ?? meera.name : meera.name
+  const signedOn = own ? rec!.signedAt?.slice(0, 10) ?? DAY90_DATES.day90 : '2027-04-06'
+  const moved = own ? movedOf(day0.terms, terms90) : DAY90_SPECIMEN.moved
+  const x = useX()
   // The booked call stays until Dr Meera confirms a move; a request is shown beside it.
   const slot = DAY90_DATES.call
   const [requested, setRequested] = useState<string | null>(null)
@@ -40,13 +61,17 @@ export default function Day90() {
   const pointerPick = useRef(false)
   const day = weekdayOf(slot)
   const b0 = day0.terms.find((t) => t.key === 'B')!.value!
-  const b90 = DAY90_TERMS.find((t) => t.key === 'B')!.value!
+  const b90 = terms90.find((t) => t.key === 'B')!.value!
   const gradeOf: Grade = grade === 'index' ? 'index' : 'clinical'
   const { t: c, name, pick, when } = useCore()
   const tr = useT()
   const fmtDate = useFmtDate()
   const dayT = when(day)
-  const heldT = ORDER.filter((k) => k !== 'B' && !DAY90_SPECIMEN.moved.some((m) => m.key === k)).map((k) => name(k))
+  const heldT = ORDER.filter((k) => k !== 'B' && !moved.some((m) => m.key === k)).map((k) => name(k))
+  const most = moved[0]?.key ?? newLowest.key
+  const sentence = own
+    ? x(after.value > before.value ? 'd9OwnUp' : after.value < before.value ? 'd9OwnDown' : 'd9OwnSame', { a: before.value, b: after.value, term: name(most) })
+    : pick(DAY90_SPECIMEN_TEXT.sentence, DAY90_SPECIMEN.sentence)
 
   return (
     <div style={INK_GROUND} className="-mx-4 -mb-28 -mt-6 min-h-[calc(100vh-3.5rem)] px-4 pb-36 pt-8 md:mx-0 md:mb-0 md:mt-0 md:min-h-0 md:rounded-[20px] md:px-10 md:pb-12 md:pt-10 lg:px-12">
@@ -57,12 +82,15 @@ export default function Day90() {
         actions={<SpecimenTag />}
       />
 
-      {!IN_REMEASURE_WINDOW && (
+      {own ? (
+        <p className="mb-8 max-w-2xl text-[15px] text-ink-2">{rich(x('d9OwnLine'), { date: <span className="num">{fmtDate(rec!.takenOn ?? DAY90_DATES.day90)}</span> })}</p>
+      ) : !IN_REMEASURE_WINDOW && (
         <p className="mb-6 max-w-2xl rounded-card border border-dashed border-line-strong px-4 py-3 text-[14px] text-ink-2">
-          {rich(c('d9HowShown'), { d: <span className="num">{MEMBER.dayOfLoop}</span>, n: <span className="num">76</span>, date: fmtDate(REMEASURE_OPENS) })}
+          {rich(c('d9HowShown'), { d: <span className="num">{MEMBER.dayOfLoop}</span>, n: <span className="num">76</span>, date: fmtDate(REMEASURE_OPENS) })}{' '}
+          {x('d9ChainHint')} <Link to="/app" className="text-ink underline underline-offset-4 focus-ring">{x('d9ChainLink')}</Link>
         </p>
       )}
-      <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      {!own && <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="eyebrow text-ink-3">{c('d9ShowAs')}</p>
         <Tabs
           value={grade}
@@ -74,7 +102,7 @@ export default function Day90() {
             { value: 'signed', label: c('d9Signed') },
           ]}
         />
-      </div>
+      </div>}
 
       {/* ─── The number and the sentence ───────────────────────────────── */}
       <div className="grid gap-8 lg:grid-cols-[1.2fr_1fr] lg:items-center">
@@ -88,13 +116,52 @@ export default function Day90() {
               <BandLabel band={bandFor(after.value)} />
             </span>
           </div>
-          <p className="mt-6 max-w-[34ch] text-[1.5rem] font-light leading-snug text-ink md:text-[1.7rem]">{pick(DAY90_SPECIMEN_TEXT.sentence, DAY90_SPECIMEN.sentence)}</p>
-          <GradeStatus grade={grade} />
-          <MethodLine className="mt-3" method="v1.0" grade={gradeOf} takenOn={DAY90_DATES.day90} next={NEXT_MEASURE} signedBy={grade === 'signed' ? meera.name : undefined} />
+          <p className="mt-6 max-w-[34ch] text-[1.5rem] font-light leading-snug text-ink md:text-[1.7rem]">{sentence}</p>
+          <GradeStatus grade={grade} signer={signer} signedOn={signedOn} />
+          {own && grade === 'awaiting' && (
+            <p className="mt-3 max-w-xl rounded-card border border-dashed border-line-strong px-4 py-2.5 text-[13px] text-ink-2">
+              {x('d9SpecimenSign', { who: meera.name })}{' '}
+              <Link to="/console/clinical" className="text-ink underline underline-offset-4 focus-ring">{x('d9OpenPortal')}</Link>
+            </p>
+          )}
+          <MethodLine className="mt-3" method="v1.0" grade={gradeOf} takenOn={own ? rec!.takenOn ?? DAY90_DATES.day90 : DAY90_DATES.day90} next={NEXT_MEASURE} signedBy={grade === 'signed' ? signer : undefined} />
         </div>
-        <div className="flex justify-center lg:justify-end">
-          <JoyspanWheel terms={DAY90_TERMS} size={230} showLabels highlight={null} />
+        <div className="flex flex-col items-center gap-2 lg:items-end">
+          <JoyspanWheel terms={terms90} size={230} showLabels highlight={null} baseline={day0.terms} />
+          <WheelGhostKey />
         </div>
+      </div>
+
+      {/* ─── The Day-90 card: issued once signed (Index grade needs no signature) ── */}
+      <div className="mt-10">
+        {grade === 'awaiting' ? (
+          <Card tone="outline" className="flex items-start gap-3">
+            <Hourglass size={18} aria-hidden className="mt-0.5 shrink-0 text-ink-3" />
+            <div>
+              <Eyebrow>{x('d9CardTitle')}</Eyebrow>
+              <p className="mt-2 text-[16px] text-ink-2">{x('d9CardPending', { who: signer })}</p>
+            </div>
+          </Card>
+        ) : (
+          <div style={PAPER_GROUND} className="rounded-[20px] p-4 sm:p-5">
+            <IndexCardView
+              id="joy-day90-card"
+              title={x('d9CardTitle')}
+              value={after.value}
+              terms={terms90}
+              takenOn={own ? rec!.takenOn ?? DAY90_DATES.day90 : DAY90_DATES.day90}
+              method="v1.0"
+              grade={gradeOf}
+              next={NEXT_MEASURE}
+              lowest={newLowest.key}
+              step={x(`ns${newLowest.key}`)}
+              signedBy={grade === 'signed' ? signer : null}
+              signedOn={signedOn}
+              baseline={day0.terms}
+              printable={false}
+            />
+          </div>
+        )}
       </div>
 
       {/* ─── What moved, the person, the one action ─────────────────────── */}
@@ -107,7 +174,7 @@ export default function Day90() {
               <tr><th scope="col">{c('term')}</th><th scope="col">{c('d9ZeroTo90')}</th><th scope="col">{c('change')}</th></tr>
             </thead>
             <tbody>
-              {DAY90_SPECIMEN.moved.map((m) => (
+              {moved.map((m) => (
                 <tr key={m.key} className="border-b border-line last:border-0">
                   <th scope="row" className="py-3.5 pr-3 font-normal">
                     <span className="flex items-center gap-2.5 text-[17px] text-ink"><TermDot term={m.key} /> {name(m.key)}</span>
@@ -220,20 +287,21 @@ export default function Day90() {
       </div>
 
       <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5">
-        <MethodLine method="v1.0" grade={gradeOf} takenOn={DAY90_DATES.day90} signedBy={grade === 'signed' ? meera.name : undefined} />
+        <MethodLine method="v1.0" grade={gradeOf} takenOn={own ? rec!.takenOn ?? DAY90_DATES.day90 : DAY90_DATES.day90} signedBy={grade === 'signed' ? signer : undefined} />
         <Link to="/app/index" className="inline-flex items-center gap-1.5 text-[14px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring">
           {c('d9MyIndex')} <ArrowRight size={14} />
         </Link>
       </div>
 
       <Sheet open={open} onClose={() => setOpen(false)} title={c('d9Sheet')} side="right">
-        <SignedDelta grade={grade} before={before} after={after} day={dayT} />
+        <SignedDelta grade={grade} before={before} after={after} day={dayT} terms90={terms90} signer={signer} signedOn={signedOn} takenOn={own ? rec!.takenOn ?? DAY90_DATES.day90 : DAY90_DATES.day90} />
       </Sheet>
     </div>
   )
 }
 
-function GradeStatus({ grade }: { grade: GradeState }) {
+function GradeStatus({ grade, signer, signedOn }: { grade: GradeState; signer: string; signedOn: string }) {
+  const x = useX()
   const { t: c } = useCore()
   const fmtDate = useFmtDate()
   if (grade === 'index')
@@ -250,16 +318,17 @@ function GradeStatus({ grade }: { grade: GradeState }) {
     )
   return (
     <div className="mt-5 flex max-w-xl items-start gap-2.5 rounded-card border border-line px-4 py-2.5 text-[14px] text-ink-2">
-      <FileSignature size={15} aria-hidden className="mt-1 shrink-0" /><span>{rich(c('d9GsSigned'), { date: <span className="num">{fmtDate('2027-04-06')}</span> })}</span>
+      <FileSignature size={15} aria-hidden className="mt-1 shrink-0" /><span>{rich(x('d9GsSignedBy'), { who: signer, date: <span className="num">{fmtDate(signedOn)}</span> })}</span>
     </div>
   )
 }
 
 type Engine = NonNullable<ReturnType<typeof joyspanIndex>>
-function SignedDelta({ grade, before, after, day }: { grade: GradeState; before: Engine; after: Engine; day: string }) {
+function SignedDelta({ grade, before, after, day, terms90, signer, signedOn, takenOn }: { grade: GradeState; before: Engine; after: Engine; day: string; terms90: TermScore[]; signer: string; signedOn: string; takenOn: string }) {
   const day0 = INDEX_HISTORY[0]
-  const jalyDelta = Math.round(((MEMBER.remainingLifeExpectancy * (after.value - before.value)) / 100) * 10) / 10
+  const x = useX()
   const { t: c, name, pick, method } = useCore()
+  const most = movedOf(day0.terms, terms90)[0]?.key ?? lowestTerm(terms90)
   const fmtDate = useFmtDate()
   return (
     <div>
@@ -274,7 +343,7 @@ function SignedDelta({ grade, before, after, day }: { grade: GradeState; before:
         {grade === 'signed' && (
           <>
             <p className="flex items-center gap-2 text-[15px] text-ink"><FileSignature size={15} className="shrink-0" /> {c('d9SdSignedH')}</p>
-            <p className="mt-1 text-[14px] text-ink-2">{rich(c('d9SdSigned'), { date: <span className="num">{fmtDate('2027-04-06')}</span> })}</p>
+            <p className="mt-1 text-[14px] text-ink-2">{rich(x('d9SdSignedBy'), { who: signer, date: <span className="num">{fmtDate(signedOn)}</span> })}</p>
           </>
         )}
       </div>
@@ -293,7 +362,7 @@ function SignedDelta({ grade, before, after, day }: { grade: GradeState; before:
           <tbody>
             {ORDER.map((k) => {
               const a = day0.terms.find((t) => t.key === k)!.value!
-              const b = DAY90_TERMS.find((t) => t.key === k)!.value!
+              const b = terms90.find((t) => t.key === k)!.value!
               const sign = k === 'B' ? '−' : ''
               return (
                 <tr key={k} className="border-b border-line/70 align-top last:border-0">
@@ -314,7 +383,7 @@ function SignedDelta({ grade, before, after, day }: { grade: GradeState; before:
       <div className="mt-6 grid grid-cols-2 gap-3">
         {[
           { label: c('day0'), e: before, date: day0.takenOn },
-          { label: c('day90'), e: after, date: DAY90_DATES.day90 },
+          { label: c('day90'), e: after, date: takenOn },
         ].map(({ label, e, date }) => (
           <div key={label} className="min-w-0 rounded-card border border-line p-3">
             <p className="eyebrow text-ink-3">{label} · {fmtDate(date)}</p>
@@ -324,19 +393,12 @@ function SignedDelta({ grade, before, after, day }: { grade: GradeState; before:
         ))}
       </div>
       <p className="mt-3 text-[14px] text-ink-2">
-        {rich(c('d9GmFell'), { a: <span className="num">{before.gm.toFixed(1)}</span>, b: <span className="num">{after.gm.toFixed(1)}</span>, term: name(DAY90_SPECIMEN.moved.reduce((a, m) => (m.to - m.from < a.to - a.from ? m : a)).key), c: <span className="num">{(after.burden - before.burden).toFixed(2)}</span> })}
+        {rich(after.gm < before.gm ? c('d9GmFell') : x('d9GmRose'), { a: <span className="num">{before.gm.toFixed(1)}</span>, b: <span className="num">{after.gm.toFixed(1)}</span>, term: name(most), c: <span className="num">{(after.burden - before.burden).toFixed(2)}</span> })}
       </p>
-
-      <div className="mt-6 rounded-card bg-paper-sunk p-4">
-        <p className="eyebrow text-ink-3">{c('d9Research')}</p>
-        <p className="mt-1 text-[14px] text-ink-2">
-          {rich(c('d9Jaly'), { calc: <span className="num text-ink">{MEMBER.remainingLifeExpectancy} × ({after.value - before.value}) ÷ 100 = {jalyDelta}</span> })}
-        </p>
-      </div>
 
       <div className="mt-6 space-y-1">
         <MethodLine method={day0.method} grade={day0.grade} takenOn={day0.takenOn} />
-        <MethodLine method="v1.0" grade={grade === 'index' ? 'index' : 'clinical'} takenOn={DAY90_DATES.day90} signedBy={grade === 'signed' ? 'Dr Meera Iyer' : undefined} />
+        <MethodLine method="v1.0" grade={grade === 'index' ? 'index' : 'clinical'} takenOn={takenOn} signedBy={grade === 'signed' ? signer : undefined} />
         <p className="eyebrow text-ink-3">{c('d9NoRecompute', { method: method('v1.0'), l: METHODS['v1.0'].lambda })}</p>
       </div>
       <div className="mt-5"><Pill tone="neutral">{c('specimen')}</Pill></div>

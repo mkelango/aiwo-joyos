@@ -6,15 +6,17 @@ import { HOUSEHOLD, INDEX_HISTORY, MEMBER, TEAM } from '@/shared/member'
 import { COHORTS, EVENTS } from '@/shared/platform'
 import { useTheme } from '@/theme/ThemeProvider'
 import { EVENT_DATES, FLAGSHIP_NEXT, FLAGSHIP_RECAP, PASSES, SESSIONS_OPEN, SESSION_SCHEDULE, ZONES } from '@/screens/b/journeyData'
-import { accountStore, refCode, useStore } from '@/screens/b/bStore'
+import { accountStore, occasionsStore, refCode, useStore } from '@/screens/b/bStore'
 import { Done, Field, KeyValue, SpecimenQR, TimelineStep, fmtWhen, memberOnly, useSheetCrisisGuard } from '@/screens/b/parts'
 import { useDict, useTermText } from '@/lib/i18n'
 import { EVENTS_T, PASS_STATUS, EVENT_KIND, PASS_TEXT, RECAP_SESSION_TEXT, SCHEDULE_TEXT, ZONE_TEXT, SESSION_OPEN_TEXT } from '@/screens/b/i18n/journey'
 import { useCommon, useTx } from '@/screens/b/i18n/common'
+import { OCC } from '@/screens/b/i18n/occasions'
 
 // EVENTS AND PASSES (Memo p.22): your passes with a QR, the day's schedule, Experience Zones
 // by term, the Index issued on site, your Day-90 date, and Sessions open to book.
 // Venues see a name and a booking, never health data. One Daybreak: Book a pass.
+// Joyspan Occasions (a 60th birthday, an anniversary, a homecoming) are reached from here.
 
 type Open = (typeof SESSIONS_OPEN)[number]
 
@@ -43,6 +45,8 @@ function Events() {
   const flagship = EVENTS.find((e) => e.kind === 'Flagship')!
   const flagshipIndex = INDEX_HISTORY.find((x) => x.takenOn === FLAGSHIP_RECAP.indexOn) ?? latest
   const t = useDict(EVENTS_T)
+  const to = useDict(OCC)
+  const [occ] = useStore(occasionsStore)
   const tc = useCommon()
   const tx = useTx()
   const tt = useTermText()
@@ -290,6 +294,17 @@ function Events() {
           {t('day90B', { n: MEMBER.dayOfLoop })}
         </Meta>
         <ArrowLink onPress={() => router.push('/passport')}>{t('passport')}</ArrowLink>
+      </Card>
+
+      {/* Joyspan Occasions */}
+      <Card tone="raised" style={{ gap: space.s1 }}>
+        <Eyebrow>{to('occLinkEyebrow')}</Eyebrow>
+        <Title size={22}>{to('occLinkTitle')}</Title>
+        <Body tone="ink2">{to('occLinkBody')}</Body>
+        {occ.requests.length ? <Pill tone="daybreak">{to('requestedRef', { ref: occ.requests[0].ref })}</Pill> : null}
+        <ArrowLink icon="gift" onPress={() => router.push('/occasions')}>
+          {occ.requests.length ? to('occLinkRequested') : to('occLinkCta')}
+        </ArrowLink>
       </Card>
 
       {/* Book */}

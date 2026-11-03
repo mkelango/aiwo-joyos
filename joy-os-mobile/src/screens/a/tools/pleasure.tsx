@@ -1,9 +1,11 @@
 import { router } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Pressable, View } from 'react-native'
-import { ArrowLink, Body, Button, Divider, Eyebrow, Icon, Meta, Mono, Progress, Segmented, Sheet } from '@/components'
+import { ArrowLink, Body, Button, Divider, Eyebrow, Icon, Meta, Mono, Progress, Segmented, Sheet, Toggle } from '@/components'
 import { interceptsCrisis, useApp } from '@/lib/store'
-import { madeHere, useLocal } from '@/screens/a/local'
+import { ledgerStamp, ledgerWhen, madeHere, useLocal } from '@/screens/a/local'
+import { trustStore, useStore } from '@/screens/b/bStore'
+import { CONSENTS } from '@/shared/member'
 import { BarRow, IconButton, TextField } from '@/screens/a/parts'
 import { FILMS, PLANNED_START, SAVOURING_PROMPTS } from '@/screens/a/spacesData'
 import { LEDGER, LEDGER_WEEK } from '@/shared/member'
@@ -12,7 +14,8 @@ import { dayShort, useA } from '../i18n'
 import { ToolCard, ToolsHeading } from './common'
 
 // PLEASURE: what the Joy Ledger says this week, planned pleasures, a savouring prompt,
-// and Moments of Joy (short films of members savouring ordinary things).
+// and Moments of Joy (short films of members savouring ordinary things), with the opt-in
+// #MyMomentOfJoy (Memo p.19): off by default, under the Publishing consent in the Trust centre.
 
 export function PleasureTools() {
   const { t } = useA()
@@ -243,6 +246,7 @@ function Moments() {
           </Pressable>
         ))}
       </View>
+      <MyMomentOfJoy />
       <Sheet
         open={!!film}
         onClose={close}
@@ -303,5 +307,73 @@ function Moments() {
         ) : null}
       </Sheet>
     </ToolCard>
+  )
+}
+
+/** #MyMomentOfJoy: off by default; when on, the member may share one of their latest Ledger moments. */
+function MyMomentOfJoy() {
+  const { c, space, radius } = useTheme()
+  const { t, tx, lang } = useA()
+  const { ledger } = useApp()
+  const [trust] = useStore(trustStore)
+  const [optIn, setOptIn] = useLocal('myMomentOfJoy', false)
+  const [shared, setShared] = useLocal<string[]>('myMomentOfJoyShared', [])
+  const publishing = 'c_pub' in trust.consents ? trust.consents.c_pub : (CONSENTS.find((x) => x.id === 'c_pub')?.granted ?? false)
+  // The three newest moments still in the Ledger; one removed there is no longer offered or shared.
+  const recent = [...ledger].sort((a, b) => (ledgerStamp(a) < ledgerStamp(b) ? 1 : -1)).slice(0, 3)
+  const live = shared.filter((id) => ledger.some((e) => e.id === id))
+  // Withdrawing Publishing consent, or turning #MyMomentOfJoy off, takes back everything shared under it.
+  useEffect(() => {
+    if ((!publishing || !optIn) && shared.length) setShared([])
+  }, [publishing, optIn, shared.length, setShared])
+  return (
+    <View style={{ borderWidth: 1, borderColor: c.line, borderRadius: radius.card, padding: space.s2, gap: space.s1 }}>
+      <Toggle checked={optIn} onChange={setOptIn} label="#MyMomentOfJoy" description={t('Off by default. If on, you may choose a Ledger moment to share as a film or photo. Never a score, never health data, and you can take it back any time.')} />
+      {optIn ? (
+        !publishing ? (
+          <View style={{ gap: 6 }}>
+            <Meta tone="ink">{t('Publishing consent is off in the Trust centre, so nothing can be shared. What you shared before has been taken back.')}</Meta>
+            <ArrowLink icon="shield" onPress={() => router.push('/trust')}>
+              {t('Open the Trust centre')}
+            </ArrowLink>
+          </View>
+        ) : (
+          <View style={{ gap: space.s1 }}>
+            <Meta>{t('Under your Publishing consent. Nothing is shared until you pick a moment below and press share on it.')}</Meta>
+            <Eyebrow>{t('Your three latest Ledger moments')}</Eyebrow>
+            {recent.length === 0 ? <Meta tone="ink2">{t('No Ledger moments this week yet.')}</Meta> : null}
+            {recent.map((e) => {
+              const on = live.includes(e.id)
+              const what = e.word ?? e.tags.map((x) => tx(x)).join(lang === 'en' ? ' & ' : ', ')
+              return (
+                <View key={e.id} style={{ backgroundColor: c.paperSunk, borderRadius: 12, padding: 12, gap: 6 }}>
+                  <Body>{what}</Body>
+                  <Meta size={13} tone="ink3">
+                    <Mono size={13} tone="ink3">{ledgerWhen(ledgerStamp(e), lang)}</Mono>
+                    {` · ${e.tags.map((x) => tx(x)).join(', ')}${e.photo ? t(' · photo') : ''}`}
+                  </Meta>
+                  {on ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }} accessibilityLiveRegion="polite">
+                      <Icon name="check" size={14} color={c.ink2} />
+                      <Meta size={14} tone="ink2">{t('Shared as #MyMomentOfJoy')}</Meta>
+                      <Button variant="link" size="sm" onPress={() => setShared((x) => x.filter((y) => y !== e.id))} accessibilityLabel={t('Take back {x}', { x: what })}>
+                        {t('Take it back')}
+                      </Button>
+                    </View>
+                  ) : (
+                    <Button size="sm" variant="secondary" icon="share-2" onPress={() => setShared((x) => [...x.filter((y) => y !== e.id), e.id])} accessibilityLabel={t('Share {x} as #MyMomentOfJoy', { x: what })} style={{ alignSelf: 'flex-start' }}>
+                      {t('Share this moment')}
+                    </Button>
+                  )}
+                </View>
+              )
+            })}
+            <Meta size={13} tone="ink3">
+              {t('Only the words and photo of that moment are shared. No score, no health data, no location.')}
+            </Meta>
+          </View>
+        )
+      ) : null}
+    </View>
   )
 }

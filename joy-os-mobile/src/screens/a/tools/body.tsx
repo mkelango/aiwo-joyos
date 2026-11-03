@@ -1,7 +1,7 @@
 import { router } from 'expo-router'
 import { useState } from 'react'
 import { Pressable, View } from 'react-native'
-import { ArrowLink, Body, Button, Divider, Eyebrow, Icon, Meta, Mono, Pill, Segmented, TermChip, fmtDate } from '@/components'
+import { ArrowLink, Body, Button, Divider, Eyebrow, Icon, Meta, Mono, Pill, Segmented, SpecimenTag, TermChip, Toggle, fmtDate } from '@/components'
 import { useDict } from '@/lib/i18n'
 import { BarRow, Chip, Sparkline, TextField } from '@/screens/a/parts'
 import { BIOMARKERS, CAPACITY, CAPACITY_AT, LE8, LE8_SERIES, PANEL_META, SIGNALS, SPACE_TODAY, type Le8Key, type Le8Status, type Marker } from '@/screens/a/spacesData'
@@ -11,10 +11,12 @@ import { DEV, DEVICE_NOTE, SIGNAL_TEXT } from '@/screens/b/i18n/devices'
 import type { L3 } from '@/screens/b/i18n/common'
 import { useTheme } from '@/theme/ThemeProvider'
 import { Rich, useA } from '../i18n'
-import { useLocal } from '../local'
+import { H3, useLocal } from '../local'
 import { ToolCard, ToolsHeading, shortDate } from './common'
 
-// BODY: device status, signal trends, Life's Essential 8, the biomarker vault, the capacity battery.
+// BODY: device status, signal trends, Life's Essential 8, the biomarker vault, the protocol and
+// AIWO Daily stack (protocol-only, physician-signed), the capacity battery, and biological age
+// only after physician sign-off (Memo p.19).
 // Devices read the same record /devices writes (Lane B devicesStore), so a link or unlink there
 // shows here at once. LE8 readings and capacity results the member adds are kept on the phone.
 
@@ -27,7 +29,9 @@ export function BodyTools() {
       <Signals />
       <Le8 />
       <Vault />
+      <DailyStack />
       <Capacity />
+      <BiologicalAge />
     </>
   )
 }
@@ -679,6 +683,190 @@ function Capacity() {
             </View>
           )
         })}
+      </View>
+    </ToolCard>
+  )
+}
+
+// ─── Protocol and AIWO Daily stack ────────────────────────────────────────
+
+type StackItem = { id: string; kind: 'practice' | 'supplement'; label: string; dose?: string; why: string }
+
+/** Today's protocol practices and AIWO Daily stack, as signed by the physician against the January panel. */
+function DailyStack() {
+  const { c, space, radius } = useTheme()
+  const { t, lang } = useA()
+  const [done, setDone] = useLocal<{ on: string; ids: string[] }>('dailyStack', { on: SPACE_TODAY, ids: [] })
+  const [asked, setAsked] = useLocal<string[]>('dailyStackAsked', [])
+  const today = done.on === SPACE_TODAY ? done.ids : []
+  const doc = PANEL_META.signedBy
+  const vitD = BIOMARKERS.find((m) => m.name.startsWith('Vitamin D'))
+  const items: StackItem[] = [
+    { id: 'p_sun', kind: 'practice', label: t('Ten minutes of morning sun, before 10 am'), why: t('For vitamin D, below range in January') },
+    { id: 'p_walk', kind: 'practice', label: t('A 30-minute brisk walk, five days a week'), why: t('For ApoB, LDL and HbA1c, all worth watching') },
+    { id: 'p_lights', kind: 'practice', label: t('Lights out by 22:30'), why: t('Your sleep plan, from Ease') },
+    { id: 's_d3', kind: 'supplement', label: 'AIWO Daily D3', dose: '2,000 IU', why: t('With breakfast · vitamin D {v} ng/mL, range 30 – 100', { v: String(vitD?.value ?? '—') }) },
+    { id: 's_o3', kind: 'supplement', label: 'AIWO Daily Omega-3', dose: '1 g', why: t('With lunch · for ApoB and LDL') },
+    { id: 's_mg', kind: 'supplement', label: 'AIWO Daily Magnesium', dose: '200 mg', why: t('At 21:00 · part of your wind-down') },
+  ]
+  const toggle = (id: string) => setDone({ on: SPACE_TODAY, ids: today.includes(id) ? today.filter((x) => x !== id) : [...today, id] })
+  const n = items.filter((i) => today.includes(i.id)).length
+  const row = (i: StackItem) => {
+    const on = today.includes(i.id)
+    const name = i.dose ? `${i.label} ${i.dose}` : i.label
+    return (
+      <View key={i.id} style={{ borderWidth: 1, borderColor: c.line, borderRadius: radius.card, backgroundColor: on ? c.paperSunk : undefined, padding: 12, gap: 6 }}>
+        <Pressable
+          onPress={() => toggle(i.id)}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: on }}
+          aria-checked={on}
+          accessibilityLabel={t('Done today: {x}', { x: name })}
+          accessibilityHint={i.why}
+          style={({ pressed }) => ({ flexDirection: 'row', gap: 12, minHeight: 44, opacity: pressed ? 0.7 : 1 })}
+        >
+          <View style={{ width: 22, height: 22, marginTop: 1, borderRadius: 6, borderWidth: 2, borderColor: on ? c.ink : c.lineStrong, backgroundColor: on ? c.ink : undefined, alignItems: 'center', justifyContent: 'center' }}>
+            {on ? <Icon name="check" size={14} color={c.paper} /> : null}
+          </View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Body tone={on ? 'ink2' : 'ink'}>
+              {i.label}
+              {i.dose ? (
+                <>
+                  {' · '}
+                  <Mono tone={on ? 'ink2' : 'ink'}>{i.dose}</Mono>
+                </>
+              ) : null}
+            </Body>
+            <Meta size={14} tone="ink3">
+              {i.why}
+            </Meta>
+          </View>
+        </Pressable>
+        {i.kind === 'supplement' ? (
+          <View style={{ paddingLeft: 34 }}>
+            {asked.includes(i.id) ? (
+              <Meta size={14} tone="ink2" accessibilityLiveRegion="polite">
+                {t('Asked · {name} replies within a working day', { name: doc })}
+              </Meta>
+            ) : (
+              <Button variant="link" size="sm" onPress={() => setAsked((a) => [...a, i.id])} accessibilityLabel={t('Ask {name} about {x}', { name: doc, x: i.label })}>
+                {t('Ask about this')}
+              </Button>
+            )}
+          </View>
+        ) : null}
+      </View>
+    )
+  }
+  return (
+    <ToolCard
+      title={t('Protocol · AIWO Daily')}
+      aside={
+        <View accessible accessibilityLabel={t('{n} of {m} done today', { n, m: items.length })} style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
+          <Mono tone="ink" size={20} weight="light">
+            {String(n)}
+          </Mono>
+          <Mono tone="ink3" size={13}>{`/${items.length}`}</Mono>
+        </View>
+      }
+      lead={t('Signed by {name} on {date}, against your January panel. Tick what you have done today; a missed day is just a missed day.', { name: doc, date: fmtDate(PANEL_META.signed, lang) })}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+        <Eyebrow>{t('Today · {d}', { d: shortDate(SPACE_TODAY, lang) })}</Eyebrow>
+        <SpecimenTag />
+      </View>
+      <View style={{ gap: 8 }}>
+        <Body weight="medium" {...H3}>
+          {t('Protocol practices')}
+        </Body>
+        {items.filter((i) => i.kind === 'practice').map(row)}
+      </View>
+      <View style={{ gap: 8 }}>
+        <Body weight="medium" {...H3}>
+          {t('AIWO Daily stack')}
+        </Body>
+        {items.filter((i) => i.kind === 'supplement').map(row)}
+        <Meta size={14} tone="ink3">
+          {t('Missed a dose? Carry on with the next one as usual. Never double up.')}
+        </Meta>
+      </View>
+      <View style={{ flexDirection: 'row', gap: 8, backgroundColor: c.paperSunk, borderRadius: radius.card, padding: space.s2 }}>
+        <Icon name="shield" size={15} color={c.ink2} />
+        <Meta style={{ flex: 1 }}>{t('Protocol-only. AIWO Daily reaches you only when your physician adds it to your protocol, against a signed panel. There is no shop here, and nothing is sold to you on this screen.')}</Meta>
+      </View>
+      <Meta size={14} tone="ink3">
+        {t('Reviewed at Day 45 · re-tested at Day 90')} · {t('Only {name} changes the stack. Ask, and the question goes to your care team.', { name: doc })}
+      </Meta>
+      <ArrowLink icon="message-circle" onPress={() => router.push('/messages?t=t_meera')}>
+        {t('Message {name}', { name: doc })}
+      </ArrowLink>
+    </ToolCard>
+  )
+}
+
+// ─── Biological age, only after physician sign-off ───────────────────────
+
+function BiologicalAge() {
+  const { c, space, radius } = useTheme()
+  const { t, lang } = useA()
+  const [asked, setAsked] = useLocal('bioAgeAsked', false)
+  // A specimen switch shows the card as it reads once the physician has signed the estimate.
+  const [signedView, setSignedView] = useLocal('bioAgeSignedView', false)
+  const doc = PANEL_META.signedBy
+  const steps = [
+    { done: true, label: t('Clinical panel drawn · {d}', { d: shortDate(PANEL_META.drawn, lang) }) },
+    { done: true, label: t('Panel signed · {d}', { d: shortDate(PANEL_META.signed, lang) }) },
+    { done: signedView, label: t('Biological age review · at Day 45') },
+  ]
+  return (
+    <ToolCard tone="sunk" title={t('Biological age · LONGEVIS')} aside={<Icon name={signedView ? 'check-circle' : 'lock'} size={16} color={c.ink3} />}>
+      {signedView ? (
+        <View style={{ gap: space.s1 }}>
+          <View accessible accessibilityLabel={t('Biological age estimate {a} to {b}, signed by {name}.', { a: 49, b: 52, name: doc })} style={{ alignItems: 'center', justifyContent: 'center', height: 112, borderRadius: radius.card, borderWidth: 1, borderColor: c.line, backgroundColor: c.paperRaised }}>
+            <Mono size={44} weight="light" tone="ink">
+              49 – 52
+            </Mono>
+            <Meta size={14} tone="ink3">
+              {t('years · an estimate, with its range')}
+            </Meta>
+          </View>
+          <Body>{t('Signed by {name} at your Day 45 review.', { name: doc })}</Body>
+          <Meta>{t('An estimate from your panel and capacity, never a promise or a target. {name} walks you through what moves it; the number itself is not something to chase.', { name: doc })}</Meta>
+        </View>
+      ) : (
+        <View style={{ gap: space.s1 }}>
+          <View accessible accessibilityLabel={t('Locked')} style={{ alignItems: 'center', justifyContent: 'center', height: 112, borderRadius: radius.card, borderWidth: 1, borderStyle: 'dashed', borderColor: c.lineStrong }}>
+            <Mono size={44} weight="light" tone="ink3">
+              — —
+            </Mono>
+          </View>
+          <Body>{t('Shown only after a physician signs it.')}</Body>
+          <Meta>{t('An estimate from your panel and capacity, never a promise or a target. It waits for Dr Meera’s review, so a number never reaches you without a person who can explain it.')}</Meta>
+        </View>
+      )}
+      <View style={{ gap: 8 }}>
+        {steps.map((s) => (
+          <View key={s.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {s.done ? <Icon name="check" size={15} color={c.ink} /> : <View style={{ width: 9, height: 9, marginHorizontal: 3, borderRadius: 5, borderWidth: 1, borderColor: c.lineStrong }} />}
+            <Meta tone={s.done ? 'ink' : 'ink3'} style={{ flex: 1 }}>
+              {s.label}
+            </Meta>
+          </View>
+        ))}
+      </View>
+      {signedView ? null : asked ? (
+        <Meta tone="ink2" accessibilityLiveRegion="polite">
+          {t('Added to the agenda for your Day 45 review with Dr Meera.')}
+        </Meta>
+      ) : (
+        <Button size="sm" variant="secondary" icon="plus" onPress={() => setAsked(true)} style={{ alignSelf: 'flex-start' }}>
+          {t('Add to my Day 45 review')}
+        </Button>
+      )}
+      <View style={{ borderTopWidth: 1, borderTopColor: c.line, paddingTop: space.s1, gap: 6 }}>
+        <SpecimenTag />
+        <Toggle checked={signedView} onChange={setSignedView} label={t('Specimen view: after Dr Meera signs')} description={t('See this card as it reads once your physician has reviewed and signed the estimate.')} />
       </View>
     </ToolCard>
   )

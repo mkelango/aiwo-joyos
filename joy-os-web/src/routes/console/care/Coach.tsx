@@ -1,15 +1,21 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowRight, CalendarClock, Check, ChevronRight, Lock, Users, Video } from 'lucide-react'
+import { ArrowRight, CalendarClock, Check, ChevronRight, Flag, Lock, ShieldAlert, Users, Video } from 'lucide-react'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { DaybreakButton, Delta, Eyebrow, SpecimenTag } from '@/components/joy/primitives'
-import { Avatar, Button, Card, LoopRing, PageHeader, Sheet } from '@/components/ui'
+import { Avatar, Button, Card, LoopRing, PageHeader, Pill, Sheet } from '@/components/ui'
+import { INDEX_HISTORY } from '@/data/member'
 import { DRIFT_RULES } from '@/data/platform'
-import type { DriftTask } from '@/domain/types'
-import { CIRCLES_LED, CIRCLE_ROSTER, COACH_CASELOAD, DAY_N, PRIYA, RAVI } from './_data'
+import { bandFor, joyspanIndex, lowestTerm } from '@/domain/indexEngine'
+import type { Band, DriftTask, Grade, MethodVersion, TermKey } from '@/domain/types'
+import { CIRCLES_LED, CIRCLE_ROSTER, COACH_CASELOAD, DAY_N, MEERA, PRIYA, RAVI } from './_data'
 import { ConciergeDesk } from './_concierge'
+import { useClinicalState } from './_clinicalStore'
+import { RaiseConcernSheet, type ConcernTarget } from './_concern'
 import { PreviewBanner, coachDeskOf, useConsoleAccess, useConsoleRole } from './_gate'
+import { useRemeasure } from './_remeasure'
+import { useCircleReports, type CircleReport } from './_reports'
 import { coach, isClinicalTask, isMyTask, taskLabel, useCoachState, type CoachTask } from './_store'
 import { AccessNote, CardHead, ConsoleTermChip, Kpi, PriorityTag, ScrollTabs, SlaChip, areaCls, fieldCls, fmtClock, fmtOpened, labelCls, parseIst, useConsoleNow } from './_parts'
 
@@ -72,6 +78,7 @@ function Coach({ deskSwitch }: { deskSwitch: ReactNode }) {
   const [outcomeErr, setOutcomeErr] = useState('')
   const [notice, setNotice] = useState<{ text: string; to?: string; cta?: string } | null>(null)
   const [sort, setSort] = useState<'day' | 'index' | 'name'>('day')
+  const [concern, setConcern] = useState<(ConcernTarget & { reportId?: string }) | null>(null)
 
   const openTasks = tasks.filter((t) => t.status !== 'done')
   const inLoop = COACH_CASELOAD.length
@@ -313,6 +320,8 @@ function Coach({ deskSwitch }: { deskSwitch: ReactNode }) {
         </Card>
       </div>
 
+      <ScoresFeed />
+
       {/* Caseload */}
       <Card className="mt-8">
         <CardHead
@@ -419,6 +428,8 @@ function Coach({ deskSwitch }: { deskSwitch: ReactNode }) {
         </div>
       </section>
 
+      <Moderation canAct={canAct} now={now} onConcern={setConcern} />
+
       {tonight && (
         <div className="mt-8 flex justify-end">
           <button type="button" onClick={() => setCircleOpen(tonight.id)} className="inline-flex items-center gap-1.5 text-left text-[15px] text-ink underline-offset-4 hover:underline focus-ring">
@@ -427,7 +438,13 @@ function Coach({ deskSwitch }: { deskSwitch: ReactNode }) {
         </div>
       )}
 
-      <CircleSheet id={circleOpen} onClose={() => setCircleOpen(null)} canAct={canAct} now={now} />
+      <CircleSheet id={circleOpen} onClose={() => setCircleOpen(null)} canAct={canAct} now={now} onConcern={(t) => { setCircleOpen(null); setConcern(t) }} />
+      <RaiseConcernSheet
+        target={concern}
+        onClose={() => setConcern(null)}
+        canAct={canAct}
+        onRaised={(a) => { if (concern?.reportId) coach.moderate(concern.reportId, { status: 'concern', at: fmtClock(now), alertId: a.id }) }}
+      />
 
       <Sheet open={!!closing} onClose={() => setClosing(null)} title={closing ? `Close task · ${closing.memberName}` : 'Close task'} side="center">
         {closing && (
@@ -464,7 +481,7 @@ function Coach({ deskSwitch }: { deskSwitch: ReactNode }) {
 
 // ─── Circle sheet: roster, this week, call room, attendance ────────────────
 
-function CircleSheet({ id, onClose, canAct, now }: { id: string | null; onClose: () => void; canAct: boolean; now: number }) {
+function CircleSheet({ id, onClose, canAct, now, onConcern }: { id: string | null; onClose: () => void; canAct: boolean; now: number; onConcern: (t: ConcernTarget) => void }) {
   const { circles } = useCoachState()
   const c = CIRCLES_LED.find((x) => x.id === id)
   const roster = id ? CIRCLE_ROSTER[id] ?? [] : []
@@ -532,11 +549,14 @@ function CircleSheet({ id, onClose, canAct, now }: { id: string | null; onClose:
                       <input type="checkbox" checked={on} disabled={!canAct} onChange={() => toggle(m.name)} className="h-4 w-4 accent-[color:var(--ink)]" />
                       <span className="truncate">{m.name}</span>
                     </label>
-                    {m.id ? (
-                      <Link to={`/console/coach/member/${m.id}`} onClick={onClose} className="shrink-0 text-[13px] text-ink underline-offset-4 hover:underline focus-ring">Digest</Link>
-                    ) : (
-                      <span className="shrink-0 text-[12px] text-ink-3">Coach · {m.coach}</span>
-                    )}
+                    <span className="flex shrink-0 items-center gap-3">
+                      {m.id ? (
+                        <Link to={`/console/coach/member/${m.id}`} onClick={onClose} className="text-[13px] text-ink underline-offset-4 hover:underline focus-ring">Digest</Link>
+                      ) : (
+                        <span className="text-[12px] text-ink-3">Coach · {m.coach}</span>
+                      )}
+                      <button type="button" disabled={!canAct} onClick={() => onConcern({ name: m.name, memberId: m.id, context: `circle · ${c.name}` })} className="text-[13px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring disabled:opacity-50" aria-label={`Raise a concern about ${m.name}`}>Concern</button>
+                    </span>
                   </li>
                 )
               })}
@@ -552,5 +572,175 @@ function CircleSheet({ id, onClose, canAct, now }: { id: string | null; onClose:
         <p className="text-[13px] text-ink-3">Attendance is for the circle lead only. Members never see who came and who did not.</p>
       </div>
     </Sheet>
+  )
+}
+
+// ─── New scores feed (score.issued) ────────────────────────────────────────
+// Architecture 8e-32 and the Publish step (p.159): score.issued reaches the coach console.
+// Check and Index grades issue at once; a Clinical grade issues only when a physician signs,
+// so a sign-off in the clinical portal (and the member's own Day-90 re-measure) lands here.
+// Coaches see the Index, its band and the lowest term. Never lab values.
+
+type Issued = { id: string; memberId: string; member: string; grade: Grade; value: number; prev: number | null; band: Band; lowest: TermKey; method: MethodVersion; ms: number; what: string; signedBy?: string }
+
+const istMs = (s: string) => parseIst(s)
+const specimenIssued = (): Issued[] => {
+  const arjun = INDEX_HISTORY[0]
+  return [
+    { id: 'si-0287-rm', memberId: 'm_0287', member: 'Leela Thomas', grade: 'index', value: 66, prev: 64, band: bandFor(66), lowest: 'B', method: 'v1.0', ms: istMs('2027-01-28 07:42'), what: 'Re-measure · taken in the app' },
+    { id: 'si-0262-d0', memberId: 'm_0262', member: 'Sameer Joshi', grade: 'index', value: 52, prev: null, band: bandFor(52), lowest: 'R', method: 'v1.0', ms: istMs('2027-01-22 10:15'), what: 'Day 0 · first measure' },
+    { id: 'si-0001-d0', memberId: 'm_0001', member: 'Arjun Rao', grade: 'clinical', value: arjun.value, prev: 61, band: arjun.band, lowest: arjun.lowestTerm, method: arjun.method, ms: istMs('2027-01-02 17:30'), what: 'Day 0 · Joycation, on site', signedBy: arjun.signedBy },
+  ]
+}
+
+function ScoresFeed() {
+  const { signoffs } = useClinicalState()
+  const rm = useRemeasure()
+  const { scoresSeen } = useCoachState()
+  const inCaseload = new Set(COACH_CASELOAD.map((m) => m.id))
+
+  const feed = useMemo(() => {
+    const live: Issued[] = []
+    for (const s of signoffs) {
+      if (!s.signed || !inCaseload.has(s.memberId)) continue
+      const now = joyspanIndex(s.now, s.method)
+      const prev = joyspanIndex(s.prev, s.method)
+      if (!now) continue
+      const hhmm = s.signed.match(/(\d{2}:\d{2})$/)?.[1] ?? '21:10'
+      live.push({ id: `si-${s.id}`, memberId: s.memberId, member: s.member, grade: 'clinical', value: now.value, prev: prev?.value ?? null, band: bandFor(now.value), lowest: lowestTerm(s.now), method: s.method, ms: istMs(`2027-01-28 ${hhmm}`), what: s.occasion, signedBy: s.signed.split(' · ')[1] ?? MEERA.name })
+    }
+    if (rm.phase === 'signed') {
+      const now = joyspanIndex(rm.terms, rm.method)
+      const prev = joyspanIndex(rm.prev, rm.method)
+      if (now) live.push({ id: `si-remeasure-${rm.memberId}`, memberId: rm.memberId, member: rm.member, grade: 'clinical', value: now.value, prev: prev?.value ?? null, band: bandFor(now.value), lowest: lowestTerm(rm.terms), method: rm.method, ms: rm.signedMs ?? Date.now(), what: 'Day 90 re-measure · Clinical grade, from the app', signedBy: rm.signedBy ?? MEERA.name })
+    }
+    return [...live, ...specimenIssued()].sort((a, b) => b.ms - a.ms)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signoffs, rm])
+
+  const unseen = feed.filter((f) => !scoresSeen.includes(f.id))
+  const awaiting = signoffs.filter((s) => !s.signed && !s.returned && inCaseload.has(s.memberId)).length + (rm.phase === 'pending' ? 1 : 0)
+  const GRADE: Record<Grade, string> = { check: 'Check', index: 'Index grade', clinical: 'Clinical grade' }
+
+  return (
+    <Card className="mt-8" aria-labelledby="scores-h">
+      <CardHead
+        eyebrow="New scores · score.issued"
+        title={<span id="scores-h">{unseen.length ? <><span className="num">{unseen.length}</span> new since you last looked</> : 'Nothing new since you last looked'}</span>}
+        aside={<Button size="sm" variant="ghost" disabled={!unseen.length} onClick={() => coach.seeScores(unseen.map((f) => f.id))}>Mark all seen</Button>}
+      />
+      <ul className="divide-y divide-[color:var(--line)]" aria-label="Scores issued to your caseload">
+        {feed.map((f) => {
+          const isNew = !scoresSeen.includes(f.id)
+          return (
+            <li key={f.id} className="grid gap-2 py-3 md:grid-cols-[1fr_auto] md:items-center md:gap-6">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link to={`/console/coach/member/${f.memberId}`} onClick={() => coach.seeScores([f.id])} className="text-[16px] text-ink underline-offset-4 hover:underline focus-ring">{f.member}</Link>
+                  {isNew && <Pill tone="daybreak">New</Pill>}
+                  <span className="text-[14px] text-ink-2">{f.what}</span>
+                </div>
+                <p className="mt-1 text-[13px] text-ink-3">
+                  <span className="num">{fmtOpened(new Date(f.ms + 5.5 * 3600_000).toISOString().slice(0, 16).replace('T', ' '))}</span> · {GRADE[f.grade]} · method <span className="num">{f.method}</span>{f.signedBy ? <> · signed by {f.signedBy}</> : null}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="flex items-baseline gap-2"><span className="num text-[22px] font-light text-ink">{f.value}</span><Delta value={f.prev === null ? null : f.value - f.prev} className="text-[13px]" /></span>
+                <span className="eyebrow text-ink-2">{f.band}</span>
+                <ConsoleTermChip term={f.lowest} />
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+      <p className="mt-3 text-[13px] text-ink-3">
+        Index and band, as the member sees them. {awaiting ? <><span className="num">{awaiting}</span> Clinical-grade {awaiting === 1 ? 'score waits' : 'scores wait'} for a physician’s signature and will appear here when signed.</> : 'No Clinical-grade score is waiting for a signature.'} A fall is a reason to call, never a mark against anyone.
+      </p>
+    </Card>
+  )
+}
+
+// ─── Circle moderation: member reports and "raise a concern" ───────────────
+
+function fmtReportAt(ms: number | null) {
+  if (ms === null) return 'time not given'
+  return fmtOpened(new Date(ms + 5.5 * 3600_000).toISOString().slice(0, 16).replace('T', ' '))
+}
+
+function Moderation({ canAct, now, onConcern }: { canAct: boolean; now: number; onConcern: (t: ConcernTarget & { reportId?: string }) => void }) {
+  const reports = useCircleReports()
+  const { moderation } = useCoachState()
+  const { alerts } = useClinicalState()
+  const [noting, setNoting] = useState<string | null>(null)
+  const [note, setNote] = useState('')
+  const [err, setErr] = useState('')
+  const open = reports.filter((r) => !moderation[r.id])
+
+  const spoke = (r: CircleReport) => {
+    if (!canAct) return
+    if (note.trim().length < 10) return setErr('Write a sentence about what you said and agreed (10 characters or more).')
+    coach.moderate(r.id, { status: 'spoken', at: fmtClock(now), note: note.trim() })
+    setNoting(null); setNote(''); setErr('')
+  }
+
+  return (
+    <Card tone="sunk" className="mt-6" aria-labelledby="mod-h">
+      <CardHead
+        eyebrow="Moderation · reports from your circles"
+        title={<span id="mod-h">{open.length ? <><span className="num">{open.length}</span> {open.length === 1 ? 'report needs' : 'reports need'} you</> : 'Every report has been handled'}</span>}
+        aside={<Flag size={16} className="text-ink-3" aria-hidden />}
+      />
+      <ul className="space-y-3" aria-label="Circle reports">
+        {reports.map((r) => {
+          const m = moderation[r.id]
+          const alert = m?.alertId ? alerts.find((a) => a.id === m.alertId) : undefined
+          return (
+            <li key={r.id} className={clsx('rounded-lg border border-line bg-paper-raised p-4', m && 'opacity-80')}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[15px] text-ink">
+                  About <span className="font-medium">{r.memberName.split(' ')[0]}</span>
+                  {r.circleName && <span className="text-ink-2"> · {r.circleName}</span>}
+                </p>
+                <span className="flex items-center gap-2">
+                  {r.specimen && <SpecimenTag />}
+                  <span className="num text-[12px] text-ink-3">{fmtReportAt(r.ms)}</span>
+                </span>
+              </div>
+              <blockquote className="mt-2 border-l-2 border-line-strong pl-3 text-[15px] text-ink">{r.reason}</blockquote>
+              <p className="mt-2 text-[13px] text-ink-3">Reported by a member of the circle. Who reported is kept from you and from {r.memberName.split(' ')[0]}.</p>
+              {m ? (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[14px]">
+                  <p className="flex items-start gap-2 text-ink"><Check size={14} className="mt-1 shrink-0" aria-hidden />
+                    <span>
+                      {m.status === 'spoken' && <>Spoke with them · <span className="num">{m.at}</span>{m.note ? <> · {m.note}</> : null}</>}
+                      {m.status === 'no-action' && <>Read, no action needed · <span className="num">{m.at}</span></>}
+                      {m.status === 'concern' && <>Concern raised to {alert?.owner ?? 'the clinical team'} · <span className="num">{m.at}</span> · {alert?.status === 'closed' ? 'closed by the clinician' : 'open on the safety board'}</>}
+                    </span>
+                  </p>
+                  {m.status !== 'concern' && <button type="button" disabled={!canAct} onClick={() => coach.moderate(r.id, null)} className="text-[13px] text-ink-2 underline underline-offset-4 hover:text-ink focus-ring disabled:opacity-50">Reopen</button>}
+                </div>
+              ) : noting === r.id ? (
+                <form onSubmit={(e) => { e.preventDefault(); spoke(r) }} noValidate className="mt-3 space-y-2">
+                  <label htmlFor={`mod-note-${r.id}`} className={labelCls}>What you said and agreed</label>
+                  <textarea id={`mod-note-${r.id}`} rows={2} className={areaCls} value={note} onChange={(e) => { setNote(e.target.value); setErr('') }} placeholder="e.g. Spoke after the session; agreed one voice at a time for the share round." aria-invalid={!!err} />
+                  {err && <p className="text-[13px] text-error" role="alert">{err}</p>}
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="submit" size="sm" variant="ink" disabled={!canAct}>Save</Button>
+                    <Button size="sm" variant="ghost" onClick={() => { setNoting(null); setNote(''); setErr('') }}>Cancel</Button>
+                  </div>
+                </form>
+              ) : (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button size="sm" variant="secondary" disabled={!canAct} onClick={() => { setNoting(r.id); setNote(''); setErr('') }}>Spoke with them</Button>
+                  <Button size="sm" variant="secondary" disabled={!canAct} onClick={() => onConcern({ name: r.memberName, memberId: r.memberId, context: `circle report${r.circleName ? ` · ${r.circleName}` : ''}`, prefill: `A circle member reported: “${r.reason}” `, reportId: r.id })}><ShieldAlert size={14} aria-hidden /> Raise a concern</Button>
+                  <Button size="sm" variant="ghost" disabled={!canAct} onClick={() => coach.moderate(r.id, { status: 'no-action', at: fmtClock(now) })}>No action needed</Button>
+                </div>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+      <p className="mt-4 text-[13px] text-ink-3">Circles use first names only and are never recorded. A concern goes to the clinical team as a safety alert; anything else stays between you and the circle.</p>
+    </Card>
   )
 }

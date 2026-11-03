@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, BellOff, Check, Fingerprint, KeyRound, Link2, Loader2, Lock, Mail, MessageCircle, Plus, RotateCcw, Smartphone, Trash2, UserPlus, Users, Watch } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BellOff, Check, Fingerprint, KeyRound, Link2, Loader2, Lock, Mail, MessageCircle, Plus, RotateCcw, ShieldCheck, Smartphone, Trash2, UserPlus, Users, Watch } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
@@ -12,10 +12,10 @@ import { useApp, type Lang } from '@/lib/store'
 import { COUNTRIES, DEVICES, EMAIL_RE, INTENTS, ONBOARDING_COPY, ONBOARDING_STEPS as STEPS, countryName, phoneError, type CountryCode, type DeviceId, type OnboardingStep } from './_data'
 import { E, OB, dateLocale } from './_i18n'
 import { FlowTopBar, enterCodeDigits, rich, useBand } from './_parts'
-import { CHECK_KEY, ONBOARDING_KEY, readJSON, removeKey, writeJSON, type SavedCheck, type SavedOnboarding } from './_store'
+import { CHECK_KEY, ONBOARDING_KEY, ageOn, readJSON, removeKey, writeJSON, type Guardian, type SavedAge, type SavedCheck, type SavedOnboarding } from './_store'
 
 // ONBOARDING (Plan §4B; competitive pattern 5, intent-first, device last):
-// welcome → AIWO ID (name, contact, passkey or code) → intent → language → three
+// welcome → AIWO ID (name, contact, passkey or code) → age (the minors gate) → intent → language → three
 // consents → device → household → quiet hours → "Your 90 days begin" → the baseline
 // Index. Back/next, validation, progress. Saved as you go in this browser
 // ('joyos:onboarding'), so "Save and exit" really resumes, and a finished Check
@@ -30,6 +30,23 @@ type Account = SavedOnboarding['account']
 type Channels = { app: boolean; whatsapp: boolean; email: boolean }
 
 const EMPTY_ACCOUNT: Account = { name: '', via: 'phone', country: '+91', phone: '', email: '', verified: null }
+const EMPTY_AGE: SavedAge = { dob: '', minor: false, guardian: null }
+const EMPTY_GUARDIAN: Guardian = { name: '', relation: 'Parent', via: 'phone', country: '+91', phone: '', email: '', status: 'draft' }
+const GUARDIAN_RELATIONS: Guardian['relation'][] = ['Parent', 'Legal guardian']
+
+/** Under 18 by the date of birth given (Arch p26: minors are never scored). */
+function isMinor(dob: string) {
+  const a = ageOn(dob)
+  return a !== null && a < 18
+}
+
+function isoDay(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function guardianContact(g: Guardian) {
+  return g.via === 'phone' ? `${g.country} ${g.phone.trim()}` : g.email.trim()
+}
 
 function accountErrors(a: Account, lang: Lang = 'en'): { name?: string; contact?: string; verified?: string } {
   const e: { name?: string; contact?: string; verified?: string } = {}
@@ -66,7 +83,12 @@ export default function Onboarding() {
   const [attempted, setAttempted] = useState(false)
 
   const [account, setAccount] = useState<Account>(saved?.account ?? EMPTY_ACCOUNT)
-  const [intents, setIntents] = useState<TermKey[]>(saved?.intents ?? (check ? [check.lowest] : []))
+  const [age, setAge] = useState<SavedAge>(saved?.age ?? EMPTY_AGE)
+  const minor = isMinor(age.dob)
+  // The Check's lowest Space is offered as a starting focus only to adults: under 18 the
+  // Check carries nothing over, so it is pre-selected on reaching Intent, never up front.
+  const [intents, setIntents] = useState<TermKey[]>(saved?.intents ?? [])
+  const intentsTouched = useRef(false)
   const [consents, setConsents] = useState<Consents>(saved?.consents ?? { care: false, data: false, publishing: false })
   const [device, setDevice] = useState<DeviceId>((saved?.device as DeviceId) ?? 'oura')
   const [linked, setLinked] = useState<Partial<Record<DeviceId, 'linking' | 'linked'>>>(() => Object.fromEntries((saved?.linked ?? []).map((d) => [d, 'linked'])))
@@ -105,6 +127,7 @@ export default function Onboarding() {
   const snapshot = (extra?: Partial<SavedOnboarding>): SavedOnboarding => ({
     step: highWater.current,
     account,
+    age: { ...age, minor },
     intents,
     consents,
     device,
@@ -121,7 +144,7 @@ export default function Onboarding() {
     highWater.current = Math.max(highWater.current, step)
     writeJSON(ONBOARDING_KEY, snapshot())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, account, intents, consents, device, linked, invites, quiet, perDay, channels])
+  }, [step, account, age, intents, consents, device, linked, invites, quiet, perDay, channels])
 
   const draftStarted = draft.name.trim() !== '' || draft.contact.trim() !== ''
 
@@ -131,6 +154,13 @@ export default function Onboarding() {
         const e = accountErrors(account, lang)
         if (e.name || e.contact) return t('vAccount')
         if (e.verified) return e.verified
+        return null
+      }
+      case 'Age': {
+        if (!age.dob) return t('vAgeEmpty')
+        const years = ageOn(age.dob)
+        if (years === null || years > 120) return t('vAgeBad')
+        if (years < 18 && age.guardian?.status !== 'verified') return t('vGuardian')
         return null
       }
       case 'Intent':
@@ -158,10 +188,18 @@ export default function Onboarding() {
   const resumeTarget = resumeGap === -1 ? resumeStep : resumeGap + 1
 
   const go = (to: number, d: 1 | -1) => {
+    const at = Math.max(0, Math.min(STEPS.length - 1, to))
     setError(null)
     setAttempted(false)
     setDir(d)
-    setStep(Math.max(0, Math.min(STEPS.length - 1, to)))
+    if (STEPS[at] === 'Intent' && check && !minor && intents.length === 0 && !intentsTouched.current) setIntents([check.lowest])
+    setStep(at)
+  }
+  // Turning out to be under 18 drops a focus that only came from the Check's bands.
+  const changeAge = (a: SavedAge) => {
+    if (isMinor(a.dob) && !minor && check && !intentsTouched.current && intents.length === 1 && intents[0] === check.lowest) setIntents([])
+    setAge(a)
+    setError(null)
   }
   const next = () => {
     if (STEPS[step] === 'Welcome' && resumable) {
@@ -181,7 +219,9 @@ export default function Onboarding() {
     highWater.current = 0
     setResumable(false)
     setAccount(EMPTY_ACCOUNT)
-    setIntents(check ? [check.lowest] : [])
+    setAge(EMPTY_AGE)
+    setIntents([])
+    intentsTouched.current = false
     setConsents({ care: false, data: false, publishing: false })
     setDevice('oura')
     clearLinkTimers()
@@ -234,13 +274,14 @@ export default function Onboarding() {
           >
             {name === 'Welcome' && <Welcome headingRef={headingRef} lang={lang} onLang={setLang} resumable={resumable} resumeStep={resumeTarget} resumeName={STEPS[resumeTarget]} savedAt={saved?.savedAt} completedAt={saved?.completedAt} firstName={account.name} onStartAgain={startAgain} />}
             {name === 'Account' && <AccountStep headingRef={headingRef} eyebrow={eyebrow()} value={account} onChange={(a) => { setAccount(a); setError(null) }} attempted={attempted} />}
-            {name === 'Intent' && <IntentStep headingRef={headingRef} eyebrow={eyebrow()} check={check} value={intents} onChange={(v) => { setIntents(v); setError(null) }} />}
+            {name === 'Age' && <AgeStep headingRef={headingRef} eyebrow={eyebrow()} value={age} onChange={changeAge} childName={account.name.trim()} attempted={attempted} />}
+            {name === 'Intent' && <IntentStep headingRef={headingRef} eyebrow={eyebrow()} check={minor ? null : check} value={intents} onChange={(v) => { intentsTouched.current = true; setIntents(v); setError(null) }} />}
             {name === 'Language' && <LanguageStep headingRef={headingRef} eyebrow={eyebrow()} value={lang} onChange={setLang} />}
             {name === 'Consents' && <ConsentStep headingRef={headingRef} eyebrow={eyebrow()} value={consents} onChange={(v) => { setConsents(v); setError(null) }} />}
             {name === 'Device' && <DeviceStep headingRef={headingRef} eyebrow={eyebrow()} device={device} setDevice={setDevice} linked={linked} onLink={linkDevice} setLinked={setLinked} />}
             {name === 'Household' && <HouseholdStep headingRef={headingRef} eyebrow={eyebrow(t('optionalSuffix'))} invites={invites} setInvites={setInvites} draft={draft} setDraft={(d) => { setDraft(d); setError(null) }} />}
             {name === 'Quiet hours' && <QuietStep headingRef={headingRef} eyebrow={eyebrow()} quiet={quiet} setQuiet={(q) => { setQuiet(q); setError(null) }} perDay={perDay} setPerDay={(n) => { setPerDay(n); setError(null) }} channels={channels} setChannels={(c) => { setChannels(c); setError(null) }} />}
-            {name === 'Begin' && <BeginStep headingRef={headingRef} eyebrow={eyebrow()} account={account} check={check} intents={intents} lang={lang} consents={consents} device={device} linked={linked[device] === 'linked'} invites={invites} quiet={quiet} perDay={perDay} channels={channels} onFinish={finish} />}
+            {name === 'Begin' && <BeginStep headingRef={headingRef} eyebrow={eyebrow()} account={account} guardian={minor ? age.guardian : null} check={minor ? null : check} intents={intents} lang={lang} consents={consents} device={device} linked={linked[device] === 'linked'} invites={invites} quiet={quiet} perDay={perDay} channels={channels} onFinish={finish} />}
           </motion.div>
         </AnimatePresence>
 
@@ -339,7 +380,7 @@ function Welcome({ headingRef, lang, onLang, resumable, resumeStep, resumeName, 
         </div>
       )}
       <ol className="grid gap-3 sm:grid-cols-2">
-        {([1, 2, 3, 4, 5, 6] as const).map((n) => [t(`wl${n}h`), t(`wl${n}b`)]).map(([h, b], i) => (
+        {(['1', 'Age', '2', '3', '4', '5', '6'] as const).map((n) => [t(`wl${n}h`), t(`wl${n}b`)]).map(([h, b], i) => (
           <li key={h} className="flex gap-3 rounded-card border border-line bg-paper-raised p-4">
             <span className="num flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-paper-sunk text-[13px] text-ink-2">{i + 1}</span>
             <span className="min-w-0">
@@ -551,6 +592,205 @@ function AccountStep({ headingRef, eyebrow, value, onChange, attempted }: HeadRe
           </div>
         )}
       </Card>
+    </div>
+  )
+}
+
+// The minors gate (Arch p26 and the onboarding consent screens, p17): a date of birth;
+// under 18 nothing is scored and setup waits for verifiable parental consent. The
+// guardian's side (their declaration and a DigiLocker age token) is simulated here.
+function AgeStep({ headingRef, eyebrow, value, onChange, childName, attempted }: HeadRef & { value: SavedAge; onChange: (a: SavedAge) => void; childName: string; attempted: boolean }) {
+  const t = useDict(OB)
+  const te = useDict(E)
+  const lang = useLang()
+  const years = ageOn(value.dob)
+  const minor = years !== null && years < 18
+  const g = value.guardian ?? EMPTY_GUARDIAN
+  const c = COUNTRIES.find((x) => x.code === g.country) ?? COUNTRIES[0]
+  const [gErr, setGErr] = useState<{ name?: string; contact?: string }>({})
+  const [viewing, setViewing] = useState(false)
+  const [declared, setDeclared] = useState(false)
+  const [declErr, setDeclErr] = useState(false)
+  const [verifying, setVerifying] = useState(false)
+  const timer = useRef<number | null>(null)
+  useEffect(() => () => { if (timer.current !== null) window.clearTimeout(timer.current) }, [])
+  // The verification timer reads the record as it is when the token comes back.
+  const latest = useRef(value)
+  latest.current = value
+
+  const now = new Date()
+  const maxDob = isoDay(now)
+  const minDob = isoDay(new Date(now.getFullYear() - 120, now.getMonth(), now.getDate()))
+  const dobBad = !!value.dob && (years === null || years > 120)
+  const showDobErr = (attempted && !value.dob) || dobBad
+  const child = childName || t('childFallback')
+  const relLow = t(`relGl_${g.relation}`)
+
+  // Any change to who the guardian is, or how we reach them, asks for consent again.
+  const setG = (patch: Partial<Guardian>) => {
+    onChange({ ...value, guardian: { ...g, ...patch, status: 'draft', sentAt: undefined, consentedAt: undefined, ref: undefined } })
+    setGErr({})
+  }
+  const reset = () => {
+    onChange({ ...value, guardian: { ...g, status: 'draft', sentAt: undefined, consentedAt: undefined, ref: undefined } })
+    setViewing(false)
+    setDeclared(false)
+    setDeclErr(false)
+  }
+  const send = () => {
+    const e: typeof gErr = {}
+    if (!g.name.trim()) e.name = t('gErrName')
+    if (g.via === 'phone') {
+      const pe = phoneError(g.country as CountryCode, g.phone, lang)
+      if (pe) e.contact = pe
+    } else if (!g.email.trim()) e.contact = t('errEmail')
+    else if (!EMAIL_RE.test(g.email.trim())) e.contact = te('emailBad')
+    setGErr(e)
+    if (Object.keys(e).length) return
+    onChange({ ...value, guardian: { ...g, name: g.name.trim(), status: 'sent', sentAt: new Date().toISOString() } })
+  }
+  const verify = () => {
+    if (!declared) return setDeclErr(true)
+    setVerifying(true)
+    timer.current = window.setTimeout(() => {
+      const cur = latest.current
+      const ref = `VPC-${Math.random().toString(16).slice(2, 8).toUpperCase()}`
+      if (cur.guardian?.status === 'sent') onChange({ ...cur, guardian: { ...cur.guardian, status: 'verified', consentedAt: new Date().toISOString(), ref } })
+      setVerifying(false)
+      setViewing(false)
+    }, 1200)
+  }
+
+  return (
+    <div>
+      <StepHead headingRef={headingRef} eyebrow={eyebrow} title={<>{rich(t('ageTitle'), { em: <em>{t('ageTitleEm')}</em> })}</>} lead={t('ageLead')} />
+      <Card>
+        <label htmlFor="age-dob" className="block text-[14px] text-ink-2">{t('dob')}</label>
+        <input
+          id="age-dob"
+          type="date"
+          value={value.dob}
+          min={minDob}
+          max={maxDob}
+          onChange={(e) => onChange({ ...value, dob: e.target.value })}
+          aria-invalid={showDobErr}
+          aria-describedby="age-dob-help"
+          className={clsx('num mt-1.5 h-12 w-full max-w-xs rounded-full border bg-paper px-4 text-[16px] text-ink focus-ring', showDobErr ? 'border-error' : 'border-line-strong')}
+        />
+        <p id="age-dob-help" className={clsx('mt-1.5 text-[13px]', showDobErr ? 'text-error' : 'text-ink-3')} aria-live="polite">
+          {dobBad ? t('vAgeBad') : showDobErr ? t('vAgeEmpty') : years !== null ? <>{rich(t('ageIs'), { n: <span className="num text-ink">{years}</span> })} {t('dobHelp')}</> : t('dobHelp')}
+        </p>
+      </Card>
+
+      {years !== null && !dobBad && !minor && (
+        <Card tone="sunk" className="mt-5">
+          <Eyebrow>{t('adultH')}</Eyebrow>
+          <p className="mt-2 text-[16px] leading-relaxed text-ink">{t('adultB')}</p>
+        </Card>
+      )}
+
+      {minor && (
+        <>
+          <Card tone="sunk" className="mt-5">
+            <Pill className="border border-line bg-transparent">{t('minorPill')}</Pill>
+            <p className="mt-3 text-[19px] leading-snug text-ink">{t('minorH')}</p>
+            <ul className="mt-3 space-y-1.5 text-[15px] text-ink-2">
+              {(['minor1', 'minor2', 'minor3'] as const).map((k) => <li key={k} className="flex gap-2"><Check size={15} className="mt-1 shrink-0 text-ink" aria-hidden /> {t(k)}</li>)}
+            </ul>
+          </Card>
+
+          <Card className="mt-5" aria-live="polite">
+            <div className="flex items-center gap-2"><Users size={18} className="text-ink-2" aria-hidden /><Eyebrow>{t('gH')}</Eyebrow></div>
+            {g.status === 'verified' ? (
+              <div className="mt-4 flex items-start gap-4">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-ink text-paper"><ShieldCheck size={22} aria-hidden /></span>
+                <div className="min-w-0">
+                  <p className="text-[17px] text-ink">{t('gDoneH')}</p>
+                  <p className="mt-1 break-words text-[14px] text-ink-2">{rich(t('gDoneB'), { name: g.name, rel: relLow, date: <span className="num">{g.consentedAt ? fmtWhen(g.consentedAt, lang) : ''}</span>, ref: <span className="num">{g.ref}</span> })}</p>
+                  <Button variant="link" className="mt-2" onClick={reset}>{t('gChange')}</Button>
+                </div>
+              </div>
+            ) : g.status === 'sent' ? (
+              <div className="mt-4">
+                <div className="flex items-start gap-4">
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-line-strong text-ink">{g.via === 'phone' ? <Smartphone size={20} aria-hidden /> : <Mail size={20} aria-hidden />}</span>
+                  <div className="min-w-0">
+                    <p className="text-[17px] text-ink">{t('gSentH', { name: g.name })}</p>
+                    <p className="mt-1 break-words text-[14px] text-ink-2">{rich(t('gSentB'), { name: g.name, c: <span className={g.via === 'phone' ? 'num' : 'break-all'}>{guardianContact(g)}</span> })}</p>
+                    <p className="mt-2 text-[13px] text-ink-3">{t('gSpec', { name: g.name })}</p>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Button variant="secondary" onClick={() => setViewing((v) => !v)} aria-expanded={viewing}>{t('gAnswer', { name: g.name })}</Button>
+                  <Button variant="ghost" onClick={reset}>{t('gChange')}</Button>
+                </div>
+                {viewing && (
+                  <div className="mt-5 rounded-card border border-dashed border-line-strong p-4 md:p-5">
+                    <p className="eyebrow text-ink-3">{t('gViewEyebrow', { name: g.name })}</p>
+                    <p className="mt-2 text-[18px] text-ink">{t('gViewH', { child })}</p>
+                    <p className="mt-1 text-[15px] leading-relaxed text-ink-2">{t('gViewB', { child })}</p>
+                    <label className="mt-4 flex cursor-pointer items-start gap-3">
+                      <input type="checkbox" checked={declared} onChange={(e) => { setDeclared(e.target.checked); setDeclErr(false) }} disabled={verifying} className="peer sr-only" />
+                      <span className={clsx('mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-colors peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[color:var(--daybreak)]', declared ? 'border-ink bg-ink text-paper' : declErr ? 'border-error bg-paper' : 'border-line-strong bg-paper')} aria-hidden>
+                        {declared && <Check size={15} />}
+                      </span>
+                      <span className="min-w-0 text-[15px] text-ink">{t('gDeclare', { child, rel: relLow })}</span>
+                    </label>
+                    {declErr && <p role="alert" className="mt-2 text-[14px] text-error">{t('gDeclareFirst')}</p>}
+                    <Button variant="ink" className="mt-4" onClick={verify} disabled={verifying}>
+                      {verifying ? <><Loader2 size={16} className="animate-spin" aria-hidden /> {t('gVerifying')}</> : <><ShieldCheck size={16} aria-hidden /> {t('gVerify')}</>}
+                    </Button>
+                    <p className="mt-2 text-[13px] text-ink-3">{t('gVerifyNote')}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="mt-4">
+                <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
+                  <div>
+                    <label htmlFor="g-name" className="block text-[14px] text-ink-2">{t('gName')}</label>
+                    <input id="g-name" value={g.name} onChange={(e) => setG({ name: e.target.value })} autoComplete="off" aria-invalid={!!gErr.name} aria-describedby={gErr.name ? 'g-name-err' : undefined} placeholder="Lakshmi" className={clsx('mt-1.5 h-11 w-full rounded-full border bg-paper px-4 text-[16px] text-ink placeholder:text-ink-3 focus-ring', gErr.name ? 'border-error' : 'border-line-strong')} />
+                    {gErr.name && <p id="g-name-err" className="mt-1.5 text-[14px] text-error">{gErr.name}</p>}
+                  </div>
+                  <div>
+                    <label htmlFor="g-rel" className="block text-[14px] text-ink-2">{t('gRel')}</label>
+                    <select id="g-rel" value={g.relation} onChange={(e) => setG({ relation: e.target.value as Guardian['relation'] })} className="mt-1.5 h-11 w-full rounded-full border border-line-strong bg-paper px-4 text-[16px] text-ink focus-ring sm:w-48">
+                      {GUARDIAN_RELATIONS.map((r) => <option key={r} value={r}>{t(`relG_${r}`)}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <p className="mt-5 text-[14px] text-ink-2">{t('gReach')}</p>
+                <Tabs<'phone' | 'email'>
+                  value={g.via}
+                  onChange={(v) => setG({ via: v })}
+                  className="mt-2 flex w-full sm:w-auto"
+                  items={[
+                    { value: 'phone', label: <span className="flex items-center gap-1.5"><Smartphone size={15} aria-hidden /> {t('mobile')}</span> },
+                    { value: 'email', label: <span className="flex items-center gap-1.5"><Mail size={15} aria-hidden /> {te('email')}</span> },
+                  ]}
+                />
+                {g.via === 'phone' ? (
+                  <div className="mt-3 flex gap-2">
+                    <label htmlFor="g-cc" className="sr-only">{te('countryCode')}</label>
+                    <select id="g-cc" value={g.country} onChange={(e) => setG({ country: e.target.value })} className="num h-11 w-[7.5rem] shrink-0 rounded-full border border-line-strong bg-paper px-3 text-[15px] text-ink focus-ring sm:w-auto">
+                      {COUNTRIES.map((x) => <option key={x.code} value={x.code}>{x.code} {countryName(x.code, lang)}</option>)}
+                    </select>
+                    <label htmlFor="g-phone" className="sr-only">{te('mobileNumber')}</label>
+                    <input id="g-phone" type="tel" inputMode="numeric" autoComplete="off" value={g.phone} onChange={(e) => setG({ phone: e.target.value })} aria-invalid={!!gErr.contact} aria-describedby={gErr.contact ? 'g-contact-err' : undefined} placeholder={c.placeholder} className={clsx('num h-11 min-w-0 flex-1 rounded-full border bg-paper px-4 text-[16px] text-ink placeholder:text-ink-3 focus-ring', gErr.contact ? 'border-error' : 'border-line-strong')} />
+                  </div>
+                ) : (
+                  <div className="mt-3">
+                    <label htmlFor="g-email" className="sr-only">{te('email')}</label>
+                    <input id="g-email" type="email" inputMode="email" autoComplete="off" value={g.email} onChange={(e) => setG({ email: e.target.value })} aria-invalid={!!gErr.contact} aria-describedby={gErr.contact ? 'g-contact-err' : undefined} placeholder="parent@example.com" className={clsx('h-11 w-full rounded-full border bg-paper px-4 text-[16px] text-ink placeholder:text-ink-3 focus-ring', gErr.contact ? 'border-error' : 'border-line-strong')} />
+                  </div>
+                )}
+                {gErr.contact && <p id="g-contact-err" className="mt-1.5 text-[14px] text-error">{gErr.contact}</p>}
+                <Button variant="ink" className="mt-5" onClick={send}><Mail size={16} aria-hidden /> {t('gSend')}</Button>
+              </div>
+            )}
+          </Card>
+        </>
+      )}
     </div>
   )
 }
@@ -852,7 +1092,7 @@ function QuietStep({ headingRef, eyebrow, quiet, setQuiet, perDay, setPerDay, ch
   )
 }
 
-function BeginStep({ headingRef, eyebrow, account, check, intents, lang, consents, device, linked, invites, quiet, perDay, channels, onFinish }: HeadRef & { account: Account; check: SavedCheck | null; intents: TermKey[]; lang: Lang; consents: Consents; device: DeviceId; linked: boolean; invites: Invite[]; quiet: { from: string; to: string }; perDay: number; channels: Channels; onFinish: (to: string) => void }) {
+function BeginStep({ headingRef, eyebrow, account, guardian, check, intents, lang, consents, device, linked, invites, quiet, perDay, channels, onFinish }: HeadRef & { account: Account; guardian: Guardian | null; check: SavedCheck | null; intents: TermKey[]; lang: Lang; consents: Consents; device: DeviceId; linked: boolean; invites: Invite[]; quiet: { from: string; to: string }; perDay: number; channels: Channels; onFinish: (to: string) => void }) {
   const dev = DEVICES.find((d) => d.id === device)!
   const t = useDict(OB)
   const te = useDict(E)
@@ -862,6 +1102,7 @@ function BeginStep({ headingRef, eyebrow, account, check, intents, lang, consent
   const reach = [channels.app && t('app'), channels.whatsapp && 'WhatsApp', channels.email && te('email')].filter(Boolean).join(' · ') || t('noMessages')
   const rows: [string, ReactNode][] = [
     ['AIWO ID', <span className="break-words">{account.name.trim()} · <span className={account.via === 'phone' ? 'num' : undefined}>{contactLabel(account)}</span> <span className="text-ink-3">· {account.verified === 'passkey' ? t('vPasskey') : account.verified === 'code' ? t('vCode') : t('vNone')}</span></span>],
+    [t('rowAge'), guardian ? t('ageMinorRow', { name: guardian.name }) : t('adultH')],
     ...(check ? ([[t('fromCheckRow'), <span className="flex items-center gap-2"><TermDot term={check.lowest} /> {t('spaceIsBand', { space: tt.space(check.lowest), band: lang === 'en' ? check.bands[check.lowest] : band.inline(check.bands[check.lowest]) })}</span>]] as [string, ReactNode][]) : []),
     [t('rowFocus'), <span className="flex flex-wrap gap-3">{intents.map((k) => <span key={k} className="flex items-center gap-2"><TermDot term={k} /> {tt.space(k)}</span>)}</span>],
     [L.names.Language, LANGS.find((l) => l.value === lang)!.native],
@@ -873,7 +1114,16 @@ function BeginStep({ headingRef, eyebrow, account, check, intents, lang, consent
   const loop = ([['0', 'loop0'], ['15', 'loop15'], ['45', 'loop45'], ['60', 'loop60'], ['76', 'loop76'], ['90', 'loop90']] as const).map(([d, k]) => [d, t(k)] as const)
   return (
     <div>
-      <StepHead headingRef={headingRef} eyebrow={eyebrow} title={<>{rich(account.name.trim() ? t('bTitleName') : t('bTitle'), { name: account.name.trim(), em: <em>{t('bTitleEm')}</em> })}</>} lead={t('bLead')} />
+      <StepHead headingRef={headingRef} eyebrow={eyebrow} title={<>{rich(account.name.trim() ? t('bTitleName') : t('bTitle'), { name: account.name.trim(), em: <em>{t('bTitleEm')}</em> })}</>} lead={guardian ? t('bMinorLead') : t('bLead')} />
+      {guardian ? (
+        <Card tone="sunk">
+          <div className="flex flex-wrap items-center gap-3">
+            <Eyebrow>{t('bMinorH')}</Eyebrow>
+            <Pill className="border border-line bg-transparent">{t('minorPill')}</Pill>
+          </div>
+          <p className="mt-3 text-[16px] leading-relaxed text-ink">{t('bMinorB', { name: guardian.name })}</p>
+        </Card>
+      ) : (
       <Card>
         <Eyebrow>{t('theLoop')}</Eyebrow>
         <ol className="mt-5 grid grid-cols-3 gap-y-5 sm:grid-cols-6" aria-label={t('loopAria')}>
@@ -889,6 +1139,7 @@ function BeginStep({ headingRef, eyebrow, account, check, intents, lang, consent
           ))}
         </ol>
       </Card>
+      )}
       <dl className="mt-5 divide-y divide-line rounded-card border border-line bg-paper-raised">
         {rows.map(([k, v]) => (
           <div key={k} className="flex flex-col gap-1 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
@@ -898,8 +1149,15 @@ function BeginStep({ headingRef, eyebrow, account, check, intents, lang, consent
         ))}
       </dl>
       <div className="mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-        <DaybreakButton onClick={() => onFinish('/app/index/take')} className="w-full sm:w-auto">{t('takeBaseline')} <ArrowRight size={20} aria-hidden /></DaybreakButton>
-        <button onClick={() => onFinish('/app')} className="text-center text-[15px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring sm:ml-3">{t('startTomorrow')}</button>
+        {guardian ? (
+          // Under 18: nothing is scored, so there is no baseline Index to take.
+          <DaybreakButton onClick={() => onFinish('/app')} className="w-full sm:w-auto">{t('goToday')} <ArrowRight size={20} aria-hidden /></DaybreakButton>
+        ) : (
+          <>
+            <DaybreakButton onClick={() => onFinish('/app/index/take')} className="w-full sm:w-auto">{t('takeBaseline')} <ArrowRight size={20} aria-hidden /></DaybreakButton>
+            <button onClick={() => onFinish('/app')} className="text-center text-[15px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring sm:ml-3">{t('startTomorrow')}</button>
+          </>
+        )}
       </div>
       <p className="mt-5 text-[13px] text-ink-3">
         {t('bFoot')}

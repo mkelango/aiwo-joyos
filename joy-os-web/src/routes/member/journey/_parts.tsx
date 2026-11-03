@@ -1,9 +1,10 @@
 import clsx from 'clsx'
 import { motion, useReducedMotion } from 'framer-motion'
-import { Bed, ChevronDown, Download, Pause, Play, RotateCcw, Ruler, Sparkles, Users, Utensils, Footprints, MessageCircle } from 'lucide-react'
+import { ArrowRight, Bed, ChevronDown, Download, Pause, PartyPopper, Play, RotateCcw, Ruler, Sparkles, Users, Utensils, Footprints, MessageCircle } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
-import { TermChip, TermDot } from '@/components/joy/primitives'
-import { Toggle } from '@/components/ui'
+import { Link } from 'react-router-dom'
+import { Eyebrow, TermChip, TermDot } from '@/components/joy/primitives'
+import { Card, Toggle } from '@/components/ui'
 import type { TermKey } from '@/domain/types'
 import type { ItemKind } from './_data'
 import { useJ } from './_i18n'
@@ -277,4 +278,27 @@ export function useAfterIndex() {
     return v === null ? '—' : k === 'B' ? `−${v}` : String(v)
   }
   return { measured: m, ji: m ? String(m.value) : '—', value, cell }
+}
+
+/** Joyspan Occasions, linked from the ’Cation tab and Events: the family templates on the same engine. */
+export function OccasionsCard() {
+  const { t } = useJ()
+  const req = useJourney().occasionRequests[0]
+  return (
+    <section className="mt-10" aria-labelledby="occasions-link">
+      <Card tone="outline" className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex min-w-0 gap-4">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-paper-sunk text-ink-2" aria-hidden><PartyPopper size={19} /></span>
+          <div className="min-w-0">
+            <Eyebrow><span id="occasions-link">{t('occLinkEyebrow')}</span></Eyebrow>
+            <p className="mt-1 text-[1.2rem] font-light text-ink">{t('occLinkTitle')}</p>
+            <p className="mt-1 text-[15px] text-ink-2">{t('occLinkBody')}</p>
+          </div>
+        </div>
+        <Link to={req ? '/app/occasions#plan' : '/app/occasions'} className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full border border-line-strong bg-paper-raised px-4 text-[15px] text-ink hover:bg-paper-sunk focus-ring">
+          {t(req ? 'occLinkRequested' : 'occLinkCta')} <ArrowRight size={15} />
+        </Link>
+      </Card>
+    </section>
+  )
 }

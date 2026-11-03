@@ -210,7 +210,14 @@ export const RELEASE_FLAGS = [
   { key: 'ui_tamil_hindi', label: 'Tamil and Hindi interface', scope: 'Beta cohort', state: '5%', on: true },
   { key: 'nba_bandit', label: 'Guarded next-best-action bandit (Ease excluded)', scope: 'J3', state: 'Off', on: false },
   { key: 'tenant_star_health', label: 'Star Health tenant routes', scope: 'J3', state: 'Off', on: false },
+  // Architecture p.34 leaves open whether the public Check stays anonymous or asks for a phone number: a flag, so either ships.
+  { key: 'check_asks_phone', label: 'Public Check asks for a phone number', scope: 'Public Check · India', state: 'Off', on: false },
 ]
+
+/** Shared with the public Check (entry lane): JSON boolean, default false = anonymous. */
+export const CHECK_PHONE_KEY = 'joyos:flag:check-asks-phone'
+/** Shared with the member layout (shell lane): JSON { tagline }, empty string = none. Northwind is the live employer tenant. */
+export const TENANT_BRANDING_KEY = 'joyos:tenant:branding'
 
 export const RED_TEAM = [
   { suite: 'Crisis intercept', cases: 420, passed: 420, required: 1, last: '27 Jan', note: 'Self-harm and medical-emergency language routes to a person and Tele-MANAS 14416 before any model runs.' },
@@ -589,3 +596,308 @@ export const TRACES = TRACE_ROWS.map(([id, at, tool, lang, tenant, guard, rv, fd
   }
 })
 export type Trace = (typeof TRACES)[number]
+
+// ─── Tenant admin · aggregate filters (specimen) ─────────────────────────
+// GET /partner/v1/aggregates?cohort=&term=&period= (Architecture p.22). Cohorts are invitation waves; the three wave
+// cohorts sum to the Cycle 1 totals (enrolled 812, measured 655, re-measured 465), and their department cells sum to the
+// tenant's department table. Any cohort or cell under the employer threshold (50) is suppressed, never shown smaller,
+// and publishedDepartments below adds complementary suppression so no hidden cell can be recovered by subtraction.
+
+export type AggPeriod = 'd0' | 'd90' | 'change'
+export type AggCohortKey = 'all' | 'wave-1' | 'wave-2' | 'wave-3' | 'joiners'
+type AggTerm = { key: TermKey; d0: number; d90: number }
+export type AggCohort = {
+  value: AggCohortKey
+  label: string
+  note: string
+  invited: number | null
+  enrolled: number
+  measured: number
+  remeasured: number
+  improvedLowest: number
+  termMeans: AggTerm[]
+  departments: { name: string; n: number; ji: number | null; delta: number | null }[]
+}
+const tm = (h: [number, number], p: [number, number], r: [number, number], f: [number, number], d: [number, number], b: [number, number]): AggTerm[] =>
+  ([['H', h], ['P', p], ['R', r], ['F', f], ['D', d], ['B', b]] as [TermKey, [number, number]][]).map(([key, [d0, d90]]) => ({ key, d0, d90 }))
+
+export const AGG_COHORTS: AggCohort[] = [
+  {
+    value: 'all', label: 'Cycle 1 · everyone enrolled', note: 'All three invitation waves, Day 0 on 23 Oct 2026.', invited: null, enrolled: 812, measured: 655, remeasured: 465, improvedLowest: 0.56,
+    termMeans: tm([63, 66], [61, 64], [58, 62], [49, 54], [55, 59], [36, 31]),
+    departments: [
+      { name: 'Engineering', n: 140, ji: 53, delta: 5 }, { name: 'Sales', n: 104, ji: 50, delta: 6 }, { name: 'Operations', n: 86, ji: 54, delta: 4 },
+      { name: 'Finance', n: 58, ji: 51, delta: 3 }, { name: 'People & Legal', n: 52, ji: 55, delta: 6 }, { name: 'Leadership', n: 25, ji: null, delta: null },
+    ],
+  },
+  {
+    value: 'wave-1', label: 'Wave 1 cohort · Engineering and Operations', note: 'Invited 7 Oct 2026.', invited: 420, enrolled: 318, measured: 262, remeasured: 194, improvedLowest: 0.58,
+    termMeans: tm([65, 68], [60, 63], [57, 61], [51, 56], [54, 58], [35, 30]),
+    departments: [{ name: 'Engineering', n: 112, ji: 54, delta: 5 }, { name: 'Operations', n: 70, ji: 55, delta: 4 }, { name: 'Leadership', n: 12, ji: null, delta: null }],
+  },
+  {
+    value: 'wave-2', label: 'Wave 2 cohort · Sales, Finance, People & Legal', note: 'Invited 14 Oct 2026.', invited: 480, enrolled: 341, measured: 276, remeasured: 196, improvedLowest: 0.55,
+    termMeans: tm([62, 65], [62, 65], [59, 63], [47, 52], [56, 60], [37, 32]),
+    departments: [{ name: 'Sales', n: 92, ji: 50, delta: 6 }, { name: 'Finance', n: 52, ji: 51, delta: 3 }, { name: 'People & Legal', n: 44, ji: null, delta: null }, { name: 'Leadership', n: 8, ji: null, delta: null }],
+  },
+  {
+    value: 'wave-3', label: 'Wave 3 cohort · the one reminder', note: 'Invited 19 Oct 2026. Large enough to report as a cohort; every department inside it is under fifty.', invited: 241, enrolled: 153, measured: 117, remeasured: 75, improvedLowest: 0.52,
+    termMeans: tm([61, 63], [60, 62], [57, 60], [48, 52], [54, 57], [38, 33]),
+    departments: [
+      { name: 'Engineering', n: 28, ji: null, delta: null }, { name: 'Sales', n: 12, ji: null, delta: null }, { name: 'Operations', n: 16, ji: null, delta: null },
+      { name: 'Finance', n: 6, ji: null, delta: null }, { name: 'People & Legal', n: 8, ji: null, delta: null }, { name: 'Leadership', n: 5, ji: null, delta: null },
+    ],
+  },
+  {
+    value: 'joiners', label: 'New joiners · Cycle 2', note: 'Enrolled since November; Day 0 on 1 Feb 2027. Under fifty, so nothing is reported yet.', invited: 120, enrolled: 34, measured: 0, remeasured: 0, improvedLowest: 0,
+    termMeans: [], departments: [],
+  },
+]
+
+// ─── Disclosure control for the department table ─────────────────────────
+// A threshold on each cell is not enough once cohorts can be filtered: every published cell is also a term in two sums
+// an employer can see. (1) Across cohorts: a department's tenant cell equals the sum of its wave cells, so publishing
+// Engineering for everyone (140) and for wave 1 (112) gives away wave 3 (28) by subtraction. (2) Within a cohort: the
+// re-measured total equals the sum of its department cells, so publishing every department but one gives that one away.
+// Primary suppression hides every cell under the group minimum. Complementary suppression then hides the smallest
+// published cell in any sum whose hidden part would come to more than nothing but less than the minimum, and repeats
+// until nothing changes. Whatever can still be derived is a union of fifty or more.
+
+export type DeptStatus = 'shown' | 'small' | 'complement'
+export type PublishedDept = { name: string; n: number; ji: number | null; delta: number | null; status: DeptStatus }
+
+const WAVE_KEYS: AggCohortKey[] = ['wave-1', 'wave-2', 'wave-3']
+
+function disclosureControl(minGroup: number): Map<AggCohortKey, PublishedDept[]> {
+  const out = new Map<AggCohortKey, PublishedDept[]>(
+    AGG_COHORTS.map((c) => [c.value, c.departments.map((d) => ({ ...d, status: d.n < minGroup || d.ji === null || d.delta === null ? 'small' : 'shown' }))]),
+  )
+  const hiddenSum = (cells: PublishedDept[]) => cells.reduce((s, d) => s + (d.status === 'shown' ? 0 : d.n), 0)
+  const unsafe = (cells: PublishedDept[]) => {
+    const h = hiddenSum(cells)
+    return h > 0 && h < minGroup
+  }
+  const hideSmallest = (cells: PublishedDept[]) => {
+    const pick = cells.filter((d) => d.status === 'shown').sort((a, b) => a.n - b.n)[0]
+    if (pick) pick.status = 'complement'
+    return !!pick
+  }
+  const names = [...new Set(AGG_COHORTS.flatMap((c) => c.departments.map((d) => d.name)))]
+  for (let changed = true, guard = 0; changed && guard < 50; guard++) {
+    changed = false
+    // (1) Across cohorts: tenant cell = sum of the wave cells. While the tenant cell is published, the hidden wave cells
+    // add up to a known number, which must be zero or a group of fifty or more.
+    for (const name of names) {
+      const whole = out.get('all')?.find((d) => d.name === name)
+      if (!whole || whole.status !== 'shown') continue
+      const waves = WAVE_KEYS.flatMap((k) => out.get(k)?.filter((d) => d.name === name) ?? [])
+      while (unsafe(waves) && hideSmallest(waves)) changed = true
+    }
+    // (2) Within a cohort: re-measured total = sum of its department cells.
+    for (const cells of out.values()) {
+      while (unsafe(cells) && hideSmallest(cells)) changed = true
+    }
+  }
+  return out
+}
+
+/** Department cells for one cohort after primary and complementary suppression. */
+export function publishedDepartments(cohort: AggCohortKey, minGroup: number): PublishedDept[] {
+  return disclosureControl(minGroup).get(cohort) ?? []
+}
+
+export const AGG_PERIODS: { value: AggPeriod; label: string }[] = [
+  { value: 'change', label: 'Day 0 → Day 90' },
+  { value: 'd0', label: 'Day 0 · 23 Oct 2026' },
+  { value: 'd90', label: 'Day 90 · 21 Jan 2027' },
+]
+
+// ─── Tenant admin · settings (specimen) ──────────────────────────────────
+// Architecture p.27: features are tagged wellbeing or clinical; clinical features need a physician in the loop and are
+// disabled for tenants and regions without a licensed clinical partner. Safety routing is never a clinical feature.
+
+export const CLINICAL_FEATURES = [
+  { key: 'clinical_grade', label: 'Clinical-grade Index and physician-signed Day-90 card', note: 'A physician reviews and signs the re-measure.' },
+  { key: 'biomarker_explainer', label: 'Biomarker explanations (explain_biomarker)', note: 'Plain-word lab values, signed by a physician.' },
+  { key: 'lab_panels', label: 'Partner lab panels and the biomarker vault', note: 'Structured results through the lab pipeline.' },
+  { key: 'clinician_review', label: 'Clinician review and call on a P1 screen', note: 'PHQ-4, ISI or PSS-4 above the Medical Director’s threshold.' },
+]
+export const CLINICAL_PARTNER = {
+  employer: { partner: null as string | null, note: 'Northwind’s contract is wellbeing only. Ease flags route to the Northwind EAP; no licensed clinical partner is named for this tenant.' },
+  insurer: { partner: null as string | null, note: 'A licensed clinical partner is part of the J3 pilot terms still in conversation (Decision 7). Until it is signed, clinical features stay off for policyholders.' },
+}
+
+export const API_SCOPES = [
+  { key: 'eligibility:write', label: 'POST /partner/v1/eligibility', note: 'Send the eligibility file. No health data.' },
+  { key: 'aggregates:read', label: 'GET /partner/v1/aggregates', note: 'Cohort, term and period aggregates, k-suppressed.' },
+  { key: 'invitations:write', label: 'POST /partner/v1/invitations', note: 'Schedule invitation waves.' },
+] as const
+export type ApiScope = (typeof API_SCOPES)[number]['key']
+export const WEBHOOK_EVENTS = [
+  { key: 'enrolment.created', note: 'Counts only: a person enrolled, with no name or ID, batched hourly into groups.' },
+  { key: 'aggregate.published', note: 'A new aggregate or quarterly report is ready to fetch.' },
+] as const
+export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number]['key']
+export type ApiKey = { id: string; name: string; env: 'sandbox' | 'production'; scopes: ApiScope[]; created: string; lastUsed: string | null; revoked?: string }
+export type Webhook = { id: string; url: string; events: WebhookEvent[]; created: string; status: 'active' | 'revoked'; deliveries: { at: string; event: WebhookEvent; code: number; ms: number }[] }
+
+export const TENANT_API: Record<TenantKind, { keys: ApiKey[]; hooks: Webhook[] }> = {
+  employer: {
+    keys: [
+      { id: 'cli_nw_prod_7f2a', name: 'Workday eligibility sync', env: 'production', scopes: ['eligibility:write'], created: '12 Oct 2026', lastUsed: '28 Jan 2027 06:00' },
+      { id: 'cli_nw_prod_31c9', name: 'People analytics dashboard', env: 'production', scopes: ['aggregates:read'], created: '30 Oct 2026', lastUsed: '27 Jan 2027 18:12' },
+      { id: 'cli_nw_sbx_0d44', name: 'Sandbox testing', env: 'sandbox', scopes: ['eligibility:write', 'aggregates:read', 'invitations:write'], created: '5 Oct 2026', lastUsed: '9 Jan 2027 11:40' },
+    ],
+    hooks: [
+      { id: 'wh_nw_01', url: 'https://hooks.northwindcapital.in/joyos/aggregates', events: ['aggregate.published'], created: '30 Oct 2026', status: 'active', deliveries: [{ at: '22 Jan 2027 09:02', event: 'aggregate.published', code: 200, ms: 182 }, { at: '28 Oct 2026 09:01', event: 'aggregate.published', code: 200, ms: 240 }] },
+    ],
+  },
+  insurer: {
+    keys: [{ id: 'cli_sh_sbx_a61e', name: 'Pilot integration · sandbox', env: 'sandbox', scopes: ['eligibility:write', 'aggregates:read'], created: '18 Nov 2026', lastUsed: '26 Jan 2027 15:30' }],
+    hooks: [],
+  },
+}
+
+// ─── Control plane · on-call rota (specimen) ─────────────────────────────
+// Architecture p.27: on-call rota in the control plane; escalation if unacknowledged; every alert closed with an outcome.
+// The week runs from the 09:00 IST handover on Thursday 28 Jan 2027.
+
+export type RotaKey = 'clinical' | 'sre' | 'privacy'
+export const ROTA_DAYS = ['Thu 28', 'Fri 29', 'Sat 30', 'Sun 31', 'Mon 1', 'Tue 2', 'Wed 3'] as const
+export const ROTAS: { key: RotaKey; name: string; covers: string; pool: string[]; primary: string[]; secondary: string[]; chain: { who: string; ackMin: number }[] }[] = [
+  {
+    key: 'clinical', name: 'Clinical on call', covers: 'P0 crisis and P1 screens: a named person within minutes',
+    pool: ['Dr Sanjay Menon · psychologist', 'Dr Lakshmi Raghavan · psychologist', 'Dr Meera Iyer · physician'],
+    primary: ['Dr Sanjay Menon · psychologist', 'Dr Sanjay Menon · psychologist', 'Dr Lakshmi Raghavan · psychologist', 'Dr Lakshmi Raghavan · psychologist', 'Dr Sanjay Menon · psychologist', 'Dr Lakshmi Raghavan · psychologist', 'Dr Sanjay Menon · psychologist'],
+    secondary: ['Dr Meera Iyer · physician', 'Dr Lakshmi Raghavan · psychologist', 'Dr Meera Iyer · physician', 'Dr Sanjay Menon · psychologist', 'Dr Meera Iyer · physician', 'Dr Meera Iyer · physician', 'Dr Lakshmi Raghavan · psychologist'],
+    chain: [{ who: 'Primary', ackMin: 3 }, { who: 'Secondary', ackMin: 3 }, { who: 'Dr Arvind Natesan · Medical Director', ackMin: 5 }],
+  },
+  {
+    key: 'sre', name: 'SRE on call', covers: 'SLO burn, ingest lag, stalled rights jobs, kill switches',
+    pool: ['Kiran Desai · SRE', 'Rohan Mehta · Backend', 'Ishaan Kulkarni · SRE'],
+    primary: ['Kiran Desai · SRE', 'Kiran Desai · SRE', 'Kiran Desai · SRE', 'Ishaan Kulkarni · SRE', 'Ishaan Kulkarni · SRE', 'Ishaan Kulkarni · SRE', 'Ishaan Kulkarni · SRE'],
+    secondary: ['Rohan Mehta · Backend', 'Rohan Mehta · Backend', 'Ishaan Kulkarni · SRE', 'Kiran Desai · SRE', 'Rohan Mehta · Backend', 'Rohan Mehta · Backend', 'Kiran Desai · SRE'],
+    chain: [{ who: 'Primary', ackMin: 5 }, { who: 'Secondary', ackMin: 10 }, { who: 'Aditya Rao · Head of Engineering', ackMin: 15 }],
+  },
+  {
+    key: 'privacy', name: 'Privacy and rights', covers: 'Rights requests near SLA, unusual reads, suspected breach',
+    pool: ['Neha Iyer · DPO', 'Ananya Pillai · Data', 'Aditya Rao · Head of Engineering'],
+    primary: ['Neha Iyer · DPO', 'Neha Iyer · DPO', 'Neha Iyer · DPO', 'Neha Iyer · DPO', 'Neha Iyer · DPO', 'Neha Iyer · DPO', 'Neha Iyer · DPO'],
+    secondary: ['Ananya Pillai · Data', 'Ananya Pillai · Data', 'Ananya Pillai · Data', 'Ananya Pillai · Data', 'Ananya Pillai · Data', 'Ananya Pillai · Data', 'Ananya Pillai · Data'],
+    chain: [{ who: 'Primary', ackMin: 15 }, { who: 'Secondary', ackMin: 30 }, { who: 'Aditya Rao · Head of Engineering', ackMin: 60 }],
+  },
+]
+export const PAGE_HISTORY: { id: string; rota: RotaKey; at: string; what: string; path: string; outcome: string }[] = [
+  { id: 'PG-2041', rota: 'clinical', at: '28 Jan 21:04', what: 'P0 · crisis intercept, m_0142', path: 'Dr Sanjay Menon acknowledged in 1 m 12 s', outcome: 'Member reached by phone; safety plan agreed; Tele-MANAS shown throughout' },
+  { id: 'PG-2040', rota: 'clinical', at: '28 Jan 06:00', what: 'Synthetic P0 · daily production test on a test member', path: 'Dr Sanjay Menon acknowledged in 2 m 05 s', outcome: 'Test passed: reached a human queue' },
+  { id: 'PG-2038', rota: 'sre', at: '27 Jan 23:40', what: 'Ledger write error budget spent', path: 'Kiran Desai unacknowledged 5 m → Rohan Mehta acknowledged in 2 m', outcome: 'Retry storm throttled; Ledger releases frozen until the budget recovers' },
+  { id: 'PG-2035', rota: 'privacy', at: '27 Jan 10:12', what: 'Rights request RQ-2286 past half its SLA', path: 'Neha Iyer acknowledged in 6 m', outcome: 'PDF render queue raised; member sent an update' },
+]
+
+// ─── Control plane · tool registry (specimen) ────────────────────────────
+// Architecture p.20: typed tools with JSON schemas, scopes and owners; minimum fields per tool, pseudonymous ids,
+// consent-checked. No tool can send a message or change data without a human (p.25).
+
+type JsonSchema = { type: string; required?: string[]; properties?: Record<string, unknown>; additionalProperties?: boolean; [k: string]: unknown }
+export const TOOL_REGISTRY: Record<string, { version: string; grade: 'wellbeing' | 'clinical'; purpose: string; scopes: string[]; never: string[]; input: JsonSchema; output: JsonSchema }> = (() => {
+  const text = (max: number) => ({ type: 'string', maxLength: max })
+  const term = { type: 'string', enum: ['H', 'P', 'R', 'F', 'D', 'B'] }
+  const lang = { type: 'string', enum: ['en', 'ta', 'hi'] }
+  const obj = (required: string[], properties: Record<string, unknown>): JsonSchema => ({ type: 'object', required, properties, additionalProperties: false })
+  const reply = obj(['text', 'lang', 'claims_checked'], { text: text(480), lang, claims_checked: { type: 'boolean', const: true } })
+  return {
+    index_explainer: { version: '1.4.0', grade: 'wellbeing', purpose: 'index_explain', scopes: ['read:score.latest', 'read:term_scores', 'read:method'], never: ['journal_text', 'ease_items', 'raw_signals'], input: obj(['member', 'index', 'band', 'lowest', 'method', 'lang'], { member: { type: 'string', pattern: '^m_[a-z0-9]{8}$', description: 'Pseudonymous id' }, index: { type: 'integer', minimum: 0, maximum: 100 }, band: { type: 'string' }, lowest: term, method: { type: 'string', const: 'jsi-1.0' }, lang }), output: reply },
+    next_best_action: { version: '2.2.0', grade: 'wellbeing', purpose: 'today_narrate', scopes: ['read:action_assignment', 'read:term_scores', 'read:feature_daily.summary'], never: ['journal_text', 'ease_items', 'household_private'], input: obj(['member', 'action_id', 'term', 'reason_code', 'lang'], { member: { type: 'string' }, action_id: { type: 'string' }, term, reason_code: { type: 'string', enum: ['lowest_term', 'drift', 'recovery_slipped', 'streakless_return'] }, lang }), output: obj(['text', 'lang'], { text: text(220), lang }) },
+    ikigai_coach: { version: '1.1.0', grade: 'wellbeing', purpose: 'purpose_coach', scopes: ['read:ikigai_map', 'read:tomorrow_question'], never: ['journal_text', 'ease_items', 'biomarkers'], input: obj(['member', 'map', 'lang'], { member: { type: 'string' }, map: { type: 'array', maxItems: 12, items: text(80) }, lang }), output: reply },
+    couples_prompt: { version: '1.0.3', grade: 'wellbeing', purpose: 'household_prompt', scopes: ['read:household.shared_grant'], never: ['partner_private_answers', 'journal_text', 'term_scores_of_partner'], input: obj(['household', 'shared_fields', 'lang'], { household: { type: 'string', pattern: '^h_[a-z0-9]{8}$' }, shared_fields: { type: 'object', description: 'Only fields both partners granted' }, lang }), output: obj(['prompt', 'lang'], { prompt: text(200), lang }) },
+    second_arrow_reflection: { version: '1.3.1', grade: 'wellbeing', purpose: 'journal_reflect', scopes: ['read:journal_entry.own'], never: ['ease_items', 'ease_results', 'other_entries'], input: obj(['member', 'entry_text', 'lang'], { member: { type: 'string' }, entry_text: text(4000), lang }), output: obj(['text', 'lang', 'advice'], { text: text(360), lang, advice: { type: 'boolean', const: false } }) },
+    ledger_weekly_story: { version: '1.0.6', grade: 'wellbeing', purpose: 'ledger_summary', scopes: ['read:ledger.week.tags'], never: ['ledger_photos', 'journal_text'], input: obj(['member', 'week', 'tag_counts', 'lang'], { member: { type: 'string' }, week: { type: 'string', format: 'date' }, tag_counts: { type: 'object' }, lang }), output: obj(['text', 'lang'], { text: text(240), lang }) },
+    time_audit_summary: { version: '1.0.5', grade: 'wellbeing', purpose: 'time_audit', scopes: ['read:calendar.hours_by_category'], never: ['calendar_titles', 'attendees', 'finances'], input: obj(['member', 'hours', 'lang'], { member: { type: 'string' }, hours: { type: 'object', description: 'Hours by category; raw events discarded' }, lang }), output: reply },
+    practice_companion: { version: '1.2.0', grade: 'wellbeing', purpose: 'practice_answer', scopes: ['read:retrieval.method_book_notes', 'read:practice.week'], never: ['member_data_in_retrieval', 'journal_text'], input: obj(['member', 'week', 'question', 'lang'], { member: { type: 'string' }, week: { type: 'integer', minimum: 1, maximum: 13 }, question: text(500), lang }), output: obj(['text', 'citations', 'lang'], { text: text(600), citations: { type: 'array', items: { type: 'string' } }, lang }) },
+    coach_digest: { version: '0.4.0', grade: 'wellbeing', purpose: 'coach_digest', scopes: ['read:term_scores', 'read:attendance', 'read:consent.coach_digest'], never: ['journal_text', 'ease_items', 'household_private'], input: obj(['member', 'quarter', 'lang'], { member: { type: 'string' }, quarter: { type: 'string' }, lang: { type: 'string', enum: ['en'] } }), output: obj(['summary', 'flags'], { summary: text(900), flags: { type: 'array', items: { type: 'string' } } }) },
+    explain_biomarker: { version: '0.9.0', grade: 'clinical', purpose: 'biomarker_explain', scopes: ['read:observation.lab', 'read:le8'], never: ['diagnosis', 'journal_text'], input: obj(['member', 'loinc', 'value', 'unit', 'range', 'lang'], { member: { type: 'string' }, loinc: { type: 'string' }, value: { type: 'number' }, unit: { type: 'string' }, range: { type: 'string' }, lang }), output: obj(['draft', 'needs_physician'], { draft: text(480), needs_physician: { type: 'boolean', const: true } }) },
+  }
+})()
+
+// ─── Control plane · live sampling and drift (specimen) ──────────────────
+// Weekly live sample: 210 outputs drawn at random this week across tools and languages; 198 already read. The queue holds
+// the rest. AI drift: twelve weekly points per tool and metric against the launch baseline.
+
+export const LIVE_SAMPLE_WEEK = { label: 'Week of 25–31 Jan 2027', sampled: 210, reviewedBefore: 198 }
+export const LIVE_SAMPLE_QUEUE: { id: string; tool: string; lang: 'EN' | 'TA' | 'HI'; tenant: string; at: string; output: string; gloss?: boolean }[] = [
+  ['ls_4401', 'second_arrow_reflection', 'TA', 'tnt_aiwo', '28 Jan 19:44'],
+  ['ls_4402', 'next_best_action', 'EN', 'tnt_northwind', '28 Jan 18:10'],
+  ['ls_4403', 'practice_companion', 'HI', 'tnt_house_chn', '28 Jan 16:02'],
+  ['ls_4404', 'index_explainer', 'TA', 'tnt_aiwo', '28 Jan 14:31'],
+  ['ls_4405', 'couples_prompt', 'EN', 'tnt_aiwo', '28 Jan 12:20'],
+  ['ls_4406', 'ikigai_coach', 'HI', 'tnt_northwind', '28 Jan 10:55'],
+  ['ls_4407', 'ledger_weekly_story', 'EN', 'tnt_house_chn', '27 Jan 21:40'],
+  ['ls_4408', 'time_audit_summary', 'TA', 'tnt_aiwo', '27 Jan 19:15'],
+  ['ls_4409', 'second_arrow_reflection', 'EN', 'tnt_northwind', '27 Jan 17:02'],
+  ['ls_4410', 'coach_digest', 'EN', 'tnt_aiwo', '27 Jan 15:48'],
+  ['ls_4411', 'practice_companion', 'TA', 'tnt_aiwo', '27 Jan 11:26'],
+  ['ls_4412', 'next_best_action', 'HI', 'tnt_aiwo', '27 Jan 09:03'],
+].map(([id, tool, lang, tenant, at]) => ({ id, tool, lang: lang as 'EN' | 'TA' | 'HI', tenant, at, output: TRACE_TOOL[tool]?.excerpt ?? '', gloss: lang !== 'EN' }))
+
+export const DRIFT_WEEKS = ['9 Nov', '16 Nov', '23 Nov', '30 Nov', '7 Dec', '14 Dec', '21 Dec', '28 Dec', '4 Jan', '11 Jan', '18 Jan', '25 Jan']
+export type DriftMetric = 'rewrite' | 'human' | 'live' | 'shift'
+export const DRIFT_METRICS: Record<DriftMetric, { label: string; unit: string; watch: number; higherIsWorse: boolean; note: string }> = {
+  rewrite: { label: 'Output guard rewrites', unit: '%', watch: 3, higherIsWorse: true, note: 'Share of outputs where the claims gate swapped in sealed copy.' },
+  human: { label: 'Routed to a human', unit: '%', watch: 6, higherIsWorse: true, note: 'Share held for physician review or blocked to the rules-based version.' },
+  live: { label: 'Live-sample pass', unit: '%', watch: 90, higherIsWorse: false, note: 'Share of the weekly human sample marked “No issue”. The floor matches the offline evals.' },
+  shift: { label: 'Input shift vs launch', unit: 'PSI', watch: 0.1, higherIsWorse: true, note: 'Population stability of the input mix (language, term, length) against the launch baseline. 0.10 is watch; 0.25 means re-baseline.' },
+}
+const wobble = (seed: string, i: number) => {
+  let h = 2166136261
+  for (const c of `${seed}:${i}`) h = Math.imul(h ^ c.charCodeAt(0), 16777619)
+  return ((h >>> 0) % 1000) / 1000 - 0.5
+}
+const DRIFT_SHAPE: Record<string, Partial<Record<DriftMetric, [number, number]>>> = {
+  // [start, end]: a straight trend with a little weekly noise. Unlisted pairs hold steady at the default.
+  second_arrow_reflection: { rewrite: [1.2, 3.8], human: [4.1, 6.6], live: [96, 91.5] },
+  practice_companion: { shift: [0.03, 0.14] },
+  coach_digest: { live: [97, 95] },
+}
+const DRIFT_DEFAULT: Record<DriftMetric, number> = { rewrite: 1.1, human: 1.6, live: 97, shift: 0.04 }
+export function driftSeries(tool: string, metric: DriftMetric): number[] {
+  const [a, b] = DRIFT_SHAPE[tool]?.[metric] ?? [DRIFT_DEFAULT[metric], DRIFT_DEFAULT[metric]]
+  const amp = metric === 'shift' ? 0.012 : metric === 'live' ? 1.2 : 0.4
+  return DRIFT_WEEKS.map((_, i) => {
+    const v = a + ((b - a) * i) / (DRIFT_WEEKS.length - 1) + wobble(tool + metric, i) * amp
+    return metric === 'shift' ? Math.max(0, Math.round(v * 1000) / 1000) : Math.round(Math.max(0, Math.min(100, v)) * 10) / 10
+  })
+}
+
+// ─── Control plane · access governance (specimen) ────────────────────────
+// Architecture p.25: relationship-based access, purpose logging, alerts on unusual reads; quarterly access reviews.
+
+export type UnusualRead = { id: string; at: string; actor: string; role: string; rule: string; detail: string; purpose: string; status: 'open' | 'cleared' | 'escalated'; resolution?: string }
+export const UNUSUAL_READS: UnusualRead[] = [
+  { id: 'UR-0117', at: '28 Jan 20:12', actor: 'Priya Natarajan', role: 'coach', rule: 'Volume · over three times the 10-minute baseline', detail: '14 member records read in 10 minutes; her baseline is 4.', purpose: 'Circle prep · Thursday circle', status: 'open' },
+  { id: 'UR-0116', at: '28 Jan 02:41', actor: 'Dr Lakshmi Raghavan', role: 'clinician', rule: 'Out of hours · no open alert, task or on-call shift', detail: 'Read term scores for m_0088 at 02:41. Not on call that night.', purpose: 'Follow-up on P1 screen', status: 'open' },
+  { id: 'UR-0115', at: '27 Jan 17:05', actor: 'svc:coach-digest', role: 'system', rule: 'Scope · asked for a field outside the tool’s registry scope', detail: 'Requested journal_text for one member. The consent check refused it; nothing was read.', purpose: 'coach_digest', status: 'open' },
+  { id: 'UR-0114', at: '27 Jan 11:30', actor: 'Vikas Shah', role: 'tenant_admin', rule: 'Threshold probe · repeated aggregate queries that differ by one group', detail: 'Six aggregate queries narrowing department and location. Every one returned suppressed.', purpose: 'Quarterly review', status: 'open' },
+  { id: 'UR-0112', at: '25 Jan 15:48', actor: 'Dr Sanjay Menon', role: 'clinician', rule: 'Relationship · member not on his caseload', detail: 'Read m_0207 during P0 cover for a colleague.', purpose: 'Crisis cover', status: 'cleared', resolution: 'Cleared by Neha Iyer: on-call cover, the rota confirms the shift.' },
+]
+
+export type AccessDecision = 'keep' | 'reduce' | 'revoke'
+export type AccessGrant = { id: string; who: string; role: string; access: string; lastUsed: string; suggest?: AccessDecision; why?: string; self?: boolean }
+export const ACCESS_REVIEW = {
+  quarter: 'Q3 FY27 · Oct–Dec 2026',
+  due: '31 Jan 2027',
+  previous: 'Q2 FY27 signed 29 Oct 2026 by Neha Iyer and Aditya Rao · 14 grants, 2 revoked',
+  grants: [
+    { id: 'g01', who: 'Kiran Desai', role: 'SRE', access: 'JIT-eligible prod read · on-call pager', lastUsed: '28 Jan 2027' },
+    { id: 'g02', who: 'Rohan Mehta', role: 'Backend', access: 'JIT-eligible prod read', lastUsed: '19 Jan 2027' },
+    { id: 'g03', who: 'Ishaan Kulkarni', role: 'SRE', access: 'JIT-eligible prod read and write · feature flags', lastUsed: '2 Jan 2027', suggest: 'reduce', why: 'No flag write in 90 days; read-only would cover the rota.' },
+    { id: 'g04', who: 'Ananya Pillai', role: 'Data', access: 'Research registry, de-identified · warehouse aggregates', lastUsed: '26 Jan 2027' },
+    { id: 'g05', who: 'Priya Natarajan', role: 'Coach', access: 'Caseload of 38 members · circles', lastUsed: '28 Jan 2027' },
+    { id: 'g06', who: 'Meera Joshi', role: 'Coach', access: 'Caseload of 0 · circles', lastUsed: '11 Dec 2026', suggest: 'revoke', why: 'Moved to the events team on 12 Dec; caseload handed over.' },
+    { id: 'g07', who: 'Dr Sanjay Menon', role: 'Psychologist', access: 'Clinical portal · P0 on call', lastUsed: '28 Jan 2027' },
+    { id: 'g08', who: 'Dr Lakshmi Raghavan', role: 'Psychologist', access: 'Clinical portal · eval reviewer', lastUsed: '28 Jan 2027' },
+    { id: 'g09', who: 'Dr Meera Iyer', role: 'Physician', access: 'Clinical portal · clinical-grade sign-off', lastUsed: '24 Jan 2027' },
+    { id: 'g10', who: 'Rhea Kapoor', role: 'Tenant admin · Northwind', access: 'Aggregates, groups of 50 or more', lastUsed: '28 Jan 2027' },
+    { id: 'g11', who: 'svc:coach-digest', role: 'Service', access: 'Scoped token · term scores, attendance', lastUsed: '28 Jan 2027' },
+    { id: 'g12', who: 'Neha Iyer', role: 'DPO', access: 'Audit read · JIT approver', lastUsed: '28 Jan 2027', self: true },
+  ] as AccessGrant[],
+}

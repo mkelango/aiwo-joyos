@@ -1,14 +1,17 @@
 import { router } from 'expo-router'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Pressable, View } from 'react-native'
-import { ArrowLink, Avatar, Body, Button, DaybreakButton, Eyebrow, Icon, InkSurface, Meta, MethodLine, Mono, Numeral, Segmented, Serif, Sheet, TermDot, Title } from '@/components'
+import { ArrowLink, Avatar, Body, Button, DaybreakButton, Eyebrow, Icon, InkSurface, JoyspanWheel, Meta, MethodLine, Mono, Numeral, Segmented, Serif, Sheet, TermDot, Title, fmtDate } from '@/components'
+import { kit } from '@/components/_i18n'
+import { REMEASURE_DATES, REMEASURE_INITIAL, useClinicalRemeasure, useSignOffTimer } from '@/lib/indexRecord'
+import { bandFor } from '@/shared/indexEngine'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { H2, useLocal } from '@/screens/a/local'
 import { DAY90_DATES, DAY90_TERMS, DAY90_WHY, NEXT_90 } from '@/screens/a/coreData'
 import { INK, InkScreen, TextField } from '@/screens/a/parts'
 import { DAY90_SPECIMEN, INDEX_HISTORY, TEAM } from '@/shared/member'
 import { termByKey } from '@/shared/terms'
-import type { TermKey } from '@/shared/types'
+import type { TermKey, TermScore } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { memberOnly } from '@/screens/b/parts'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
@@ -19,6 +22,12 @@ import { txFor } from '@/screens/a/i18n'
 // DAY 90 (Memo p.18 screen 04; Playbook p39): the re-measure where the number went down.
 // Warm Ink ground in both schemes. A fall is a sentence and a named person, never red,
 // never a streak lost. The Index moved 64 → 61; Freedom fell; Dr Meera calls on Thursday.
+//
+// The chain that leads here (Architecture screen 14): the Day-76 invite → the Clinical-grade
+// assessment (/index-take?grade=clinical: two sittings, then the labs) → awaiting physician
+// sign-off (no number until she signs; a specimen timer stands in for the clinical portal) →
+// this card with the member's own signed numbers. The specimen card (64 → 61) stays one tap
+// away from the invite as a labelled preview.
 
 const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 const SLOTS = [
@@ -70,7 +79,33 @@ function Day90() {
   }
   const [open, setOpen] = useState<TermKey | null>('F')
   const before = INDEX_HISTORY[0]
-  const fell = DAY90_SPECIMEN.from - DAY90_SPECIMEN.to
+  // The re-measure chain (kept on the phone) and the simulated sign-off timer.
+  const rm = useSignOffTimer()
+  const [, setRm] = useClinicalRemeasure()
+  const [preview, setPreview] = useState(false)
+  const [clinDraft] = useLocal<{ answers?: Record<string, number> }>('indexTakeClinical', {})
+  const draftStarted = Object.keys(clinDraft?.answers ?? {}).length > 0
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  useEffect(() => {
+    if (rm.stage !== 'awaiting') return
+    const id = setInterval(() => setNowMs(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [rm.stage])
+  // The member's own signed result, or the specimen.
+  const own = !preview && rm.stage === 'signed' ? rm.result ?? null : null
+  const fromV = own ? before.value : DAY90_SPECIMEN.from
+  const toV = own ? own.ji : DAY90_SPECIMEN.to
+  const termsNow: TermScore[] = own
+    ? ORDER.map((k) => {
+        const v = own.terms[k]
+        const b = before.terms.find((x) => x.key === k)?.value ?? v
+        return { key: k, value: v, band: bandFor(v, k === 'B'), delta: v - b }
+      })
+    : DAY90_TERMS
+  const dir = toV < fromV ? 'down' : toV > fromV ? 'up' : 'held'
+  const fell = fromV - toV
+  const mover = ORDER.reduce((a, k) => (Math.abs(termsNow.find((x) => x.key === k)?.delta ?? 0) > Math.abs(termsNow.find((x) => x.key === a)?.delta ?? 0) ? k : a), 'H' as TermKey)
+  const signer = own ? rm.signedBy ?? meera.name : meera.name
 
   const back = (
     <View style={{ paddingHorizontal: space.gutter, width: '100%', maxWidth: 640, alignSelf: 'center' }}>
@@ -87,12 +122,110 @@ function Day90() {
     </View>
   )
 
+  // ── Day 76: the invite ──
+  if (!preview && rm.stage === 'invite') {
+    const steps = ['step1', 'step2', 'step3', 'step4'] as const
+    return (
+      <InkScreen top={back}>
+        <View style={{ gap: space.s1 }}>
+          <Eyebrow tone="daybreak">{t('inviteEyebrow')}</Eyebrow>
+          <Title size={34} accessibilityRole="header">
+            {t('inviteA')}<Serif>{t('inviteSerif')}</Serif>{t('inviteB')}
+          </Title>
+          <Body size={19} style={{ lineHeight: 28 }}>
+            {t('inviteLead')}
+          </Body>
+        </View>
+        <View style={{ backgroundColor: INK.paperRaised, borderRadius: radius.card, padding: 20, gap: space.s2 }}>
+          <Eyebrow {...H2}>{t('inviteSteps')}</Eyebrow>
+          {steps.map((k, i) => (
+            <View key={k} style={{ flexDirection: 'row', gap: 14 }}>
+              <Mono size={15} tone="ink3" style={{ width: 20, paddingTop: 2 }}>
+                {String(i + 1)}
+              </Mono>
+              <Body style={{ flex: 1 }}>{t(k)}</Body>
+            </View>
+          ))}
+          <Meta>{t('inviteWindow', { opens: fmtDate(REMEASURE_DATES.opens), day90: fmtDate(REMEASURE_DATES.day90) })}</Meta>
+          <DaybreakButton icon="arrow-right" onPress={() => router.push('/index-take?grade=clinical')}>
+            {draftStarted ? t('pickUp') : t('begin')}
+          </DaybreakButton>
+        </View>
+        <View style={{ borderWidth: 1, borderStyle: 'dashed', borderColor: INK.lineStrong, borderRadius: radius.card, padding: 12 }}>
+          <Meta size={14}>{t('inviteSpecimen')}</Meta>
+        </View>
+        <Button variant="ghost" icon="eye" onPress={() => setPreview(true)} style={{ alignSelf: 'flex-start' }}>
+          {t('previewSpecimen')}
+        </Button>
+      </InkScreen>
+    )
+  }
+
+  // ── Awaiting physician sign-off: no number until she signs ──
+  if (!preview && rm.stage === 'awaiting') {
+    const left = Math.max(0, Math.ceil(((rm.signDueAt ?? 0) - nowMs) / 1000))
+    const sentAt = rm.submittedAt ? new Date(rm.submittedAt) : null
+    const time = sentAt ? `${String(sentAt.getHours()).padStart(2, '0')}:${String(sentAt.getMinutes()).padStart(2, '0')}` : '—'
+    return (
+      <InkScreen top={back}>
+        <View style={{ gap: space.s1 }}>
+          <Eyebrow tone="daybreak">{t('awaitEyebrow')}</Eyebrow>
+          <Title size={34} accessibilityRole="header">
+            {t('awaitA')}<Serif>{t('awaitSerif')}</Serif>{t('awaitB')}
+          </Title>
+          <Body size={19} style={{ lineHeight: 28 }}>
+            {t('awaitLead', { time })}
+          </Body>
+        </View>
+        <View style={{ backgroundColor: INK.paperRaised, borderRadius: radius.card, padding: 20, gap: space.s2 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Avatar person={meera} size={48} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Body weight="semibold">{meera.name}</Body>
+              <Meta>{t('awaitEyebrow')}</Meta>
+            </View>
+            <Icon name="clock" size={18} color={INK.ink2} />
+          </View>
+          <Meta accessibilityLiveRegion="polite">{left > 0 ? t('awaitTimer', { s: left }) : t('awaitSigning')}</Meta>
+          <Meta>{rm.labs && rm.labs.length ? t('awaitLabs', { list: rm.labs.join(', ') }) : t('awaitNoLabs')}</Meta>
+          <MethodLine method="v1.0" grade="clinical" />
+        </View>
+        <Meta>{t('awaitWhile')}</Meta>
+        <Button variant="ghost" icon="sun" onPress={() => router.replace('/')} style={{ alignSelf: 'flex-start' }}>
+          {tc('backToday')}
+        </Button>
+      </InkScreen>
+    )
+  }
+
   return (
     <InkScreen top={back}>
+      {preview ? (
+        <View style={{ gap: 4 }}>
+          <View style={{ borderWidth: 1, borderStyle: 'dashed', borderColor: INK.lineStrong, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2, alignSelf: 'flex-start' }}>
+            <Eyebrow size={11}>{t('previewNote')}</Eyebrow>
+          </View>
+          <Button variant="link" onPress={() => setPreview(false)}>
+            {t('backToInvite')}
+          </Button>
+        </View>
+      ) : null}
       <View style={{ gap: space.s1 }}>
         <Eyebrow tone="daybreak">{t('eyebrow')}</Eyebrow>
         <Title size={34} accessibilityRole="header">
-          {t('titleA')}<Serif>{t('titleSerif')}</Serif>{t('titleB')}
+          {dir === 'down' ? (
+            <>
+              {t('titleA')}<Serif>{t('titleSerif')}</Serif>{t('titleB')}
+            </>
+          ) : dir === 'up' ? (
+            <>
+              {t('titleUpA')}<Serif>{t('titleUpSerif')}</Serif>{t('titleUpB')}
+            </>
+          ) : (
+            <>
+              {t('titleHeldA')}<Serif>{t('titleHeldSerif')}</Serif>{t('titleHeldB')}
+            </>
+          )}
         </Title>
       </View>
 
@@ -101,11 +234,11 @@ function Day90() {
         <View
           style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.s2, flexWrap: 'wrap' }}
           accessible
-          accessibilityLabel={t('movedA11y', { from: DAY90_SPECIMEN.from, to: DAY90_SPECIMEN.to, fell })}
+          accessibilityLabel={dir === 'down' ? t('movedA11y', { from: fromV, to: toV, fell }) : t('movedA11yGen', { from: fromV, to: toV })}
         >
           <View style={{ gap: 2 }}>
             <Numeral size={56} tone="ink3">
-              {DAY90_SPECIMEN.from}
+              {fromV}
             </Numeral>
             <Eyebrow>{t('day0')}</Eyebrow>
           </View>
@@ -113,15 +246,25 @@ function Day90() {
             <Icon name="arrow-right" size={22} color={INK.ink3} />
           </View>
           <View style={{ gap: 2 }}>
-            <Numeral size={96}>{DAY90_SPECIMEN.to}</Numeral>
+            <Numeral size={96}>{toV}</Numeral>
             <Eyebrow>{t('day90')}</Eyebrow>
           </View>
         </View>
         <Body size={19} style={{ lineHeight: 28 }}>
-          {ax(DAY90_SPECIMEN.sentence)}
+          {own ? t(dir === 'held' ? 'ownHeld' : 'ownSentence', { from: fromV, to: toV, space: tt.space(mover) }) : ax(DAY90_SPECIMEN.sentence)}
         </Body>
         <View style={{ borderWidth: 1, borderStyle: 'dashed', borderColor: INK.lineStrong, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2, alignSelf: 'flex-start' }}>
           <Eyebrow size={11}>{t('specimen')}</Eyebrow>
+        </View>
+      </View>
+
+      {/* The Wheel at Day 90 over its Day-0 outline (the 14% Ink ghost) */}
+      <View style={{ alignItems: 'center', gap: space.s1 }}>
+        <Eyebrow {...H2} style={{ alignSelf: 'flex-start' }}>{t('wheelTitle')}</Eyebrow>
+        <JoyspanWheel terms={termsNow} baseline={before.terms} size={220} value={toV} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{ width: 18, height: 0, borderTopWidth: 1.5, borderColor: INK.wheelGhost }} />
+          <Meta size={13}>{kit(lang, 'wheelGhost')}</Meta>
         </View>
       </View>
 
@@ -179,7 +322,7 @@ function Day90() {
         <Meta>{t('likeForLike')}</Meta>
         <View style={{ borderTopWidth: 1, borderTopColor: INK.line }}>
           {ORDER.map((k) => {
-            const now = DAY90_TERMS.find((x) => x.key === k)!
+            const now = termsNow.find((x) => x.key === k)!
             const then = before.terms.find((x) => x.key === k)!
             const d = now.delta ?? 0
             const isOpen = open === k
@@ -210,14 +353,14 @@ function Day90() {
                 </View>
                 {isOpen ? (
                   <Meta tone="ink2" style={{ paddingLeft: 20 }}>
-                    {ax(DAY90_WHY[k])}
+                    {own ? t('ownWhy') : ax(DAY90_WHY[k])}
                   </Meta>
                 ) : null}
               </Pressable>
             )
           })}
         </View>
-        <MethodLine method="v1.0" grade="clinical" takenOn={DAY90_DATES.day90} signedBy={meera.name} />
+        <MethodLine method="v1.0" grade="clinical" takenOn={DAY90_DATES.day90} signedBy={signer} />
       </View>
 
       {/* The next ninety days */}
@@ -282,6 +425,11 @@ function Day90() {
         <Button variant="ghost" icon="book-open" onPress={() => router.push('/index-result')} style={{ alignSelf: 'flex-start' }}>
           {t('howMade')}
         </Button>
+        {own ? (
+          <Button variant="link" onPress={() => setRm(REMEASURE_INITIAL)}>
+            {t('walkAgain')}
+          </Button>
+        ) : null}
       </View>
 
       <InkSurface.Provider value={false}>

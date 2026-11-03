@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { AlertTriangle, Check, FileSignature, FlaskConical, Pill as PillIcon, Phone, ScrollText, SearchX, ShieldCheck, Sparkles, Undo2 } from 'lucide-react'
+import { AlertTriangle, Check, FilePen, FileSignature, FlaskConical, Pill as PillIcon, Phone, ScrollText, SearchX, ShieldCheck, Smartphone, Sparkles, Undo2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -12,9 +12,11 @@ import {
   CLINICAL_RECORDS, CLOSE_OUTCOMES, EXTRA_FORMULARY, EXTRA_INTERACTIONS, FORMULARY, MD_CONFIG, MEERA, MEMBER_IDS, RETURN_REASONS, SCREEN_ROUTES, SCREEN_ROUTE_OWNER,
   type SafetyAlert,
 } from './_data'
-import { clinical, recordOf, useClinicalState, type ClinicalAudit, type Draft, type MdActive, type MdHistory, type Order, type Screen, type Sent, type SignItem } from './_clinicalStore'
+import { clinical, recordOf, stampOf, useClinicalState, type ClinicalAudit, type Draft, type MdActive, type MdHistory, type Order, type Screen, type RemeasureWork, type Sent, type SignItem, type SoapNote } from './_clinicalStore'
 import { PreviewBanner, useConsoleAccess } from './_gate'
-import { AccessNote, CardHead, Kpi, PriorityTag, ScrollTabs, SlaChip, areaCls, fieldCls, fmtClock, fmtDuration, labelCls, useConsoleNow, useTabParam } from './_parts'
+import { CLINICAL_PURPOSES, ReasonGate } from './_purpose'
+import { remeasure, useRemeasure, type Remeasure } from './_remeasure'
+import { AccessNote, CardHead, Kpi, PriorityTag, ScrollTabs, SlaChip, areaCls, fieldCls, fmtClock, fmtDuration, fmtOpened, labelCls, parseIst, useConsoleNow, useTabParam } from './_parts'
 
 // CLINICAL PORTAL (Memo p.24, p.27; Architecture p6, p8, p18): P0/P1 safety board with SLAs,
 // screen-threshold queue, Clinical-grade sign-off, results and e-Rx, AI HITL queue, and the
@@ -30,6 +32,29 @@ function reachOf(a: SafetyAlert) {
   if (!a.ackAt) return null
   const ms = +new Date(a.ackAt) - +new Date(a.openedAt)
   return { ms, within: ms <= a.slaMinutes * 60000 }
+}
+
+/** The member's own Clinical-grade re-measure, as it sits in the sign-off queue. */
+const RM_ID = 'rm-member'
+
+function remeasureItem(rm: Remeasure, work: RemeasureWork): SignItem | null {
+  if (rm.phase !== 'pending' && rm.phase !== 'signed') return null
+  const rec = CLINICAL_RECORDS[rm.memberId]
+  return {
+    id: RM_ID,
+    member: rm.member,
+    memberId: rm.memberId,
+    occasion: 'Day 90 re-measure · Clinical grade · from the app',
+    method: rm.method,
+    engine: rm.engine,
+    drafted: rm.submittedMs ? fmtOpened(stampOf(rm.submittedMs)) : 'from the app',
+    prev: rm.prev,
+    now: rm.terms,
+    labs: rec ? rec.labs.map((l) => ({ name: l.name, value: String(l.series[l.series.length - 1]), unit: l.unit, ref: l.ref, flag: l.flag })) : [],
+    notes: work.notes,
+    signed: rm.phase === 'signed' ? `Signed · ${rm.signedBy ?? MEERA.name}${rm.signedMs ? ` · ${fmtClock(rm.signedMs)}` : ''}` : null,
+    returned: rm.phase === 'signed' ? null : work.returned,
+  }
 }
 
 const NAME_OF: Record<string, string> = Object.fromEntries(Object.entries(MEMBER_IDS).map(([n, id]) => [id, n]))
@@ -89,7 +114,13 @@ export default function Clinical() {
     setParams(next, { replace: true })
   }
   // Persisted for the browser session (_clinicalStore), like the coach console's work.
-  const { alerts, signoffs, drafts, screens, md, mdHistory, audit } = useClinicalState()
+  const { alerts, signoffs: queue, drafts, screens, md, mdHistory, audit, remeasure: rmWork } = useClinicalState()
+  // The member's re-measure (W5) joins the sign-off queue, first, once they submit it in the app.
+  const rm = useRemeasure()
+  const rmItem = remeasureItem(rm, rmWork)
+  const signoffs = rmItem ? [rmItem, ...queue] : queue
+  // A reason is asked each time a member record is opened; it holds while the same member stays open.
+  const [reason, setReason] = useState<{ id: string; purpose: string } | null>(null)
   const openAudit = (id: string) => {
     const next = new URLSearchParams(params)
     next.set('tab', 'audit')
@@ -98,7 +129,16 @@ export default function Clinical() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   const setAlerts = clinical.setAlerts
-  const setSignoffs = clinical.setSignoffs
+  const setSignoffs = (f: (s: SignItem[]) => SignItem[]) => {
+    const next = f(signoffs)
+    const r = rmItem ? next.find((x) => x.id === RM_ID) : undefined
+    if (rmItem && r) {
+      // Signing writes the signed state back to the member's own record.
+      if (r.signed && !rmItem.signed) remeasure.sign(MEERA.name, now, joyspanIndex(rm.terms, rm.method)?.value ?? null)
+      if (r.notes !== rmItem.notes || r.returned !== rmItem.returned) clinical.setRemeasure({ notes: r.notes, returned: r.returned })
+    }
+    clinical.setSignoffs(() => next.filter((x) => x.id !== RM_ID))
+  }
   const setDrafts = clinical.setDrafts
   const setScreens = clinical.setScreens
 
@@ -201,8 +241,25 @@ export default function Clinical() {
       <div className="mt-6">
         {tab === 'safety' && <SafetyBoard alerts={alerts} setAlerts={setAlerts} now={now} onAck={ack} onOpen={openMember} canAct={canAct} p0Minutes={md.values.p0} log={log} />}
         {tab === 'screens' && <ScreenQueue screens={screens} setScreens={setScreens} setAlerts={setAlerts} alerts={alerts} now={now} onOpen={openMember} canAct={canAct} md={md} log={log} />}
-        {tab === 'signoff' && <SignOff items={signoffs} setItems={setSignoffs} now={now} onOpen={openMember} canAct={canAct} log={log} />}
-        {tab === 'member' && <MemberRecord key={memberId} memberId={memberId} setMember={setMember} now={now} canAct={canAct} alerts={alerts} log={log} audit={audit} onAudit={openAudit} />}
+        {tab === 'signoff' && <RemeasureNote rm={rm} />}
+        {tab === 'signoff' && <SignOff key={rmItem ? 'with-rm' : 'queue'} items={signoffs} setItems={setSignoffs} now={now} onOpen={openMember} canAct={canAct} log={log} />}
+        {tab === 'member' && (
+          <MemberRecord
+            key={memberId}
+            memberId={memberId}
+            setMember={setMember}
+            now={now}
+            canAct={canAct}
+            alerts={alerts}
+            log={log}
+            audit={audit}
+            onAudit={openAudit}
+            reason={reason?.id === memberId ? reason.purpose : null}
+            onReason={(p) => setReason({ id: memberId, purpose: p })}
+            onChangeReason={() => setReason(null)}
+            suggestedPurpose={alerts.some((a) => a.memberId === memberId && a.status !== 'closed') ? 'Safety alert follow-up' : signoffs.some((x) => x.memberId === memberId && !x.signed && !x.returned) ? 'Clinical-grade sign-off' : 'Results review'}
+          />
+        )}
         {tab === 'ai' && <AiReview drafts={drafts} setDrafts={setDrafts} onOpen={openMember} canAct={canAct} log={log} />}
         {/* Kept mounted so a pending proposal or a new version survives a tab switch. */}
         <div hidden={tab !== 'config'}><MedicalDirector canAct={canAct} active={md} history={mdHistory} log={log} /></div>
@@ -444,6 +501,32 @@ function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canA
 
 // ─── Sign-off ──────────────────────────────────────────────────────────────
 
+/** Where the member's own Day-90 re-measure stands, above the sign-off queue. */
+function RemeasureNote({ rm }: { rm: Remeasure }) {
+  const first = rm.member.split(' ')[0]
+  if (rm.phase === 'pending') {
+    return (
+      <p role="status" className="mb-4 flex items-start gap-2.5 rounded-card border border-ink bg-paper-raised px-4 py-3 text-[15px] text-ink">
+        <Smartphone size={17} className="mt-0.5 shrink-0" aria-hidden />
+        <span>New from the app: {rm.member} completed the Clinical-grade re-measure{rm.submittedMs ? <> at <span className="num">{fmtClock(rm.submittedMs)}</span></> : null}. It is first in the queue. {first}’s Day-90 card reads “awaiting physician sign-off” until you sign.</span>
+      </p>
+    )
+  }
+  if (rm.phase === 'signed') {
+    return (
+      <p role="status" className="mb-4 flex items-start gap-2.5 rounded-card bg-paper-sunk px-4 py-3 text-[15px] text-ink">
+        <FileSignature size={17} className="mt-0.5 shrink-0" aria-hidden />
+        <span>{rm.member}’s Day-90 re-measure is signed{rm.signedBy ? <> by {rm.signedBy}</> : null}. {first}’s Day-90 card now shows the signed delta, and the score is issued to the coach.</span>
+      </p>
+    )
+  }
+  return (
+    <AccessNote className="mb-4">
+      <span className="text-ink">{rm.member}’s Day-90 re-measure joins this queue from the app.</span> The Day-76 invite opens the window; once {first} completes the Clinical-grade assessment it waits here for your signature.{rm.phase === 'in-progress' ? ' He has started it; there is nothing to sign yet.' : ''}
+    </AccessNote>
+  )
+}
+
 function SignOff({ items, setItems, now, onOpen, canAct, log }: { items: SignItem[]; setItems: (f: (s: SignItem[]) => SignItem[]) => void; now: number; onOpen: (id: string) => void; canAct: boolean; log: Log }) {
   const [sel, setSel] = useState(items[0]?.id)
   const [note, setNote] = useState('')
@@ -653,12 +736,26 @@ const URGENCY = ['STAT · home draw tonight', 'Within 48 h', 'Routine · next vi
 /** An e-Rx can be withdrawn for ten minutes after it is signed. */
 const CANCEL_WINDOW_MS = 10 * 60000
 
-function MemberRecord({ memberId, setMember, now, canAct, alerts, log, audit, onAudit }: { memberId: string; setMember: (id: string) => void; now: number; canAct: boolean; alerts: SafetyAlert[]; log: Log; audit: ClinicalAudit[]; onAudit: (id: string) => void }) {
+function MemberRecord({ memberId, setMember, now, canAct, alerts, log, audit, onAudit, reason, onReason, onChangeReason, suggestedPurpose }: {
+  memberId: string
+  setMember: (id: string) => void
+  now: number
+  canAct: boolean
+  alerts: SafetyAlert[]
+  log: Log
+  audit: ClinicalAudit[]
+  onAudit: (id: string) => void
+  /** The reason given for this opening; null until the clinician gives one. */
+  reason: string | null
+  onReason: (purpose: string) => void
+  onChangeReason: () => void
+  suggestedPurpose: string
+}) {
   const rec = CLINICAL_RECORDS[memberId]
-  // Opening a record is a read; a record the relationship check refuses is written down too.
+  // A record the relationship check refuses is written down at once. A record that can open
+  // asks for the reason first; the read is written with that reason (ReasonGate below).
   useEffect(() => {
-    if (rec) log({ what: 'Opened the clinical record · labs, medicines, orders', purpose: 'Results review', kind: 'read', memberId })
-    else log({ what: 'Tried to open a record · refused, no relationship or Care consent · nothing read', purpose: 'Results review', kind: 'refused', memberId })
+    if (!rec) log({ what: 'Tried to open a record · refused, no relationship or Care consent · nothing read', purpose: 'Results review', kind: 'refused', memberId })
   }, [memberId]) // eslint-disable-line react-hooks/exhaustive-deps
   const trail = audit.filter((e) => e.memberId === memberId)
   const lastRead = trail.find((e) => e.kind === 'read')
@@ -711,6 +808,21 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts, log, audit, on
           <p className="text-[15px] text-ink-2">You are not the assigned physician or psychologist for <span className="num text-ink">{memberId}</span>, or there is no Care consent on file. The relationship check fails closed; nothing was read. Choose one of your members above.</p>
         </div>
       </Card>
+    )
+  }
+
+  if (!reason) {
+    return (
+      <ReasonGate
+        quiet
+        who={rec.name}
+        recordLabel={`clinical record · ${rec.id}`}
+        purposes={CLINICAL_PURPOSES}
+        suggested={suggestedPurpose}
+        aside={picker}
+        consent={<>Care consent v3 · {rec.care}.</>}
+        onOpen={(p) => { log({ what: 'Opened the clinical record · labs, medicines, orders, SOAP notes', purpose: p, kind: 'read', memberId }); onReason(p) }}
+      />
     )
   }
 
@@ -781,7 +893,7 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts, log, audit, on
 
       <Card className="min-w-0">
         <CardHead eyebrow={<>Member clinical view · <span className="num">{rec.id}</span> · ABHA linked</>} title={<>{rec.name}, <span className="num">{rec.age}</span> · results</>} aside={<>{picker}<SpecimenTag /></>} />
-        <p className="-mt-2 mb-3 flex flex-wrap items-center gap-2 text-[13px] text-ink-3"><span>{rec.care}</span><Pill>{lastRead ? <>Read logged <span className="num">{lastRead.at.slice(11)}</span> · purpose: results review</> : 'Read logged · purpose: results review'}</Pill></p>
+        <p className="-mt-2 mb-3 flex flex-wrap items-center gap-2 text-[13px] text-ink-3"><span>{rec.care}</span><Pill>{lastRead ? <>Read logged <span className="num">{lastRead.at.slice(11)}</span> · purpose: {reason.toLowerCase()}</> : <>Read logged · purpose: {reason.toLowerCase()}</>}</Pill><button type="button" onClick={onChangeReason} className="text-ink-2 underline underline-offset-4 hover:text-ink focus-ring">Change the reason</button></p>
         <p className="text-[15px] text-ink-2">{rec.chart.sentence}</p>
         <div className="mt-3 h-48" role="img" aria-label={`${rec.chart.lab}: ${chartData.map((d) => `${d.value} on ${d.date}`).join(', ')}`}>
           <ResponsiveContainer width="100%" height="100%">
@@ -971,6 +1083,8 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts, log, audit, on
         </Card>
       </div>
 
+      <SoapNotes memberId={rec.id} first={first} canAct={canAct} log={log} now={now} labs={rec.labs} />
+
       <Card tone="sunk" className="min-w-0">
         <CardHead
           eyebrow={<>Audit · {rec.name} · this session</>}
@@ -982,6 +1096,200 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts, log, audit, on
         <p className="mt-4 text-[13px] text-ink-3">{first} sees these reads under “Who has seen my data”, with the role and the purpose.</p>
       </Card>
     </div>
+  )
+}
+
+// ─── SOAP notes: draft, sign, amend ────────────────────────────────────────
+// Architecture 8f-35: the member clinical view carries SOAP notes. A draft stays in this
+// portal; a signed note is part of the record and is never edited, only amended.
+
+type SoapFields = Pick<SoapNote, 's' | 'o' | 'a' | 'p'>
+const SOAP_PARTS: { key: keyof SoapFields; label: string; hint: string }[] = [
+  { key: 's', label: 'Subjective', hint: 'What the member tells you, in their words where it matters.' },
+  { key: 'o', label: 'Objective', hint: 'Results, vitals and what you observed.' },
+  { key: 'a', label: 'Assessment', hint: 'Your clinical reading of it.' },
+  { key: 'p', label: 'Plan', hint: 'Medicines, orders, follow-up and who does what.' },
+]
+const AMEND_REASONS = ['Correction of fact', 'Addition after review', 'Result received after signing', 'Late entry']
+const EMPTY_SOAP: SoapFields = { s: '', o: '', a: '', p: '' }
+
+const SOAP_SEED: Record<string, SoapNote[]> = {
+  m_0001: [{
+    id: 'soap-seed-0001', status: 'signed', author: MEERA.name, specimen: true, amendments: [],
+    createdMs: parseIst('2027-01-02 16:40'), savedMs: parseIst('2027-01-02 17:05'), signedMs: parseIst('2027-01-02 17:10'),
+    s: 'Feels well. Evenings with his wife are the best part of the day; says work is heavy this quarter. No chest pain, no breathlessness on stairs.',
+    o: 'BP 127/80. LDL-C 104 mg/dL (from 118), ApoB 91 mg/dL, HbA1c 5.6 %, Vitamin D 29 ng/mL. On-site Joycation measure.',
+    a: 'Lipids improving on atorvastatin 10 mg; blood pressure at target on telmisartan 40 mg. Vitamin D nearly in range.',
+    p: 'Continue current medicines. Finish the cholecalciferol course. Repeat lipid panel + ApoB with the Day 90 re-measure.',
+  }],
+  m_0203: [{
+    id: 'soap-seed-0203', status: 'signed', author: MEERA.name, specimen: true, amendments: [],
+    createdMs: parseIst('2027-01-12 11:00'), savedMs: parseIst('2027-01-12 11:15'), signedMs: parseIst('2027-01-12 11:20'),
+    s: 'Mild tiredness in the afternoons. No palpitations. Outside physician started spironolactone this month.',
+    o: 'Serum potassium 4.9 mmol/L, creatinine 1.0 mg/dL, eGFR 76. BP 134/84.',
+    a: 'Potassium rising on ramipril with spironolactone; renal function drifting down.',
+    p: 'Repeat electrolytes in two weeks. Speak with the outside physician about spironolactone. Low-potassium food note sent.',
+  }],
+}
+
+function SoapNotes({ memberId, first, canAct, log, now, labs }: { memberId: string; first: string; canAct: boolean; log: Log; now: number; labs: { name: string; unit: string; series: (number | string)[]; flag?: 'H' | 'L' }[] }) {
+  const work = recordOf(useClinicalState(), memberId)
+  const notes = work.soap ?? SOAP_SEED[memberId] ?? []
+  const setNotes = (f: (n: SoapNote[]) => SoapNote[]) => clinical.updateRecord(memberId, (w) => ({ ...w, soap: f(w.soap ?? SOAP_SEED[memberId] ?? []) }))
+  const draft = notes.find((n) => n.status === 'draft')
+  const signed = notes.filter((n) => n.status === 'signed').sort((a, b) => (b.signedMs ?? 0) - (a.signedMs ?? 0))
+
+  const [editing, setEditing] = useState(!!draft)
+  const [form, setForm] = useState<SoapFields>(draft ? { s: draft.s, o: draft.o, a: draft.a, p: draft.p } : EMPTY_SOAP)
+  const [attest, setAttest] = useState(false)
+  const [err, setErr] = useState('')
+  const [notice, setNotice] = useState<string | null>(null)
+  const [amending, setAmending] = useState<string | null>(null)
+  const [amReason, setAmReason] = useState('')
+  const [amText, setAmText] = useState('')
+  const [amErr, setAmErr] = useState('')
+  const at = (ms: number) => fmtOpened(stampOf(ms))
+
+  const startNew = () => { setForm(EMPTY_SOAP); setEditing(true); setAttest(false); setErr(''); setNotice(null) }
+  const upsert = (status: SoapNote['status']) => {
+    const id = draft?.id ?? `soap-${now.toString(36)}`
+    const note: SoapNote = { id, status, ...form, author: MEERA.name, createdMs: draft?.createdMs ?? now, savedMs: now, amendments: [], ...(status === 'signed' ? { signedMs: now } : {}) }
+    setNotes((ns) => (ns.some((n) => n.id === id) ? ns.map((n) => (n.id === id ? note : n)) : [note, ...ns]))
+  }
+  const saveDraft = () => {
+    if (!canAct) return
+    if (!Object.values(form).some((v) => v.trim())) return setErr('Write at least one part before saving a draft.')
+    upsert('draft')
+    log({ what: draft ? 'Updated a SOAP note draft' : 'Started a SOAP note draft', purpose: 'Clinical documentation · SOAP', memberId })
+    setErr('')
+    setNotice(`Draft saved at ${fmtClock(now)}. A draft stays in this portal and is not part of ${first}’s record until you sign it.`)
+  }
+  const sign = () => {
+    if (!canAct) return
+    const missing = SOAP_PARTS.filter((x) => form[x.key].trim().length < 5).map((x) => x.label)
+    if (missing.length) return setErr(`Complete every part before signing: ${missing.join(', ')}.`)
+    if (!attest) return setErr('Confirm the note is accurate and complete to sign it.')
+    upsert('signed')
+    log({ what: 'Signed a SOAP note', purpose: 'Clinical documentation · SOAP', memberId })
+    setEditing(false); setForm(EMPTY_SOAP); setAttest(false); setErr('')
+    setNotice(`SOAP note signed by ${MEERA.name} at ${fmtClock(now)}. It is now part of ${first}’s clinical record; it can be amended, never edited.`)
+  }
+  const discard = () => {
+    if (!canAct) return
+    if (draft) {
+      setNotes((ns) => ns.filter((n) => n.id !== draft.id))
+      log({ what: 'Discarded a SOAP note draft · never part of the record', purpose: 'Clinical documentation · SOAP', memberId })
+    }
+    setEditing(false); setForm(EMPTY_SOAP); setAttest(false); setErr(''); setNotice(draft ? 'Draft discarded.' : null)
+  }
+  const insertResults = () => {
+    const latest = labs.map((l) => `${l.name} ${l.series[l.series.length - 1]} ${l.unit}${l.flag ? ` (${l.flag})` : ''}`).join(', ')
+    setForm((f) => ({ ...f, o: f.o.trim() ? `${f.o.trim()} ${latest}.` : `${latest}.` }))
+  }
+  const amend = (n: SoapNote) => {
+    if (!canAct) return
+    if (!amReason) return setAmErr('Choose why you are amending.')
+    if (amText.trim().length < 10) return setAmErr('Write the amendment in at least 10 characters.')
+    setNotes((ns) => ns.map((x) => (x.id === n.id ? { ...x, amendments: [...x.amendments, { id: `am-${now.toString(36)}`, ms: now, by: MEERA.name, reason: amReason, text: amText.trim() }] } : x)))
+    log({ what: `Amended the SOAP note signed ${at(n.signedMs ?? n.savedMs)} · ${amReason.toLowerCase()}`, purpose: 'Clinical documentation · SOAP', memberId })
+    setAmending(null); setAmReason(''); setAmText(''); setAmErr('')
+    setNotice(`Amendment signed by ${MEERA.name} at ${fmtClock(now)}. The original note stays as it was, with the amendment beside it.`)
+  }
+
+  return (
+    <Card className="min-w-0">
+      <CardHead
+        eyebrow={<>SOAP notes · {first}</>}
+        title="Draft, sign, amend"
+        aside={!editing && <Button size="sm" variant="secondary" disabled={!canAct} onClick={startNew}><FilePen size={14} aria-hidden /> {draft ? 'Continue the draft' : 'New SOAP note'}</Button>}
+      />
+      {notice && <p role="status" className="mb-4 flex items-start justify-between gap-3 rounded-lg bg-paper-sunk px-4 py-2.5 text-[14px] text-ink"><span className="flex items-start gap-2"><Check size={15} className="mt-0.5 shrink-0" aria-hidden />{notice}</span><button onClick={() => setNotice(null)} className="shrink-0 text-[13px] text-ink-3 hover:underline focus-ring">Dismiss</button></p>}
+
+      {editing && (
+        <form onSubmit={(e) => { e.preventDefault(); sign() }} noValidate className="mb-6 space-y-4 rounded-lg border border-ink p-4">
+          <p className="eyebrow text-ink-3">{draft ? <>Draft · saved <span className="num">{at(draft.savedMs)}</span></> : 'New note · not saved yet'}</p>
+          {SOAP_PARTS.map((x) => (
+            <div key={x.key}>
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <label htmlFor={`soap-${x.key}`} className={labelCls}><span className="num mr-1.5">{x.key.toUpperCase()}</span>{x.label}</label>
+                {x.key === 'o' && <button type="button" disabled={!canAct} onClick={insertResults} className="text-[13px] text-ink underline underline-offset-4 focus-ring disabled:opacity-50">Insert latest results</button>}
+              </div>
+              <textarea id={`soap-${x.key}`} rows={x.key === 'p' ? 3 : 2} className={areaCls} value={form[x.key]} disabled={!canAct} onChange={(e) => { setForm((f) => ({ ...f, [x.key]: e.target.value })); setErr('') }} placeholder={x.hint} />
+            </div>
+          ))}
+          <label className="flex items-start gap-3 text-[15px] text-ink">
+            <input type="checkbox" checked={attest} disabled={!canAct} onChange={(e) => { setAttest(e.target.checked); setErr('') }} className="mt-1 h-4 w-4 accent-[color:var(--ink)]" />
+            This note is accurate and complete. Once signed it cannot be edited, only amended.
+          </label>
+          {err && <p className="text-[13px] text-error" role="alert">{err}</p>}
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="ghost" disabled={!canAct} onClick={discard}>{draft ? 'Discard draft' : 'Cancel'}</Button>
+            <Button variant="secondary" disabled={!canAct} onClick={saveDraft}>Save draft</Button>
+            <Button variant="ink" type="submit" disabled={!canAct}><FileSignature size={15} aria-hidden /> Sign note</Button>
+          </div>
+        </form>
+      )}
+
+      {!editing && draft && (
+        <p className="mb-4 rounded-lg border border-dashed border-line-strong px-4 py-3 text-[14px] text-ink-2">A draft saved <span className="num">{at(draft.savedMs)}</span> is waiting. Continue it to sign.</p>
+      )}
+
+      {signed.length === 0 ? (
+        <p className="text-[15px] text-ink-3">No signed notes for {first} yet.</p>
+      ) : (
+        <ul className="space-y-4" aria-label={`Signed SOAP notes for ${first}`}>
+          {signed.map((n) => (
+            <li key={n.id} className="rounded-lg border border-line p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Pill tone="ink"><FileSignature size={12} aria-hidden /> Signed · {n.author} · <span className="num">{at(n.signedMs ?? n.savedMs)}</span></Pill>
+                {n.specimen && <SpecimenTag />}
+              </div>
+              <dl className="mt-3 grid gap-x-4 gap-y-2 text-[15px] sm:grid-cols-[110px_1fr]">
+                {SOAP_PARTS.map((x) => (
+                  <div key={x.key} className="contents">
+                    <dt className="eyebrow pt-1 text-ink-3"><span className="num mr-1">{x.key.toUpperCase()}</span>{x.label}</dt>
+                    <dd className="text-ink">{n[x.key]}</dd>
+                  </div>
+                ))}
+              </dl>
+              {n.amendments.length > 0 && (
+                <ul className="mt-3 space-y-2 border-t border-line pt-3">
+                  {n.amendments.map((a) => (
+                    <li key={a.id} className="text-[14px]">
+                      <p className="text-[13px] text-ink-3">Amendment · <span className="num">{at(a.ms)}</span> · {a.by} · {a.reason}</p>
+                      <p className="text-ink">{a.text}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {amending === n.id ? (
+                <form onSubmit={(e) => { e.preventDefault(); amend(n) }} noValidate className="mt-3 space-y-3 rounded-lg bg-paper-sunk p-3">
+                  <div>
+                    <label htmlFor={`am-r-${n.id}`} className={labelCls}>Reason</label>
+                    <select id={`am-r-${n.id}`} className={fieldCls} value={amReason} onChange={(e) => { setAmReason(e.target.value); setAmErr('') }}>
+                      <option value="">Choose…</option>
+                      {AMEND_REASONS.map((r) => <option key={r}>{r}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor={`am-t-${n.id}`} className={labelCls}>Amendment</label>
+                    <textarea id={`am-t-${n.id}`} rows={2} className={areaCls} value={amText} onChange={(e) => { setAmText(e.target.value); setAmErr('') }} placeholder="What changes, and why. The original stays as written." />
+                  </div>
+                  {amErr && <p className="text-[13px] text-error" role="alert">{amErr}</p>}
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => { setAmending(null); setAmErr('') }}>Cancel</Button>
+                    <Button size="sm" variant="ink" type="submit" disabled={!canAct}><FileSignature size={14} aria-hidden /> Sign amendment</Button>
+                  </div>
+                </form>
+              ) : (
+                <Button size="sm" variant="link" className="mt-3 text-[14px]" disabled={!canAct} onClick={() => { setAmending(n.id); setAmReason(''); setAmText(''); setAmErr('') }}>Amend</Button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-4 text-[13px] text-ink-3">Drafts never leave this portal. A signed note joins the clinical record; each amendment is signed, dated and kept beside the original.</p>
+    </Card>
   )
 }
 

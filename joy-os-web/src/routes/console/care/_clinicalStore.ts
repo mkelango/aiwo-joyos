@@ -15,7 +15,25 @@ export type MdActive = { version: string; signedOn: string; signers: string[]; h
 export type MdHistory = (typeof MD_CONFIG.history)[number]
 export type Sent = { rx: string; drug: string; dose: string; freq: string; sentAt: number; reason?: string }
 export type Order = { test: string; when: string; status: string }
-export type RecordWork = { sent: Sent[]; adjusted: Record<string, string>; orders: Order[] }
+/** A signed SOAP note is never edited: it is amended, each amendment signed and kept beside it. */
+export type SoapAmendment = { id: string; ms: number; by: string; reason: string; text: string }
+export type SoapNote = {
+  id: string
+  status: 'draft' | 'signed'
+  s: string
+  o: string
+  a: string
+  p: string
+  author: string
+  createdMs: number
+  savedMs: number
+  signedMs?: number
+  amendments: SoapAmendment[]
+  specimen?: boolean
+}
+export type RecordWork = { sent: Sent[]; adjusted: Record<string, string>; orders: Order[]; soap?: SoapNote[] }
+/** The clinician's work on the member's own Clinical-grade re-measure (the record itself lives with the member). */
+export type RemeasureWork = { notes: string[]; returned: { reason: string; note: string; at: string } | null }
 /**
  * One line of the clinical audit: who, in what role, did or read what, on whose record, for
  * what purpose, and when (console clock). Append-only: a reset of the specimen keeps it.
@@ -44,6 +62,7 @@ type State = {
   records: Record<string, RecordWork>
   rxSeq: number
   audit: ClinicalAudit[]
+  remeasure: RemeasureWork
 }
 
 const KEY = 'joyos:care:clinical:v1'
@@ -66,6 +85,7 @@ const seed = (): State => ({
   records: {},
   rxSeq: 41,
   audit: [],
+  remeasure: { notes: [], returned: null },
 })
 
 function load(): State {
@@ -84,6 +104,7 @@ function load(): State {
       records: p.records && typeof p.records === 'object' ? p.records : {},
       rxSeq: typeof p.rxSeq === 'number' ? p.rxSeq : fresh.rxSeq,
       audit: Array.isArray(p.audit) ? p.audit : [],
+      remeasure: p.remeasure && Array.isArray(p.remeasure.notes) ? p.remeasure : fresh.remeasure,
     }
   } catch {
     return fresh
@@ -160,6 +181,9 @@ export const clinical = {
   },
   updateRecord(memberId: string, f: (w: RecordWork) => RecordWork) {
     emit({ ...state, records: { ...state.records, [memberId]: f(recordOf(state, memberId)) } })
+  },
+  setRemeasure(w: RemeasureWork) {
+    emit({ ...state, remeasure: w })
   },
   /** The next e-Rx number for this session. */
   nextRx() {

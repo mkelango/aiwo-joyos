@@ -320,6 +320,15 @@ export const CIRCLE_START: CirclePerson[] = [
 
 export const TWO_AM_START = ['Kavya', 'Ravi', 'Suresh', 'Dr Meera Iyer']
 
+/** The phone's own address book, as the simulated on-device picker shows it (Arch p.24:
+ *  contacts never leave the phone; a circle keeps only the name the member picks or types). */
+export const PHONE_CONTACTS = [
+  'Anand Krishnan', 'Bhavna Shah', 'Deepa Menon', 'Farah Khan', 'Geetha Raman', 'Harish Kumar',
+  'Ishaan Mehta', 'Joseph Thomas', 'Kavya Rao', 'Lakshmi Iyer', 'Meenakshi Sundaram', 'Mohan Das',
+  'Nandini Rao', 'Padma Srinivasan', 'Pradeep Nair', 'Rekha Pillai', 'Sanjay Rao', 'Thomas Mathew',
+  'Usha Devi', 'Vikram Shetty', 'Zainab Ali',
+] as const
+
 export const STATE_OF_US = [
   { minutes: 5, title: 'Appreciations', prompt: 'Each of you names three things the other did this week that you noticed and liked. Specific, not general.' },
   { minutes: 5, title: 'What is working', prompt: 'One thing about the week, the house or the two of you that went well. Say why it worked.' },

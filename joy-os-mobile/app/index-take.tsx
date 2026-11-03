@@ -1,4 +1,4 @@
-import { router } from 'expo-router'
+import { router, useLocalSearchParams } from 'expo-router'
 import { useMemo, useState } from 'react'
 import { Linking, Pressable, View } from 'react-native'
 import {
@@ -19,8 +19,15 @@ import {
   Serif,
   TermChip,
   Title,
+  Toggle,
+  fmtDate,
 } from '@/components'
 import { useApp } from '@/lib/store'
+import { playSound } from '@/lib/sound'
+import { REMEASURE_DATES, SIGN_OFF_MS, effectiveAnswers, useClinicalRemeasure, useSubmittedIndex, type Amendment } from '@/lib/indexRecord'
+import { isMinor, onboardingAccountStore } from '@/lib/onboardingAccount'
+import { useStore } from '@/screens/b/bStore'
+import { BIOMARKERS } from '@/screens/a/spacesData'
 import { ALL_ITEMS, SITTINGS, scaleOf, type FlatItem } from '@/shared/indexItems'
 import { scoreAnswers, toMeasured, type MeasuredIndex, type SittingResult } from '@/shared/indexScoring'
 import { bandFor } from '@/shared/indexEngine'
@@ -41,6 +48,16 @@ import { txFor } from '@/screens/a/i18n'
 // the PHQ-4 items, and a review before sending. The full bank (62 items, every instrument
 // complete) is administered and scored on the phone by the same engine as the result screen;
 // the result is kept as useLocal('measuredIndex') for Index result and Practice.
+//
+// Correct right (Architecture, member rights): answers can be changed freely before sending
+// (the review); after scoring, ?amend=1 opens the answers as sent and lets the member add a
+// correction. Corrections are append-only and dated; the Index is rescored with them.
+// Clinical grade (?grade=clinical, the Day-90 re-measure opened by the Day-76 invite): the same
+// two sittings, then the lab results, then it waits for the physician's sign-off (no number is
+// shown until she signs; see Day 90). A member under 18 is never scored (minors gate).
+
+// The lab results that join Body in Clinical grade (specimen panel, marker names as written).
+const CLINICAL_LABS = ['HbA1c', 'LDL cholesterol', 'ApoB', 'hs-CRP', 'Vitamin D (25-OH)']
 
 type Step =
   | { kind: 'intro' }
@@ -50,6 +67,10 @@ type Step =
   | { kind: 'review' }
   | { kind: 'paused' }
   | { kind: 'done' }
+  | { kind: 'labs' }
+  | { kind: 'sentClinical' }
+  | { kind: 'amendList' }
+  | { kind: 'amendItem'; i: number }
 type Flat = FlatItem
 interface Saved {
   answers: Record<string, number>
@@ -67,6 +88,14 @@ export default memberOnly(TakeIndex)
 function TakeIndex() {
   const { c, space } = useTheme()
   const { offline, setCrisisOpen, queueSync } = useApp()
+  const params = useLocalSearchParams<{ amend?: string; grade?: string }>()
+  const clinical = params.grade === 'clinical'
+  const [account] = useStore(onboardingAccountStore)
+  const [submitted, setSubmitted] = useSubmittedIndex()
+  const [rm, setRm] = useClinicalRemeasure()
+  const [useLabs, setUseLabs] = useState(true)
+  const [amendPick, setAmendPick] = useState<number | null>(null)
+  const [amendToast, setAmendToast] = useState<string | null>(null)
   const tt = useTermText()
   const [, setMeasured] = useLocal<MeasuredIndex>('measuredIndex', null)
   const [result, setResult] = useState<SittingResult | null>(null)
@@ -78,8 +107,9 @@ function TakeIndex() {
   const items = useMemo<Flat[]>(() => ALL_ITEMS, [])
   const totalItems = SITTINGS.reduce((a, s) => a + s.total, 0)
   const firstOf2 = items.findIndex((x) => x.sitting === 2)
-  const [step, setStep] = useState<Step>({ kind: 'intro' })
-  const [saved, setSaved, ready] = useLocal<Saved>('indexTake', EMPTY)
+  const [step, setStep] = useState<Step>(params.amend === '1' ? { kind: 'amendList' } : { kind: 'intro' })
+  // The Clinical-grade re-measure keeps its own draft, so an Index-grade one is not disturbed.
+  const [saved, setSaved, ready] = useLocal<Saved>(clinical ? 'indexTakeClinical' : 'indexTake', EMPTY)
   const [fromReview, setFromReview] = useState(false)
   const [sentCare, setSentCare] = useState(false)
   const { answers, seen } = saved
@@ -136,6 +166,295 @@ function TakeIndex() {
     </Card>
   )
 
+  /** A correction's date and time on this phone's clock. */
+  const localStamp = (iso: string) => {
+    const d = new Date(iso)
+    const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    return `${fmtDate(ymd)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  }
+  const labelFor = (f: Flat, v: number | undefined) => scaleOf(f.block, f.item).find((o) => o.value === v)?.label ?? t('notAnswered')
+  const itemText = (f: Flat) => (f.item.stem ? `${f.item.stem.replace('…', '')} ${f.item.text.replace('…', '')}` : f.item.text)
+
+  // ── Minors gate: no scoring under 18 ─────────────────────────────────────
+  if (isMinor(account)) {
+    return (
+      <Screen key="minor">
+        <ScreenHeader
+          back
+          eyebrow={t('minorEyebrow')}
+          title={
+            <>
+              {t('minorA')}<Serif>{t('minorSerif')}</Serif>{t('minorB')}
+            </>
+          }
+          lead={t('minorLead')}
+        />
+        <DaybreakButton onPress={() => router.replace('/')}>{tc('backToday')}</DaybreakButton>
+      </Screen>
+    )
+  }
+
+  // ── Clinical grade already sent: it waits for (or has) the physician's signature ──
+  if (clinical && rm.stage !== 'invite' && step.kind !== 'sentClinical') {
+    return (
+      <Screen key="clinical-sent">
+        <ScreenHeader back eyebrow={t('csEyebrow')} title={t('clinEyebrow')} lead={t('csAlready')} />
+        <DaybreakButton onPress={() => router.replace('/day-90')}>{t('csWhere')}</DaybreakButton>
+      </Screen>
+    )
+  }
+
+  // ── Correct right: the answers as sent, with append-only corrections ─────
+  if (step.kind === 'amendList' || step.kind === 'amendItem') {
+    if (!submitted) {
+      return (
+        <Screen key="amend-none">
+          <ScreenHeader back eyebrow={t('amEyebrow')} title={t('amEyebrow')} lead={t('amNone')} />
+          <DaybreakButton onPress={() => setStep({ kind: 'intro' })}>{t('amTake')}</DaybreakButton>
+        </Screen>
+      )
+    }
+    const eff = effectiveAnswers(submitted)
+    const corrected = new Set(submitted.amendments.map((a) => a.itemId))
+    if (step.kind === 'amendItem') {
+      const f = items[step.i]
+      const now = eff[f.item.id]
+      const pick = amendPick ?? now
+      const addCorrection = () => {
+        if (pick === undefined || pick === now) return
+        const a: Amendment = { id: `am${Date.now()}`, itemId: f.item.id, from: now, to: pick, at: new Date().toISOString() }
+        const next = { ...submitted, amendments: [...submitted.amendments, a] }
+        setSubmitted(next)
+        // Rescored with every correction applied; the sent answers stay as they were.
+        const r = scoreAnswers(effectiveAnswers(next))
+        setMeasured(toMeasured(r, submitted.at))
+        queueSync({ id: `index-amend-${a.id}`, kind: 'index' })
+        playSound('complete')
+        setAmendToast(t('amAdded', { v: r.engine.value }))
+        setAmendPick(null)
+        setStep({ kind: 'amendList' })
+      }
+      return (
+        <Screen key={`amend-${step.i}`}>
+          <Pressable
+            onPress={() => {
+              setAmendPick(null)
+              setStep({ kind: 'amendList' })
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t('amBackList')}
+            hitSlop={8}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44, alignSelf: 'flex-start' }}
+          >
+            <Icon name="chevron-left" size={18} color={c.ink3} />
+            <Eyebrow>{t('amBackList')}</Eyebrow>
+          </Pressable>
+          <View style={{ gap: space.s2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1, flexWrap: 'wrap' }}>
+              <TermChip term={f.block.term} withSpace={termByKey(f.block.term).name !== termByKey(f.block.term).space} />
+              <Eyebrow>{f.block.code}</Eyebrow>
+            </View>
+            {note}
+            <Meta>{f.item.stem ?? f.block.timeframe}</Meta>
+            <Title size={26} accessibilityRole="header">
+              {f.item.text}
+            </Title>
+            <Card tone="sunk" padding={16} style={{ gap: 4 }}>
+              <Meta tone="ink">{t('amAsSent', { label: labelFor(f, submitted.answers[f.item.id]) })}</Meta>
+              {corrected.has(f.item.id) ? <Meta tone="ink">{t('amNow', { label: labelFor(f, now) })}</Meta> : null}
+            </Card>
+            <Meta>{t('amPickNew')}</Meta>
+          </View>
+          <View accessibilityRole="radiogroup" accessibilityLabel={f.item.text} style={{ gap: space.s1 }}>
+            {scaleOf(f.block, f.item).map((o) => (
+              <OptionRow key={o.value} label={o.label} selected={pick === o.value} onPress={() => setAmendPick(o.value)} />
+            ))}
+          </View>
+          <View style={{ gap: space.s1 }}>
+            <DaybreakButton onPress={addCorrection} disabled={pick === undefined || pick === now} accessibilityHint={t('amAddHint')}>
+              {t('amAdd')}
+            </DaybreakButton>
+            <Meta size={14} tone="ink3" align="center">
+              {t('amNote')}
+            </Meta>
+          </View>
+        </Screen>
+      )
+    }
+    return (
+      <Screen key="amend-list">
+        <ScreenHeader
+          back
+          eyebrow={t('amEyebrow')}
+          title={
+            <>
+              {t('amTitleA')}<Serif>{t('amTitleSerif')}</Serif>{t('amTitleB')}
+            </>
+          }
+          lead={t('amLead', { date: fmtDate(submitted.at) })}
+        />
+        {amendToast ? (
+          <Card tone="soft" padding={16} style={{ flexDirection: 'row', gap: 10 }}>
+            <Icon name="check" size={18} color={c.ink} />
+            <Body style={{ flex: 1 }} accessibilityLiveRegion="polite">
+              {amendToast}
+            </Body>
+          </Card>
+        ) : null}
+        <Card tone="sunk" style={{ gap: space.s1 }}>
+          <Eyebrow {...H2}>{t('amLog', { n: submitted.amendments.length })}</Eyebrow>
+          {submitted.amendments.length === 0 ? (
+            <Meta>{t('amLogNone')}</Meta>
+          ) : (
+            [...submitted.amendments].reverse().map((a) => {
+              const f = items.find((x) => x.item.id === a.itemId)
+              if (!f) return null
+              return (
+                <View key={a.id} style={{ gap: 2, paddingVertical: 4 }}>
+                  <Meta size={14} tone="ink3">
+                    {`${f.block.code} · ${localStamp(a.at)}`}
+                  </Meta>
+                  <Body>{itemText(f)}</Body>
+                  <Meta tone="ink">{t('amLogRow', { from: labelFor(f, a.from), to: labelFor(f, a.to) })}</Meta>
+                </View>
+              )
+            })
+          )}
+          <Meta size={14} tone="ink3">
+            {t('amNote')}
+          </Meta>
+        </Card>
+        {note}
+        {SITTINGS.map((st) => (
+          <Card key={st.n} tone="raised" style={{ gap: space.s1 }}>
+            <Eyebrow {...H2}>{t('sittingTitle', { n: st.n, title: ax(st.title) })}</Eyebrow>
+            {items
+              .map((f, idx) => ({ f, idx }))
+              .filter(({ f }) => f.sitting === st.n)
+              .map(({ f, idx }, j) => {
+                const label = labelFor(f, eff[f.item.id])
+                return (
+                  <View key={f.item.id}>
+                    {j > 0 ? <Divider /> : null}
+                    <Pressable
+                      onPress={() => {
+                        setAmendPick(null)
+                        setAmendToast(null)
+                        setStep({ kind: 'amendItem', i: idx })
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('amRowA11y', { text: f.item.text, label })}
+                      style={({ pressed }) => ({ paddingVertical: 12, gap: 4, opacity: pressed ? 0.7 : 1 })}
+                    >
+                      <Meta size={14} tone="ink3">
+                        {corrected.has(f.item.id) ? `${f.block.code} · ${t('amCorrected')}` : f.block.code}
+                      </Meta>
+                      <Body>{itemText(f)}</Body>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <Meta tone="ink" weight="semibold">
+                          {label}
+                        </Meta>
+                        <Meta size={14} tone="ink2" style={{ textDecorationLine: 'underline' }}>
+                          {t('amCorrect')}
+                        </Meta>
+                      </View>
+                    </Pressable>
+                  </View>
+                )
+              })}
+          </Card>
+        ))}
+        <DaybreakButton onPress={() => router.replace('/index-result')}>{t('amDone')}</DaybreakButton>
+      </Screen>
+    )
+  }
+
+  // ── Clinical grade: the lab results, then send for sign-off ──────────────
+  if (step.kind === 'labs') {
+    const labs = BIOMARKERS.filter((m) => CLINICAL_LABS.includes(m.name))
+    const send = () => {
+      const r = scoreAnswers(answers)
+      setRm({
+        stage: 'awaiting',
+        submittedAt: new Date().toISOString(),
+        signDueAt: Date.now() + SIGN_OFF_MS,
+        result: toMeasured(r, REMEASURE_DATES.day90),
+        labs: useLabs ? labs.map((m) => m.name) : [],
+      })
+      queueSync({ id: 'index-clinical-day90', kind: 'index' })
+      setSentCare(r.phqFlag || phqHigh)
+      playSound('complete')
+      setSaved(EMPTY)
+      setStep({ kind: 'sentClinical' })
+    }
+    return (
+      <Screen key={stepKey}>
+        <ScreenHeader
+          eyebrow={t('labsEyebrow')}
+          title={
+            <>
+              {t('labsA')}<Serif>{t('labsSerif')}</Serif>{t('labsB')}
+            </>
+          }
+          lead={t('labsLead', { date: fmtDate(REMEASURE_DATES.labsDrawn) })}
+        />
+        <Card tone="raised" style={{ gap: space.s1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+            <Eyebrow {...H2}>{t('labsPanel')}</Eyebrow>
+            <TermChip term="H" />
+          </View>
+          {labs.map((m, j) => (
+            <View key={m.name}>
+              {j > 0 ? <Divider /> : null}
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, paddingVertical: 10 }} accessible accessibilityLabel={`${m.name}: ${m.value} ${m.unit}, ${t('labsRange', { r: m.range })}`}>
+                <Body style={{ flex: 1 }}>{m.name}</Body>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Mono size={17} tone="ink">{`${m.value} ${m.unit}`}</Mono>
+                  <Meta size={13} tone="ink3">
+                    {t('labsRange', { r: m.range })}
+                  </Meta>
+                </View>
+              </View>
+            </View>
+          ))}
+        </Card>
+        <Toggle checked={useLabs} onChange={setUseLabs} label={t('labsUse')} description={t('labsUseD')} />
+        <View style={{ gap: space.s1 }}>
+          <DaybreakButton onPress={send} accessibilityHint={t('labsSendHint')}>
+            {t('labsSend')}
+          </DaybreakButton>
+          <Button variant="ghost" onPress={() => setStep({ kind: 'review' })} style={{ alignSelf: 'center' }}>
+            {t('review')}
+          </Button>
+        </View>
+      </Screen>
+    )
+  }
+
+  if (step.kind === 'sentClinical') {
+    return (
+      <Screen key={stepKey}>
+        <ScreenHeader
+          eyebrow={t('csEyebrow')}
+          title={
+            <>
+              {t('csA')}<Serif>{t('csSerif')}</Serif>{t('csB')}
+            </>
+          }
+          lead={t('csLead')}
+        />
+        {offline ? <Meta tone="ink3">{t('queuedOffline')}</Meta> : null}
+        {sentCare ? careCard : null}
+        <View style={{ gap: space.s1 }}>
+          <DaybreakButton onPress={() => router.replace('/day-90')}>{t('csWhere')}</DaybreakButton>
+          <Button variant="ghost" onPress={() => router.replace('/')} style={{ alignSelf: 'center' }}>
+            {tc('backToday')}
+          </Button>
+        </View>
+      </Screen>
+    )
+  }
+
   // ── Intro ────────────────────────────────────────────────────────────────
   if (step.kind === 'intro') {
     const resuming = ready && answered > 0
@@ -143,14 +462,25 @@ function TakeIndex() {
       <Screen key={stepKey}>
         <ScreenHeader
           back
-          eyebrow={t('introEyebrow')}
+          eyebrow={clinical ? t('clinEyebrow') : t('introEyebrow')}
           title={
-            <>
-              {t('introA')}<Serif>{t('introSerif')}</Serif>{t('introB')}
-            </>
+            clinical ? (
+              <>
+                {t('clinA')}<Serif>{t('clinSerif')}</Serif>{t('clinB')}
+              </>
+            ) : (
+              <>
+                {t('introA')}<Serif>{t('introSerif')}</Serif>{t('introB')}
+              </>
+            )
           }
-          lead={t('introLead')}
+          lead={clinical ? t('clinLead') : t('introLead')}
         />
+        {clinical ? (
+          <View style={{ borderWidth: 1, borderStyle: 'dashed', borderColor: c.lineStrong, borderRadius: 12, padding: 12 }}>
+            <Meta size={14}>{t('clinSpecimen')}</Meta>
+          </View>
+        ) : null}
         {resuming ? (
           <Card tone="soft" style={{ gap: space.s1 }} >
             <Eyebrow tone="daybreak">{t('kept')}</Eyebrow>
@@ -468,20 +798,25 @@ function TakeIndex() {
         <View style={{ gap: space.s1 }}>
           <DaybreakButton
             onPress={() => {
+              // Clinical grade: the labs come next, then it goes for sign-off unscored to the member.
+              if (clinical) return setStep({ kind: 'labs' })
               // Scored here by the engine and kept on the phone: the newest entry on Index result.
               const r = scoreAnswers(answers)
               setMeasured(toMeasured(r, SPACE_TODAY))
+              // The answers as sent, frozen with the score: corrections are appended later.
+              setSubmitted({ at: SPACE_TODAY, answers, amendments: [] })
               setResult(r)
               // Offline: the sitting waits in the sync queue (the app-wide banner counts it).
               queueSync({ id: `index-${SPACE_TODAY}`, kind: 'index' })
               setSentCare(r.phqFlag || phqHigh)
+              playSound('complete')
               setStep({ kind: 'done' })
               setSaved(EMPTY)
             }}
             disabled={answered < items.length}
-            accessibilityHint={t('sendHint')}
+            accessibilityHint={clinical ? undefined : t('sendHint')}
           >
-            {t('send')}
+            {clinical ? t('clinSendReview') : t('send')}
           </DaybreakButton>
           {answered < items.length ? (
             <Meta tone="ink3" align="center">{t('stillTo', { n: items.length - answered })}</Meta>

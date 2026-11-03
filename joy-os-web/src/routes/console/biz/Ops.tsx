@@ -5,14 +5,16 @@ import { useRef, useState } from 'react'
 import { Bar, BarChart, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { DaybreakButton, Eyebrow, SpecimenTag, TermChip } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill, Sheet, Tabs, Toggle } from '@/components/ui'
-import { AI_TOOLS, AUDIT, CELLS, COSTS, HUMAN_REVIEW, JIT_REQUESTS, RED_TEAM, RELEASE_FLAGS, RIGHTS_JOBS, RIGHTS_STORES, SIGNAL_SOURCES, SLOS, TENANTS, TRACES, TRACE_GUARD, TRACE_REVIEWERS, type Trace, type TraceFinding, type TraceGuard } from './_data'
-import { AccessNote, CardHead, ChartLead, Field, Kpi, Legend, Meter, Row, ScrollTabs, StatusTag, Swatch, areaCls, fieldCls, pct, tabPanelProps, tick, tipLabel, tipStyle, useTabParam, type StatusTone } from './_parts'
+import { AI_TOOLS, AUDIT, CELLS, CHECK_PHONE_KEY, COSTS, JIT_REQUESTS, RED_TEAM, RELEASE_FLAGS, RIGHTS_JOBS, RIGHTS_STORES, SIGNAL_SOURCES, SLOS, TENANTS, TRACES, TRACE_GUARD, TRACE_REVIEWERS, type Trace, type TraceFinding, type TraceGuard } from './_data'
+import { AccessNote, CardHead, ChartLead, Field, Kpi, Legend, Meter, Row, ScrollTabs, StatusTag, Swatch, areaCls, fieldCls, pct, readStored, tabPanelProps, tick, tipLabel, tipStyle, useTabParam, writeStored, type StatusTone } from './_parts'
+import { AccessReview, CheckVariantCard, DriftDashboard, LiveSample, OnCall, ToolRegistrySheet, UnusualReads, type Log } from './_opsExtras'
 
 // CONTROL PLANE (Architecture p.20, p.24–27; Memo p.15): flags and kill switches on every AI tool,
 // the evaluation plane, SLOs and error budgets, cost per member per service, tenants and region cells,
-// audit with just-in-time access, signals ingest and rights-request jobs.
+// audit with just-in-time access, unusual-read alerts and quarterly access reviews, signals ingest, rights-request jobs,
+// the on-call rota with escalation, the tool registry, live-sample review and drift dashboards.
 
-const TABS = ['flags', 'evals', 'slos', 'cost', 'cells', 'audit', 'signals', 'rights'] as const
+const TABS = ['flags', 'evals', 'slos', 'oncall', 'cost', 'cells', 'audit', 'signals', 'rights'] as const
 type Tab = (typeof TABS)[number]
 const EVAL_BAR = 0.9
 const COST_TARGET = 60
@@ -59,7 +61,8 @@ export default function Ops() {
   const [jitOpen, setJitOpen] = useState(false)
   const [changes, setChanges] = useState<Change[]>([])
   const [tools, setTools] = useState<Record<string, ToolState>>(() => Object.fromEntries(AI_TOOLS.map((t) => [t.key, { on: t.on, killedFor: [], signoff: 'none' as const }])))
-  const [flags, setFlags] = useState<Record<string, boolean>>(() => Object.fromEntries(RELEASE_FLAGS.map((f) => [f.key, f.on])))
+  // The public Check variant is shared with the Check itself through localStorage (default: anonymous).
+  const [flags, setFlags] = useState<Record<string, boolean>>(() => Object.fromEntries(RELEASE_FLAGS.map((f) => [f.key, f.key === 'check_asks_phone' ? readStored<boolean>(CHECK_PHONE_KEY, false) === true : f.on])))
   const [jobs, setJobs] = useState<Job[]>(() => RIGHTS_JOBS.map((r) => ({ ...r, escalated: false, retrying: false, notices: initialNotices(r) })))
   const [evalRun, setEvalRun] = useState<{ state: RunState; at?: string }>({ state: 'idle' })
   const [replay, setReplay] = useState<Record<string, RunState>>({})
@@ -103,6 +106,7 @@ export default function Ops() {
     if (p.kind === 'flag') {
       const f = RELEASE_FLAGS.find((x) => x.key === p.key)!
       setFlags((fs) => ({ ...fs, [p.key]: p.to }))
+      if (p.key === 'check_asks_phone') writeStored(CHECK_PHONE_KEY, p.to)
       log(`${p.key} ${p.to ? 'on' : 'off'} · ${f.scope}`, reason)
     } else if (p.kind === 'signoff') {
       setTools((ts) => ({ ...ts, [p.key]: { ...ts[p.key], signoff: 'requested' } }))
@@ -208,6 +212,7 @@ export default function Ops() {
           { value: 'flags', label: 'Flags & kill switches' },
           { value: 'evals', label: 'Evaluation plane' },
           { value: 'slos', label: 'SLOs & budgets' },
+          { value: 'oncall', label: 'On-call & escalation' },
           { value: 'cost', label: 'Cost' },
           { value: 'cells', label: 'Tenants & cells' },
           { value: 'audit', label: 'Audit & JIT', count: jit.filter((j) => j.status === 'pending').length },
@@ -219,11 +224,12 @@ export default function Ops() {
       <AnimatePresence mode="wait">
         <motion.div key={tab} {...tabPanelProps('ops', tab)} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
           {tab === 'flags' && <Flags tools={tools} flags={flags} changes={changes} ask={ask} />}
-          {tab === 'evals' && <Evals tools={tools} run={evalRun} onRun={runEvals} reviews={traceReviews} onRequestReview={requestTraceReview} />}
+          {tab === 'evals' && <Evals tools={tools} run={evalRun} onRun={runEvals} reviews={traceReviews} onRequestReview={requestTraceReview} log={log} />}
           {tab === 'slos' && <Slos />}
+          {tab === 'oncall' && <OnCall log={log} />}
           {tab === 'cost' && <Cost total={totalCost} costs={costs} offTools={killed} />}
           {tab === 'cells' && <Cells tools={tools} />}
-          {tab === 'audit' && <Audit jit={jit} changes={changes} onDecide={decide} onRevoke={revoke} onWithdraw={withdraw} />}
+          {tab === 'audit' && <Audit jit={jit} changes={changes} onDecide={decide} onRevoke={revoke} onWithdraw={withdraw} log={log} />}
           {tab === 'signals' && <Signals flags={flags} replay={replay} onReplay={runReplay} />}
           {tab === 'rights' && <Rights jobs={jobs} setJobs={setJobs} log={log} stamp={stamp} />}
         </motion.div>
@@ -306,10 +312,11 @@ function ChangeForm({ p, tool, onApply, onCancel }: { p: Pending; tool?: ToolSta
 // ─── Flags & kill switches ───────────────────────────────────────────────
 
 function Flags({ tools, flags, changes, ask }: { tools: Record<string, ToolState>; flags: Record<string, boolean>; changes: Change[]; ask: (kind: Pending['kind'], key: string, to: boolean) => void }) {
+  const [registry, setRegistry] = useState<string | null>(null)
   return (
     <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
       <Card className="lg:col-span-8">
-        <CardHead eyebrow="Per-AI-tool kill switches" title="Typed tools, each one switchable" lead="Switching a tool off falls back to rules-based next actions and sealed copy, for every tenant or just one. Members are never shown an error; they see the plain version." />
+        <CardHead eyebrow="Tool registry · per-AI-tool kill switches" title="Typed tools, each one switchable" lead="Every tool is registered with a JSON schema, its scopes and an owner; open Schema to see them. Switching a tool off falls back to rules-based next actions and sealed copy, for every tenant or just one. Members are never shown an error; they see the plain version." />
         <ul className="divide-y divide-line">
           {AI_TOOLS.map((t) => {
             const st = tools[t.key]
@@ -332,7 +339,7 @@ function Flags({ tools, flags, changes, ask }: { tools: Record<string, ToolState
                     {on && below.length > 0 && <StatusTag tone="watch">Below floor in {below.join(', ')}</StatusTag>}
                   </div>
                   <p className="mt-1 text-[14px] text-ink-2">{t.what}</p>
-                  <p className="mt-0.5 text-[13px] text-ink-3">{t.owner} · eval floor <span className="num">{pct(min)}</span> across {offered.map(([l]) => l).join(', ')} · <span className="num">{t.calls.toLocaleString('en-IN')}</span> calls in 7 days</p>
+                  <p className="mt-0.5 text-[13px] text-ink-3"><button className="underline decoration-line-strong underline-offset-2 hover:text-ink focus-ring" onClick={() => setRegistry(t.key)} aria-label={`Schema and scopes for ${t.key}`}>Schema &amp; scopes</button> · {t.owner} · eval floor <span className="num">{pct(min)}</span> across {offered.map(([l]) => l).join(', ')} · <span className="num">{t.calls.toLocaleString('en-IN')}</span> calls in 7 days</p>
                   {on && below.length > 0 && <p className="mt-1 text-[13px] text-ink-2">{below.map((l) => LANG_NAME[l]).join(' and ')} answers route to physician review until a re-run passes the <span className="num">{pct(EVAL_BAR)}</span> floor.</p>}
                   {on && st.killedFor.length > 0 && <p className="mt-1 text-[13px] text-ink-2">Off for {st.killedFor.map(scopeLabel).join(', ')}. <button className="underline decoration-line-strong underline-offset-2 hover:text-ink focus-ring" onClick={() => ask('tool', t.key, true)}>Restore</button></p>}
                   {signedOff && <p className="mt-1 text-[13px] text-ink-2">Signed by {t.hold}. English can answer once switched on; Tamil and Hindi route to physician review until a re-run passes the <span className="num">{pct(EVAL_BAR)}</span> floor.</p>}
@@ -378,6 +385,7 @@ function Flags({ tools, flags, changes, ask }: { tools: Record<string, ToolState
             })}
           </ul>
         </Card>
+        <CheckVariantCard asksPhone={!!flags.check_asks_phone} onChange={() => ask('flag', 'check_asks_phone', !flags.check_asks_phone)} />
         <Card tone="sunk">
           <Eyebrow>Changes this session</Eyebrow>
           {changes.length === 0 ? (
@@ -391,13 +399,14 @@ function Flags({ tools, flags, changes, ask }: { tools: Record<string, ToolState
           )}
         </Card>
       </div>
+      <ToolRegistrySheet toolKey={registry} onClose={() => setRegistry(null)} />
     </div>
   )
 }
 
 // ─── Evaluation plane ────────────────────────────────────────────────────
 
-function Evals({ tools, run, onRun, reviews, onRequestReview }: { tools: Record<string, ToolState>; run: { state: RunState; at?: string }; onRun: () => void; reviews: Record<string, TraceReview>; onRequestReview: (id: string, reviewer: string, note: string) => void }) {
+function Evals({ tools, run, onRun, reviews, onRequestReview, log }: { tools: Record<string, ToolState>; run: { state: RunState; at?: string }; onRun: () => void; reviews: Record<string, TraceReview>; onRequestReview: (id: string, reviewer: string, note: string) => void; log: Log }) {
   const live = AI_TOOLS.filter((t) => tools[t.key].on)
   const data = live.map((t) => ({ name: t.key, EN: t.langs.EN * 100, TA: t.langs.TA ? t.langs.TA * 100 : null, HI: t.langs.HI ? t.langs.HI * 100 : null }))
   const below = live.flatMap((t) => (Object.entries(t.langs) as [string, number][]).filter(([, v]) => v > 0 && v < EVAL_BAR).map(([l, v]) => ({ tool: t.key, lang: l, v })))
@@ -463,17 +472,8 @@ function Evals({ tools, run, onRun, reviews, onRequestReview }: { tools: Record<
         </ul>
       </Card>
 
-      <Card tone="sunk" className="lg:col-span-5">
-        <Eyebrow>Live sampling · weekly human review</Eyebrow>
-        <p className="mt-3 text-[1.35rem] font-light leading-snug text-ink"><span className="num">{HUMAN_REVIEW.reviewed}</span> of <span className="num">{HUMAN_REVIEW.sampled}</span> sampled outputs read by a person this week.</p>
-        <p className="mt-2 text-[14px] text-ink-2">{HUMAN_REVIEW.reviewers}</p>
-        <ul className="mt-5 space-y-2.5 border-t border-line pt-4">
-          {HUMAN_REVIEW.findings.map((f) => (
-            <li key={f.kind} className="flex items-center justify-between text-[15px]"><span className="text-ink-2">{f.kind}</span><span className="num text-ink">{f.n}</span></li>
-          ))}
-        </ul>
-        <p className="mt-5 text-[14px] text-ink-2">Every output stores model, prompt version, tool, inputs hash and reviewer; open any call in the traces below. No member data trains third-party models.</p>
-      </Card>
+      <LiveSample log={log} />
+      <DriftDashboard tools={tools} log={log} />
 
       <Traces tools={tools} reviews={reviews} onRequestReview={onRequestReview} />
     </div>
@@ -888,7 +888,7 @@ function Cells({ tools }: { tools: Record<string, ToolState> }) {
 
 // ─── Audit & JIT ─────────────────────────────────────────────────────────
 
-function Audit({ jit, changes, onDecide, onRevoke, onWithdraw }: { jit: Jit[]; changes: Change[]; onDecide: (id: string, approve: boolean) => void; onRevoke: (id: string) => void; onWithdraw: (id: string) => void }) {
+function Audit({ jit, changes, onDecide, onRevoke, onWithdraw, log }: { jit: Jit[]; changes: Change[]; onDecide: (id: string, approve: boolean) => void; onRevoke: (id: string) => void; onWithdraw: (id: string) => void; log: Log }) {
   const [verify, setVerify] = useState<'idle' | 'running' | 'ok'>('idle')
   const [role, setRole] = useState<'all' | 'system' | 'people'>('all')
   const rows = AUDIT.filter((a) => role === 'all' || (role === 'system' ? a.role === 'system' : a.role !== 'system'))
@@ -966,6 +966,9 @@ function Audit({ jit, changes, onDecide, onRevoke, onWithdraw }: { jit: Jit[]; c
         </div>
         <p className="mt-3 text-[13px] text-ink-3">Members see their own slice of this trail in the Trust centre.</p>
       </Card>
+
+      <UnusualReads log={log} />
+      <AccessReview log={log} />
     </div>
   )
 }

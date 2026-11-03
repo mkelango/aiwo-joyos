@@ -252,20 +252,20 @@ export type DeviceId = (typeof DEVICES)[number]['id']
 // Step names and footer buttons; the rest of setup reads from OB in _i18n.ts.
 // Translations of the data below (intents, devices, next steps, notes) live in _i18n.ts.
 
-export const ONBOARDING_STEPS = ['Welcome', 'Account', 'Intent', 'Language', 'Consents', 'Device', 'Household', 'Quiet hours', 'Begin'] as const
+export const ONBOARDING_STEPS = ['Welcome', 'Account', 'Age', 'Intent', 'Language', 'Consents', 'Device', 'Household', 'Quiet hours', 'Begin'] as const
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number]
 
 export const ONBOARDING_COPY: Record<'en' | 'ta' | 'hi', { step: string; of: string; cont: string; back: string; skip: string; begin: string; later: string; saveExit: string; names: Record<OnboardingStep, string> }> = {
   en: {
     step: 'Step', of: 'of', cont: 'Continue', back: 'Back', skip: 'Skip for now', begin: 'Let’s begin', later: 'Link it later', saveExit: 'Save and exit',
-    names: { Welcome: 'Welcome', Account: 'Your AIWO ID', Intent: 'Intent', Language: 'Language', Consents: 'Three consents', Device: 'Device', Household: 'Household', 'Quiet hours': 'Quiet hours', Begin: 'Ready' },
+    names: { Welcome: 'Welcome', Account: 'Your AIWO ID', Age: 'Your age', Intent: 'Intent', Language: 'Language', Consents: 'Three consents', Device: 'Device', Household: 'Household', 'Quiet hours': 'Quiet hours', Begin: 'Ready' },
   },
   ta: {
     step: 'படி', of: '/', cont: 'தொடரவும்', back: 'பின்செல்', skip: 'இப்போது தவிர்', begin: 'தொடங்குவோம்', later: 'பிறகு இணைக்கவும்', saveExit: 'சேமித்து வெளியேறு',
-    names: { Welcome: 'வரவேற்பு', Account: 'AIWO ID', Intent: 'நோக்கம்', Language: 'மொழி', Consents: 'ஒப்புதல்கள்', Device: 'சாதனம்', Household: 'குடும்பம்', 'Quiet hours': 'அமைதி நேரம்', Begin: 'தயார்' },
+    names: { Welcome: 'வரவேற்பு', Account: 'AIWO ID', Age: 'உங்கள் வயது', Intent: 'நோக்கம்', Language: 'மொழி', Consents: 'ஒப்புதல்கள்', Device: 'சாதனம்', Household: 'குடும்பம்', 'Quiet hours': 'அமைதி நேரம்', Begin: 'தயார்' },
   },
   hi: {
     step: 'चरण', of: '/', cont: 'जारी रखें', back: 'वापस', skip: 'अभी छोड़ें', begin: 'शुरू करें', later: 'बाद में जोड़ें', saveExit: 'सहेजें और बाहर निकलें',
-    names: { Welcome: 'स्वागत', Account: 'AIWO ID', Intent: 'उद्देश्य', Language: 'भाषा', Consents: 'सहमतियाँ', Device: 'डिवाइस', Household: 'परिवार', 'Quiet hours': 'शांत समय', Begin: 'तैयार' },
+    names: { Welcome: 'स्वागत', Account: 'AIWO ID', Age: 'आपकी उम्र', Intent: 'उद्देश्य', Language: 'भाषा', Consents: 'सहमतियाँ', Device: 'डिवाइस', Household: 'परिवार', 'Quiet hours': 'शांत समय', Begin: 'तैयार' },
   },
 }

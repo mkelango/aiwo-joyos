@@ -6,10 +6,10 @@ import { CIRCLE } from '@/shared/platform'
 import { MEMBER } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
 import { palettes } from '@/theme/tokens'
-import { useReduceMotion } from '@/lib/store'
+import { useApp, useReduceMotion } from '@/lib/store'
 import { CAPTIONS, CIRCLE_NEXT, CIRCLE_SESSIONS, OTHER_CIRCLES, PRACTICE_CONTENT, SALONS } from '@/screens/b/journeyData'
-import { a11yStore, accountStore, useStore } from '@/screens/b/bStore'
-import { CheckLine, Done, TimelineStep, fmtWhen, memberOnly } from '@/screens/b/parts'
+import { a11yStore, accountStore, circleReportsStore, useStore } from '@/screens/b/bStore'
+import { CheckLine, ChoiceCard, Done, Field, FilterChips, TimelineStep, fmtWhen, memberOnly, useSheetCrisisGuard } from '@/screens/b/parts'
 import { useDict } from '@/lib/i18n'
 import { CIRCLES, OTHER_CIRCLE_TEXT, CIRCLE_STATUS, SALON_TITLE, CIRCLE_PROMPT } from '@/screens/b/i18n/journey'
 import { PRACTICE_TITLE, useCommon, useTx } from '@/screens/b/i18n/common'
@@ -17,6 +17,8 @@ import { PRACTICE_TITLE, useCommon, useTx } from '@/screens/b/i18n/common'
 // CIRCLES (Memo p.21): the circle of eight — the same eight people and a lead, Monday at
 // 7 pm, thirty minutes, for the ninety days. First names only, cameras optional, nothing
 // ranked. Other circles and salons by invitation. One Daybreak: join Monday's call.
+// Moderation (Arch 8b-16): a member can raise a concern about someone in the circle. Only the
+// coach and AIWO's safety team see it; the person is never told who raised it. Kept on the phone.
 
 export default memberOnly(Circles)
 
@@ -34,6 +36,9 @@ function Circles() {
   const tc = useCommon()
   const tx = useTx()
   const prompt = PRACTICE_CONTENT.find((p) => p.week === CIRCLE_NEXT.week)!
+  const coachFirst = CIRCLE.coach.split(' ')[0]
+  const [reportOpen, setReportOpen] = useState(false)
+  const [reports, setReports] = useStore(circleReportsStore)
   // Avatars are neutral: the Spectrum is reserved for the six terms, never for people.
 
   return (
@@ -77,6 +82,32 @@ function Circles() {
             </View>
           ))}
         </View>
+        <Button variant="link" size="sm" icon="flag" onPress={() => setReportOpen(true)} style={{ alignSelf: 'flex-start' }}>
+          {t('repOpen')}
+        </Button>
+        {reports.reports.length ? (
+          <Card tone="sunk" padding={16} style={{ gap: space.s1 }}>
+            <Eyebrow>{t('repYours')}</Eyebrow>
+            {reports.reports.map((rp) => {
+              const k = reasonOf(rp.reason)
+              return (
+                <View key={rp.id} style={{ gap: 2 }}>
+                  <Body>{t('repRow', { name: rp.about, d: fmtDate(rp.at.slice(0, 10)) })}</Body>
+                  <Meta size={14}>{`${k ? t(`rep_${k}`) : rp.reason} · ${t('repWithCoach', { c: coachFirst })}`}</Meta>
+                  <Button
+                    size="sm"
+                    variant="link"
+                    accessibilityLabel={t('repWithdrawAria', { name: rp.about })}
+                    onPress={() => setReports((r) => ({ reports: r.reports.filter((x) => x.id !== rp.id) }))}
+                    style={{ alignSelf: 'flex-start' }}
+                  >
+                    {t('repWithdraw')}
+                  </Button>
+                </View>
+              )
+            })}
+          </Card>
+        ) : null}
         <Card tone="sunk" padding={16} style={{ gap: 6 }}>
           <Eyebrow>{t('promptFrom')}</Eyebrow>
           <Body>
@@ -244,6 +275,14 @@ function Circles() {
         <Meta>{t('cantMake')}</Meta>
       </Sheet>
 
+      {reportOpen ? (
+        <ReportSheet
+          coach={coachFirst}
+          onClose={() => setReportOpen(false)}
+          onSend={(about, reason) => setReports((r) => ({ reports: [{ id: `cr${Date.now().toString(36)}`, about, reason, at: new Date().toISOString() }, ...r.reports] }))}
+        />
+      ) : null}
+
       {room ? (
         <CallRoom
           mode={room}
@@ -256,6 +295,111 @@ function Circles() {
         />
       ) : null}
     </Screen>
+  )
+}
+
+// ─── Raise a concern ─────────────────────────────────────────────────────────
+
+const REASONS = ['unsafe', 'outside', 'unkind', 'worried', 'other'] as const
+type Reason = (typeof REASONS)[number]
+/** Kept in English for the coach console (staff consoles stay English); shown in the member's language. */
+const REASON_EN: Record<Reason, string> = {
+  unsafe: 'Made someone feel unsafe',
+  outside: 'Shared something from the circle outside it',
+  unkind: 'Unkind, harassing or abusive words',
+  worried: 'I am worried about them',
+  other: 'Something else',
+}
+const reasonOf = (stored: string): Reason | undefined => REASONS.find((k) => stored === REASON_EN[k] || stored.startsWith(`${REASON_EN[k]} · `))
+
+/** Mounted only while open, so each concern starts blank. */
+function ReportSheet({ coach, onClose, onSend }: { coach: string; onClose: () => void; onSend: (about: string, reason: string) => void }) {
+  const { space } = useTheme()
+  const t = useDict(CIRCLES)
+  const tc = useCommon()
+  const guard = useSheetCrisisGuard()
+  const { setCrisisOpen } = useApp()
+  const others = CIRCLE.members.filter((m) => m !== MEMBER.firstName)
+  const [about, setAbout] = useState('')
+  const [reason, setReason] = useState<Reason | ''>('')
+  const [note, setNote] = useState('')
+  const [tried, setTried] = useState(false)
+  const [sent, setSent] = useState(false)
+  const send = () => {
+    // Emergency intercept first: support is offered before anything is sent.
+    if (!guard(note, onClose)) return
+    setTried(true)
+    if (!about || !reason) return
+    const n = note.trim()
+    onSend(about, n ? `${REASON_EN[reason]} · “${n}”` : REASON_EN[reason])
+    setSent(true)
+  }
+  return (
+    <Sheet
+      open
+      onClose={onClose}
+      title={t('repTitle')}
+      footer={
+        sent ? (
+          <Button variant="secondary" block onPress={onClose}>
+            {t('repDone')}
+          </Button>
+        ) : (
+          <View style={{ gap: 8 }}>
+            <Button variant="ink" block icon="flag" onPress={send}>
+              {t('repSend', { c: coach })}
+            </Button>
+            <Button variant="ghost" block onPress={onClose}>
+              {tc('cancel')}
+            </Button>
+          </View>
+        )
+      }
+    >
+      {sent ? (
+        <>
+          <Done>{t('repSent', { c: coach })}</Done>
+          <Meta>{t('repSentNext', { c: coach })}</Meta>
+          <Card tone="sunk" padding={16} style={{ gap: 6 }}>
+            <Meta tone="ink">{t('repDanger')}</Meta>
+            <Button
+              variant="link"
+              onPress={() => {
+                onClose()
+                // The root crisis sheet opens once this sheet has gone.
+                setTimeout(() => setCrisisOpen(true), 300)
+              }}
+              style={{ alignSelf: 'flex-start' }}
+            >
+              {t('repSupport')}
+            </Button>
+          </Card>
+        </>
+      ) : (
+        <>
+          <Meta>{t('repLead', { c: coach })}</Meta>
+          <Meta tone="ink">{t('repWho')}</Meta>
+          <FilterChips<string> label={t('repWho')} value={about} onChange={setAbout} items={others.map((m) => ({ value: m, label: m }))} />
+          {tried && !about ? (
+            <Meta tone="error" accessibilityLiveRegion="polite">
+              {t('repErrWho')}
+            </Meta>
+          ) : null}
+          <Meta tone="ink">{t('repWhy')}</Meta>
+          <View style={{ gap: space.s1 }} accessibilityRole="radiogroup" accessibilityLabel={t('repWhy')}>
+            {REASONS.map((k) => (
+              <ChoiceCard key={k} selected={reason === k} onPress={() => setReason(k)} accessibilityLabel={t(`rep_${k}`)} title={<Body size={15}>{t(`rep_${k}`)}</Body>} />
+            ))}
+          </View>
+          {tried && !reason ? (
+            <Meta tone="error" accessibilityLiveRegion="polite">
+              {t('repErrWhy')}
+            </Meta>
+          ) : null}
+          <Field label={`${t('repNote', { c: coach })} ${t('optional')}`} value={note} onChangeText={setNote} multiline maxLength={400} placeholder={t('repNotePh')} />
+        </>
+      )}
+    </Sheet>
   )
 }
 

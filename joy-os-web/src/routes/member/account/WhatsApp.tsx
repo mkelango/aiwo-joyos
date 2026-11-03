@@ -12,6 +12,7 @@ import { readNotifPrefs, rich, syncWhatsAppChannel, useMemberProfile, usePersist
 import { INSTRUMENT_NOTE, fill, useDict, useLang, useTermText } from '@/lib/i18n'
 import { WA, useLookup } from './_i18n'
 import { WatchComplication } from './_watch'
+import { recordConsentEvent } from './_consent'
 
 // WHATSAPP (Memo p.17, p.22, J5): a simulated WhatsApp Business chat for the Check,
 // Joy Ledger prompts and reminders — consented, at most three a day, quiet hours,
@@ -98,7 +99,7 @@ export default function WhatsApp() {
   const scroller = useRef<HTMLDivElement>(null)
   const [wa, setWa] = usePersisted('wa', { consented: CONSENTS.find((c) => c.id === 'c_wa')!.granted, requested: false })
   const consented = wa.consented
-  const setConsented = (v: boolean) => { setWa({ consented: v, requested: false }); syncWhatsAppChannel(v) }
+  const setConsented = (v: boolean, via: 'whatsapp' | 'reply' = 'whatsapp') => { setWa({ consented: v, requested: false }); syncWhatsAppChannel(v); recordConsentEvent('c_wa', v ? 'granted' : 'withdrawn', via) }
   const [quiet] = useState(() => { const p = readNotifPrefs(); return `${p.quietFrom} – ${p.quietTo}` })
   const [consentOpen, setConsentOpen] = useState(false)
 
@@ -155,7 +156,7 @@ export default function WhatsApp() {
     }
     if (/^stop$/i.test(t)) {
       if (consented) {
-        setConsented(false)
+        setConsented(false, 'reply')
         showToast(tw('stopToast'))
         botSay(['WhatsApp prompts are off. Nothing more will arrive here.', 'You can turn them on again in the app, under WhatsApp or Settings.'])
       } else {

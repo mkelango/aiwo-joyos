@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowRight, Baby, Check, Clock, Equal, Eye, EyeOff, HandHeart, Lock, Mic, Phone, Plus, ScrollText, Settings2, Smartphone, Type, Undo2, X } from 'lucide-react'
+import { ArrowRight, Baby, Check, Clock, Equal, Eye, EyeOff, HandHeart, Lock, Mic, Phone, Plus, Settings2, Smartphone, Type, Undo2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { BandLabel, DaybreakButton, MethodLine, SpecimenTag, TermChip, TermDot, fmtDate } from '@/components/joy/primitives'
@@ -17,6 +17,7 @@ import { useDict, useTermText } from '@/lib/i18n'
 import { HH, useData } from './_i18n'
 import { ReadAloud, SpeakAnswer } from './_voice'
 import { useCore } from '@/routes/member/core/_i18n'
+import { CharterCard, FjoOffice, KindStrip, useHouseholdKind } from './_charter'
 
 /** Lakshmi's elder mode and her family helper (by her consent, which she can withdraw and give again). */
 type Elder = { large: boolean; voice: boolean; helper: boolean; helperSince: string; asked: boolean }
@@ -26,6 +27,7 @@ const ELDER_DEFAULT: Elder = { large: true, voice: true, helper: true, helperSin
 // with a family helper by the elder's consent, minors never scored, a share-grant
 // flow both partners must agree to, and a household page that shows only what
 // both share. Couples Check shows agree / differ, never who said what.
+// Household kind (couple | family | Family Joy Office) and an authored Family Joy Charter: see _charter.
 export default function Household() {
   const tr = useDict(HH)
   const dx = useData()
@@ -48,6 +50,7 @@ export default function Household() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [cancelInvite, setCancelInvite] = useState<Invite | null>(null)
   const [elderOpen, setElderOpen] = useState(false)
+  const [kindRec, setKind] = useHouseholdKind()
   const me = INDEX_HISTORY[0]
   const kavyaIndex = CASELOAD.find((c) => c.name === 'Kavya Rao')!.index
   const [arjun, kavya, lakshmi] = HOUSEHOLD
@@ -69,6 +72,8 @@ export default function Household() {
         lead={tr('lead')}
         actions={<Button variant="secondary" onClick={() => setInviteOpen(true)}><Plus size={16} /> {tr('invite')}</Button>}
       />
+
+      <KindStrip kind={kindRec.kind} since={kindRec.since} people={HOUSEHOLD.length + 1} onChange={(k) => { setKind(k); showToast(tr('kindToast', { kind: tr(k === 'fjo' ? 'kindFjo' : k === 'couple' ? 'kindCouple' : 'kindFamily') })) }} />
 
       {/* Members */}
       <Section id="members" eyebrow={tr('whoEyebrow')} title={tr('whoTitle')} aside={<SpecimenTag />}>
@@ -125,6 +130,14 @@ export default function Household() {
           </AnimatePresence>
         </ul>
       </Section>
+
+      {kindRec.kind === 'fjo' && (
+        <FjoOffice
+          adults={[{ name: arjun.name, status: 'signed', on: '2027-01-24' }, { name: kavya.name, status: 'booked', on: '2027-02-11' }, { name: lakshmi.name, status: 'booked', on: '2027-02-12' }]}
+          minor={HOUSEHOLD_MINOR.name}
+          onAsk={showToast}
+        />
+      )}
 
       {/* The household page — only what both share */}
       <Section
@@ -249,20 +262,7 @@ export default function Household() {
           </Card>
         </Section>
 
-        <Section id="charter" eyebrow={tr('patron')} title={tr('charter')}>
-          <Card tone="sunk" className="flex flex-col">
-            <ScrollText size={22} className="text-ink-3" />
-            <p className="mt-4 text-[1.3rem] font-light leading-snug text-ink">
-              {rich(tr('charterLine'), { em: <em className="font-serif">{tr('charterEm')}</em> })}
-            </p>
-            <ul className="mt-4 space-y-2 text-[15px] text-ink-2">
-              <li className="flex gap-2"><Check size={16} className="mt-1 shrink-0 text-ink-3" /> {tr('charter1')}</li>
-              <li className="flex gap-2"><Check size={16} className="mt-1 shrink-0 text-ink-3" /> {tr('charter2')}</li>
-              <li className="flex gap-2"><Check size={16} className="mt-1 shrink-0 text-ink-3" /> {tr('charter3')}</li>
-            </ul>
-            <Link to="/app/membership" className="inline-flex items-center gap-1.5 pt-6 text-[15px] text-ink underline-offset-4 hover:underline focus-ring">{tr('seePatron')} <ArrowRight size={15} /></Link>
-          </Card>
-        </Section>
+        <CharterCard kind={kindRec.kind} adults={[arjun, kavya, lakshmi].map((p) => p.name.split(' ')[0])} minor={HOUSEHOLD_MINOR.name.split(' ')[0]} onToast={showToast} />
       </div>
 
       <ShareSheet

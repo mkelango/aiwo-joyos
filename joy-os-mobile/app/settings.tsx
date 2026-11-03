@@ -1,11 +1,12 @@
 import { router } from 'expo-router'
 import { useEffect, useState } from 'react'
-import { View } from 'react-native'
+import { Platform, View } from 'react-native'
 import { Body, Button, Card, DaybreakButton, Divider, Eyebrow, ListRow, Meta, Mono, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, Toggle, Title, fmtDate } from '@/components'
 import { LANGS, useDict, useT } from '@/lib/i18n'
 import { SETTINGS } from '@/screens/b/i18n/account'
 import { LANG_LABEL, perDayKey, useCommon, usePrefsError } from '@/screens/b/i18n/common'
 import { useApp, useReduceMotion, type TextSize, type ThemePref } from '@/lib/store'
+import { playSound, type SoundKind } from '@/lib/sound'
 import { MEMBER } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
 import { PLANS } from '@/screens/b/_data'
@@ -15,6 +16,8 @@ import { ChoiceCard, TimeStepper, memberOnly } from '@/screens/b/parts'
 // SETTINGS: language (English · தமிழ் · हिन्दी), theme (follows the system by default),
 // text size on top of Dynamic Type, notifications with quiet hours (never more than three a
 // day), offline, and the way back to the welcome and onboarding. One Daybreak: save.
+// Security: the biometric lock (Architecture p21) with its lock-after delay; turning it on shows
+// the lock screen on the next open. Sound (Playbook p54): three sounds, silent by default.
 
 const SAMPLE = {
   en: 'Anything good in the last few hours?',
@@ -31,7 +34,21 @@ function Settings() {
   const tc = useCommon()
   const prefsErr = usePrefsError()
   const householdName = MEMBER.household === SETTINGS.householdName.en ? ts('householdName') : MEMBER.household
-  const { lang, setLang, themePref, setThemePref, textSize, setTextSize, offline, setOffline, syncQueue, reduceMotion, setReduceMotion } = useApp()
+  const { lang, setLang, themePref, setThemePref, textSize, setTextSize, offline, setOffline, syncQueue, reduceMotion, setReduceMotion, sound, setSound, biometricLock, setBiometricLock, lockAfter, setLockAfter, lockNow, deviceAtRisk } = useApp()
+  const [played, setPlayed] = useState<string | null>(null)
+  const SOUNDS: { kind: SoundKind; name: 'sndAction' | 'sndComplete' | 'sndMorning'; desc: 'sndActionDesc' | 'sndCompleteDesc' | 'sndMorningDesc' }[] = [
+    { kind: 'action', name: 'sndAction', desc: 'sndActionDesc' },
+    { kind: 'complete', name: 'sndComplete', desc: 'sndCompleteDesc' },
+    { kind: 'morning', name: 'sndMorning', desc: 'sndMorningDesc' },
+  ]
+  // The lock-after delay in seconds (the app store keeps it); the four choices the phone offers.
+  const AFTER: { value: string; label: string }[] = [
+    { value: '0', label: ts('lockNow') },
+    { value: '60', label: ts('lock1') },
+    { value: '300', label: ts('lock5') },
+    { value: '900', label: ts('lock15') },
+  ]
+  const afterValue = AFTER.some((a) => a.value === String(lockAfter)) ? String(lockAfter) : '0'
   // Reduce motion is on if the member chose it or the phone asks for it.
   const motionReduced = useReduceMotion()
   const systemMotion = motionReduced && !reduceMotion
@@ -198,27 +215,66 @@ function Settings() {
         </Card>
       </View>
 
+      {/* Sound (Playbook p54): three sounds, silent by default */}
+      <View style={{ gap: space.s2 }}>
+        <SectionTitle>{ts('sound')}</SectionTitle>
+        <Card tone="raised" style={{ gap: space.s2 }}>
+          <Body weight="medium">{ts('soundTitle')}</Body>
+          <Toggle
+            checked={sound}
+            onChange={(v) => {
+              setSound(v)
+              setPlayed(null)
+            }}
+            label={ts('soundLabel')}
+            description={ts('soundDesc')}
+          />
+          <Meta size={14} accessibilityLiveRegion="polite">{sound ? `${ts('soundOn')} ${ts('soundWhere')}` : ts('soundOffHint')}</Meta>
+          <Divider />
+          <Eyebrow>{ts('soundTry')}</Eyebrow>
+          {SOUNDS.map((x) => (
+            <View key={x.kind} style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1 }}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Body>{ts(x.name)}</Body>
+                <Meta size={14}>{ts(x.desc)}</Meta>
+              </View>
+              <Button
+                size="sm"
+                variant="secondary"
+                icon="play"
+                accessibilityLabel={ts('soundPlayA11y', { name: ts(x.name) })}
+                onPress={() => {
+                  playSound(x.kind, { preview: true })
+                  setPlayed(ts(x.name))
+                }}
+              >
+                {ts('soundPlay')}
+              </Button>
+            </View>
+          ))}
+          {played ? <Meta size={14} accessibilityLiveRegion="polite">{ts('soundPlaying', { name: played })}</Meta> : null}
+          {Platform.OS !== 'web' ? <Meta size={14} tone="ink3">{ts('soundHaptic')}</Meta> : null}
+        </Card>
+      </View>
+
       {/* Security */}
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{ts('security')}</SectionTitle>
         <Card tone="raised" style={{ gap: space.s2 }}>
-          <Toggle checked={lock.appLock} onChange={(v) => setLock((l) => ({ ...l, appLock: v }))} label={ts('appLock')} description={ts('appLockD')} />
-          {lock.appLock ? (
+          <Toggle checked={biometricLock} onChange={setBiometricLock} label={ts('appLock')} description={ts('appLockD')} />
+          {biometricLock ? (
             <>
               <Eyebrow>{ts('lockAfter')}</Eyebrow>
-              <Segmented<LockState['after']>
-                value={lock.after}
-                onChange={(v) => setLock((l) => ({ ...l, after: v }))}
-                items={[
-                  { value: 'now', label: ts('lockNow') },
-                  { value: '1m', label: ts('lock1') },
-                  { value: '5m', label: ts('lock5') },
-                  { value: '15m', label: ts('lock15') },
-                ]}
-                style={{ flexWrap: 'wrap' }}
-              />
+              <Segmented<string> value={afterValue} onChange={(v) => setLockAfter(Number(v))} items={AFTER} style={{ flexWrap: 'wrap' }} />
+              <Meta size={14} accessibilityLiveRegion="polite">
+                {afterValue === '0' ? ts('locksNow') : ts('locksAfter', { x: AFTER.find((a) => a.value === afterValue)!.label })}
+              </Meta>
+              <Button variant="secondary" size="sm" icon="lock" onPress={lockNow} style={{ alignSelf: 'flex-start' }}>
+                {ts('lockTry')}
+              </Button>
             </>
           ) : null}
+          <ListRow icon={deviceAtRisk ? 'shield-off' : 'shield'} title={ts('phoneSecurity')} sub={deviceAtRisk ? ts('phoneSecurityRisk') : ts('phoneSecuritySub')} onPress={() => router.push('/device-security')} />
           <Divider />
           <Eyebrow>{ts('passkeys')}</Eyebrow>
           <Meta size={14}>{ts('passkeysBody')}</Meta>

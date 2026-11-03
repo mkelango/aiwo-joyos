@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { ArrowRight, Bell, BellOff, BookOpen, Compass, Fingerprint, HeartHandshake, Home, KeyRound, LogOut, Mail, MessageCircle, Moon, Plane, Smartphone, Sun, Trash2, UserRound, WifiOff } from 'lucide-react'
+import { ArrowRight, Bell, BellOff, BookOpen, Compass, Fingerprint, HeartHandshake, Home, KeyRound, LogOut, Mail, MessageCircle, Moon, Plane, Play, Smartphone, Sun, Trash2, UserRound, Volume2, VolumeX, WifiOff } from 'lucide-react'
 import { MotionConfig } from 'framer-motion'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
@@ -8,6 +8,7 @@ import { Button, Card, PageHeader, Pill, Sheet } from '@/components/ui'
 import { MEMBER } from '@/data/member'
 import { LANGS, fill, useT, useDict } from '@/lib/i18n'
 import { useApp, type TextSize } from '@/lib/store'
+import { playSound } from '@/lib/sound'
 import { DEFAULT_NOTIF_PREFS, LEDGER_TIMES, NOTIF_TYPES, pushesPerDay, type Channel, type NotifPrefs } from './_data'
 import { Field, LinkButton, Section, Segmented, Select, Toggle } from './_parts'
 import { applyReducedMotion, inputCls, rich, usePersisted, useToast } from './_util'
@@ -17,7 +18,8 @@ import { ReadAloud, SpeakAnswer, useSpeech } from './_voice'
 
 // SETTINGS (Memo p.17, p.22): language (EN · தமிழ் · हिन्दी), Paper or warm Ink,
 // text size, notifications (≤3 a day, each type off in one tap, quiet hours
-// 21:45–07:30, channels), biometric lock, offline demo, accessibility, sign out.
+// 21:45–07:30, channels), biometric lock, offline demo, accessibility, sound
+// (Playbook p.54: three sounds only, silent by default), sign out.
 // Language, theme and text size apply at once; one Daybreak saves notifications.
 
 const CHANNELS: { id: Channel; label: string; icon: typeof Smartphone; desc: string }[] = [
@@ -49,6 +51,7 @@ export default function Settings() {
   const [prefs, setPrefs] = usePersisted('prefs', A11Y_DEFAULTS)
   const { speak } = useSpeech()
   const [heard, setHeard] = useState<string | null>(null)
+  const [played, setPlayed] = useState<string | null>(null)
   const setPref = <K extends keyof typeof prefs>(k: K, v: (typeof prefs)[K], msg: string) => { setPrefs((p) => ({ ...p, [k]: v })); showToast(msg) }
   useEffect(() => { applyReducedMotion(prefs.reduceMotion) }, [prefs.reduceMotion])
   const [signOut, setSignOut] = useState(false)
@@ -77,7 +80,7 @@ export default function Settings() {
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[200px_minmax(0,1fr)]">
         <nav aria-label={t('navLabel')} className="hidden lg:block">
           <ul className="sticky top-8 space-y-1 text-[15px]">
-            {[['language', t('language')], ['appearance', t('appearance')], ['notifications', t('notifications')], ['security', t('security')], ['offline', t('offline')], ['a11y', t('a11y')], ['account', t('account')]].map(([id, l]) => (
+            {[['language', t('language')], ['appearance', t('appearance')], ['notifications', t('notifications')], ['security', t('security')], ['offline', t('offline')], ['a11y', t('a11y')], ['sound', t('sound')], ['account', t('account')]].map(([id, l]) => (
               <li key={id}><a href={`#${id}`} className="block rounded-lg px-3 py-1.5 text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring">{l}</a></li>
             ))}
           </ul>
@@ -270,6 +273,31 @@ export default function Settings() {
                 <p className="-mt-2 text-[13px] text-ink-3">{t('vtOffHint')}</p>
               )}
               <Toggle checked={prefs.captions} onChange={(v) => setPref('captions', v, v ? t('capOn') : t('capOff'))} label={t('capLabel')} description={t('capDesc')} />
+            </Card>
+          </Section>
+
+          {/* Sound — three sounds only, silent by default */}
+          <Section id="sound" eyebrow={t('sound')} title={t('soundTitle')}>
+            <Card className="space-y-5">
+              <Toggle checked={prefs.sound} onChange={(v) => { setPref('sound', v, v ? t('soundOn') : t('soundOff')); setPlayed(null) }} label={<span className="inline-flex items-center gap-2">{prefs.sound ? <Volume2 size={17} className="text-ink-3" /> : <VolumeX size={17} className="text-ink-3" />} {t('soundLabel')}</span>} description={t('soundDesc')} />
+              {prefs.sound ? (
+                <div className="rounded-card bg-paper-sunk p-4">
+                  <p className="eyebrow text-ink-3">{t('soundTry')}</p>
+                  <ul className="mt-3 grid gap-2 sm:grid-cols-3">
+                    {([['action', t('sndAction'), t('sndActionDesc')], ['complete', t('sndComplete'), t('sndCompleteDesc')], ['morning', t('sndMorning'), t('sndMorningDesc')]] as const).map(([k, l, desc]) => (
+                      <li key={k}>
+                        <button type="button" onClick={() => { playSound(k); setPlayed(l) }} className="flex w-full items-start gap-3 rounded-card border border-line bg-paper-raised p-3 text-left hover:border-line-strong focus-ring">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-paper-sunk text-ink"><Play size={14} /></span>
+                          <span className="min-w-0"><span className="block text-[15px] text-ink">{l}</span><span className="text-[13px] text-ink-2">{desc}</span></span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <p aria-live="polite" className="mt-3 text-[13px] text-ink-3">{played ? t('soundPlaying', { name: played }) : t('soundWhere')}</p>
+                </div>
+              ) : (
+                <p className="-mt-2 text-[13px] text-ink-3">{t('soundOffHint')}</p>
+              )}
             </Card>
           </Section>
 

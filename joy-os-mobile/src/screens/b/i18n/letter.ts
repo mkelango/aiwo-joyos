@@ -1,0 +1,31 @@
+import type { Dict } from '@/lib/i18n'
+
+// The Joyspan Letter (Memo p17 print artefacts; Playbook p63: monthly, in the Mentor's voice,
+// with real numbers). The letters themselves are the Mentor's own words and stay as written.
+export const LETTER = {
+  eyebrow: { en: 'The Joyspan Letter · monthly', ta: 'ஜாய்ஸ்பான் கடிதம் · மாதந்தோறும்', hi: 'जॉयस्पैन लेटर · हर महीने' },
+  titleA: { en: 'A letter, ', ta: 'ஒரு கடிதம், ', hi: 'एक ख़त, ' },
+  titleSerif: { en: 'with real numbers', ta: 'உண்மையான எண்களுடன்', hi: 'असली नंबरों के साथ' },
+  titleB: { en: '.', ta: '.', hi: '।' },
+  lead: { en: 'Once a month from the Mentor: what moved in his own number, what did not, and one thing he is changing. Published when it goes down, too.', ta: 'மாதம் ஒருமுறை வழிகாட்டியிடமிருந்து: அவரது சொந்த எண்ணில் என்ன மாறியது, எது மாறவில்லை, அவர் மாற்றும் ஒன்று. எண் குறைந்தாலும் வெளியிடப்படும்.', hi: 'महीने में एक बार मार्गदर्शक से: उनके अपने नंबर में क्या बदला, क्या नहीं, और एक चीज़ जो वे बदल रहे हैं। नंबर नीचे जाए तब भी छपता है।' },
+  asWritten: { en: '', ta: 'கடிதம் வழிகாட்டியின் சொந்த வார்த்தைகளில், எழுதியபடியே உள்ளது.', hi: 'ख़त मार्गदर्शक के अपने शब्दों में है, जैसा लिखा गया।' },
+  issues: { en: 'Issues', ta: 'இதழ்கள்', hi: 'अंक' },
+  issueNo: { en: 'Letter No. {n}', ta: 'கடிதம் எண் {n}', hi: 'लेटर नं. {n}' },
+  latest: { en: 'Latest', ta: 'சமீபத்தியது', hi: 'नवीनतम' },
+  numbers: { en: 'His numbers', ta: 'அவரது எண்கள்', hi: 'उनके नंबर' },
+  writeBack: { en: 'Write back', ta: 'பதில் எழுதுங்கள்', hi: 'जवाब लिखें' },
+  writeBackLead: { en: 'Tell him yours: what moved, what did not, one thing you are changing.', ta: 'உங்களுடையதைச் சொல்லுங்கள்: என்ன மாறியது, எது மாறவில்லை, நீங்கள் மாற்றும் ஒன்று.', hi: 'अपना बताइए: क्या बदला, क्या नहीं, एक चीज़ जो आप बदल रहे हैं।' },
+  replyLabel: { en: 'Your reply', ta: 'உங்கள் பதில்', hi: 'आपका जवाब' },
+  replyPh: { en: 'This month I…', ta: 'இந்த மாதம் நான்…', hi: 'इस महीने मैंने…' },
+  quoteOk: { en: 'He may quote me, first name only', ta: 'அவர் என்னை மேற்கோள் காட்டலாம், முதல் பெயர் மட்டும்', hi: 'वे मुझे उद्धृत कर सकते हैं, सिर्फ़ पहला नाम' },
+  quoteOkD: { en: 'Off by default. Without it, your reply is read and never printed.', ta: 'இயல்பாக அணைக்கப்பட்டுள்ளது. இது இல்லாமல், உங்கள் பதில் படிக்கப்படும், ஒருபோதும் அச்சிடப்படாது.', hi: 'शुरू में बंद। इसके बिना आपका जवाब पढ़ा जाता है, कभी छापा नहीं जाता।' },
+  send: { en: 'Send my reply', ta: 'என் பதிலை அனுப்பு', hi: 'मेरा जवाब भेजें' },
+  sent: { en: 'Sent to the Letter desk. Specimen: kept on this phone.', ta: 'கடித மேசைக்கு அனுப்பப்பட்டது. மாதிரி: இந்தத் தொலைபேசியில் வைக்கப்பட்டுள்ளது.', hi: 'लेटर डेस्क को भेजा गया। नमूना: इसी फ़ोन पर रखा है।' },
+  yourReplies: { en: 'Your replies · {n}', ta: 'உங்கள் பதில்கள் · {n}', hi: 'आपके जवाब · {n}' },
+  mayQuote: { en: 'may be quoted', ta: 'மேற்கோள் காட்டலாம்', hi: 'उद्धृत किया जा सकता है' },
+  notQuoted: { en: 'not for print', ta: 'அச்சுக்கு அல்ல', hi: 'छपाई के लिए नहीं' },
+  empty: { en: 'Write a few words first.', ta: 'முதலில் சில வார்த்தைகள் எழுதுங்கள்.', hi: 'पहले कुछ शब्द लिखें।' },
+  delivery: { en: 'Arrives by email on the first Sunday of the month, and here. Switch it off in Notifications.', ta: 'மாதத்தின் முதல் ஞாயிறு மின்னஞ்சலிலும் இங்கேயும் வரும். அறிவிப்புகளில் அணைக்கலாம்.', hi: 'महीने के पहले रविवार को ईमेल पर और यहाँ आता है। सूचनाओं में बंद कर सकते हैं।' },
+  print: { en: 'Print this issue', ta: 'இந்த இதழை அச்சிடு', hi: 'यह अंक प्रिंट करें' },
+  specimen: { en: 'Specimen issues · numbers illustrative', ta: 'மாதிரி இதழ்கள் · எண்கள் எடுத்துக்காட்டுக்கு', hi: 'नमूना अंक · नंबर उदाहरण के लिए' },
+} satisfies Dict

@@ -16,7 +16,8 @@ import { useSpaceState } from './_state'
 
 // BODY · Healthspan (Memo p.19): device link, Life's Essential 8, biomarker vault
 // (from LifeOS, physician-signed), capacity battery at home, signal trends as
-// features, and biological age only after physician sign-off.
+// features, the protocol and AIWO Daily stack (protocol-only, physician-signed),
+// and biological age only after physician sign-off.
 // The one Daybreak button: start the home capacity test.
 export default function Body() {
   const { t, r } = useSpaceText()
@@ -27,6 +28,7 @@ export default function Body() {
         <div className="flex lg:col-span-7"><Le8Tracker /></div>
       </div>
       <BiomarkerVault />
+      <DailyStack />
       <div className="grid gap-6 lg:grid-cols-12">
         <div className="flex lg:col-span-7"><CapacityBattery /></div>
         <div className="flex lg:col-span-5"><BiologicalAge /></div>
@@ -489,6 +491,83 @@ function BiomarkerVault() {
           </div>
         )}
       </Sheet>
+    </ToolCard>
+  )
+}
+
+// ─── Protocol and AIWO Daily stack ────────────────────────────────────────
+
+// Memo p.19: "protocol and AIWO Daily stack". Supplements follow the protocol-only rule
+// (Arch p.6): they appear only as part of a physician-signed protocol, never as a shop.
+// Today's ticks are kept for the specimen day; there is no streak and no count of days.
+type StackItem = { id: string; kind: 'practice' | 'supplement'; label: string; dose?: string; why: string }
+const VITAMIN_D = BIOMARKERS.find((b) => b.name === 'Vitamin D (25-OH)')
+
+function DailyStack() {
+  const { t, r, dm } = useSpaceText()
+  const [done, setDone] = useSpaceState<{ on: string; ids: string[] }>('body.stack.today.v1', { on: SPACE_TODAY, ids: [] })
+  const [asked, setAsked] = useSpaceState<string[]>('body.stack.asked.v1', [])
+  const today = done.on === SPACE_TODAY ? done.ids : []
+  const doc = PANEL_META.signedBy
+  const items: StackItem[] = [
+    { id: 'p_sun', kind: 'practice', label: t('body.st.p1'), why: t('body.st.p1w') },
+    { id: 'p_walk', kind: 'practice', label: t('body.st.p2'), why: t('body.st.p2w') },
+    { id: 'p_lights', kind: 'practice', label: t('body.st.p3'), why: t('body.st.p3w') },
+    { id: 's_d3', kind: 'supplement', label: 'AIWO Daily D3', dose: '2,000 IU', why: t('body.st.s1w', { v: String(VITAMIN_D?.value ?? '—') }) },
+    { id: 's_o3', kind: 'supplement', label: 'AIWO Daily Omega-3', dose: '1 g', why: t('body.st.s2w') },
+    { id: 's_mg', kind: 'supplement', label: 'AIWO Daily Magnesium', dose: '200 mg', why: t('body.st.s3w') },
+  ]
+  const toggle = (id: string, on: boolean) => setDone({ on: SPACE_TODAY, ids: on ? [...today.filter((x) => x !== id), id] : today.filter((x) => x !== id) })
+  const n = items.filter((i) => today.includes(i.id)).length
+  const row = (i: StackItem) => {
+    const on = today.includes(i.id)
+    const wasAsked = asked.includes(i.id)
+    return (
+      <li key={i.id} className={clsx('rounded-2xl border p-4 transition-colors', on ? 'border-line bg-paper-sunk' : 'border-line')}>
+        <label className="flex cursor-pointer items-start gap-3">
+          <input type="checkbox" checked={on} onChange={(e) => toggle(i.id, e.target.checked)} aria-label={t('body.st.markDone', { x: i.dose ? `${i.label} ${i.dose}` : i.label })} className="peer sr-only" />
+          <span aria-hidden className={clsx('mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[color:var(--daybreak)]', on ? 'border-ink bg-ink text-paper' : 'border-line-strong')}>
+            {on && <Check size={13} />}
+          </span>
+          <span className="min-w-0">
+            <span className={clsx('block text-[16px]', on ? 'text-ink-2' : 'text-ink')}>{i.label}{i.dose && <> · <span className="num">{i.dose}</span></>}</span>
+            <span className="mt-0.5 block text-[13px] text-ink-3">{i.why}</span>
+          </span>
+        </label>
+        {i.kind === 'supplement' && (
+          <div className="mt-2 pl-8">
+            {wasAsked
+              ? <p className="text-[13px] text-ink-2" role="status">{t('body.st.asked', { name: doc })}</p>
+              : <button type="button" onClick={() => setAsked((a) => [...a, i.id])} aria-label={t('body.st.askAria', { name: doc, x: i.label })} className="rounded text-[13px] text-ink underline underline-offset-4 focus-ring">{t('body.st.ask')}</button>}
+          </div>
+        )}
+      </li>
+    )
+  }
+  return (
+    <ToolCard
+      eyebrow={t('body.st.eyebrow')}
+      title={t('body.st.title')}
+      sub={t('body.st.sub', { name: doc, date: fmtDate(PANEL_META.signed) })}
+      aside={<><SpecimenTag /><span className="num text-[1.6rem] font-light text-ink" aria-label={t('body.st.done', { n: String(n), m: String(items.length) })}>{n}<span className="text-[14px] text-ink-3">/{items.length}</span></span></>}
+    >
+      <p className="eyebrow text-ink-3">{t('body.st.today', { d: dm(SPACE_TODAY) })}</p>
+      <div className="mt-3 grid gap-6 lg:grid-cols-2">
+        <section aria-labelledby="st-protocol">
+          <h3 id="st-protocol" className="text-[15px] font-medium text-ink">{t('body.st.protocol')}</h3>
+          <ul className="mt-2.5 space-y-2">{items.filter((i) => i.kind === 'practice').map(row)}</ul>
+        </section>
+        <section aria-labelledby="st-stack">
+          <h3 id="st-stack" className="text-[15px] font-medium text-ink">{t('body.st.stack')}</h3>
+          <ul className="mt-2.5 space-y-2">{items.filter((i) => i.kind === 'supplement').map(row)}</ul>
+          <p className="mt-3 text-[13px] text-ink-3">{t('body.st.missed')}</p>
+        </section>
+      </div>
+      <p className="mt-5 flex items-start gap-2 rounded-2xl bg-paper-sunk p-4 text-[14px] text-ink-2"><ShieldCheck size={15} className="mt-0.5 shrink-0" aria-hidden /> <span>{t('body.st.rule')}</span></p>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4 text-[13px] text-ink-3">
+        <span>{t('body.st.review')} · {t('body.st.change', { name: doc })}</span>
+        <Link to="/app/care/messages" className="inline-flex items-center gap-1.5 rounded text-[14px] text-ink underline underline-offset-4 focus-ring">{r('c.messageX', { name: doc })} <ArrowRight size={14} aria-hidden /></Link>
+      </div>
     </ToolCard>
   )
 }

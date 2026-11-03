@@ -36,7 +36,8 @@ import type { Band, TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { COUPLES_CHECK, HOUSEHOLD_MINOR, KAVYA_SHARED, SPECIMEN_NOW, type Grant, type GrantScope } from '@/screens/b/accountData'
 import { PLANS } from '@/screens/b/_data'
-import { accountStore, refCode, useStore } from '@/screens/b/bStore'
+import { accountStore, householdKindStore, refCode, useStore } from '@/screens/b/bStore'
+import { CharterCard, FjoOffice, KindCard } from '@/screens/b/charter'
 import { ChoiceCard, Done, Field, KeyValue, shareOrCopy, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
 import { HOUSE, THEME_TEXT } from '@/screens/b/i18n/household'
@@ -47,6 +48,8 @@ import { BAND, useCommon, useTx } from '@/screens/b/i18n/common'
 // elder mode with a helper by the elder's consent, minors never scored, share grants both
 // partners must agree to, and a household page that shows only what both share.
 // Couples Check: agree / differ, never who said what. One Daybreak: "Propose a share".
+// Household kind (couple | family | Family Joy Office, Arch p.13) and the Family Joy Charter the
+// family writes and every adult agrees to: see src/screens/b/charter.tsx.
 
 const bandFor = (v: number): Band => (v >= 70 ? 'steady' : v >= 50 ? 'uneven' : 'thin')
 /** Scope words, relation and age labels in the member's language. */
@@ -86,6 +89,7 @@ function Household() {
     toastTimer.current = setTimeout(() => setToast(msg), 350)
   }
   const isPatron = acct.plan === 'Patron'
+  const [kindRec] = useStore(householdKindStore)
   const me = INDEX_HISTORY[0]
   const kavyaIndex = CASELOAD.find((x) => x.name === 'Kavya Rao')!.index
   const [arjun, kavya, lakshmi] = HOUSEHOLD
@@ -122,6 +126,8 @@ function Household() {
         }
         lead={t('lead')}
       />
+
+      <KindCard people={HOUSEHOLD.length + 1} onToast={toastAfterSheet} />
 
       {/* Members */}
       <View style={{ gap: space.s2 }}>
@@ -167,6 +173,18 @@ function Household() {
           {t('invite')}
         </Button>
       </View>
+
+      {kindRec.kind === 'fjo' ? (
+        <FjoOffice
+          adults={[
+            { name: arjun.name, status: 'signed', on: '2027-01-24' },
+            { name: kavya.name, status: 'booked', on: '2027-02-11' },
+            { name: lakshmi.name, status: 'booked', on: '2027-02-12' },
+          ]}
+          minor={HOUSEHOLD_MINOR.name}
+          onToast={setToast}
+        />
+      ) : null}
 
       {/* Household page */}
       <View style={{ gap: space.s2 }}>
@@ -291,18 +309,7 @@ function Household() {
       </View>
 
       {/* Charter */}
-      <Card tone="sunk" style={{ gap: space.s1 + 4 }}>
-        <Eyebrow>{isPatron ? t('patronIn') : t('patronSoon')}</Eyebrow>
-        <Title size={22}>{t('charter')}</Title>
-        <Body tone="ink2">{t('charterBody')}</Body>
-        {[t('c1'), t('c2'), t('c3')].map((x) => (
-          <View key={x} style={{ flexDirection: 'row', gap: 10 }}>
-            <Icon name="check" size={15} color={c.ink2} />
-            <Meta style={{ flex: 1 }}>{x}</Meta>
-          </View>
-        ))}
-        <ArrowLink onPress={() => router.push('/membership')}>{isPatron ? t('seeMembership') : t('seePatron')}</ArrowLink>
-      </Card>
+      <CharterCard isPatron={isPatron} adults={[arjun, kavya, lakshmi].map((p) => p.name.split(' ')[0])} minor={HOUSEHOLD_MINOR.name.split(' ')[0]} onToast={toastAfterSheet} />
 
       <InviteSheet
         open={inviteOpen}

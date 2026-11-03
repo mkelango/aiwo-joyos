@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { router } from 'expo-router'
+import { useEffect, useState } from 'react'
 import { Pressable, View } from 'react-native'
-import { Body, Divider, Eyebrow, Icon, Meta, Mono, Segmented, Toggle } from '@/components'
+import { Body, Button, Divider, Eyebrow, Icon, Meta, Mono, Progress, Segmented, SpecimenTag, Toggle } from '@/components'
 import { interceptsCrisis, useApp } from '@/lib/store'
+import { trustStore, useStore } from '@/screens/b/bStore'
+import { CONSENTS } from '@/shared/member'
 import { useLocal } from '@/screens/a/local'
 import { Chip, IconButton, TextField } from '@/screens/a/parts'
 import { NO_SUGGESTIONS, PEACE_OF_MIND, TIME_AUDIT, TIME_KINDS } from '@/screens/a/spacesData'
@@ -9,7 +12,7 @@ import { useTheme } from '@/theme/ThemeProvider'
 import { useA } from '../i18n'
 import { ToolCard, ToolsHeading } from './common'
 
-// FREEDOM: the time audit (calendar summarised, then discarded), the No list, the weekly
+// FREEDOM: the time audit (a consented calendar, summarised, then discarded), the No list, the weekly
 // sabbath, and the peace-of-mind list. Never financial advice.
 
 export function FreedomTools() {
@@ -29,7 +32,200 @@ const DAY_KEYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 type Kind = (typeof TIME_KINDS)[number]['key']
 
+// Calendar opt-in (Memo p.19 and p.26): one calendar, read-only, only for the time audit,
+// read once, summarised to hours by kind, raw events discarded. The purpose-level consent
+// lives in the Trust centre (trustStore, c_cal); this screen only reads it, so a withdrawal
+// there turns the audit off here at once.
+type CalProvider = 'google' | 'microsoft'
+const CAL_PROVIDERS: readonly CalProvider[] = ['google', 'microsoft']
+const CAL_NAME: Record<CalProvider, string> = { google: 'Google Calendar', microsoft: 'Microsoft Outlook' }
+type CalConnection = { provider: CalProvider | null; rerun: boolean }
+
+/** The Trust centre's calendar consent, live: the member's own choice over the specimen default. */
+function useCalendarConsent() {
+  const [trust] = useStore(trustStore)
+  const fallback = CONSENTS.find((x) => x.id === 'c_cal')?.granted ?? false
+  return 'c_cal' in trust.consents ? trust.consents.c_cal : fallback
+}
+
 function TimeAudit() {
+  const on = useCalendarConsent()
+  const [conn, setConn] = useLocal<CalConnection>('calendarConnection', { provider: null, rerun: false })
+  const [disconnected, setDisconnected] = useState(false)
+  const provider = conn.provider && CAL_PROVIDERS.includes(conn.provider) ? conn.provider : null
+  const disconnect = () => {
+    setConn({ provider: null, rerun: false })
+    setDisconnected(true)
+  }
+  if (!on) return <CalendarOff provider={provider} onDisconnect={disconnect} />
+  if (!provider) return <CalendarOptIn disconnected={disconnected} onConnect={(p) => (setConn({ provider: p, rerun: false }), setDisconnected(false))} />
+  return <AuditView provider={provider} rerun={conn.rerun} onRerun={() => setConn((x) => ({ ...x, rerun: true }))} onDisconnect={disconnect} />
+}
+
+function Check({ checked, label, onPress }: { checked: boolean; label: string; onPress: () => void }) {
+  const { c } = useTheme()
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked }}
+      aria-checked={checked}
+      accessibilityLabel={label}
+      style={({ pressed }) => ({ flexDirection: 'row', gap: 12, paddingVertical: 8, minHeight: 44, opacity: pressed ? 0.7 : 1 })}
+    >
+      <View style={{ width: 22, height: 22, marginTop: 1, borderRadius: 6, borderWidth: 2, borderColor: checked ? c.ink : c.lineStrong, backgroundColor: checked ? c.ink : undefined, alignItems: 'center', justifyContent: 'center' }}>
+        {checked ? <Icon name="check" size={14} color={c.paper} /> : null}
+      </View>
+      <Body style={{ flex: 1 }}>{label}</Body>
+    </Pressable>
+  )
+}
+
+function CalendarOptIn({ disconnected, onConnect }: { disconnected: boolean; onConnect: (p: CalProvider) => void }) {
+  const { c, space, radius } = useTheme()
+  const { t } = useA()
+  const [step, setStep] = useState<'choose' | 'grant' | 'reading'>('choose')
+  const [provider, setProvider] = useState<CalProvider>('google')
+  const [agree, setAgree] = useState(false)
+  const [phase, setPhase] = useState(0)
+  // Reading is simulated: three short beats, then the summary appears and the raw entries are gone.
+  useEffect(() => {
+    if (step !== 'reading') return
+    const ids = [setTimeout(() => setPhase(1), 700), setTimeout(() => setPhase(2), 1400), setTimeout(() => onConnect(provider), 2100)]
+    return () => ids.forEach(clearTimeout)
+  }, [step]) // eslint-disable-line react-hooks/exhaustive-deps
+  const name = CAL_NAME[provider]
+  const reading = [t('Reading 14 days of {p}…', { p: name }), t('Adding up the hours by kind…'), t('Discarding the raw entries…')]
+  return (
+    <ToolCard
+      title={step === 'grant' ? t('{p} · access request', { p: name }) : t('Time audit · optional')}
+      aside={<SpecimenTag />}
+      lead={step === 'choose' ? t('Joy OS reads two weeks of one calendar, read-only and once. It adds the hours up into four kinds, keeps only those totals and discards every event. Freedom works without it.') : undefined}
+    >
+      {step === 'choose' ? (
+        <View style={{ gap: space.s2 }}>
+          {disconnected ? (
+            <Meta tone="ink" accessibilityLiveRegion="polite">
+              {t('Disconnected. The summary is deleted and nothing more will be read.')}
+            </Meta>
+          ) : null}
+          <Body size={20} style={{ lineHeight: 28 }}>
+            {t('Whose time is it? Connect a calendar to find out.')}
+          </Body>
+          <View style={{ gap: 8 }} accessibilityRole="radiogroup" accessibilityLabel={t('Choose a calendar')}>
+            <Eyebrow>{t('Choose a calendar')}</Eyebrow>
+            {CAL_PROVIDERS.map((p) => {
+              const sel = provider === p
+              return (
+                <Pressable
+                  key={p}
+                  onPress={() => setProvider(p)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: sel }}
+                  aria-checked={sel}
+                  accessibilityLabel={`${CAL_NAME[p]}. ${t('Read-only · the last 14 days')}`}
+                  style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14, minHeight: 56, borderRadius: radius.card, borderWidth: sel ? 2 : 1, borderColor: sel ? c.ink : c.line, backgroundColor: sel ? c.paperSunk : pressed ? c.paperSunk : undefined })}
+                >
+                  <View style={{ width: 18, height: 18, marginTop: 2, borderRadius: 9, borderWidth: 2, borderColor: sel ? c.ink : c.lineStrong, alignItems: 'center', justifyContent: 'center' }}>
+                    {sel ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.ink }} /> : null}
+                  </View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Body weight="medium">{CAL_NAME[p]}</Body>
+                    <Meta size={14} tone="ink3">{t('Read-only · the last 14 days')}</Meta>
+                  </View>
+                </Pressable>
+              )
+            })}
+          </View>
+          <View style={{ backgroundColor: c.paperSunk, borderRadius: radius.card, padding: space.s2, gap: space.s1 }}>
+            <View style={{ gap: 2 }}>
+              <Eyebrow>{t('What is kept')}</Eyebrow>
+              <Meta>{t('Hours per day in four kinds: yours, chosen work, asked of you, obligation.')}</Meta>
+            </View>
+            <View style={{ gap: 2 }}>
+              <Eyebrow>{t('What is never kept')}</Eyebrow>
+              <Meta>{t('Event titles, guests, places and notes. They are read, summarised and dropped.')}</Meta>
+            </View>
+          </View>
+          <Button variant="ink" icon="calendar" onPress={() => (setAgree(false), setStep('grant'))} style={{ alignSelf: 'flex-start' }}>
+            {t('Continue')}
+          </Button>
+        </View>
+      ) : step === 'grant' ? (
+        <View style={{ gap: space.s2 }}>
+          <Body size={20} style={{ lineHeight: 28 }}>
+            {t('Joy OS would like to read this calendar')}
+          </Body>
+          <View style={{ borderWidth: 1, borderColor: c.line, borderRadius: radius.card, padding: space.s2, gap: 8 }}>
+            <Eyebrow>{t('Joy OS can')}</Eyebrow>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Icon name="check" size={15} color={c.ink} />
+              <Meta tone="ink" style={{ flex: 1 }}>{t('See the times and titles of your events from 11 to 24 Jan, once')}</Meta>
+            </View>
+          </View>
+          <View style={{ borderWidth: 1, borderColor: c.line, borderRadius: radius.card, padding: space.s2, gap: 8 }}>
+            <Eyebrow>{t('Joy OS cannot')}</Eyebrow>
+            {[t('Create, change or delete events'), t('Invite, email or share with anyone'), t('Read again without asking you first')].map((x) => (
+              <View key={x} style={{ flexDirection: 'row', gap: 8 }}>
+                <Icon name="x" size={15} color={c.ink2} />
+                <Meta style={{ flex: 1 }}>{x}</Meta>
+              </View>
+            ))}
+          </View>
+          <Check checked={agree} onPress={() => setAgree((a) => !a)} label={t('I allow a one-time, read-only read of this calendar.')} />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s1 }}>
+            <Button variant="ink" icon="shield" disabled={!agree} onPress={() => (setPhase(0), setStep('reading'))}>
+              {t('Allow read')}
+            </Button>
+            <Button variant="ghost" onPress={() => setStep('choose')}>
+              {t('Back')}
+            </Button>
+          </View>
+          <Meta size={14} tone="ink3">
+            {t('Withdraw calendar consent any time in the Trust centre; the time audit stops at once.')}
+          </Meta>
+        </View>
+      ) : (
+        <View style={{ gap: space.s2 }}>
+          <Progress value={phase + 1} max={3} color={c.ink} label={t('Connecting your calendar')} />
+          <View style={{ gap: 8 }} accessibilityLiveRegion="polite">
+            {reading.map((x, i) => (
+              <View key={x} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                {i < phase ? <Icon name="check" size={15} color={c.ink} /> : <View style={{ width: 8, height: 8, marginHorizontal: 3, borderRadius: 4, backgroundColor: i === phase ? c.ink : undefined, borderWidth: i === phase ? 0 : 1, borderColor: c.lineStrong }} />}
+                <Meta tone={i <= phase ? 'ink' : 'ink3'} style={{ flex: 1 }}>{x}</Meta>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+    </ToolCard>
+  )
+}
+
+function CalendarOff({ provider, onDisconnect }: { provider: CalProvider | null; onDisconnect: () => void }) {
+  const { space } = useTheme()
+  const { t } = useA()
+  return (
+    <ToolCard tone="sunk" title={t('Time audit · optional')} lead={t('Calendar consent is withdrawn in the Trust centre. Joy OS reads no calendar, and no time-audit summary is shown.')}>
+      <Body size={20} style={{ lineHeight: 28 }}>
+        {t('The time audit is off.')}
+      </Body>
+      {provider ? <Meta tone="ink">{t('Your {p} connection is paused until you give consent again.', { p: CAL_NAME[provider] })}</Meta> : null}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s1 }}>
+        <Button variant="secondary" icon="shield" onPress={() => router.push('/trust')}>
+          {t('Turn calendar back on in the Trust centre')}
+        </Button>
+        {provider ? (
+          <Button variant="ghost" icon="trash-2" onPress={onDisconnect}>
+            {t('Disconnect and delete the summary')}
+          </Button>
+        ) : null}
+      </View>
+    </ToolCard>
+  )
+}
+
+function AuditView({ provider, rerun, onRerun, onDisconnect }: { provider: CalProvider; rerun: boolean; onRerun: () => void; onDisconnect: () => void }) {
   const { c, resolve, space } = useTheme()
   const { t, tx, lang, week } = useA()
   const totals = TIME_KINDS.map((k) => ({ ...k, hours: TIME_AUDIT.reduce((a, d) => a + d[k.key as Kind], 0) }))
@@ -79,8 +275,22 @@ function TimeAudit() {
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 1, borderTopColor: c.line, paddingTop: space.s1 }}>
         <Icon name="shield" size={14} color={c.ink3} />
         <Meta size={14} tone="ink3" style={{ flex: 1 }}>
-          {t('Google Calendar · entries summarised, then discarded. Priya sees totals only.')}
+          {t('{p} · entries summarised, then discarded. Priya sees totals only.', { p: CAL_NAME[provider] })}
         </Meta>
+      </View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.s1 }}>
+        {rerun ? (
+          <Meta tone="ink2" accessibilityLiveRegion="polite" style={{ flexBasis: '100%' }}>
+            {t('Scheduled for 7 Feb. We will ask again before reading.')}
+          </Meta>
+        ) : (
+          <Button size="sm" variant="secondary" icon="calendar" onPress={onRerun}>
+            {t('Run again in two weeks')}
+          </Button>
+        )}
+        <Button size="sm" variant="ghost" onPress={onDisconnect}>
+          {t('Disconnect {p}', { p: CAL_NAME[provider] })}
+        </Button>
       </View>
     </ToolCard>
   )

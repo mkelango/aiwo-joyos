@@ -1,19 +1,23 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { CalendarCheck, Check, Info, Landmark, Plus, ShieldCheck, Trash2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { CalendarCheck, Check, Info, Landmark, Plus, ShieldCheck, Trash2, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { DaybreakButton, Eyebrow, SpecimenTag } from '@/components/joy/primitives'
 import { Button, Pill, Progress, Tabs } from '@/components/ui'
 import { NO_SUGGESTIONS, PEACE_OF_MIND, TIME_AUDIT, TIME_KINDS } from './_data'
 import { ChartTip, SpaceShell, ToolCard, axisTick, rovingRadio, useCrisisGuard, Toggle } from './_SpaceShell'
-import { useSpaceText } from './_i18n'
+import { useSpaceText, type SpKey } from './_i18n'
+import { CONSENTS } from '@/data/member'
+import { ACCT_CHANGED } from '@/routes/member/account/_prefs'
 import { useSpaceState } from './_state'
 
 // FREEDOM (Memo p.19): the time audit (two weeks of calendar, consented,
 // summarised then discarded: whose time is it?), the No list, the digital
 // sabbath scheduler, the peace-of-mind checklist. Never financial advice.
+// The time audit starts from a calendar opt-in (provider, read-only grant) and
+// follows the calendar consent in the Trust centre.
 // The one Daybreak button: keep my No list.
 export default function Freedom() {
   const { t, r } = useSpaceText()
@@ -34,9 +38,167 @@ export default function Freedom() {
 
 // ─── Time audit ───────────────────────────────────────────────────────────
 
+// Calendar opt-in (Memo p.26, Arch p.24): Google or Microsoft, read-only, only for the time
+// audit, read once, summarised to hours by kind, raw events discarded. The purpose-level
+// consent lives in the Trust centre (joyos:acct:consents, c_cal); this screen only reads it,
+// so a withdrawal there turns the audit off here.
+type CalProvider = 'google' | 'microsoft'
+const CAL_PROVIDERS: readonly CalProvider[] = ['google', 'microsoft']
+const CAL_NAME: Record<CalProvider, string> = { google: 'Google Calendar', microsoft: 'Microsoft Outlook' }
+type CalConnection = { provider: CalProvider | null }
+
+function readCalendarConsent(): { on: boolean; withdrawnAt?: string } {
+  const fallback = CONSENTS.find((c) => c.id === 'c_cal')?.granted ?? false
+  let on = fallback
+  try {
+    const raw = localStorage.getItem('joyos:acct:consents')
+    const v = raw ? (JSON.parse(raw) as Record<string, { on?: unknown }>) : null
+    if (v && typeof v.c_cal?.on === 'boolean') on = v.c_cal.on
+  } catch {
+    /* storage unavailable: the specimen consent stands */
+  }
+  if (on) return { on }
+  // The Trust centre's consent history carries the date of the withdrawal, when there is one.
+  try {
+    const raw = localStorage.getItem('joyos:acct:consent-history')
+    const h = raw ? (JSON.parse(raw) as { events?: { ref: string; action: string; at: string }[] }) : null
+    const last = (h?.events ?? []).filter((e) => e.ref === 'c_cal').sort((a, b) => a.at.localeCompare(b.at)).pop()
+    return { on, withdrawnAt: last?.action === 'withdrawn' ? last.at.slice(0, 10) : undefined }
+  } catch {
+    return { on }
+  }
+}
+
+/** The Trust centre's calendar consent, read-only, following changes made elsewhere. */
+function useCalendarConsent() {
+  const [c, setC] = useState(readCalendarConsent)
+  useEffect(() => {
+    const sync = () => setC(readCalendarConsent())
+    window.addEventListener(ACCT_CHANGED, sync)
+    window.addEventListener('storage', sync)
+    window.addEventListener('focus', sync)
+    return () => {
+      window.removeEventListener(ACCT_CHANGED, sync)
+      window.removeEventListener('storage', sync)
+      window.removeEventListener('focus', sync)
+    }
+  }, [])
+  return c
+}
+
 function TimeAudit() {
-  const [view, setView] = useState<'day' | 'total'>('day')
+  const consent = useCalendarConsent()
+  const [conn, setConn] = useSpaceState<CalConnection>('freedom.calendar.v1', { provider: null })
   const [rerun, setRerun] = useSpaceState<'idle' | 'asked'>('freedom.audit.rerun.v1', 'idle')
+  const [note, setNote] = useState('')
+  const provider = conn.provider && CAL_PROVIDERS.includes(conn.provider) ? conn.provider : null
+  const disconnect = () => { setConn({ provider: null }); setRerun('idle'); setNote('fr.ta.disconnected') }
+  if (!consent.on) return <CalendarOff provider={provider} withdrawnAt={consent.withdrawnAt} onDisconnect={disconnect} />
+  if (!provider) return <CalendarOptIn note={note} onConnect={(p) => { setConn({ provider: p }); setNote('') }} />
+  return <AuditView provider={provider} rerun={rerun} onRerun={() => setRerun('asked')} onDisconnect={disconnect} />
+}
+
+function CalendarOptIn({ note, onConnect }: { note: string; onConnect: (p: CalProvider) => void }) {
+  const [step, setStep] = useState<'choose' | 'grant' | 'reading'>('choose')
+  const [provider, setProvider] = useState<CalProvider>('google')
+  const [agree, setAgree] = useState(false)
+  const [phase, setPhase] = useState(0)
+  const { t } = useSpaceText()
+  const radio = rovingRadio(CAL_PROVIDERS, provider, setProvider)
+  // Reading is simulated: three short beats, then the summary appears and the raw entries are gone.
+  useEffect(() => {
+    if (step !== 'reading') return
+    const ids = [window.setTimeout(() => setPhase(1), 700), window.setTimeout(() => setPhase(2), 1400), window.setTimeout(() => onConnect(provider), 2100)]
+    return () => ids.forEach((id) => window.clearTimeout(id))
+  }, [step]) // eslint-disable-line react-hooks/exhaustive-deps
+  const name = CAL_NAME[provider]
+  return (
+    <ToolCard eyebrow={step === 'grant' ? t('fr.cal.grantEyebrow', { p: name }) : t('fr.cal.eyebrow')} title={step === 'grant' ? t('fr.cal.grantTitle') : t('fr.cal.title')} sub={step === 'choose' ? t('fr.cal.sub') : undefined} aside={<SpecimenTag />}>
+      <AnimatePresence mode="wait" initial={false}>
+        {step === 'choose' && (
+          <motion.div key="choose" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }}>
+            {note && <p role="status" className="mb-4 rounded-2xl border border-line px-4 py-3 text-[14px] text-ink-2">{t(note as SpKey)}</p>}
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)]">
+              <div>
+                <Eyebrow>{t('fr.cal.choose')}</Eyebrow>
+                <div role="radiogroup" aria-label={t('fr.cal.choose')} className="mt-2.5 grid gap-2.5 sm:grid-cols-2">
+                  {CAL_PROVIDERS.map((p) => (
+                    <button key={p} type="button" {...radio(p)} className={clsx('flex items-start gap-3 rounded-2xl border p-4 text-left focus-ring', provider === p ? 'border-ink bg-paper-sunk' : 'border-line hover:border-line-strong')}>
+                      <span aria-hidden className={clsx('mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border', provider === p ? 'border-ink' : 'border-line-strong')}>{provider === p && <span className="h-2 w-2 rounded-full bg-ink" />}</span>
+                      <span className="min-w-0">
+                        <span className="block text-[16px] text-ink">{CAL_NAME[p]}</span>
+                        <span className="mt-0.5 block text-[13px] text-ink-3">{t('fr.cal.readonly')}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <Button variant="ink" className="mt-5" onClick={() => { setAgree(false); setStep('grant') }}><CalendarCheck size={15} /> {t('fr.cal.continue')}</Button>
+              </div>
+              <dl className="space-y-4 rounded-2xl bg-paper-sunk p-4 text-[14px]">
+                <div><dt className="eyebrow text-ink-3">{t('fr.cal.keeps')}</dt><dd className="mt-1 text-ink-2">{t('fr.cal.keepsB')}</dd></div>
+                <div><dt className="eyebrow text-ink-3">{t('fr.cal.never')}</dt><dd className="mt-1 text-ink-2">{t('fr.cal.neverB')}</dd></div>
+              </dl>
+            </div>
+          </motion.div>
+        )}
+        {step === 'grant' && (
+          <motion.div key="grant" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }} className="max-w-[40rem]">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-2xl border border-line p-4">
+                <Eyebrow>{t('fr.cal.can')}</Eyebrow>
+                <p className="mt-2 flex gap-2 text-[14px] text-ink"><Check size={15} className="mt-0.5 shrink-0" aria-hidden /> {t('fr.cal.can1')}</p>
+              </div>
+              <div className="rounded-2xl border border-line p-4">
+                <Eyebrow>{t('fr.cal.cannot')}</Eyebrow>
+                <ul className="mt-2 space-y-1.5 text-[14px] text-ink-2">
+                  {(['fr.cal.cannot1', 'fr.cal.cannot2', 'fr.cal.cannot3'] as const).map((k) => <li key={k} className="flex gap-2"><X size={15} className="mt-0.5 shrink-0" aria-hidden /> {t(k)}</li>)}
+                </ul>
+              </div>
+            </div>
+            <label className="mt-5 flex cursor-pointer items-start gap-3">
+              <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="peer sr-only" />
+              <span aria-hidden className={clsx('mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[color:var(--daybreak)]', agree ? 'border-ink bg-ink text-paper' : 'border-line-strong')}>{agree && <Check size={13} />}</span>
+              <span className="text-[15px] text-ink">{t('fr.cal.agree')}</span>
+            </label>
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              <Button variant="ink" disabled={!agree} onClick={() => { setPhase(0); setStep('reading') }}><ShieldCheck size={15} /> {t('fr.cal.allow')}</Button>
+              <Button variant="ghost" onClick={() => setStep('choose')}>{t('fr.cal.back')}</Button>
+            </div>
+          </motion.div>
+        )}
+        {step === 'reading' && (
+          <motion.div key="reading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }} className="max-w-[32rem]">
+            <Progress value={phase + 1} max={3} color="var(--term-f)" label={t('fr.cal.readingLabel')} />
+            <ol className="mt-4 space-y-2 text-[15px]" aria-live="polite">
+              {(['fr.cal.reading1', 'fr.cal.reading2', 'fr.cal.reading3'] as const).map((k, i) => (
+                <li key={k} className={clsx('flex items-center gap-2', i <= phase ? 'text-ink' : 'text-ink-3')}>
+                  {i < phase ? <Check size={15} className="shrink-0" aria-hidden /> : <span aria-hidden className={clsx('ml-[3px] h-2 w-2 shrink-0 rounded-full', i === phase ? 'bg-ink' : 'border border-line-strong')} />}
+                  <span className={i < phase ? '' : 'ml-0.5'}>{t(k, { p: name })}</span>
+                </li>
+              ))}
+            </ol>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </ToolCard>
+  )
+}
+
+function CalendarOff({ provider, withdrawnAt, onDisconnect }: { provider: CalProvider | null; withdrawnAt?: string; onDisconnect: () => void }) {
+  const { t, dm } = useSpaceText()
+  return (
+    <ToolCard tone="sunk" eyebrow={t('fr.cal.eyebrow')} title={t('fr.cal.offTitle')} sub={<>{t('fr.cal.offSub')}{withdrawnAt ? <> {t('fr.cal.offOn', { d: dm(withdrawnAt) })}</> : null}</>} aside={<ShieldCheck size={16} className="text-ink-3" aria-hidden />}>
+      {provider && <p className="text-[14px] text-ink-2">{t('fr.cal.paused', { p: CAL_NAME[provider] })}</p>}
+      <div className={clsx('flex flex-wrap items-center gap-3', provider && 'mt-4')}>
+        <Link to="/app/trust#consents" className="inline-flex h-11 items-center gap-2 rounded-full border border-line-strong bg-paper-raised px-4 text-[15px] font-medium text-ink hover:bg-paper-sunk focus-ring">{t('fr.cal.turnOn')}</Link>
+        {provider && <Button variant="ghost" onClick={onDisconnect}><Trash2 size={14} /> {t('fr.cal.deleteSummary')}</Button>}
+      </div>
+    </ToolCard>
+  )
+}
+
+function AuditView({ provider, rerun, onRerun, onDisconnect }: { provider: CalProvider; rerun: 'idle' | 'asked'; onRerun: () => void; onDisconnect: () => void }) {
+  const [view, setView] = useState<'day' | 'total'>('day')
   const { t, d, r, day } = useSpaceText()
   const dayLabel = (v: string) => { const [w, n] = v.split(' '); return `${day(w)} ${n}` }
   const totals = useMemo(() => {
@@ -50,7 +212,7 @@ function TimeAudit() {
   const names = Object.fromEntries(TIME_KINDS.map((k) => [k.key, d(k.label)]))
   return (
     <ToolCard
-      eyebrow={t('fr.ta.eyebrow')}
+      eyebrow={t('fr.ta.eyebrow', { p: CAL_NAME[provider] })}
       title={<>{r('fr.ta.title', { p: <span className="num">{pct(totals.mine)}%</span>, e: <em>{t('fr.ta.titleE')}</em> })}</>}
       sub={t('fr.ta.sub', { all: Math.round(all), mine: pct(totals.mine), asked: pct(totals.asked), wk: weekdayAsked })}
       aside={<SpecimenTag />}
@@ -97,8 +259,11 @@ function TimeAudit() {
         )}
       </AnimatePresence>
       <div className="mt-6 flex flex-col gap-3 border-t border-line pt-4 md:flex-row md:items-center md:justify-between">
-        <p className="flex items-start gap-2 text-[13px] text-ink-3"><ShieldCheck size={15} className="mt-0.5 shrink-0" aria-hidden /> <span>{r('fr.ta.footer', { link: <Link to="/app/trust" className="rounded underline underline-offset-4 focus-ring">{t('c.trust')}</Link> })}</span></p>
-        {rerun === 'idle' ? <Button size="sm" onClick={() => setRerun('asked')}><CalendarCheck size={14} /> {t('fr.ta.rerun')}</Button> : <p className="text-[13px] text-ink-2" role="status">{t('fr.ta.scheduled')}</p>}
+        <p className="flex items-start gap-2 text-[13px] text-ink-3"><ShieldCheck size={15} className="mt-0.5 shrink-0" aria-hidden /> <span>{r('fr.ta.footer', { p: CAL_NAME[provider], link: <Link to="/app/trust#consents" className="rounded underline underline-offset-4 focus-ring">{t('c.trust')}</Link> })}</span></p>
+        <div className="flex flex-wrap items-center gap-2">
+          {rerun === 'idle' ? <Button size="sm" onClick={onRerun}><CalendarCheck size={14} /> {t('fr.ta.rerun')}</Button> : <p className="text-[13px] text-ink-2" role="status">{t('fr.ta.scheduled')}</p>}
+          <Button size="sm" variant="ghost" onClick={onDisconnect}>{t('fr.ta.disconnect', { p: CAL_NAME[provider] })}</Button>
+        </div>
       </div>
     </ToolCard>
   )

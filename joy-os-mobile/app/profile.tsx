@@ -6,11 +6,12 @@ import { useApp, type Lang } from '@/lib/store'
 import { HOUSEHOLD, MEMBER } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
 import { PLANS } from '@/screens/b/_data'
-import { accountStore, maskPhone, sessionStore, useStore, type AccountState } from '@/screens/b/bStore'
+import { abhaStore, accountStore, maskPhone, nomineeStore, sessionStore, useStore, type AccountState } from '@/screens/b/bStore'
 import { Done, Field, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
 import { useDict } from '@/lib/i18n'
 import { PROFILE, SETTINGS, RELATION_TEXT } from '@/screens/b/i18n/account'
 import { useCommon, useTx } from '@/screens/b/i18n/common'
+import { NOMINEE_REL } from '@/screens/b/i18n/trust'
 
 // PROFILE: who you are in Joy OS — AIWO ID (copy), personal details (validated edit), the
 // household, an emergency contact, the account links, and a deliberate sign-out with a
@@ -28,6 +29,9 @@ function Profile() {
   const { lang, setLang } = useApp()
   const guard = useSheetCrisisGuard()
   const [acct, setAcct] = useStore(accountStore)
+  // The DPDP nominee and ABHA are set in the Trust centre; Profile shows them.
+  const [nominee] = useStore(nomineeStore)
+  const [abha] = useStore(abhaStore)
   const planName = `${PLANS.find((p) => p.key === acct.plan)?.name ?? MEMBER.plan} + ${MEMBER.membership}`
   const [, setSession] = useStore(sessionStore)
   const [copied, setCopied] = useState(false)
@@ -155,6 +159,16 @@ function Profile() {
           <Body weight="medium">{em.name}</Body>
           <Meta>{`${tx(RELATION_TEXT[em.relation], em.relation)} · ${maskPhone(em.phone)}`}</Meta>
           <Meta size={14} tone="ink3">{t('calledOnly')}</Meta>
+        </Card>
+      </View>
+
+      <View style={{ gap: space.s1 }}>
+        <SectionTitle aside={<Button variant="link" onPress={() => router.push('/trust')}>{tc('edit')}</Button>}>{t('nomineeEyebrow')}</SectionTitle>
+        <Card tone="raised" style={{ gap: 4 }}>
+          <Body weight="medium">{nominee.name}</Body>
+          <Meta>{`${tx(NOMINEE_REL[nominee.relation], nominee.relation)} · ${nominee.email}`}</Meta>
+          <Meta size={14} tone="ink3">{t('nomineeNote')}</Meta>
+          <Meta size={14} tone="ink3">{abha.linked ? t('abhaLine', { address: abha.address }) : t('abhaNone')}</Meta>
         </Card>
       </View>
 

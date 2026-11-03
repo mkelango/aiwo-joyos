@@ -211,4 +211,23 @@ export const CATION = dict({
   Meal: ['உணவு', 'भोजन'],
   Talk: ['உரையாடல்', 'बातचीत'],
   'Physician · AIWO Clinical': ['மருத்துவர் · AIWO Clinical', 'डॉक्टर · AIWO Clinical'],
+
+  // Empty state (a member with no ’cation yet) and Joyspan Occasions
+  'Specimen view: a member with no ’cation yet': ['மாதிரிப் பார்வை: இன்னும் ’கேஷன் எடுக்காத உறுப்பினர்', 'नमूना दृश्य: ऐसा सदस्य जिसने अभी कोई ’केशन नहीं लिया'],
+  'See this tab as it looks before a first stay. Turn it off to return to Arjun’s Joycation.': ['முதல் தங்கலுக்கு முன் இந்தத் தாவல் எப்படித் தெரியும் என்று பாருங்கள். அர்ஜுனின் Joycation-க்குத் திரும்ப இதை அணையுங்கள்.', 'देखिए कि पहले ठहराव से पहले यह टैब कैसा दिखता है। अर्जुन के Joycation पर लौटने के लिए इसे बंद करें।'],
+  'none taken yet': ['இன்னும் எதுவும் எடுக்கவில்லை', 'अभी कोई नहीं लिया'],
+  'You have not taken a ’cation yet. Your Index already says where one would help most.': ['நீங்கள் இன்னும் ’கேஷன் எடுக்கவில்லை. எது அதிகம் உதவும் என்பதை உங்கள் குறியீடு ஏற்கெனவே சொல்கிறது.', 'आपने अभी कोई ’केशन नहीं लिया है। आपका इंडेक्स पहले से बताता है कि सबसे ज़्यादा मदद कहाँ होगी।'],
+  'Your first ’cation, for your lowest term: {name}': ['உங்கள் முதல் ’கேஷன், உங்கள் மிகக் குறைந்த கூறுக்காக: {name}', 'आपका पहला ’केशन, आपके सबसे कम पहलू के लिए: {name}'],
+  '{lowest} is your lowest term at *{v}*. {cation} is made for it: {promise} It ends with a measured delta on Day 90, not a souvenir.': ['{lowest} உங்கள் மிகக் குறைந்த கூறு, *{v}*. {cation} அதற்காகவே உருவானது: {promise} அது நினைவுப் பொருளோடு அல்ல, நாள் 90-இல் அளக்கப்பட்ட மாற்றத்தோடு முடிகிறது.', '{lowest} आपका सबसे कम पहलू है, *{v}* पर। {cation} इसी के लिए बना है: {promise} यह किसी यादगार चीज़ पर नहीं, दिन 90 पर मापे गए बदलाव पर ख़त्म होता है।'],
+  'Also for {lowest}: {list}': ['{lowest}-க்கு மேலும்: {list}', '{lowest} के लिए और भी: {list}'],
+  'See your request': ['உங்கள் கோரிக்கையைப் பாருங்கள்', 'अपना अनुरोध देखें'],
+  'What every ’cation promises': ['ஒவ்வொரு ’கேஷனும் தரும் உறுதி', 'हर ’केशन का वादा'],
+  'A named outcome on the booking, in your own words': ['முன்பதிவில், உங்கள் சொற்களில், ஒரு பெயரிட்ட விளைவு', 'बुकिंग पर आपके अपने शब्दों में लिखा एक नामित नतीजा'],
+  'A measured change in the primary term, kept in Joy OS': ['முதன்மைக் கூறில் அளக்கப்பட்ட மாற்றம், Joy OS-இல் வைக்கப்படும்', 'मुख्य पहलू में मापा गया बदलाव, जो Joy OS में रखा जाता है'],
+  'A named clinician present, not on call': ['அழைப்பில் அல்ல, நேரில் இருக்கும் பெயரிட்ட மருத்துவர்', 'एक नामित चिकित्सक जो मौजूद रहते हैं, सिर्फ़ फ़ोन पर नहीं'],
+  'Ninety days of continuation from checkout': ['புறப்பட்ட நாளிலிருந்து தொண்ணூறு நாள் தொடர்ச்சி', 'चेक-आउट से नब्बे दिन की निरंतरता'],
+  'Joyspan Occasions': ['ஜாய்ஸ்பான் விழாக்கள்', 'जॉयस्पैन अवसर'],
+  'A 60th birthday, an anniversary, a homecoming': ['60வது பிறந்தநாள், ஒரு திருமண நாள், ஒரு வீடு திரும்புதல்', '60वाँ जन्मदिन, एक सालगिरह, एक घर-वापसी'],
+  'The family’s day, with three generations measured together: each person their own Index and their own ninety days.': ['குடும்பத்தின் நாள், மூன்று தலைமுறைகள் ஒன்றாக அளக்கப்படும்: ஒவ்வொருவருக்கும் சொந்தக் குறியீடு, சொந்தத் தொண்ணூறு நாட்கள்.', 'परिवार का दिन, तीन पीढ़ियाँ एक साथ मापी जाती हैं: हर व्यक्ति का अपना इंडेक्स और अपने नब्बे दिन।'],
+  'See the Occasions': ['விழாக்களைப் பாருங்கள்', 'अवसर देखें'],
 })

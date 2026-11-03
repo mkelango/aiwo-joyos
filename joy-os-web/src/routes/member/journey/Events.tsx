@@ -9,7 +9,7 @@ import { Button, Card, EmptyState, LoopRing, PageHeader, Pill, SectionTitle, She
 import { CIRCLE, COHORTS, EVENTS } from '@/data/platform'
 import { HOUSEHOLD, INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
 import { FLAGSHIP_NEXT, FLAGSHIP_RECAP, PASSES, SALONS, SESSIONS_ALLOWANCE, SESSIONS_OPEN, SESSION_SCHEDULE, ZONES } from './_data'
-import { QRCode, SheetFocus, fade } from './_parts'
+import { OccasionsCard, QRCode, SheetFocus, fade } from './_parts'
 // One shared emergency intercept for every member free-text field (Memo p.24).
 import { useCrisisGuard } from '@/routes/member/spaces/_SpaceShell'
 import { addPass, cancelPass, holderName, passCode, setFlagshipRequest, setSalon, setSchedule, useJourney } from './_store'
@@ -250,6 +250,9 @@ export default function Events() {
 
       {/* Upcoming at AIWO */}
       <UpcomingAtAiwo />
+
+      {/* Joyspan Occasions */}
+      <OccasionsCard />
 
       {/* Sessions booking */}
       <SessionBooking onShowPass={setOpenPass} />

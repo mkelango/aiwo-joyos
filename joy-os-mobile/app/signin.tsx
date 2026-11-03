@@ -26,7 +26,7 @@ const ID_RE = /^AIWO-[A-Z0-9]{4}-[A-Z0-9]{4}$/
 export default function SignIn() {
   const { c, space } = useTheme()
   const insets = useSafeAreaInsets()
-  const { setCrisisOpen } = useApp()
+  const { setCrisisOpen, deviceAtRisk } = useApp()
   const { next = '' } = useLocalSearchParams<{ next?: string }>()
   const [, setSession] = useStore(sessionStore)
   const [phase, setPhase] = useState<Phase>('id')
@@ -385,6 +385,10 @@ export default function SignIn() {
           ) : null}
 
           <View style={{ marginTop: 'auto', alignItems: 'center', gap: 4 }}>
+            {/* Client security (Architecture p21): the jailbreak / root check, warn not block. */}
+            <Button variant="link" size="sm" icon={deviceAtRisk ? 'shield-off' : 'shield'} onPress={() => router.push('/device-security')} style={{ alignSelf: 'center' }}>
+              {deviceAtRisk ? t('phoneRisk') : t('phoneOk')}
+            </Button>
             <Button variant="link" onPress={() => setCrisisOpen(true)} style={{ alignSelf: 'center' }}>
               {tc('crisis')}
             </Button>

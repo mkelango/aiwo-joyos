@@ -43,6 +43,8 @@ export interface Palette {
   termDInk: string
   termBInk: string
   wheelGuide: string
+  /** The Day-0 outline on the Wheel: a 14% Ink ghost (Playbook p45). */
+  wheelGhost: string
   /** Modal scrim behind sheets. */
   scrim: string
 }
@@ -96,6 +98,7 @@ export const light: Palette = {
   termDInk: '#7a5a00',
   termBInk: '#7d5230',
   wheelGuide: 'rgba(28,19,20,0.12)',
+  wheelGhost: 'rgba(28,19,20,0.14)',
   scrim: 'rgba(28,19,20,0.32)',
 }
 
@@ -131,6 +134,7 @@ export const dark: Palette = {
   termBInk: '#e3a86e',
   termB: '#e3a86e', // the minus on dark grounds
   wheelGuide: 'rgba(242,238,232,0.14)',
+  wheelGhost: 'rgba(242,238,232,0.14)',
   scrim: 'rgba(0,0,0,0.55)',
 }
 
@@ -153,6 +157,46 @@ export const fonts = {
   mono: 'IBMPlexMono_400Regular',
   monoMedium: 'IBMPlexMono_500Medium',
 } as const
+
+/**
+ * Tamil and Hindi (Playbook p41; Architecture p21): Mukta Malar for Tamil, Mukta for
+ * Devanagari, loaded by ThemeProvider when the language needs them. Nunito Sans and Newsreader
+ * carry no Indic glyphs, so the sans roles take Mukta / Mukta Malar and the serif roles take
+ * Noto Serif Tamil and Tiro Devanagari Hindi (their italic cuts). Mono stays IBM Plex Mono:
+ * numbers are Latin digits in every language.
+ */
+/** A set of font families, one per role. */
+export type FontSet = { [K in keyof typeof fonts]: string }
+
+export const indicFonts: Record<'ta' | 'hi', FontSet> = {
+  ta: {
+    sansLight: 'MuktaMalar_300Light',
+    sans: 'MuktaMalar_400Regular',
+    sansMedium: 'MuktaMalar_500Medium',
+    sansSemi: 'MuktaMalar_600SemiBold',
+    sansBold: 'MuktaMalar_700Bold',
+    serifItalic: 'NotoSerifTamil_400Regular_Italic',
+    serifLightItalic: 'NotoSerifTamil_300Light_Italic',
+    monoLight: fonts.monoLight,
+    mono: fonts.mono,
+    monoMedium: fonts.monoMedium,
+  },
+  hi: {
+    sansLight: 'Mukta_300Light',
+    sans: 'Mukta_400Regular',
+    sansMedium: 'Mukta_500Medium',
+    sansSemi: 'Mukta_600SemiBold',
+    sansBold: 'Mukta_700Bold',
+    serifItalic: 'TiroDevanagariHindi_400Regular_Italic',
+    serifLightItalic: 'TiroDevanagariHindi_400Regular_Italic',
+    monoLight: fonts.monoLight,
+    mono: fonts.mono,
+    monoMedium: fonts.monoMedium,
+  },
+}
+
+/** Tamil and Devanagari set one step larger than Latin at the same role, with +10% leading (Playbook p41). */
+export const indicType = { scale: 1.06, leading: 1.1 } as const
 
 /** Type scale in points. 17 is the body minimum for reading text (Memo p.18). */
 export const type = {

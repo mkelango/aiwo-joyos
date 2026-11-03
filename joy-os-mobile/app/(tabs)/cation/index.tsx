@@ -1,5 +1,5 @@
 import { router } from 'expo-router'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Pressable, View } from 'react-native'
 import {
   AppBar,
@@ -26,6 +26,8 @@ import {
   TermChip,
   TermDot,
   Title,
+  Toggle,
+  Button,
   fmtDate,
 } from '@/components'
 import { INDEX_HISTORY, MEMBER, TEAM } from '@/shared/member'
@@ -35,13 +37,14 @@ import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { MY_CATION, SIGNAL_READINGS } from '@/screens/b/journeyData'
 import { FilterChips, HereMarker, PrimaryChip, TimelineStep } from '@/screens/b/parts'
-import { useCationRequests } from '@/screens/a/local'
+import { useCationRequests, useLocal } from '@/screens/a/local'
 import { Rich, useA } from '@/screens/a/i18n'
 import { useT } from '@/lib/i18n'
 
 // ’CATION (Memo p.20): the member's current journey — before, during, after; the hand-off,
 // readings from Signal Points, the named outcome and the ninety days; then the ’cation for
-// the lowest term and the ten. One Daybreak: see the suggested ’cation.
+// the lowest term, Joyspan Occasions and the ten. One Daybreak: see the suggested ’cation.
+// A specimen switch shows the empty state of a member with no ’cation yet (Memo p.17).
 
 type Filter = 'all' | 'ALL' | TermKey
 
@@ -54,15 +57,16 @@ const phaseState = (key: string): 'done' | 'now' | 'next' => {
 }
 
 export default function CationHome() {
+  // A specimen switch shows the tab for a member with no ’cation yet: the empty state invites the
+  // ’cation for the lowest term (Memo p.17). Kept on the phone until switched back.
+  const [noCation, setNoCation] = useLocal('cationDemoEmpty', false)
+  return noCation ? <NoCation demo={<DemoSwitch on={noCation} onChange={setNoCation} />} /> : <WithCation demo={<DemoSwitch on={noCation} onChange={setNoCation} />} />
+}
+
+function WithCation({ demo }: { demo: ReactNode }) {
   const { c, space } = useTheme()
   const { t, tx, lang, name, space: spaceName } = useA()
   const tt = useT()
-  const [filter, setFilter] = useState<Filter>('all')
-  const { requests } = useCationRequests()
-  const requestLine = (slug: string) => {
-    const r = requests[slug]
-    return r ? `${r.interestOnly ? t('Interest registered') : t('Requested')} · ${r.ref}` : null
-  }
   const latest = INDEX_HISTORY[0]
   const lowest = termByKey(latest.lowestTerm)
   const lowestScore = latest.terms.find((t) => t.key === latest.lowestTerm)?.value
@@ -70,8 +74,6 @@ export default function CationHome() {
   const suggested = CATIONS.find((x) => x.slug === 'savourcation')!
   const coach = TEAM.find((p) => p.role === 'Coach')!
   const concierge = TEAM.find((p) => p.role === 'Concierge')!
-  const groups: (TermKey | 'ALL')[] = ['ALL', 'H', 'P', 'R', 'F', 'D', 'B']
-  const shown = groups.flatMap((g) => CATIONS.filter((x) => x.primary === g)).filter((x) => filter === 'all' || x.primary === filter)
 
   return (
     <Screen inTabs top={<AppBar />}>
@@ -80,6 +82,7 @@ export default function CationHome() {
         title={<Rich text={t('Go somewhere. Come back *different*.')} wrap={(w) => <Serif>{w}</Serif>} />}
         lead={t('You checked out of {venue} on {date}. The ’cation ended; the ninety days did not.', { venue: MY_CATION.venue, date: fmtDate(MY_CATION.checkedOut, lang) })}
       />
+      {demo}
 
       {/* Current journey timeline */}
       <Card tone="raised" style={{ gap: space.s3 }}>
@@ -255,6 +258,28 @@ export default function CationHome() {
         </Card>
       </View>
 
+      <OccasionsLink />
+
+      <Catalogue />
+    </Screen>
+  )
+}
+
+/** The ten ’cations, filterable by term. `noCation` hides the line for the ’cation the specimen member took. */
+function Catalogue({ noCation = false }: { noCation?: boolean }) {
+  const { c, space } = useTheme()
+  const { t, tx, space: spaceName } = useA()
+  const [filter, setFilter] = useState<Filter>('all')
+  const { requests } = useCationRequests()
+  const requestLine = (slug: string) => {
+    const r = requests[slug]
+    return r ? `${r.interestOnly ? t('Interest registered') : t('Requested')} · ${r.ref}` : null
+  }
+  const latest = INDEX_HISTORY[0]
+  const groups: (TermKey | 'ALL')[] = ['ALL', 'H', 'P', 'R', 'F', 'D', 'B']
+  const shown = groups.flatMap((g) => CATIONS.filter((x) => x.primary === g)).filter((x) => filter === 'all' || x.primary === filter)
+  return (
+    <>
       {/* The ten */}
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{t('The ten ’cations · by term')}</SectionTitle>
@@ -288,7 +313,7 @@ export default function CationHome() {
                 <Eyebrow>{tx(x.nights)}</Eyebrow>
               </View>
               <Meta>{tx(x.promise)}</Meta>
-              {x.slug === MY_CATION.slug ? <Meta size={14} tone="daybreak">{t('You took this · {venue}', { venue: MY_CATION.venue })}</Meta> : null}
+              {!noCation && x.slug === MY_CATION.slug ? <Meta size={14} tone="daybreak">{t('You took this · {venue}', { venue: MY_CATION.venue })}</Meta> : null}
               {x.primary === latest.lowestTerm ? <Meta size={14} tone="daybreak">{t('For your lowest term')}</Meta> : null}
               {requestLine(x.slug) ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -320,6 +345,106 @@ export default function CationHome() {
           </Meta>
         </View>
       </View>
+    </>
+  )
+}
+
+/** Specimen switch between Arjun’s ’Cation tab and the tab of a member who has not taken one yet. */
+function DemoSwitch({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+  const { c, space, radius } = useTheme()
+  const { t } = useA()
+  return (
+    <View style={{ borderWidth: 1, borderStyle: 'dashed', borderColor: c.lineStrong, borderRadius: radius.card, padding: space.s2, gap: 8 }}>
+      <SpecimenTag />
+      <Toggle checked={on} onChange={onChange} label={t('Specimen view: a member with no ’cation yet')} description={t('See this tab as it looks before a first stay. Turn it off to return to Arjun’s Joycation.')} />
+    </View>
+  )
+}
+
+/** Joyspan Occasions: a family day, measured (Memo p.20). Opens /occasions. */
+function OccasionsLink() {
+  const { c, space } = useTheme()
+  const { t } = useA()
+  return (
+    <Card tone="outline" style={{ gap: space.s2 }}>
+      <View style={{ flexDirection: 'row', gap: space.s2 }}>
+        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.paperSunk, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="gift" size={19} color={c.ink2} />
+        </View>
+        <View style={{ flex: 1, gap: 4 }}>
+          <Eyebrow>{t('Joyspan Occasions')}</Eyebrow>
+          <Title size={20}>{t('A 60th birthday, an anniversary, a homecoming')}</Title>
+          <Meta>{t('The family’s day, with three generations measured together: each person their own Index and their own ninety days.')}</Meta>
+        </View>
+      </View>
+      <Button variant="secondary" iconRight="arrow-right" onPress={() => router.push('/occasions')} style={{ alignSelf: 'flex-start' }}>
+        {t('See the Occasions')}
+      </Button>
+    </Card>
+  )
+}
+
+/** The ’Cation tab for a member with no ’cation yet: the empty state invites the ’cation for the lowest term. */
+function NoCation({ demo }: { demo: ReactNode }) {
+  const { c, space } = useTheme()
+  const { t, tx, name } = useA()
+  const tt = useT()
+  const { requests } = useCationRequests()
+  const latest = INDEX_HISTORY[0]
+  const lowest = latest.lowestTerm
+  const score = latest.terms.find((x) => x.key === lowest)?.value ?? ''
+  const forLowest = CATIONS.filter((x) => x.primary === lowest)
+  // The invitation leads with the ’cation already suggested for this term, else the first open one for it.
+  const invite = forLowest.find((x) => x.slug === 'savourcation') ?? forLowest.find((x) => x.status !== 'FY28') ?? forLowest[0]
+  const others = forLowest.filter((x) => x.slug !== invite?.slug)
+  const req = invite ? requests[invite.slug] : undefined
+  return (
+    <Screen inTabs top={<AppBar />}>
+      <ScreenHeader eyebrow={`${tt('cation')} · ${t('none taken yet')}`} title={<Rich text={t('Go somewhere. Come back *different*.')} wrap={(w) => <Serif>{w}</Serif>} />} lead={t('You have not taken a ’cation yet. Your Index already says where one would help most.')} />
+      {demo}
+      {invite ? (
+        <Card tone="sunk" style={{ gap: space.s2 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.s1 }}>
+            <TermChip term={lowest} withSpace />
+            <Eyebrow>
+              <Rich text={t('Lowest term · *{n}*', { n: String(score) })} wrap={(w) => <Mono size={12} tone="ink2">{w}</Mono>} />
+            </Eyebrow>
+          </View>
+          <Title size={28}>{t('Your first ’cation, for your lowest term: {name}', { name: invite.name })}</Title>
+          <Body tone="ink2">
+            <Rich text={t('{lowest} is your lowest term at *{v}*. {cation} is made for it: {promise} It ends with a measured delta on Day 90, not a souvenir.', { lowest: name(lowest), v: String(score), cation: invite.name, promise: tx(invite.promise) })} wrap={(w) => <Mono tone="ink2">{w}</Mono>} />
+          </Body>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s2, rowGap: 4 }}>
+            <Meta>{tx(invite.nights)}</Meta>
+            <Meta>
+              <Rich text={t('From *{p}*', { p: invite.priceFrom })} wrap={(w) => <Mono tone="ink">{w}</Mono>} />
+            </Meta>
+          </View>
+          <Meta size={14} tone="ink3">{t('Day-90 measure: {m}', { m: tx(invite.day90Measure) })}</Meta>
+          {others.length ? <Meta size={14} tone="ink3">{t('Also for {lowest}: {list}', { lowest: name(lowest), list: others.map((x) => x.name).join(t(' and ')) })}</Meta> : null}
+          {req ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Icon name="check" size={14} color={c.ink} />
+              <Meta size={14} tone="ink">{`${req.interestOnly ? t('Interest registered') : t('Requested')} · ${req.ref}`}</Meta>
+            </View>
+          ) : null}
+          <DaybreakButton icon="arrow-right" onPress={() => router.push(`/cation/${invite.slug}`)}>
+            {req ? t('See your request') : t('See {name}', { name: invite.name })}
+          </DaybreakButton>
+        </Card>
+      ) : null}
+      <Card tone="outline" style={{ gap: space.s2 }}>
+        <Eyebrow>{t('What every ’cation promises')}</Eyebrow>
+        {[t('A named outcome on the booking, in your own words'), t('A measured change in the primary term, kept in Joy OS'), t('A named clinician present, not on call'), t('Ninety days of continuation from checkout')].map((x) => (
+          <View key={x} style={{ flexDirection: 'row', gap: 10 }}>
+            <Icon name="check" size={15} color={c.ink3} />
+            <Body style={{ flex: 1 }}>{x}</Body>
+          </View>
+        ))}
+        <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />
+      </Card>
+      <OccasionsLink />
+      <Catalogue noCation />
     </Screen>
   )
 }

@@ -2,17 +2,18 @@ import { router } from 'expo-router'
 import { useState } from 'react'
 import { Pressable, View } from 'react-native'
 import Svg, { Circle, G, Text as SvgText } from 'react-native-svg'
-import { ArrowLink, Body, Button, Divider, Eyebrow, Icon, Meta, Mono, Pill, Progress, Sheet } from '@/components'
+import { ArrowLink, Body, Button, Divider, Eyebrow, Icon, Meta, Mono, Pill, Progress, Segmented, Sheet, SpecimenTag } from '@/components'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { useLocal } from '@/screens/a/local'
 import { IconButton, TextField } from '@/screens/a/parts'
-import { CIRCLE_START, CONNECTIONS, COUPLES_CHECK, STATE_OF_US, TWO_AM_START } from '@/screens/a/spacesData'
+import { CIRCLE_START, CONNECTIONS, COUPLES_CHECK, STATE_OF_US, TWO_AM_START, type CirclePerson } from '@/screens/a/spacesData'
 import { CIRCLE } from '@/shared/platform'
 import { useTheme } from '@/theme/ThemeProvider'
 import { localDate, Rich, useA } from '../i18n'
 import { ToolCard, ToolsHeading } from './common'
 
-// PEOPLE: the 5 & 15 orbit (Dunbar), the circle of eight, the 2 a.m. list, State of Us
+// PEOPLE: the 5 & 15 orbit (Dunbar), drawn from names the member types or picks from the
+// phone's contacts (simulated, on the device only: only the first name is kept, Memo p.19), the circle of eight, the 2 a.m. list, State of Us
 // (Gottman) with the Couples Check shown as agreement only — never who said what — and
 // connections near you.
 
@@ -36,10 +37,14 @@ function Orbit() {
   const col = term('R')
   const size = 260
   const h = size / 2
-  const five = CIRCLE_START.filter((p) => p.ring === 5)
-  const fifteen = CIRCLE_START.filter((p) => p.ring === 15)
-  const unseen = CIRCLE_START.filter((p) => !p.seen)
+  // The specimen circle, less anyone the member took out, plus anyone they added (by name only).
+  const [orbit, setOrbit] = useLocal<OrbitEdits>('orbitPeople', { added: [], removed: [] })
+  const people = [...CIRCLE_START.filter((p) => !orbit.removed.includes(p.id)), ...orbit.added]
+  const five = people.filter((p) => p.ring === 5)
+  const fifteen = people.filter((p) => p.ring === 15)
+  const unseen = people.filter((p) => !p.seen)
   const [planned, setPlanned] = useLocal<string[]>('orbitCalls', [])
+  const [pickerOpen, setPickerOpen] = useState(false)
   const place = (i: number, n: number, r: number, offset = 0) => {
     const a = -Math.PI / 2 + offset + (i / n) * Math.PI * 2
     return { x: h + r * Math.cos(a), y: h + r * Math.sin(a) }
@@ -109,8 +114,166 @@ function Orbit() {
             )}
           </View>
         ))}
+        {unseen.length === 0 ? <Meta tone="ink3">{t('Everyone in your circle was seen this month.')}</Meta> : null}
       </View>
+      <Button variant="secondary" icon="user-plus" onPress={() => setPickerOpen(true)} style={{ alignSelf: 'flex-start' }}>
+        {t('Change your 5 and 15')}
+      </Button>
+      <OrbitPicker open={pickerOpen} onClose={() => setPickerOpen(false)} people={people} orbit={orbit} setOrbit={setOrbit} />
     </ToolCard>
+  )
+}
+
+type OrbitEdits = { added: CirclePerson[]; removed: string[] }
+
+/** Contacts as they sit on the phone (specimen). They are read on the device only; Joy OS keeps the first name picked, never the number. */
+const PHONE_CONTACTS = [
+  'Anand Krishnan',
+  'Amma',
+  'Bhavna Shah',
+  'Chitra Raman',
+  'Dev Malhotra',
+  'Kavya Rao',
+  'Lakshmi Narayan',
+  'Meenakshi Sundaram',
+  'Mohan Das',
+  'Rahul Verma',
+  'Selvi Murugan',
+  'Suresh Menon',
+  'Tara Pillai',
+  'Usha Iyer',
+]
+const RING_MAX = { 5: 5, 15: 10 } as const
+
+function OrbitPicker({ open, onClose, people, orbit, setOrbit }: { open: boolean; onClose: () => void; people: CirclePerson[]; orbit: OrbitEdits; setOrbit: (fn: (o: OrbitEdits) => OrbitEdits) => void }) {
+  const { c, space, radius } = useTheme()
+  const { t } = useA()
+  const { setCrisisOpen } = useApp()
+  const [allowed, setAllowed] = useLocal('contactsAllowed', false)
+  const [ring, setRing] = useState<5 | 15>(15)
+  const [q, setQ] = useState('')
+  const [typed, setTyped] = useState('')
+  const [note, setNote] = useState('')
+  const count = (r: 5 | 15) => people.filter((p) => p.ring === r).length
+  const full = count(ring) >= RING_MAX[ring]
+  const has = (name: string) => people.some((p) => p.name.toLowerCase() === name.toLowerCase())
+  /** Returns true only when the name was added, so a refused add keeps what the member typed. */
+  const add = (name: string): boolean => {
+    const v = name.trim()
+    if (!v) return false
+    if (interceptsCrisis(v)) {
+      setCrisisOpen(true)
+      return false
+    }
+    if (has(v)) {
+      setNote(t('{n} is already in your circle.', { n: v }))
+      return false
+    }
+    if (full) {
+      setNote(ring === 5 ? t('Your five is full. Take someone out first, or add to your fifteen.') : t('Your fifteen is full. Take someone out first.'))
+      return false
+    }
+    setOrbit((o) => ({ ...o, added: [...o.added, { id: `o${Date.now()}`, name: v, ring, seen: false }] }))
+    setNote(t('{n} added to your {ring}.', { n: v, ring: ring === 5 ? t('five') : t('fifteen') }))
+    return true
+  }
+  const addTyped = () => {
+    if (add(typed)) setTyped('')
+  }
+  const remove = (p: CirclePerson) => {
+    setOrbit((o) => (o.added.some((x) => x.id === p.id) ? { ...o, added: o.added.filter((x) => x.id !== p.id) } : { ...o, removed: [...o.removed, p.id] }))
+    setNote(t('{n} taken out of your circle.', { n: p.name }))
+  }
+  const shown = PHONE_CONTACTS.filter((n) => n.toLowerCase().includes(q.trim().toLowerCase()))
+  return (
+    <Sheet open={open} onClose={onClose} title={t('Your 5 and your 15')} footer={<Button variant="ink" block onPress={onClose}>{t('Done')}</Button>}>
+      <View style={{ flexDirection: 'row', gap: 8, backgroundColor: c.paperSunk, borderRadius: radius.card, padding: space.s2 }}>
+        <Icon name="lock" size={15} color={c.ink2} />
+        <Meta style={{ flex: 1 }}>{t('Contacts never leave this phone. Joy OS keeps only the first name you pick, never the number.')}</Meta>
+      </View>
+      {note ? (
+        <Meta tone="ink" accessibilityLiveRegion="polite">
+          {note}
+        </Meta>
+      ) : null}
+      {([5, 15] as const).map((r) => (
+        <View key={r} style={{ gap: 6 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <Eyebrow>{r === 5 ? t('Your five') : t('Your fifteen')}</Eyebrow>
+            <Mono size={13} tone="ink3">{t('{a} of {b}', { a: count(r), b: RING_MAX[r] })}</Mono>
+          </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {people.filter((p) => p.ring === r).map((p) => (
+              <Pressable
+                key={p.id}
+                onPress={() => remove(p)}
+                accessibilityRole="button"
+                accessibilityLabel={t('Take {n} out of your circle', { n: p.name })}
+                style={({ pressed }) => ({ minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderRadius: radius.pill, borderWidth: 1, borderColor: c.line, backgroundColor: pressed ? c.paperSunk : c.paperRaised })}
+              >
+                <Meta tone="ink">{p.name}</Meta>
+                <Icon name="x" size={13} color={c.ink3} />
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ))}
+      <Divider />
+      <View style={{ gap: 8 }}>
+        <Eyebrow>{t('Add to')}</Eyebrow>
+        <Segmented value={String(ring) as '5' | '15'} onChange={(v) => (setRing(v === '5' ? 5 : 15), setNote(''))} items={[{ value: '5', label: t('Your five') }, { value: '15', label: t('Your fifteen') }]} />
+      </View>
+      {allowed ? (
+        <View style={{ gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+            <Eyebrow>{t('From your contacts · on this phone')}</Eyebrow>
+            <SpecimenTag />
+          </View>
+          <TextField label={t('Search contacts')} hideLabel placeholder={t('Search contacts')} value={q} onChangeText={setQ} returnKeyType="search" />
+          {shown.length === 0 ? <Meta tone="ink3">{t('No contact matches “{q}”.', { q: q.trim() })}</Meta> : null}
+          {shown.map((n) => {
+            const first = n.split(' ')[0]
+            const inCircle = has(first)
+            return (
+              <Pressable
+                key={n}
+                disabled={inCircle}
+                onPress={() => add(first)}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: inCircle }}
+                accessibilityLabel={inCircle ? t('{n}, already in your circle', { n }) : t('Add {n} to your {ring}', { n: first, ring: ring === 5 ? t('five') : t('fifteen') })}
+                style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, paddingVertical: 6, borderTopWidth: 1, borderTopColor: c.line, opacity: pressed ? 0.7 : 1 })}
+              >
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: c.paperSunk, alignItems: 'center', justifyContent: 'center' }}>
+                  <Mono size={12} tone="ink2">
+                    {n.split(' ').map((w) => w[0]).join('').slice(0, 2)}
+                  </Mono>
+                </View>
+                <Body tone={inCircle ? 'ink3' : 'ink'} style={{ flex: 1 }}>
+                  {n}
+                </Body>
+                {inCircle ? <Meta size={14} tone="ink3">{t('In your circle')}</Meta> : <Icon name="plus" size={18} color={full ? c.ink3 : c.ink} />}
+              </Pressable>
+            )
+          })}
+          <Button variant="link" size="sm" onPress={() => setAllowed(false)}>
+            {t('Stop reading contacts on this phone')}
+          </Button>
+        </View>
+      ) : (
+        <View style={{ gap: space.s1, borderWidth: 1, borderColor: c.line, borderRadius: radius.card, padding: space.s2 }}>
+          <Body weight="medium">{t('Pick from your contacts?')}</Body>
+          <Meta>{t('Your phone shows its contact list here, inside Joy OS. Nothing is uploaded; only the first name you tap is kept in your circle.')}</Meta>
+          <Button variant="secondary" icon="users" onPress={() => setAllowed(true)} style={{ alignSelf: 'flex-start' }}>
+            {t('Allow on this phone')}
+          </Button>
+        </View>
+      )}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.s1 }}>
+        <TextField label={t('Or type a name')} value={typed} onChangeText={(v) => (setTyped(v), setNote(''))} placeholder={t('A name')} onSubmitEditing={addTyped} returnKeyType="done" style={{ flex: 1 }} />
+        <IconButton icon="plus" label={t('Add {n} to your {ring}', { n: typed.trim() || t('A name'), ring: ring === 5 ? t('five') : t('fifteen') })} onPress={addTyped} tone="ink" disabled={!typed.trim()} />
+      </View>
+    </Sheet>
   )
 }
 

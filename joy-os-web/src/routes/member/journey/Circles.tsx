@@ -1,22 +1,27 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowRight, CalendarPlus, Captions, Check, CircleDot, Hand, Lock, MapPin, MessageCircle, Mic, MicOff, PhoneOff, ShieldCheck, Video, VideoOff } from 'lucide-react'
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { ArrowRight, CalendarPlus, Captions, Check, CircleDot, Flag, Hand, Lock, MapPin, MessageCircle, Mic, MicOff, PhoneOff, ShieldCheck, Video, VideoOff } from 'lucide-react'
+import { useEffect, useId, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { DaybreakButton, Eyebrow, TermDot, useFmtDate } from '@/components/joy/primitives'
-import { Avatar, Button, Card, PageHeader, Pill, SectionTitle } from '@/components/ui'
+import { Avatar, Button, Card, PageHeader, Pill, SectionTitle, Sheet } from '@/components/ui'
 import { CIRCLE, PRACTICE_WEEKS } from '@/data/platform'
 import { MEMBER, TEAM } from '@/data/member'
 import { CAPTIONS, CIRCLE_NEXT, CIRCLE_SESSIONS, OTHER_CIRCLES, PRACTICE_CONTENT, SALONS } from './_data'
-import { fade, useFocusTrap } from './_parts'
-import { TODAY, holderName, setCalendar, setCircleRequest, setSalon, useJourney } from './_store'
-import { useJ } from './_i18n'
+import { SheetFocus, fade, useFocusTrap } from './_parts'
+import { TODAY, addCircleReport, isoDate, holderName, setCalendar, setCircleRequest, setSalon, useCircleReports, useJourney, withdrawCircleReport } from './_store'
+import { useJ, type JourneyKey } from './_i18n'
 import { useA11yPrefs } from '@/routes/member/account/_prefs'
+import { useApp } from '@/lib/store'
+// One shared emergency intercept for every member free-text field (Memo p.24).
+import { useCrisisGuard } from '@/routes/member/spaces/_SpaceShell'
 
 // JOY CIRCLES (Memo p.21): eight members and a coach, a 30-minute call every
 // Monday for ninety days; video in the app, recordings off by default,
 // coach-moderated, first names only. Couples, family, founders' and alumni
 // circles; Connections salons booked from the circle. One Daybreak: join.
+// Moderation (Arch 8b-16): a member can raise a concern about someone in the
+// circle; it reaches the coach console as a moderation item (W6).
 
 /** Initials disc: a neutral Paper ground with Ink-2. The Spectrum is reserved for the six terms, so people are never painted in it. */
 const DISC = { background: 'var(--paper-sunk)', color: 'var(--ink-2)' } as const
@@ -39,6 +44,7 @@ export default function Circles() {
   const [room, setRoom] = useState<RoomMode | null>(null)
   const [left, setLeft] = useState<RoomMode | null>(null)
   const [showFull, setShowFull] = useState(false)
+  const [reportFor, setReportFor] = useState<string | null>(null)
   const sessions = [...CIRCLE_SESSIONS].reverse()
   const { hash } = useLocation()
   const calAdded = !!journey.calendar['circle-next']
@@ -93,6 +99,10 @@ export default function Circles() {
               </li>
             ))}
           </ul>
+          <div className="mt-3">
+            <Button variant="link" className="text-[13px] text-ink-2" onClick={() => setReportFor('')}><Flag size={13} /> {t('repOpen')}</Button>
+          </div>
+          <YourReports coach={coachFirst} />
 
           <div id="join-call" className="mt-auto flex flex-col gap-2 pt-8 sm:flex-row sm:items-center">
             <DaybreakButton onClick={() => { setLeft(null); setRoom(CALL_OPEN ? 'live' : 'waiting') }} className="w-full sm:w-auto"><Video size={18} /> {t(CALL_OPEN ? 'joinRoom' : 'openWaiting')}</DaybreakButton>
@@ -246,6 +256,11 @@ export default function Circles() {
         </ul>
       </Card>
 
+      <Sheet open={reportFor !== null} onClose={() => setReportFor(null)} title={t('repTitle')}>
+        <SheetFocus />
+        {reportFor !== null && <ReportForm key={reportFor} coach={coachFirst} onDone={() => setReportFor(null)} />}
+      </Sheet>
+
       <AnimatePresence>{room && <CallRoom key="room" mode={room} onMode={setRoom} onLeave={() => leave(room)} />}</AnimatePresence>
     </div>
   )
@@ -385,5 +400,130 @@ function CallBtn({ on, onClick, label, children }: { on: boolean; onClick: () =>
     <button type="button" onClick={onClick} aria-label={label} aria-pressed={on} className={clsx('flex h-12 w-12 items-center justify-center rounded-full transition-colors focus-ring', on ? 'bg-[color:var(--room-fg)] text-[color:var(--room-bg)]' : 'bg-[color:color-mix(in_srgb,var(--room-fg)_14%,transparent)] text-[color:var(--room-fg)]')}>
       {children}
     </button>
+  )
+}
+
+// ─── Raise a concern (W6) ─────────────────────────────────────────────────
+
+const REASONS = ['unsafe', 'outside', 'unkind', 'worried', 'other'] as const
+type Reason = (typeof REASONS)[number]
+/** The coach console reads reasons in English (staff consoles stay English); the member sees them in their language. */
+const REASON_EN: Record<Reason, string> = {
+  unsafe: 'Made someone feel unsafe',
+  outside: 'Shared something from the circle outside it',
+  unkind: 'Unkind, harassing or abusive words',
+  worried: 'I am worried about them',
+  other: 'Something else',
+}
+const reasonOf = (stored: string): Reason | undefined => REASONS.find((k) => stored === REASON_EN[k] || stored.startsWith(`${REASON_EN[k]} · `))
+
+function ReportForm({ coach, onDone }: { coach: string; onDone: () => void }) {
+  const id = useId()
+  const { t } = useJ()
+  const guard = useCrisisGuard()
+  const { setCrisisOpen } = useApp()
+  const others = CIRCLE.members.filter((m) => m !== MEMBER.firstName)
+  const [about, setAbout] = useState('')
+  const [reason, setReason] = useState<Reason | ''>('')
+  const [note, setNote] = useState('')
+  const [errors, setErrors] = useState<Partial<Record<'about' | 'reason', JourneyKey>>>({})
+  const [held, setHeld] = useState(false)
+  const [sent, setSent] = useState(false)
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    // Emergency intercept first: support is offered before anything is sent.
+    if (guard(note)) { setHeld(true); return }
+    setHeld(false)
+    const errs: typeof errors = {}
+    if (!about) errs.about = 'repErrWho'
+    if (!reason) errs.reason = 'repErrWhy'
+    setErrors(errs)
+    if (!about || !reason) return
+    const n = note.trim()
+    addCircleReport(about, n ? `${REASON_EN[reason]} · “${n}”` : REASON_EN[reason])
+    setSent(true)
+  }
+
+  if (sent) {
+    return (
+      <motion.div {...fade} role="status">
+        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-paper-sunk text-ink" aria-hidden><Check size={20} /></span>
+        <p className="mt-4 text-[1.2rem] text-ink">{t('repSent', { c: coach })}</p>
+        <p className="mt-2 text-[15px] text-ink-2">{t('repSentNext', { c: coach })}</p>
+        <div className="mt-5 rounded-card bg-paper-sunk p-4">
+          <p className="text-[14px] text-ink-2">{t('repDanger')}</p>
+          <Button variant="link" className="mt-1 text-[14px]" onClick={() => setCrisisOpen('manual')}>{t('repSupport')}</Button>
+        </div>
+        <Button variant="secondary" className="mt-6" onClick={onDone}>{t('repDone')}</Button>
+      </motion.div>
+    )
+  }
+
+  return (
+    <form onSubmit={submit} noValidate className="space-y-5">
+      <p className="text-[15px] text-ink-2">{t('repLead', { c: coach })}</p>
+      <fieldset>
+        <legend className="text-[15px] text-ink">{t('repWho')}</legend>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {others.map((m, i) => (
+            <label key={m} className={clsx('flex cursor-pointer items-center gap-2 rounded-full border py-1 pl-2.5 pr-3 text-[14px] transition-colors', about === m ? 'border-ink bg-paper-sunk text-ink' : 'border-line text-ink-2 hover:border-line-strong')}>
+              <input type="radio" name={`${id}-who`} value={m} checked={about === m} onChange={() => { setAbout(m); setErrors((x) => ({ ...x, about: undefined })) }} aria-invalid={i === 0 && !!errors.about} className="accent-[color:var(--ink)]" />
+              <span className="flex h-6 w-6 items-center justify-center rounded-full font-mono text-[11px]" style={DISC} aria-hidden>{m[0]}</span>
+              {m}
+            </label>
+          ))}
+        </div>
+        {errors.about && <p className="mt-2 text-[13px] text-error" role="alert">{t(errors.about)}</p>}
+      </fieldset>
+      <fieldset>
+        <legend className="text-[15px] text-ink">{t('repWhy')}</legend>
+        <div className="mt-2 space-y-2">
+          {REASONS.map((k) => (
+            <label key={k} className={clsx('flex cursor-pointer items-center gap-3 rounded-card border px-3.5 py-3 text-[14px] transition-colors', reason === k ? 'border-ink bg-paper-sunk text-ink' : 'border-line text-ink-2 hover:border-line-strong')}>
+              <input type="radio" name={`${id}-why`} value={k} checked={reason === k} onChange={() => { setReason(k); setErrors((x) => ({ ...x, reason: undefined })) }} className="accent-[color:var(--ink)]" />
+              <span className="min-w-0">{t(`rep_${k}`)}</span>
+            </label>
+          ))}
+        </div>
+        {errors.reason && <p className="mt-2 text-[13px] text-error" role="alert">{t(errors.reason)}</p>}
+      </fieldset>
+      <div>
+        <label htmlFor={`${id}-note`} className="text-[15px] text-ink">{t('repNote', { c: coach })} <span className="text-ink-3">{t('optional')}</span></label>
+        <textarea id={`${id}-note`} rows={3} maxLength={400} value={note} onChange={(e) => { setNote(e.target.value); setHeld(false) }} placeholder={t('repNotePh')} className="mt-2 w-full resize-none rounded-card border border-line-strong bg-paper-raised px-3.5 py-3 text-[15px] text-ink placeholder:text-ink-3 focus-ring" />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="ink" type="submit"><Flag size={15} /> {t('repSend', { c: coach })}</Button>
+        <Button variant="ghost" onClick={onDone}>{t('cancel')}</Button>
+      </div>
+      {held && <p className="text-[14px] text-ink-2" role="status">{t('heldForSupport')}</p>}
+    </form>
+  )
+}
+
+/** Concerns this member raised, with a way to take one back. */
+function YourReports({ coach }: { coach: string }) {
+  const reports = useCircleReports()
+  const { t } = useJ()
+  const fmtDate = useFmtDate()
+  if (reports.length === 0) return null
+  return (
+    <div className="mt-3 rounded-card bg-paper-sunk p-3.5">
+      <p className="eyebrow text-ink-3">{t('repYours')}</p>
+      <ul className="mt-2 space-y-2">
+        {reports.map((rp) => {
+          const k = reasonOf(rp.reason)
+          return (
+            <li key={rp.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-[14px]">
+              <span className="min-w-0 text-ink">
+                {t('repRow', { name: rp.about, d: fmtDate(isoDate(new Date(rp.at))) })}
+                <span className="block text-[13px] text-ink-2">{k ? t(`rep_${k}`) : <span lang="en">{rp.reason}</span>} · {t('repWithCoach', { c: coach })}</span>
+              </span>
+              <Button variant="link" className="text-[13px]" onClick={() => withdrawCircleReport(rp.id)} aria-label={t('repWithdrawAria', { name: rp.about })}>{t('withdraw')}</Button>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
   )
 }

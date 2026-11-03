@@ -94,4 +94,6 @@ export const SIGNIN = {
   doneNote: { en: 'Signed in on this phone. You can sign out from Profile at any time.', ta: 'இந்தத் தொலைபேசியில் உள்நுழைந்துவிட்டீர்கள். எப்போது வேண்டுமானாலும் சுயவிவரத்திலிருந்து வெளியேறலாம்.', hi: 'इस फ़ोन पर साइन इन हो गया। प्रोफ़ाइल से कभी भी साइन आउट कर सकते हैं।' },
   setUp: { en: 'Set up Joy OS', ta: 'Joy OS-ஐ அமையுங்கள்', hi: 'Joy OS सेट करें' },
   footer: { en: 'Specimen sign-in. No credential leaves this phone.', ta: 'மாதிரி உள்நுழைவு. எந்தச் சான்றும் இந்தத் தொலைபேசியை விட்டு வெளியேறாது.', hi: 'नमूना साइन इन। कोई भी पहचान-जानकारी इस फ़ोन से बाहर नहीं जाती।' },
+  phoneOk: { en: 'This phone: no jailbreak or root signals', ta: 'இந்தத் தொலைபேசி: jailbreak அல்லது root சமிக்ஞை இல்லை', hi: 'यह फ़ोन: jailbreak या root का कोई संकेत नहीं' },
+  phoneRisk: { en: 'This phone looks jailbroken or rooted: what this means', ta: 'இந்தத் தொலைபேசி jailbreak அல்லது root செய்யப்பட்டது போலத் தெரிகிறது: இதன் பொருள்', hi: 'यह फ़ोन jailbreak या root किया हुआ लगता है: इसका मतलब' },
 } satisfies Dict

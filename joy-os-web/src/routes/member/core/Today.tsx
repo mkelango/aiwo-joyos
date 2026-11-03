@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowRight, Check, Clock, CloudOff, CreditCard, Info, Sparkles, Users, Volume2, VolumeX, Watch } from 'lucide-react'
+import { ArrowRight, Check, Clock, CloudOff, CreditCard, FileText, Info, Sparkles, Sunrise, Users, Volume2, VolumeX, Watch } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
@@ -12,7 +12,11 @@ import { termByKey } from '@/data/terms'
 import { useApp } from '@/lib/store'
 import { useT } from '@/lib/i18n'
 import { ACTION_TEXT, fmtLocal, rich, useCore } from './_i18n'
-import { SPECIMEN_TODAY, liveLedger, specimenWeek, useLedgerRemoved, useLocal, useSignalsDown, weekCounts } from './_store'
+import { SPECIMEN_TODAY, addDays, liveLedger, specimenWeek, useLedgerRemoved, useLocal, useSignalsDown, weekCounts } from './_store'
+import { DAY90_DATES } from './_data'
+import { RemeasureCard } from './_remeasure'
+import { useX } from './_i18nX'
+import { playSound } from '@/lib/sound'
 import { useA11yPrefs } from '@/routes/member/account/_prefs'
 import { actionsFor } from '@/routes/member/spaces/_data'
 import { useSpaceText } from '@/routes/member/spaces/_i18n'
@@ -40,6 +44,9 @@ function readAddedActions(): Action[] {
 
 const canSpeak = () => typeof window !== 'undefined' && 'speechSynthesis' in window && typeof window.SpeechSynthesisUtterance === 'function'
 const SPEECH_LANG = { en: 'en-IN', ta: 'ta-IN', hi: 'hi-IN' } as const
+
+const MORNING = ['mcRested', 'mcFine', 'mcTired'] as const
+type Morning = (typeof MORNING)[number]
 
 const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve']
 
@@ -83,7 +90,15 @@ export default function Today() {
   const lowName = name(lowest.key)
   const tagWord = (s: string) => (lang === 'en' ? s.toLowerCase() : tag(s))
   // Offline, the action's state waits in the sync queue; Undo takes it back out.
+  const x = useX()
+  // The morning check-in: one tap, kept for the specimen day, with the motif's two notes.
+  const [morning, setMorning] = useLocal<Morning | null>(`morning:${SPECIMEN_TODAY}`, null)
+  const checkIn = (m: Morning) => {
+    setMorning(m)
+    playSound('morning')
+  }
   const markAction = (done: boolean, skip: boolean) => {
+    if (done) playSound('action')
     setActionDone(done)
     setSkipped(skip)
     if (done || skip) queueSync({ id: actionQueueId, kind: 'action' })
@@ -259,6 +274,28 @@ export default function Today() {
         </Card>
       </div>
 
+      {/* The morning check-in (Playbook p54: its sound is the motif's first two notes) */}
+      <Card tone="outline" className="lg:col-span-2" aria-live="polite">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <Sunrise size={18} className="mt-0.5 shrink-0 text-ink-3" aria-hidden />
+            <div className="min-w-0">
+              <Eyebrow>{x('mcEyebrow')}</Eyebrow>
+              <p className="mt-1 text-[17px] text-ink">{morning ? x('mcThanks', { a: x(morning) }) : x('mcAsk')}</p>
+            </div>
+          </div>
+          {morning ? (
+            <Button variant="link" className="self-start md:self-center" onClick={() => setMorning(null)}>{c('undo')}</Button>
+          ) : (
+            <div className="flex flex-wrap gap-2" role="group" aria-label={x('mcAsk')}>
+              {MORNING.map((m) => (
+                <Button key={m} size="sm" variant="secondary" onClick={() => checkIn(m)}>{x(m)}</Button>
+              ))}
+            </div>
+          )}
+        </div>
+      </Card>
+
       {/* Today's pool: actions added from the spaces' three actions */}
       <Card className="lg:col-span-2">
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
@@ -321,6 +358,7 @@ export default function Today() {
               </p>
             )}
           </div>
+          <div className="flex flex-col gap-3 md:items-end">
           <ol className="flex flex-wrap gap-2" aria-label={c('tdMilestones')}>
             {([['0', 'msMeasured'], ['15', 'msReview'], ['45', 'msReview'], ['60', 'msNext'], ['76', 'msRemeasure'], ['90', 'msSigned']] as const).map(([d, l]) => {
               const past = Number(d) <= MEMBER.dayOfLoop
@@ -331,8 +369,15 @@ export default function Today() {
               )
             })}
           </ol>
+          <Link to="/app/day-40" className="inline-flex items-center gap-1.5 text-[14px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring">
+            <FileText size={14} aria-hidden /> {x('tdDay40', { date: fmtDate(addDays(DAY90_DATES.day0, 40), lang) })} <ArrowRight size={13} />
+          </Link>
+          </div>
         </div>
       </Card>
+
+      {/* The re-measure chain starts here: the Day-76 invite. */}
+      <RemeasureCard className="lg:col-span-2" />
 
       <Sheet open={whyOpen} onClose={() => setWhyOpen(false)} title={c('tdWhyTitle')} side="center">
         <div className="flex flex-wrap items-center gap-2">

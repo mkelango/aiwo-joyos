@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useCallback, useSyncExternalStore } from 'react'
-import { MEMBER } from '@/shared/member'
+import { CONSENTS, MEMBER } from '@/shared/member'
 import type { TermKey } from '@/shared/types'
-import { GRANTS, type DeviceState, type Grant, type Msg, type Thread } from './accountData'
+import { GRANTS, SPECIMEN_NOW, type DeviceState, type Grant, type Msg, type Thread } from './accountData'
 
 // Lane B persisted state: small module-level stores kept on the device with AsyncStorage
 // (offline-first, like the app store). Each store hydrates once, notifies subscribers and
@@ -196,13 +196,61 @@ export const accountStore = createStore<AccountState>('account', {
 
 // ─── Trust centre: consents, research use and a scheduled erasure ───────────
 
+export type InsurerDecision = 'not-granted' | 'granted' | 'declined'
 export interface TrustState {
   /** Consent id → on/off, over each consent's specimen default. */
   consents: Record<string, boolean>
   research: boolean
   eraseScheduled: boolean
+  /** Star Health's request for aggregate outcomes: granted, declined or not yet decided. */
+  insurer: InsurerDecision
 }
-export const trustStore = createStore<TrustState>('trust', { consents: {}, research: true, eraseScheduled: false })
+export const trustStore = createStore<TrustState>('trust', { consents: {}, research: true, eraseScheduled: false, insurer: 'not-granted' })
+
+// ─── Trust centre: consent history (consent_event, Arch p.25) ─────────────────
+// Every grant, withdrawal and decline is an event with the artefact version the member agreed
+// to (the exact text in force). Nothing here is ever edited; new events are appended.
+
+/** The artefact version currently in force for each purpose. */
+export const ARTEFACT_VERSION: Record<string, string> = {
+  c_care: 'v3', c_data: 'v3', c_pub: 'v2', c_oura: 'v1', c_hk: 'v2', c_cal: 'v1', c_wa: 'v2', c_star: 'v1',
+  research: 'v2', insurer: 'v1',
+}
+export type ConsentAction = 'granted' | 'withdrawn' | 'declined'
+export type ConsentVia = 'setup' | 'trust' | 'update'
+export interface ConsentEvent {
+  id: string
+  /** A consent id from CONSENTS, or 'research' / 'insurer' for the Trust centre's own cards. */
+  ref: string
+  action: ConsentAction
+  version: string
+  /** 'YYYY-MM-DD HH:MM', India time (specimen calendar). */
+  at: string
+  via: ConsentVia
+  /** Recorded on this phone, not part of the seeded history. */
+  live?: boolean
+}
+/** The specimen history: each consent given in setup, the Care artefact updated to v3 later. */
+export const CONSENT_SEED: ConsentEvent[] = [
+  ...CONSENTS.filter((x) => x.granted && x.since).map((x) => ({
+    id: `seed-${x.id}`,
+    ref: x.id,
+    action: 'granted' as const,
+    version: x.id === 'c_care' ? 'v2' : ARTEFACT_VERSION[x.id] ?? 'v1',
+    at: `${x.since} ${x.scope === 'core' || x.scope === 'cohort' ? '09:12' : x.scope === 'device' ? '09:20' : '19:05'}`,
+    via: 'setup' as const,
+  })),
+  { id: 'seed-research', ref: 'research', action: 'granted', version: 'v2', at: '2026-07-06 09:14', via: 'setup' },
+  { id: 'seed-c_care-v3', ref: 'c_care', action: 'granted', version: 'v3', at: '2027-01-12 08:40', via: 'update' },
+]
+export const consentHistoryStore = createStore<{ events: ConsentEvent[] }>('consentHistory', { events: CONSENT_SEED })
+/** Append one consent event (specimen calendar day, the phone's clock time). */
+export function recordConsent(ref: string, action: ConsentAction, via: ConsentVia = 'trust') {
+  const d = new Date()
+  const at = `${SPECIMEN_NOW} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  const ev: ConsentEvent = { id: `ce${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, ref, action, version: ARTEFACT_VERSION[ref] ?? 'v1', at, via, live: true }
+  consentHistoryStore.set((h) => ({ events: [...h.events, ev] }))
+}
 
 // ─── Trust centre: nominee (DPDP Act) and ABHA ────────────────────────────────
 
@@ -250,6 +298,41 @@ export interface DevicesState {
   complication?: boolean
 }
 export const devicesStore = createStore<DevicesState>('devices', { states: {}, hk: {}, writeBack: true, complication: true })
+
+// ─── Household kind and the Family Joy Charter (Arch p.13; Memo tenant 5) ──────
+
+export type HouseholdKind = 'couple' | 'family' | 'fjo'
+export const householdKindStore = createStore<{ kind: HouseholdKind; since: string }>('householdKind', { kind: 'family', since: '2026-07-06' })
+
+export type RitualCadence = 'daily' | 'weekly' | 'monthly' | 'yearly'
+export interface Ritual { id: string; what: string; when: RitualCadence }
+export interface Charter {
+  values: string[]
+  rituals: Ritual[]
+  /** One shared joy a week; day 0 = Sunday. */
+  joy: { what: string; day: number }
+  written: boolean
+  /** First names of the adults who have agreed to this version. */
+  agreed: string[]
+  agreedOn?: string
+  /** The shared joy marked as had this week (date). Never counted, never a streak. */
+  week?: string
+}
+export const charterStore = createStore<Charter>('charter', { values: [], rituals: [], joy: { what: '', day: 0 }, written: false, agreed: [] })
+
+// ─── Joyspan Occasions (Memo p.20, p.29) ────────────────────────────────────────
+
+export type OccasionTemplate = 'birthday60' | 'anniversary' | 'homecoming'
+export type OccasionGeneration = 'elders' | 'middle' | 'young'
+export interface OccasionGuest { id: string; name: string; generation: OccasionGeneration; measured: boolean; elder: boolean }
+export interface OccasionRequest { ref: string; template: OccasionTemplate; honoree: string; window: string; venue: string; guests: OccasionGuest[]; outcome: string; sentOn: string }
+export const occasionsStore = createStore<{ requests: OccasionRequest[] }>('occasions', { requests: [] })
+
+// ─── Circle concerns (Arch 8b-16): reports a member raised about someone in the circle ───
+
+/** reason is kept in English (the coach console reads it); the member sees it in their language. */
+export interface CircleReport { id: string; about: string; reason: string; at: string }
+export const circleReportsStore = createStore<{ reports: CircleReport[] }>('circleReports', { reports: [] })
 
 export const refCode = (prefix: string) => `${prefix}-${Date.now().toString(36).toUpperCase().slice(-6)}`
 export const maskPhone = (p: string) => (p.length >= 10 ? `+91 ${p.slice(0, 2)}••• ••${p.slice(-3)}` : p)

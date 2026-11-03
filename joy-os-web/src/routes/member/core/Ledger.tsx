@@ -15,6 +15,7 @@ import { Provenance, Switch, TICK } from './_parts'
 import { SPECIMEN_TODAY, addDays, isSeed, liveLedger, useLedgerRemoved, useLocal, weekCounts, weekEntryCount, type ScheduleRow } from './_store'
 import { SCHEDULE_LABEL, STORY_TEXT, fmtLocal, rich, useCore } from './_i18n'
 import type { Lang } from '@/lib/store'
+import { playSound } from '@/lib/sound'
 
 // THE JOY LEDGER (Memo p.17 screen 03, p.19 Pleasure; Plan §4B).
 // Three ten-second prompts a day on a Daybreak-soft ground; tags, an optional word or
@@ -205,6 +206,7 @@ function PromptCard({ prompt, time, next, live }: { prompt: 1 | 2 | 3; time?: st
     }
     pendingPhoto.current = photo
     addLedger({ prompt, tags, word: word.trim() || undefined, photo: photo ? true : undefined })
+    playSound('complete')
     setState('saved')
   }
 

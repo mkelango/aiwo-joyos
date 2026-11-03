@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Linking, Pressable, ScrollView, View } from 'react-native'
 import type { ScrollViewInstance } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { BandLabel, Body, Button, Card, DaybreakButton, Eyebrow, Icon, JoyspanWheel, Meta, MethodLine, Mono, Numeral, Progress, Serif, TermChip, TermDot, Title } from '@/components'
+import { ArrowLink, BandLabel, Body, Button, Card, DaybreakButton, Eyebrow, Icon, JoyspanWheel, Meta, MethodLine, Mono, Numeral, Progress, Serif, TermChip, TermDot, Title } from '@/components'
 import { termByKey } from '@/shared/terms'
 import type { Band, TermKey, TermScore } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
@@ -378,6 +378,9 @@ function Result({ answers, onRestart }: { answers: Record<string, number>; onRes
             <View accessibilityLiveRegion="polite" style={{ gap: 4 }}>
               <Body weight="medium">{t('onWay')}</Body>
               <Meta>{t('letterSent', { name: lowName })}</Meta>
+              <ArrowLink icon="mail" onPress={() => router.push('/letter')}>
+                {t('readLetter')}
+              </ArrowLink>
             </View>
           ) : (
             <>
@@ -386,6 +389,9 @@ function Result({ answers, onRestart }: { answers: Record<string, number>; onRes
               <Button variant="secondary" icon="mail" onPress={sendLetter}>
                 {t('sendLetter')}
               </Button>
+              <ArrowLink icon="book-open" onPress={() => router.push('/letter')}>
+                {t('readLetter')}
+              </ArrowLink>
             </>
           )}
         </Card>

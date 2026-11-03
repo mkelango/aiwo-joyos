@@ -28,6 +28,8 @@ const TakeIndex = p(() => import('@/routes/member/core/TakeIndex'))
 const Day90 = p(() => import('@/routes/member/core/Day90'))
 const Ledger = p(() => import('@/routes/member/core/Ledger'))
 const Viva = p(() => import('@/routes/member/core/Viva'))
+const Day40 = p(() => import('@/routes/member/core/Day40'))
+const Letter = p(() => import('@/routes/member/core/Letter'))
 const SpacesHub = p(() => import('@/routes/member/spaces/SpacesHub'))
 const Body = p(() => import('@/routes/member/spaces/Body'))
 const Purpose = p(() => import('@/routes/member/spaces/Purpose'))
@@ -42,6 +44,7 @@ const Practice = p(() => import('@/routes/member/journey/Practice'))
 const PracticeWeek = p(() => import('@/routes/member/journey/PracticeWeek'))
 const Circles = p(() => import('@/routes/member/journey/Circles'))
 const Events = p(() => import('@/routes/member/journey/Events'))
+const Occasions = p(() => import('@/routes/member/journey/Occasions'))
 const Care = p(() => import('@/routes/member/account/Care'))
 const Messages = p(() => import('@/routes/member/account/Messages'))
 const Household = p(() => import('@/routes/member/account/Household'))
@@ -53,6 +56,8 @@ const WhatsApp = p(() => import('@/routes/member/account/WhatsApp'))
 const Notifications = p(() => import('@/routes/member/account/Notifications'))
 const Profile = p(() => import('@/routes/member/account/Profile'))
 const NotFound = p(() => import('@/routes/entry/NotFound'))
+// Under 18 (by the finished setup's date of birth) the Index pages give way to the minors gate.
+const MinorGate = lazy(() => import('@/routes/entry/MinorGate'))
 
 // Consoles
 const ConsoleHome = p(() => import('@/routes/console/care/ConsoleHome'))
@@ -183,12 +188,14 @@ export default function App() {
 
             <Route path="app" element={<MemberLayout />}>
               <Route index element={<Today />} />
-              <Route path="index" element={<IndexHome />} />
-              <Route path="index/take" element={<TakeIndex />} />
-              <Route path="index/day-90" element={<Day90 />} />
+              <Route path="index" element={<MinorGate><IndexHome /></MinorGate>} />
+              <Route path="index/take" element={<MinorGate><TakeIndex /></MinorGate>} />
+              <Route path="index/day-90" element={<MinorGate><Day90 /></MinorGate>} />
               <Route path="method" element={<Method />} />
               <Route path="ledger" element={<Ledger />} />
               <Route path="viva" element={<Viva />} />
+              <Route path="day-40" element={<Day40 />} />
+              <Route path="letter" element={<Letter />} />
               <Route path="spaces" element={<SpacesHub />} />
               <Route path="spaces/body" element={<Body />} />
               <Route path="spaces/purpose" element={<Purpose />} />
@@ -203,6 +210,7 @@ export default function App() {
               <Route path="practice/week/:n" element={<PracticeWeek />} />
               <Route path="circles" element={<Circles />} />
               <Route path="events" element={<Events />} />
+              <Route path="occasions" element={<Occasions />} />
               <Route path="care" element={<Care />} />
               <Route path="care/messages" element={<Messages />} />
               <Route path="household" element={<Household />} />

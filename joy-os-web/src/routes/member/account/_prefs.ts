@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 
 /** Accessibility choices made in Settings (joyos:acct:prefs), read by any screen that shows
- *  films, calls or prompts. Settings owns the writes; everyone else only reads. */
-export const A11Y_DEFAULTS = { biometric: true, lockAfter: '5', reduceMotion: false, voice: false, captions: true }
+ *  films, calls or prompts. `sound` (silent by default) is read by lib/sound's playSound. Settings owns the writes; everyone else only reads. */
+export const A11Y_DEFAULTS = { biometric: true, lockAfter: '5', reduceMotion: false, voice: false, captions: true, sound: false }
 export type A11yPrefs = typeof A11Y_DEFAULTS
 
 const PREFS_KEY = 'joyos:acct:prefs'

@@ -110,6 +110,30 @@ export const KIT = {
   wheelIndex: { en: ', Index {v}', ta: ', குறியீடு {v}', hi: ', इंडेक्स {v}' },
   minus: { en: 'minus ', ta: 'கழித்தல் ', hi: 'माइनस ' },
   notYetMeasured: { en: 'not yet measured', ta: 'இன்னும் அளவிடப்படவில்லை', hi: 'अभी मापा नहीं गया' },
+  wheelDay0: { en: ', Day 0 {v}', ta: ', நாள் 0 இல் {v}', hi: ', दिन 0 पर {v}' },
+  wheelGhost: { en: 'Outline · Day 0', ta: 'வெளிக்கோடு · நாள் 0', hi: 'रूपरेखा · दिन 0' },
+
+  // Biometric lock screen (Architecture p21). Specimen: no biometric is read.
+  lockEyebrow: { en: 'Joy OS is locked', ta: 'Joy OS பூட்டப்பட்டுள்ளது', hi: 'Joy OS लॉक है' },
+  lockTitleA: { en: 'Welcome ', ta: 'மீண்டும் ', hi: 'फिर से ' },
+  lockTitleSerif: { en: 'back', ta: 'வருக', hi: 'स्वागत' },
+  lockTitleB: { en: '.', ta: '.', hi: '।' },
+  lockLead: { en: 'What you keep in Joy OS stays private on this phone. Unlock to carry on where you were.', ta: 'Joy OS-இல் நீங்கள் வைத்திருப்பவை இந்தத் தொலைபேசியில் தனிப்பட்டதாகவே இருக்கும். விட்ட இடத்திலிருந்து தொடர பூட்டைத் திறங்கள்.', hi: 'Joy OS में जो आप रखते हैं, वह इसी फ़ोन पर निजी रहता है। जहाँ थे वहीं से आगे बढ़ने के लिए अनलॉक करें।' },
+  lockFace: { en: 'Unlock with Face ID', ta: 'Face ID மூலம் திற', hi: 'Face ID से अनलॉक करें' },
+  lockFinger: { en: 'Unlock with your fingerprint', ta: 'கைரேகை மூலம் திற', hi: 'फ़िंगरप्रिंट से अनलॉक करें' },
+  lockDevice: { en: 'Unlock with this device', ta: 'இந்தச் சாதனம் மூலம் திற', hi: 'इस डिवाइस से अनलॉक करें' },
+  lockChecking: { en: 'Checking…', ta: 'சரிபார்க்கிறது…', hi: 'जाँच हो रही है…' },
+  lockPasscode: { en: 'Use the phone’s passcode instead', ta: 'அதற்குப் பதிலாகத் தொலைபேசியின் கடவுக்குறியீட்டைப் பயன்படுத்து', hi: 'इसके बजाय फ़ोन का पासकोड इस्तेमाल करें' },
+  lockPasscodeLabel: { en: 'Phone passcode', ta: 'தொலைபேசி கடவுக்குறியீடு', hi: 'फ़ोन पासकोड' },
+  lockPasscodeHelp: { en: 'Any six digits work in the specimen.', ta: 'மாதிரியில் எந்த ஆறு இலக்கங்களும் வேலை செய்யும்.', hi: 'नमूने में कोई भी छह अंक चलेंगे।' },
+  lockPasscodeGo: { en: 'Unlock', ta: 'திற', hi: 'अनलॉक करें' },
+  lockPasscodeErr: { en: 'Enter all six digits.', ta: 'ஆறு இலக்கங்களையும் உள்ளிடுங்கள்.', hi: 'सभी छह अंक डालें।' },
+  lockSpecimen: { en: 'Specimen: no face or fingerprint is read. Unlocking is simulated on this phone.', ta: 'மாதிரி: முகமோ கைரேகையோ படிக்கப்படுவதில்லை. திறப்பது இந்தத் தொலைபேசியில் உருவகப்படுத்தப்படுகிறது.', hi: 'नमूना: कोई चेहरा या फ़िंगरप्रिंट नहीं पढ़ा जाता। अनलॉक इसी फ़ोन पर दिखावटी है।' },
+  lockCrisis: { en: 'Need to talk to someone now? Tele-MANAS 14416, free, day and night.', ta: 'இப்போதே யாரிடமாவது பேச வேண்டுமா? Tele-MANAS 14416, இலவசம், இரவும் பகலும்.', hi: 'अभी किसी से बात करनी है? Tele-MANAS 14416, मुफ़्त, दिन-रात।' },
+
+  // Jailbreak / root warning (Architecture p21: warn, not block)
+  rootBanner: { en: 'This phone looks jailbroken or rooted. Joy OS still works; what it keeps here is less protected.', ta: 'இந்தத் தொலைபேசி jailbreak அல்லது root செய்யப்பட்டது போலத் தெரிகிறது. Joy OS வேலை செய்யும்; ஆனால் இங்கே வைத்திருப்பவை குறைவான பாதுகாப்பில் இருக்கும்.', hi: 'यह फ़ोन jailbreak या root किया हुआ लगता है। Joy OS चलता रहेगा; पर यहाँ रखी चीज़ें कम सुरक्षित हैं।' },
+  rootWhat: { en: 'What this means', ta: 'இதன் பொருள் என்ன', hi: 'इसका मतलब क्या है' },
 } satisfies Dict
 
 export type KitKey = keyof typeof KIT

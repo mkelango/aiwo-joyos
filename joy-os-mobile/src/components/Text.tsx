@@ -56,13 +56,14 @@ interface BaseProps extends Omit<TextProps, 'style'> {
 export function Body({ children, tone = 'ink', color, size, weight = 'regular', style, align, ...rest }: BaseProps & { weight?: Weight }) {
   const t = useTheme()
   const col = useToneColor(tone)
-  const fs = (size ?? t.type.body) * t.textScale
+  // Tamil and Hindi: one step larger, +10% leading (t.script is 1 in English).
+  const fs = (size ?? t.type.body) * t.textScale * t.script.scale
   const family = { light: t.fonts.sansLight, regular: t.fonts.sans, medium: t.fonts.sansMedium, semibold: t.fonts.sansSemi, bold: t.fonts.sansBold }[weight]
   return (
     <RNText
       maxFontSizeMultiplier={t.maxScale.body}
       {...rest}
-      style={[{ fontFamily: family, fontSize: fs, lineHeight: Math.round(fs * 1.45), color: color ?? col, textAlign: align }, style]}
+      style={[{ fontFamily: family, fontSize: fs, lineHeight: Math.round(fs * 1.45 * t.script.leading), color: color ?? col, textAlign: align }, style]}
     >
       {children}
     </RNText>
@@ -86,7 +87,8 @@ export function Eyebrow({ children, tone = 'ink3', color, size, style, align, ..
       maxFontSizeMultiplier={t.maxScale.label}
       {...rest}
       style={[
-        { fontFamily: t.fonts.mono, fontSize: fs, lineHeight: Math.round(fs * (indic ? 1.7 : 1.5)), letterSpacing: indic ? 0 : fs * 0.14, textTransform: 'uppercase', color: color ?? col, textAlign: align },
+        // IBM Plex Mono has no Tamil or Devanagari: an Indic label takes the script's sans.
+        { fontFamily: indic ? t.fonts.sansSemi : t.fonts.mono, fontSize: fs, lineHeight: Math.round(fs * (indic ? 1.7 : 1.5)), letterSpacing: indic ? 0 : fs * 0.14, textTransform: 'uppercase', color: color ?? col, textAlign: align },
         style,
       ]}
     >
@@ -100,7 +102,8 @@ export function Numeral({ children, tone = 'ink', color, size = 96, style, align
   const t = useTheme()
   const col = useToneColor(tone)
   const fs = size * t.textScale
-  const family = weight === 'light' ? t.fonts.monoLight : weight === 'medium' ? t.fonts.monoMedium : t.fonts.mono
+  // Words in Tamil or Devanagari inside a mono run (a translated "Day 15") take the script's sans.
+  const family = hasIndic(children) ? t.fonts.sans : weight === 'light' ? t.fonts.monoLight : weight === 'medium' ? t.fonts.monoMedium : t.fonts.mono
   return (
     <RNText
       maxFontSizeMultiplier={size >= 40 ? t.maxScale.numeral : t.maxScale.body}
@@ -131,12 +134,12 @@ export function Serif({ children, size, color, style }: { children: ReactNode; s
 export function Title({ children, tone = 'ink', color, size, style, align, ...rest }: BaseProps) {
   const t = useTheme()
   const col = useToneColor(tone)
-  const fs = (size ?? t.type.heading) * t.textScale
+  const fs = (size ?? t.type.heading) * t.textScale * t.script.scale
   return (
     <RNText
       maxFontSizeMultiplier={t.maxScale.body}
       {...rest}
-      style={[{ fontFamily: t.fonts.sansLight, fontSize: fs, lineHeight: Math.round(fs * 1.22), letterSpacing: -fs * 0.01, color: color ?? col, textAlign: align }, style]}
+      style={[{ fontFamily: t.fonts.sansLight, fontSize: fs, lineHeight: Math.round(fs * 1.22 * t.script.leading), letterSpacing: -fs * 0.01, color: color ?? col, textAlign: align }, style]}
     >
       {children}
     </RNText>

@@ -19,10 +19,12 @@ export const GRACE_UNTIL = '2027-02-15'
  * - Offline, with the real count of changes queued on this phone (Ledger moments added while
  *   offline), then "sending" and "synced" when the connection is back. Specimen: nothing leaves.
  * - Payments grace: a failed renewal, 14 days of unchanged access, a calm way to pay.
+ * - Jailbreak / root (Architecture p21: warn, not block): a signal from expo-device or the
+ *   specimen demo switch. Everything keeps working; the banner explains, until read.
  * Never red, never urgent: a fall or a missed payment is not an alarm.
  */
 export function AppBanners() {
-  const { offline, setOffline, syncQueue, syncState, syncedCount, paymentsGrace } = useApp()
+  const { offline, setOffline, syncQueue, syncState, syncedCount, paymentsGrace, deviceAtRisk, rootedAck } = useApp()
   const [session] = useStore(sessionStore)
   const path = usePathname()
   const t = useDict(KIT)
@@ -50,6 +52,11 @@ export function AppBanners() {
         text={t('graceBanner', { date: fmtDate(GRACE_UNTIL) })}
         action={{ label: t('gracePay'), hint: t('gracePayHint'), onPress: () => router.push('/membership') }}
       />,
+    )
+  }
+  if (deviceAtRisk && !rootedAck && path !== '/device-security') {
+    rows.push(
+      <Banner key="rooted" icon="shield-off" text={t('rootBanner')} action={{ label: t('rootWhat'), onPress: () => router.push('/device-security') }} />,
     )
   }
   if (!rows.length) return null

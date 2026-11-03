@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowRight, Building2, Check, Download, FileJson, Fingerprint, Globe2, HelpCircle, KeyRound, Lock, Server, ShieldCheck, Trash2, UserRound } from 'lucide-react'
+import { ArrowRight, Building2, Check, Download, FileJson, Globe2, HelpCircle, KeyRound, Lock, Server, ShieldCheck, Trash2, UserRound } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { DaybreakButton, SpecimenTag, fmtDate } from '@/components/joy/primitives'
@@ -13,6 +13,8 @@ import { CLAIMS_LOG, DEFAULT_NOMINEE, EXPORTS_PAST, EXTRA_ACCESS, SPECIMEN_NOW }
 import { Checkbox, Field, Section, Segmented, Select, Toggle } from './_parts'
 import { inputCls, rich, syncWhatsAppChannel, useMemberProfile, usePersisted, useToast } from './_util'
 import { AbhaCard } from './_abha'
+import { ARTEFACT_VERSION, CONSENT_SEED, latestFor, makeEvent, type ConsentAction, type ConsentEvent, type ConsentHistory } from './_consent'
+import { StepUp } from './_stepup'
 import { useDict } from '@/lib/i18n'
 import { TRUST, useData } from './_i18n'
 
@@ -20,6 +22,8 @@ import { TRUST, useData } from './_i18n'
 // export (JSON / FHIR, ≤72 h), delete (step-up, consent withdrawal honoured ≤24 h),
 // nominee, research consent, ABHA, aggregates-only for employers, method pages,
 // the claims log and data residency. One Daybreak: "Request export".
+// Consent history (consent_event, Arch p.25): every grant and withdrawal with its artefact
+// version; export and erasure each pass a step-up check (passkey or SMS code) first.
 const SCOPE_LABEL: Record<Consent['scope'], keyof typeof TRUST> = { core: 'scopeCore', device: 'scopeDevice', calendar: 'scopeCalendar', whatsapp: 'scopeMessaging', cohort: 'scopeResearch', partner: 'scopePartner' }
 
 export default function TrustCentre() {
@@ -30,9 +34,13 @@ export default function TrustCentre() {
   // Consents are kept per viewer so a withdrawal survives a reload; WhatsApp always follows the shared value.
   const [stored, setStored] = usePersisted<Record<string, { on: boolean; pending?: boolean }>>('consents', Object.fromEntries(CONSENTS.map((c) => [c.id, { on: c.granted }])))
   const consents = { ...stored, c_wa: { ...stored.c_wa, on: wa.consented } }
+  // Every grant and withdrawal is kept as an event with the artefact version (consent_event).
+  const [history, setHistory] = usePersisted<ConsentHistory>('consent-history', CONSENT_SEED)
+  const record = (ref: string, action: ConsentAction) => setHistory((h) => ({ events: [...h.events, makeEvent(ref, action, 'trust')] }))
   const setConsent = (id: string, on: boolean) => {
     setStored((s) => ({ ...s, [id]: { on, pending: true } }))
     if (id === 'c_wa') { setWa({ consented: on }); syncWhatsAppChannel(on) }
+    record(id, on ? 'granted' : 'withdrawn')
   }
   const { hash } = useLocation()
   // Arriving from Settings or Profile with #data / #consents: scroll once the page has rendered.
@@ -52,7 +60,8 @@ export default function TrustCentre() {
 
       <Summary given={Object.values(consents).filter((c) => c.on).length} />
       <AccessLog onAsk={(who) => showToast(t('askToast', { who }))} />
-      <Consents state={consents} setConsent={setConsent} onChange={showToast} />
+      <Consents state={consents} history={history} setConsent={setConsent} onChange={showToast} />
+      <ConsentLog history={history} />
 
       <Section id="data" className="mt-16" eyebrow={t('dataEyebrow')} title={t('dataTitle')}>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -60,13 +69,13 @@ export default function TrustCentre() {
           <DeleteCard />
           <NomineeCard onSaved={showToast} />
           <div className="grid gap-6">
-            <ResearchCard onChange={showToast} />
+            <ResearchCard onChange={showToast} onRecord={record} />
             <AbhaCard onChange={showToast} />
           </div>
         </div>
       </Section>
 
-      <Aggregates onChange={showToast} />
+      <Aggregates onChange={showToast} onRecord={record} />
       <MethodAndClaims />
       <Residency />
       {toast}
@@ -152,7 +161,7 @@ function AccessLog({ onAsk }: { onAsk: (who: string) => void }) {
   )
 }
 
-function Consents({ state, setConsent, onChange }: { state: Record<string, { on: boolean; pending?: boolean }>; setConsent: (id: string, on: boolean) => void; onChange: (m: string) => void }) {
+function Consents({ state, history, setConsent, onChange }: { state: Record<string, { on: boolean; pending?: boolean }>; history: ConsentHistory; setConsent: (id: string, on: boolean) => void; onChange: (m: string) => void }) {
   const t = useDict(TRUST)
   const dx = useData()
   const [confirm, setConfirm] = useState<Consent | null>(null)
@@ -176,6 +185,8 @@ function Consents({ state, setConsent, onChange }: { state: Record<string, { on:
             <ul className="divide-y divide-line">
               {items.map((c) => {
                 const s = state[c.id]
+                const last = latestFor(history, c.id)
+                const version = s.on && last?.action === 'granted' ? last.version : ARTEFACT_VERSION[c.id]
                 return (
                   <li key={c.id} className="px-5 py-4 md:px-6">
                     <Toggle
@@ -188,13 +199,18 @@ function Consents({ state, setConsent, onChange }: { state: Record<string, { on:
                           <span className="mt-1 block text-[13px] text-ink-3">
                             {s.pending ? (
                               <span className="inline-flex items-center gap-1 text-ink-2"><Check size={13} /> {t('changeRecorded')}</span>
+                            ) : s.on && last?.action === 'granted' ? (
+                              rich(t('givenOn'), { date: <span className="num">{fmtDate(last.at.slice(0, 10))}</span> })
                             ) : s.on && c.since ? (
                               rich(t('givenOn'), { date: <span className="num">{fmtDate(c.since)}</span> })
                             ) : s.on ? (
                               rich(t('givenOn'), { date: <span className="num">{fmtDate(SPECIMEN_NOW)}</span> })
+                            ) : last?.action === 'withdrawn' ? (
+                              rich(t('withdrawnOn'), { date: <span className="num">{fmtDate(last.at.slice(0, 10))}</span> })
                             ) : (
                               t('notGiven')
                             )}
+                            {' · '}{rich(t('artefact'), { v: <span className="num">{version}</span> })}
                           </span>
                         </>
                       }
@@ -224,6 +240,44 @@ function Consents({ state, setConsent, onChange }: { state: Record<string, { on:
           </>
         )}
       </Sheet>
+    </Section>
+  )
+}
+
+const ACTION_LABEL: Record<ConsentAction, keyof typeof TRUST> = { granted: 'actGranted', withdrawn: 'actWithdrawn', declined: 'actDeclined' }
+const VIA_LABEL: Record<ConsentEvent['via'], keyof typeof TRUST> = { setup: 'viaSetup', trust: 'viaTrust', whatsapp: 'viaWhatsapp', reply: 'viaReply', update: 'viaUpdate' }
+const LOG_SHORT = 6
+
+/** Consent history: every grant and withdrawal (consent_event), newest first, with the artefact version. */
+function ConsentLog({ history }: { history: ConsentHistory }) {
+  const t = useDict(TRUST)
+  const dx = useData()
+  const [all, setAll] = useState(false)
+  const rows = useMemo(() => [...history.events].reverse().sort((a, b) => b.at.localeCompare(a.at)), [history])
+  const live = rows.filter((e) => e.live).length
+  const shown = all ? rows : rows.slice(0, LOG_SHORT)
+  const name = (ref: string) => ref === 'research' ? t('researchLabel') : ref === 'insurer' ? t('insurerName') : dx(CONSENTS.find((c) => c.id === ref)?.name ?? ref)
+  return (
+    <Section id="consent-history" className="mt-16" eyebrow={t('histEyebrow')} title={rich(t('histTitle'), { em: <em className="font-serif">{t('histEm')}</em> })} lead={t('histLead')} aside={<SpecimenTag />}>
+      <Card>
+        <p className="text-[14px] text-ink-2" aria-live="polite">{rich(t('histEvents'), { n: <span className="num">{rows.length}</span> })}{live > 0 && rich(t('histSession'), { n: <span className="num">{live}</span> })}</p>
+        <DataTable
+          className="mt-2"
+          caption={t('histLog')}
+          rows={shown}
+          rowKey={(r) => r.id}
+          columns={[
+            { key: 'at', header: t('when'), render: (r) => <span className="num whitespace-nowrap text-ink-2">{fmtDate(r.at.slice(0, 10))} · {r.at.slice(11)}</span> },
+            { key: 'ref', header: t('histConsent'), render: (r) => <span className="text-ink">{name(r.ref)}</span>, className: 'min-w-[180px]' },
+            { key: 'action', header: t('histChange'), render: (r) => <span className="inline-flex flex-wrap items-center gap-1.5"><Pill tone={r.action === 'granted' ? 'positive' : 'neutral'}>{t(ACTION_LABEL[r.action])}</Pill>{r.live && <span className="eyebrow text-ink-3">{t('thisSession')}</span>}</span> },
+            { key: 'version', header: t('histVersion'), render: (r) => <span className="num text-ink-2">{r.version}</span> },
+            { key: 'via', header: t('histWhere'), render: (r) => <span className="whitespace-nowrap text-ink-2">{t(VIA_LABEL[r.via])}</span> },
+          ]}
+        />
+        {rows.length > LOG_SHORT && (
+          <Button size="sm" variant="ghost" className="mt-3" onClick={() => setAll((v) => !v)}>{all ? t('histFewer') : t('histAll')} {!all && <span className="num">({rows.length})</span>}</Button>
+        )}
+      </Card>
     </Section>
   )
 }
@@ -267,6 +321,7 @@ function ExportCard({ consents, onDone }: { consents: Record<string, { on: boole
     { key: 'ready', label: t('stReady') },
   ]
   const idx = steps.findIndex((s) => s.key === status)
+  const [stepUp, setStepUp] = useState(false)
   return (
     <Card className="flex flex-col">
       <div className="flex items-center gap-2"><FileJson size={18} className="text-ink-3" /><p className="eyebrow text-ink-3">{t('export')}</p></div>
@@ -280,7 +335,7 @@ function ExportCard({ consents, onDone }: { consents: Record<string, { on: boole
       <AnimatePresence mode="wait">
         {status === 'idle' ? (
           <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mt-6">
-            <DaybreakButton onClick={() => setStatus('requested')} className="w-full sm:w-auto">{t('requestExport')}</DaybreakButton>
+            <DaybreakButton onClick={() => setStepUp(true)} className="w-full sm:w-auto">{t('requestExport')}</DaybreakButton>
           </motion.div>
         ) : (
           <motion.div key="track" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="mt-6 rounded-card bg-paper-sunk p-4">
@@ -292,7 +347,8 @@ function ExportCard({ consents, onDone }: { consents: Record<string, { on: boole
                 </li>
               ))}
             </ol>
-            <p className="mt-3 text-[14px] text-ink-2">
+            <p className="mt-3 inline-flex items-center gap-1.5 text-[13px] text-ink-3"><ShieldCheck size={13} /> {t('stepUpDone')}</p>
+            <p className="mt-1 text-[14px] text-ink-2">
               {status === 'ready'
                 ? downloaded ? t('downloadedFile', { file: format === 'fhir' ? t('fhir') : t('jsonFile') }) : t('fileReady', { file: format === 'fhir' ? t('fhir') : t('jsonFile') })
                 : t('requestedBy', { a: fmtDate('2027-01-28'), b: fmtDate('2027-01-31') })}
@@ -314,6 +370,9 @@ function ExportCard({ consents, onDone }: { consents: Record<string, { on: boole
           <p key={x.id} className="mt-2 text-[14px] text-ink-2"><span className="num">{fmtDate(x.requested)}</span> · {dx(x.format)} · <span className="num">{x.size}</span> · {dx(x.status)}</p>
         ))}
       </div>
+      <Sheet open={stepUp} onClose={() => setStepUp(false)} title={t('suExportTitle')} side="center">
+        <StepUp open={stepUp} why={t('suWhyExport')} onCancel={() => setStepUp(false)} onVerified={() => { setStepUp(false); setStatus('requested'); onDone(t('exportVerified')) }} />
+      </Sheet>
     </Card>
   )
 }
@@ -378,16 +437,7 @@ function DeleteCard() {
           </div>
         )}
         {step === 'auth' && (
-          <div className="space-y-4 text-center">
-            <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-paper-sunk text-ink"><Fingerprint size={30} /></span>
-            <p className="text-[17px] text-ink">{t('confirmYou')}</p>
-            <p className="text-[15px] text-ink-2">{t('stepUp')}</p>
-            <div className="flex flex-wrap justify-center gap-2 pt-2">
-              <Button variant="ghost" onClick={() => setStep('confirm')}>{t('back')}</Button>
-              <Button variant="ghost" onClick={close}>{t('cancel')}</Button>
-              <Button variant="ink" onClick={() => { setScheduled(true); close() }}><KeyRound size={15} /> {t('usePasskey')}</Button>
-            </div>
-          </div>
+          <StepUp open={step === 'auth'} why={t('suWhyErase')} onBack={() => setStep('confirm')} onCancel={close} onVerified={() => { setScheduled(true); close() }} />
         )}
       </Sheet>
     </Card>
@@ -442,7 +492,7 @@ function NomineeCard({ onSaved }: { onSaved: (m: string) => void }) {
   )
 }
 
-function ResearchCard({ onChange }: { onChange: (m: string) => void }) {
+function ResearchCard({ onChange, onRecord }: { onChange: (m: string) => void; onRecord: (ref: string, action: ConsentAction) => void }) {
   const t = useDict(TRUST)
   const [research, setResearch] = usePersisted('research', { on: true })
   const on = research.on
@@ -453,7 +503,7 @@ function ResearchCard({ onChange }: { onChange: (m: string) => void }) {
       <div className="mt-3">
         <Toggle
           checked={on}
-          onChange={(v) => { setOn(v); onChange(v ? t('researchOn') : t('researchOff')) }}
+          onChange={(v) => { setOn(v); onRecord('research', v ? 'granted' : 'withdrawn'); onChange(v ? t('researchOn') : t('researchOff')) }}
           label={t('researchLabel')}
           description={t('researchDesc')}
         />
@@ -463,13 +513,19 @@ function ResearchCard({ onChange }: { onChange: (m: string) => void }) {
 }
 
 type InsurerState = 'not-granted' | 'granted' | 'declined'
-function Aggregates({ onChange }: { onChange: (m: string) => void }) {
+function Aggregates({ onChange, onRecord }: { onChange: (m: string) => void; onRecord: (ref: string, action: ConsentAction) => void }) {
   const t = useDict(TRUST)
   const [ins, setIns] = usePersisted<{ state: InsurerState }>('insurer', { state: 'not-granted' })
   const insurer = ins.state
   const setInsurer = (v: InsurerState) => setIns({ state: v })
   const [review, setReview] = useState(false)
   const decide = (v: InsurerState) => {
+    // Only real changes become consent events; going back to undecided after a decline records nothing.
+    if (v !== insurer) {
+      if (v === 'granted') onRecord('insurer', 'granted')
+      else if (v === 'declined') onRecord('insurer', 'declined')
+      else if (insurer === 'granted') onRecord('insurer', 'withdrawn')
+    }
     setInsurer(v)
     setReview(false)
     onChange(v === 'granted' ? t('insGranted') : v === 'declined' ? t('insDeclined') : t('insReset'))

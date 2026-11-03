@@ -1,14 +1,14 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowRight, Check, ChevronLeft, ChevronRight, Lock, Moon, Pause, Play, Plus, Trash2, X } from 'lucide-react'
+import { ArrowRight, BookUser, Check, ChevronLeft, ChevronRight, Lock, Moon, Pause, Play, Plus, Search, Smartphone, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { DaybreakButton, Eyebrow } from '@/components/joy/primitives'
-import { Button, Pill } from '@/components/ui'
+import { Button, Pill, Sheet } from '@/components/ui'
 import { CIRCLE } from '@/data/platform'
 import { fmtDate } from '@/components/joy/primitives'
 import { useSpaceState } from './_state'
-import { COUPLES_CHECK, COUPLES_ITEMS, COUPLES_OPTIONS, CONNECTIONS, CIRCLE_START, SPACE_TODAY, STATE_OF_US, STATE_OF_US_PAST, TWO_AM_START, type CirclePerson } from './_data'
+import { COUPLES_CHECK, COUPLES_ITEMS, COUPLES_OPTIONS, CONNECTIONS, CIRCLE_START, PHONE_CONTACTS, SPACE_TODAY, STATE_OF_US, STATE_OF_US_PAST, TWO_AM_START, type CirclePerson } from './_data'
 import { SpaceShell, ToolCard, rovingRadio, useCrisisGuard, Toggle } from './_SpaceShell'
 import { useSpaceText, type SpKey } from './_i18n'
 import { INSTRUMENT_NOTE } from '@/lib/i18n'
@@ -62,6 +62,8 @@ function CirclesOrbit() {
   const { t, d, r, lang } = useSpaceText()
   const [onlyUnseen, setOnlyUnseen] = useState(false)
   const [removed, setRemoved] = useState<{ person: CirclePerson; index: number } | null>(null)
+  const [picking, setPicking] = useState(false)
+  const [fromContacts, setFromContacts] = useState(false)
   const inner = people.filter((p) => p.ring === 5)
   const outer = people.filter((p) => p.ring === 15)
   const unseen = people.filter((p) => !p.seen)
@@ -81,7 +83,12 @@ function CirclesOrbit() {
     if ((ring === 5 ? inner : outer).length >= caps[ring]) return setErr({ k: ring === 5 ? 'ppl.c.err5' : 'ppl.c.err15' })
     const id = `p${Date.now()}`
     setPeople((p) => [...p, { id, name: n, ring, seen: true }])
-    setSel(id); setName(''); setErr(null); setRemoved(null)
+    setSel(id); setName(''); setErr(null); setRemoved(null); setFromContacts(false)
+  }
+  // The picker hands back one name only; it fills the field so the circle still stores a name the member typed or kept.
+  const pick = (full: string) => {
+    setName(Array.from(full.split(' ')[0]).slice(0, NAME_MAX).join(''))
+    setErr(null); setFromContacts(true); setPicking(false)
   }
   const update = (id: string, patch: Partial<CirclePerson>) => setPeople((ps) => ps.map((p) => (p.id === id ? { ...p, ...patch } : p)))
   const move = (p: CirclePerson) => {
@@ -203,8 +210,12 @@ function CirclesOrbit() {
             <Eyebrow>{t('ppl.c.addSomeone')}</Eyebrow>
             <label className="mt-3 block">
               <span className="sr-only">{t('ppl.c.firstName')}</span>
-              <input value={name} maxLength={NAME_MAX} onChange={(e) => { setName(e.target.value); setErr(null) }} placeholder={t('ppl.c.firstName')} aria-invalid={!!err} aria-describedby={err ? 'circ-err' : undefined} className={inputCls} />
+              <input value={name} maxLength={NAME_MAX} onChange={(e) => { setName(e.target.value); setErr(null) }} placeholder={t('ppl.c.firstName')} aria-invalid={!!err} aria-describedby={err ? 'circ-err' : fromContacts ? 'circ-picked' : undefined} className={inputCls} />
             </label>
+            <button type="button" onClick={() => setPicking(true)} disabled={full[5] && full[15]} className="mt-2 inline-flex items-center gap-1.5 rounded text-[14px] text-ink underline underline-offset-4 disabled:opacity-40 focus-ring">
+              <BookUser size={14} aria-hidden /> {t('ppl.ct.open')}
+            </button>
+            {fromContacts && <p id="circ-picked" role="status" className="mt-1.5 text-[13px] text-ink-2">{t('ppl.ct.filled')}</p>}
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <div role="radiogroup" aria-label={t('ppl.c.which')} className="inline-flex w-full rounded-full bg-paper-raised p-1 sm:w-auto sm:flex-1">
                 {RINGS.map((r) => (
@@ -229,7 +240,44 @@ function CirclesOrbit() {
           </form>
         </div>
       </div>
+      <ContactsPicker open={picking} onClose={() => setPicking(false)} inCircles={people.map((p) => p.name.toLowerCase())} onPick={pick} />
     </ToolCard>
+  )
+}
+
+/** A simulated on-device contacts picker (the phone's own sheet): the list never leaves the
+ *  phone and Joy OS receives only the one name picked. */
+function ContactsPicker({ open, onClose, inCircles, onPick }: { open: boolean; onClose: () => void; inCircles: string[]; onPick: (name: string) => void }) {
+  const [q, setQ] = useState('')
+  const { t } = useSpaceText()
+  useEffect(() => { if (open) setQ('') }, [open])
+  const needle = q.trim().toLowerCase()
+  const rows = PHONE_CONTACTS.filter((c) => !needle || c.toLowerCase().includes(needle))
+  return (
+    <Sheet open={open} onClose={onClose} title={t('ppl.ct.title')}>
+      <p className="inline-flex items-center gap-1.5 rounded-full bg-paper-sunk px-3 py-1 text-[12px] text-ink-2"><Smartphone size={13} aria-hidden /> {t('ppl.ct.tag')}</p>
+      <p className="mt-3 text-[14px] text-ink-2">{t('ppl.ct.note')}</p>
+      <label className="relative mt-4 block">
+        <span className="sr-only">{t('ppl.ct.search')}</span>
+        <Search size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-3" aria-hidden />
+        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('ppl.ct.search')} className={clsx(inputCls, 'pl-10')} />
+      </label>
+      <ul className="mt-3 divide-y divide-line">
+        {rows.map((c) => {
+          const taken = inCircles.includes(c.split(' ')[0].toLowerCase())
+          return (
+            <li key={c}>
+              <button type="button" disabled={taken} onClick={() => onPick(c)} className="flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left hover:bg-paper-sunk disabled:cursor-not-allowed disabled:hover:bg-transparent focus-ring">
+                <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-paper-sunk text-[13px] text-ink-2">{c.split(' ').map((w) => w[0]).join('').slice(0, 2)}</span>
+                <span className={clsx('min-w-0 flex-1 text-[16px]', taken ? 'text-ink-3' : 'text-ink')}>{c}</span>
+                {taken && <span className="shrink-0 text-[12px] text-ink-3">{t('ppl.ct.inCircles')}</span>}
+              </button>
+            </li>
+          )
+        })}
+        {rows.length === 0 && <li className="break-words py-8 text-center text-[15px] text-ink-2">{t('ppl.ct.none', { q })}</li>}
+      </ul>
+    </Sheet>
   )
 }
 

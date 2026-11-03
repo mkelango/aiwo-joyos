@@ -1,8 +1,9 @@
 import clsx from 'clsx'
 import {
   BookOpen, CalendarDays, CircleDot, Compass, HeartHandshake, Home, MessageCircle, Plane, Settings,
-  ShieldCheck, Sparkles, Users, WifiOff, Feather, Watch, CreditCard, Bell, UserRound, RefreshCw, Check, ArrowRight,
+  ShieldCheck, Sparkles, Users, WifiOff, Feather, Watch, CreditCard, Bell, UserRound, RefreshCw, Check, ArrowRight, Mail, FileText,
 } from 'lucide-react'
+import { useSyncExternalStore } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { JoyOsLockup } from '@/components/joy/Brand'
 import { fmtDate } from '@/components/joy/primitives'
@@ -13,12 +14,54 @@ import { useDict, useT } from '@/lib/i18n'
 import { SHARED } from '@/components/_i18n'
 import { CrisisSheet, ThemeToggle } from './shared'
 
+// The tenant's line of type under the mark (Architecture: "Tenants get a line of type under
+// the mark, never their own logo on Joy OS"). The tenant console writes it to
+// joyos:tenant:branding as { tagline }; an empty string means none.
+const BRANDING_KEY = 'joyos:tenant:branding'
+function readTagline(): string {
+  try {
+    const raw = localStorage.getItem(BRANDING_KEY)
+    if (!raw) return ''
+    const v = JSON.parse(raw) as { tagline?: unknown } | null
+    return v && typeof v.tagline === 'string' ? v.tagline.trim().slice(0, 80) : ''
+  } catch {
+    return ''
+  }
+}
+function subscribeBranding(cb: () => void) {
+  const on = () => cb()
+  window.addEventListener('storage', on)
+  window.addEventListener('focus', on)
+  window.addEventListener('joyos:tenant-change', on)
+  return () => {
+    window.removeEventListener('storage', on)
+    window.removeEventListener('focus', on)
+    window.removeEventListener('joyos:tenant-change', on)
+  }
+}
+function useTenantTagline() {
+  return useSyncExternalStore(subscribeBranding, readTagline, () => '')
+}
+
+/** The Joy OS mark with the tenant's line of type beneath it, when the tenant has one. */
+function MarkWithTagline({ tagline }: { tagline: string }) {
+  if (!tagline) return <JoyOsLockup to="/app" />
+  return (
+    <div className="flex min-w-0 flex-col justify-center">
+      <JoyOsLockup to="/app" />
+      {/* Tenant copy is the tenant's own words, so it is shown as written. */}
+      <p className="mt-0.5 max-w-[15rem] truncate text-[12px] leading-tight text-ink-3" title={tagline}>{tagline}</p>
+    </div>
+  )
+}
+
 // Five tabs (Memo p.17): Today, Spaces, ’Cation, Practice, Care.
 export default function MemberLayout() {
   const t = useT()
   const s = useDict(SHARED)
   const { offline, setOffline, syncQueue, syncState, syncedCount, paymentsGrace, lang } = useApp()
   const queued = syncQueue.length
+  const tagline = useTenantTagline()
   const indic = lang !== 'en'
   const { pathname } = useLocation()
   const TABS = [
@@ -33,6 +76,8 @@ export default function MemberLayout() {
     { to: '/app/ledger', label: s('ledger'), icon: Feather },
     { to: '/app/index', label: s('myIndex'), icon: CircleDot },
     { to: '/app/viva', label: s('viva'), icon: Sparkles },
+    { to: '/app/day-40', label: s('day40'), icon: FileText },
+    { to: '/app/letter', label: s('letter'), icon: Mail },
     { to: '/app/circles', label: s('circles'), icon: Users },
     { to: '/app/events', label: s('events'), icon: CalendarDays },
     { to: '/app/household', label: s('household'), icon: HeartHandshake },
@@ -51,7 +96,7 @@ export default function MemberLayout() {
       {/* Desktop rail */}
       {!immersive && (
         <aside className="fixed inset-y-0 left-0 z-30 hidden w-[264px] flex-col border-r border-line bg-paper lg:flex">
-          <div className="flex h-[72px] items-center px-6"><JoyOsLockup to="/app" /></div>
+          <div className="flex h-[72px] items-center px-6"><MarkWithTagline tagline={tagline} /></div>
           <div className="mx-4 mb-4 flex items-center gap-3 rounded-card bg-paper-sunk px-4 py-3">
             <LoopRing day={MEMBER.dayOfLoop} size={44} />
             <div className="min-w-0 break-words leading-tight">
@@ -80,8 +125,8 @@ export default function MemberLayout() {
 
       {/* Mobile top bar */}
       {!immersive && (
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-paper/90 px-4 backdrop-blur lg:hidden">
-          <JoyOsLockup to="/app" />
+        <header className={clsx('sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-line bg-paper/90 px-4 backdrop-blur lg:hidden', tagline ? 'h-16' : 'h-14')}>
+          <MarkWithTagline tagline={tagline} />
           <div className="flex items-center gap-1">
             <NavLink to="/app/notifications" className="rounded-full p-2 text-ink-2 focus-ring" aria-label={s('notifications')}><Bell size={19} /></NavLink>
             <NavLink to="/app/viva" className="rounded-full p-2 text-ink-2 focus-ring" aria-label={s('viva')}><Sparkles size={19} /></NavLink>

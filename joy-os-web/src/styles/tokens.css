@@ -52,6 +52,7 @@
   --term-b-ink: #7d5230;
 
   --wheel-guide: rgb(28 19 20 / 0.12);
+  --wheel-ghost: rgb(28 19 20 / 0.14); /* the Day-0 outline, 14% Ink (Playbook p45) */
 
   /* Type */
   --font-sans: 'Avenir Next', 'Nunito Sans', system-ui, sans-serif;
@@ -70,17 +71,18 @@
   color-scheme: light;
 }
 
-/* Tamil and Hindi: the brand Latin faces stay first, so Latin words, numbers and names
-   render exactly as in English; Tamil and Devanagari glyphs fall through to Mukta
-   Malar / Mukta, then Noto Sans Tamil / Devanagari. */
+/* Tamil and Hindi (Playbook p40; Architecture p21): the brand Latin faces stay first, so
+   Latin words, numbers and names render exactly as in English. Tamil and Devanagari glyphs
+   fall through to the specified faces: Mukta Malar / Mukta for sans, Noto Serif Tamil /
+   Tiro Devanagari Hindi for serif, then Noto Sans as the last resort. */
 :root:lang(ta) {
   --font-sans: 'Avenir Next', 'Nunito Sans', 'Mukta Malar', 'Noto Sans Tamil', system-ui, sans-serif;
-  --font-serif: 'Newsreader', 'Mukta Malar', 'Noto Sans Tamil', Georgia, serif;
+  --font-serif: 'Newsreader', 'Noto Serif Tamil', 'Mukta Malar', Georgia, serif;
   --font-mono: 'IBM Plex Mono', 'Mukta Malar', 'Noto Sans Tamil', ui-monospace, monospace;
 }
 :root:lang(hi) {
   --font-sans: 'Avenir Next', 'Nunito Sans', 'Mukta', 'Noto Sans Devanagari', system-ui, sans-serif;
-  --font-serif: 'Newsreader', 'Mukta', 'Noto Sans Devanagari', Georgia, serif;
+  --font-serif: 'Newsreader', 'Tiro Devanagari Hindi', 'Mukta', Georgia, serif;
   --font-mono: 'IBM Plex Mono', 'Mukta', 'Noto Sans Devanagari', ui-monospace, monospace;
 }
 
@@ -115,6 +117,7 @@
   --term-b-ink: #e3a86e;
   --term-b: #e3a86e; /* the minus on dark grounds */
   --wheel-guide: rgb(242 238 232 / 0.14);
+  --wheel-ghost: rgb(242 238 232 / 0.22);
   --shadow-card: 0 0 0 1px rgb(242 238 232 / 0.02);
   --shadow-lift: 0 24px 60px -20px rgb(0 0 0 / 0.6);
   color-scheme: dark;

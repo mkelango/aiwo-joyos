@@ -59,8 +59,40 @@ export const INK_GROUND: CSSProperties = {
   ['--term-d-soft' as string]: mix('--term-d', 24, '--aiwo-ink'),
   ['--term-b-soft' as string]: mix('--term-b', 26, '--aiwo-ink'),
   ['--wheel-guide' as string]: 'color-mix(in srgb, var(--aiwo-stone) 14%, transparent)',
+  ['--wheel-ghost' as string]: 'color-mix(in srgb, var(--aiwo-stone) 22%, transparent)',
   ['--shadow-card' as string]: 'none',
   colorScheme: 'dark',
+  background: 'var(--paper)',
+  color: 'var(--ink)',
+}
+
+/**
+ * Paper, scoped to one object: the Index card is Paper wherever it is shown, even on an
+ * Ink screen (Playbook p59), so the light tokens are pinned around it.
+ */
+export const PAPER_GROUND: CSSProperties = {
+  ['--paper' as string]: '#fdfbf8',
+  ['--paper-raised' as string]: '#ffffff',
+  ['--paper-sunk' as string]: 'var(--aiwo-stone)',
+  ['--ink' as string]: 'var(--aiwo-ink)',
+  ['--ink-ground' as string]: 'var(--aiwo-ink)',
+  ['--ink-2' as string]: '#4f4547',
+  ['--ink-3' as string]: '#6f6567',
+  ['--line' as string]: '#e7e0d6',
+  ['--line-strong' as string]: '#d3c9bc',
+  ['--daybreak' as string]: 'var(--aiwo-daybreak)',
+  ['--daybreak-ink' as string]: 'var(--aiwo-daybreak-deep)',
+  ['--term-b' as string]: '#a8703f',
+  ['--term-h-soft' as string]: '#dcefe7',
+  ['--term-p-soft' as string]: '#ece3f1',
+  ['--term-r-soft' as string]: '#f3dfe7',
+  ['--term-f-soft' as string]: '#dfeaf6',
+  ['--term-d-soft' as string]: '#fbf0cc',
+  ['--term-b-soft' as string]: '#f3e6da',
+  ['--wheel-guide' as string]: 'rgb(28 19 20 / 0.12)',
+  ['--wheel-ghost' as string]: 'rgb(28 19 20 / 0.14)',
+  ['--shadow-card' as string]: '0 1px 0 rgb(28 19 20 / 0.03), 0 1px 3px rgb(28 19 20 / 0.04)',
+  colorScheme: 'light',
   background: 'var(--paper)',
   color: 'var(--ink)',
 }

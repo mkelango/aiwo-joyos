@@ -12,7 +12,7 @@ import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { DEVICES, INTENTS, type DeviceId } from '@/screens/b/entryData'
 import { accountStore, notifPrefsStore, onboardingStore, refCode, sessionStore, useStore, validatePrefs, type NotifPrefs, type OnboardingDraft } from '@/screens/b/bStore'
-import { accountProblems, contactLabel, migrateOnboardingDraft, newAiwoId, onboardingAccountStore, onboardingLayoutStore, type OnboardingAccount } from '@/lib/onboardingAccount'
+import { EMPTY_GUARDIAN, GUARDIAN_CODE, accountProblems, contactLabel, guardianProblems, isMinor, migrateOnboardingDraft, newAiwoId, onboardingAccountStore, onboardingLayoutStore, type GuardianConsent, type OnboardingAccount } from '@/lib/onboardingAccount'
 import { SPECIMEN_AIWO_ID } from '@/screens/b/_data'
 import { CheckLine, ChoiceCard, Done, Field, KeyValue, StepHead, StepProgress, TimeStepper, TimelineStep, useCrisisGuard } from '@/screens/b/parts'
 import { SPECIMEN_NOW } from '@/screens/b/accountData'
@@ -22,6 +22,9 @@ import { SPECIMEN_NOW } from '@/screens/b/accountData'
 // household invites (optional) → "Your ninety days begin" → the baseline Index.
 // Back / next with validation; saved as you go on this phone (resumes at the saved step).
 // Quiet hours and channels are the same preferences Settings and Notifications show.
+// Minors gate (Architecture: "no scoring; verifiable parental consent"): the AIWO ID step asks
+// for age; under 18, a parent or guardian confirms by a code sent to their phone (specimen),
+// and Begin starts the ninety days without a baseline Index. Take the Index refuses to score.
 // One Daybreak per step.
 
 // Language comes first, so everything after it reads in the member's language.
@@ -80,6 +83,10 @@ export default function Onboarding() {
   const [invConsent, setInvConsent] = useState(false)
   const [invErr, setInvErr] = useState<{ name?: string; consent?: string }>({})
   const [invAdded, setInvAdded] = useState<string | null>(null)
+  // Minors gate: the guardian's code being typed.
+  const [gCode, setGCode] = useState('')
+  const [gErr, setGErr] = useState<string | null>(null)
+  const [gTouched, setGTouched] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [tomorrowOpen, setTomorrowOpen] = useState(false)
@@ -145,6 +152,8 @@ export default function Onboarding() {
           setTouched({ name: true, contact: true })
           return t(p.name ?? p.contact!)
         }
+        if (!account.age) return t('mgErrAge')
+        if (isMinor(account) && account.guardian.status !== 'verified') return t('mgErrGuardian')
         return account.verified ? null : t('acErrVerified')
       }
       case 'Intent':
@@ -243,6 +252,30 @@ export default function Onboarding() {
     verified('code')
     setSecure('choose')
     setError(null)
+  }
+
+  // ── Minors gate ──
+  const minor = isMinor(account)
+  const guardian = account.guardian ?? EMPTY_GUARDIAN
+  const setGuardian = (patch: Partial<GuardianConsent>) => setAccount((a) => ({ ...a, guardian: { ...(a.guardian ?? EMPTY_GUARDIAN), ...patch } }))
+  const gProbs = guardianProblems(guardian)
+  const guardianPhone = (p: string) => {
+    const d = p.replace(/\D/g, '').slice(-10)
+    return d.length === 10 ? `+91 ${d.slice(0, 5)} ${d.slice(5)}` : p.trim()
+  }
+  const sendGuardianCode = () => {
+    setGTouched(true)
+    if (gProbs.name || gProbs.phone) return
+    if (!guard(guardian.name)) return
+    setGCode('')
+    setGErr(null)
+    setGuardian({ status: 'sent', at: new Date().toISOString() })
+  }
+  const confirmGuardian = () => {
+    if (gCode !== GUARDIAN_CODE) return setGErr(t('mgCodeWrong'))
+    setGErr(null)
+    setError(null)
+    setGuardian({ status: 'verified', at: new Date().toISOString() })
   }
 
   // ── Household ──
@@ -453,6 +486,90 @@ export default function Onboarding() {
                   help={t('acContactHelp')}
                 />
               )}
+            </Card>
+            <Card tone="raised" style={{ gap: space.s2 }}>
+              <View style={{ gap: space.s1 }}>
+                <Meta tone="ink">{t('mgAgeQ')}</Meta>
+                <Segmented<'adult' | 'minor'>
+                  value={account.age ?? ('' as 'adult')}
+                  onChange={(v) => {
+                    setError(null)
+                    setAccount((a) => ({ ...a, age: v }))
+                  }}
+                  items={[
+                    { value: 'adult', label: t('mgAdult') },
+                    { value: 'minor', label: t('mgMinor') },
+                  ]}
+                />
+                <Meta size={14}>{t('mgAgeHelp')}</Meta>
+              </View>
+              {minor ? (
+                <View style={{ gap: space.s2 }} accessibilityLiveRegion="polite">
+                  <Body>{t('mgMinorBody')}</Body>
+                  {guardian.status === 'verified' ? (
+                    <View style={{ flexDirection: 'row', gap: space.s2, alignItems: 'flex-start' }}>
+                      <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.ink, alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name="check" size={20} color={c.paper} />
+                      </View>
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <Body weight="medium">{t('mgVerified', { name: guardian.name.trim(), phone: guardianPhone(guardian.phone) })}</Body>
+                        <Button variant="link" onPress={() => setAccount((a) => ({ ...a, guardian: EMPTY_GUARDIAN }))}>
+                          {t('mgChange')}
+                        </Button>
+                      </View>
+                    </View>
+                  ) : guardian.status === 'sent' ? (
+                    <View style={{ gap: space.s2 }}>
+                      <Body>{t('mgSent', { name: guardian.name.trim(), phone: guardianPhone(guardian.phone) })}</Body>
+                      <Field
+                        label={t('mgCodeLabel')}
+                        value={gCode}
+                        onChangeText={(v) => {
+                          setGCode(v.replace(/\D/g, '').slice(0, 6))
+                          setGErr(null)
+                        }}
+                        onSubmitEditing={confirmGuardian}
+                        keyboardType="number-pad"
+                        maxLength={6}
+                        placeholder="••••••"
+                        error={gErr}
+                        help={t('mgCodeHelp', { code: GUARDIAN_CODE })}
+                        style={{ maxWidth: 260 }}
+                      />
+                      <View style={{ flexDirection: 'row', gap: space.s1, flexWrap: 'wrap' }}>
+                        <Button variant="ink" icon="check" onPress={confirmGuardian}>
+                          {t('mgConfirm')}
+                        </Button>
+                        <Button variant="ghost" onPress={() => setGuardian({ status: null })}>
+                          {tc('back')}
+                        </Button>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={{ gap: space.s2 }}>
+                      <Field
+                        label={t('mgGuardianName')}
+                        value={guardian.name}
+                        onChangeText={(v) => setGuardian({ name: v })}
+                        autoCapitalize="words"
+                        error={gTouched && gProbs.name ? t(gProbs.name) : null}
+                      />
+                      <Field
+                        label={t('mgGuardianPhone')}
+                        value={guardian.phone}
+                        onChangeText={(v) => setGuardian({ phone: v.replace(/[^\d +]/g, '') })}
+                        keyboardType="phone-pad"
+                        placeholder="98400 12345"
+                        error={gTouched && gProbs.phone ? t(gProbs.phone) : null}
+                      />
+                      <Meta size={14}>{t('mgConsentCopy')}</Meta>
+                      <Button variant="ink" icon="send" onPress={sendGuardianCode} style={{ alignSelf: 'flex-start' }}>
+                        {t('mgSend')}
+                      </Button>
+                    </View>
+                  )}
+                </View>
+              ) : null}
             </Card>
             <Card tone="sunk" style={{ gap: space.s2 }}>
               <Eyebrow>{t('acSecure')}</Eyebrow>
@@ -757,20 +874,27 @@ export default function Onboarding() {
                   {t('beginA')}<Serif>{t('beginSerif')}</Serif>{t('beginB')}
                 </>
               }
-              lead={t('beginLead')}
+              lead={minor ? t('mgBeginLead') : t('beginLead')}
             />
             <Card tone="raised" style={{ gap: space.s2 }}>
               <Eyebrow>{t('loop')}</Eyebrow>
               <View accessibilityLabel={t('loopA11y')}>
-                {(
-                  [
-                    ['0', t('l0')],
-                    ['15', t('l15')],
-                    ['45', t('l45')],
-                    ['60', t('l60')],
-                    ['76', t('l76')],
-                    ['90', t('l90')],
-                  ] as const
+                {(minor
+                  ? [
+                      ['0', t('mgL0')],
+                      ['15', t('l15')],
+                      ['45', t('l45')],
+                      ['60', t('l60')],
+                      ['90', t('mgL90')],
+                    ]
+                  : [
+                      ['0', t('l0')],
+                      ['15', t('l15')],
+                      ['45', t('l45')],
+                      ['60', t('l60')],
+                      ['76', t('l76')],
+                      ['90', t('l90')],
+                    ]
                 ).map(([d, l], i, arr) => (
                   <TimelineStep key={d} index={i} state={i === 0 ? 'now' : 'next'} last={i === arr.length - 1}>
                     <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10 }} accessible accessibilityLabel={t('dayA11y', { d, l })}>
@@ -800,6 +924,7 @@ export default function Onboarding() {
                   ) : null}
                 </View>
               </KeyValue>
+              {minor ? <KeyValue k={t('kAge')}>{t('mgSum', { name: guardian.name.trim() })}</KeyValue> : null}
               <KeyValue k={tc('language')}>{LANGS.find((l) => l.value === lang)!.native}</KeyValue>
               <KeyValue k={t('kConsents')}>{`${t('consSum')}${consents.publishing ? t('consPub') : t('consNoPub')}`}</KeyValue>
               <KeyValue k={t('kDevice')}>{device === 'none' ? t('noneForNow') : `${devName}${linked[device] === 'linked' ? t('devLinked') : t('devLater')}`}</KeyValue>
@@ -823,7 +948,18 @@ export default function Onboarding() {
             </Meta>
           </View>
         ) : null}
-        {name === 'Begin' ? (
+        {name === 'Begin' && minor ? (
+          // Under 18: no baseline Index, ever. The ninety days begin without a score.
+          <DaybreakButton
+            icon="arrow-right"
+            onPress={() => {
+              complete()
+              router.replace('/')
+            }}
+          >
+            {t('mgBegin')}
+          </DaybreakButton>
+        ) : name === 'Begin' ? (
           <>
             <DaybreakButton
               icon="arrow-right"

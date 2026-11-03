@@ -29,8 +29,9 @@ import { TENANT } from '@/shared/platform'
 import type { AccessEvent, Consent } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { CLAIMS_LOG, EXPORTS_PAST, EXTRA_ACCESS } from '@/screens/b/accountData'
-import { trustStore, useStore } from '@/screens/b/bStore'
-import { ChoiceCard, Done, Field, FilterChips, TimelineStep, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
+import { ARTEFACT_VERSION, consentHistoryStore, recordConsent, trustStore, useStore, type ConsentAction, type ConsentEvent, type InsurerDecision } from '@/screens/b/bStore'
+import { ChoiceCard, Done, Field, FilterChips, KeyValue, TimelineStep, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
+import { StepUp } from '@/screens/b/stepUp'
 import { AbhaCard, MethodCard, NomineeCard } from '@/screens/b/trustCards'
 import { useDict } from '@/lib/i18n'
 import { TRUST, SCOPE_TEXT, CONSENT_T, ACCESS_T, EXPORT_T, CLAIM_STATE, CLAIM_BY, CLAIM_T } from '@/screens/b/i18n/trust'
@@ -39,10 +40,16 @@ import { ROLE, useCommon, useTx } from '@/screens/b/i18n/common'
 // TRUST CENTRE (Memo module 14, p.27): who has seen my data, consents by purpose, export
 // (FHIR / JSON, ≤72 h), delete (step-up, honoured ≤24 h), research, aggregates-only for
 // employers and partners, the claims log and residency. One Daybreak: "Request export".
+// Consent history (consent_event, Arch p.25): every grant, withdrawal and decline with its
+// artefact version. Export and erasure each pass a step-up check (passkey or SMS code) first.
+// The insurer's request is answered here: grant aggregates only, decline, or leave undecided.
 
 const SCOPE_LABEL: Record<Consent['scope'], string> = { core: 'Core', device: 'Devices', calendar: 'Calendar', whatsapp: 'Messaging', cohort: 'Research & publishing', partner: 'Partners' }
 type ExportStatus = 'idle' | 'requested' | 'preparing' | 'ready'
 type DeleteStep = 'closed' | 'explain' | 'confirm' | 'auth'
+const ACTION_LABEL: Record<ConsentAction, 'actGranted' | 'actWithdrawn' | 'actDeclined'> = { granted: 'actGranted', withdrawn: 'actWithdrawn', declined: 'actDeclined' }
+const VIA_LABEL: Record<ConsentEvent['via'], 'viaSetup' | 'viaTrust' | 'viaUpdate'> = { setup: 'viaSetup', trust: 'viaTrust', update: 'viaUpdate' }
+const HIST_SHORT = 6
 
 export default memberOnly(Trust)
 
@@ -71,11 +78,17 @@ function Trust() {
   // Consents
   // Consents, research use and a scheduled erasure are kept on the phone (they hold on return).
   const [trust, setTrust] = useStore(trustStore)
+  // The insurer consent (c_star) is answered on its own card: granted, declined or undecided.
+  const insurer: InsurerDecision = trust.insurer ?? 'not-granted'
   const consent: Record<string, { on: boolean; changed?: boolean }> = Object.fromEntries(
-    CONSENTS.map((x) => [x.id, x.id in trust.consents ? { on: trust.consents[x.id], changed: true } : { on: x.granted }]),
+    CONSENTS.map((x) => [x.id, x.id === 'c_star' ? { on: insurer === 'granted', changed: insurer !== 'not-granted' } : x.id in trust.consents ? { on: trust.consents[x.id], changed: true } : { on: x.granted }]),
   )
   const [confirm, setConfirm] = useState<Consent | null>(null)
-  const setConsentOn = (x: Consent, v: boolean) => setTrust((s) => ({ ...s, consents: { ...s.consents, [x.id]: v } }))
+  // Every change is also kept as a consent event with the artefact version.
+  const setConsentOn = (x: Consent, v: boolean) => {
+    setTrust((s) => ({ ...s, consents: { ...s.consents, [x.id]: v } }))
+    recordConsent(x.id, v ? 'granted' : 'withdrawn')
+  }
   const consentToast = (x: Consent, v: boolean) => t(v ? 'turnedOn' : 'withdrawnT', { name: cName(x) })
   const applyConsent = (x: Consent, v: boolean) => {
     setConsentOn(x, v)
@@ -91,10 +104,39 @@ function Trust() {
   }
   const granted = Object.values(consent).filter((x) => x.on).length
   const groups = (['core', 'cohort', 'device', 'calendar', 'whatsapp', 'partner'] as const).map((g) => ({ g, items: CONSENTS.filter((x) => x.scope === g) })).filter((x) => x.items.length)
+  const lastFor = (ref: string) => history.events.reduce<ConsentEvent | undefined>((best, e) => (e.ref === ref && (!best || e.at >= best.at) ? e : best), undefined)
+
+  // Consent history
+  const [history] = useStore(consentHistoryStore)
+  const [histAll, setHistAll] = useState(false)
+  const histRows = useMemo(() => [...history.events].reverse().sort((a, b) => b.at.localeCompare(a.at)), [history])
+  const histLive = histRows.filter((e) => e.live).length
+  const histShown = histAll ? histRows : histRows.slice(0, HIST_SHORT)
+  const refName = (ref: string) => {
+    if (ref === 'research') return t('researchLabel')
+    if (ref === 'insurer') return t('insurerName')
+    const x = CONSENTS.find((y) => y.id === ref)
+    return x ? cName(x) : ref
+  }
+
+  // Insurer: Star Health asks for aggregate outcomes. Only real changes become events.
+  const [insOpen, setInsOpen] = useState(false)
+  const decideInsurer = (v: InsurerDecision) => {
+    if (v !== insurer) {
+      if (v === 'granted') recordConsent('insurer', 'granted')
+      else if (v === 'declined') recordConsent('insurer', 'declined')
+      else if (insurer === 'granted') recordConsent('insurer', 'withdrawn')
+    }
+    setTrust((s) => ({ ...s, insurer: v }))
+    setInsOpen(false)
+    toastLater(v === 'granted' ? t('insGranted') : v === 'declined' ? t('insDeclined') : t('insReset'))
+  }
+  const insState = insurer === 'granted' ? t('grantedAgg') : insurer === 'declined' ? t('declined') : t('notGranted')
 
   // Export
   const [format, setFormat] = useState<'fhir' | 'json'>('fhir')
   const [exp, setExp] = useState<ExportStatus>('idle')
+  const [expAuth, setExpAuth] = useState(false)
   const steps: { key: ExportStatus; label: string }[] = [
     { key: 'requested', label: t('requested') },
     { key: 'preparing', label: t('preparing') },
@@ -264,18 +306,76 @@ function Trust() {
               <Eyebrow>{tx(SCOPE_TEXT[g], SCOPE_LABEL[g])}</Eyebrow>
               {items.map((x) => {
                 const s = consent[x.id]
+                const last = lastFor(x.id === 'c_star' ? 'insurer' : x.id)
+                const version = `${t('artefact', { v: last?.version ?? ARTEFACT_VERSION[x.id] ?? 'v1' })}`
+                if (x.id === 'c_star') {
+                  return (
+                    <View key={x.id} style={{ gap: 6 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                        <Body weight="medium" style={{ flexShrink: 1 }}>{cName(x)}</Body>
+                        <Pill tone={insurer === 'granted' ? 'ink' : 'neutral'}>{insState}</Pill>
+                      </View>
+                      <Meta size={14}>{`${cPurpose(x)}. ${version}`}</Meta>
+                      <Button size="sm" variant="secondary" onPress={() => setInsOpen(true)} style={{ alignSelf: 'flex-start' }}>
+                        {insurer === 'not-granted' ? t('reviewStar') : t('changeAnswer')}
+                      </Button>
+                    </View>
+                  )
+                }
                 return (
                   <Toggle
                     key={x.id}
                     checked={s.on}
                     onChange={(v) => (!v && (x.scope === 'core' || x.scope === 'cohort') ? setConfirm(x) : applyConsent(x, v))}
                     label={cName(x)}
-                    description={`${cPurpose(x)}. ${s.changed ? t('changeRec') : s.on && x.since ? t('given', { date: fmtDate(x.since) }) : t('notGiven')}`}
+                    description={`${cPurpose(x)}. ${s.changed ? t('changeRec') : s.on && x.since ? t('given', { date: fmtDate(x.since) }) : t('notGiven')} · ${version}`}
                   />
                 )
               })}
             </View>
           ))}
+        </Card>
+      </View>
+
+      {/* Consent history (consent_event) */}
+      <View style={{ gap: space.s2 }}>
+        <View style={{ gap: 8 }}>
+          <SectionTitle>{t('histEyebrow')}</SectionTitle>
+          <SpecimenTag />
+        </View>
+        <Title size={24}>
+          {t('histTitleA')}<Serif>{t('histTitleSerif')}</Serif>{t('histTitleB')}
+        </Title>
+        <Body tone="ink2">{t('histLead')}</Body>
+        <Card tone="raised" style={{ gap: 0 }}>
+          <Meta size={14} tone="ink3" accessibilityLiveRegion="polite">
+            {t('histEvents', { n: histRows.length })}
+            {histLive > 0 ? t('histPhone', { n: histLive }) : ''}
+          </Meta>
+          {histShown.map((e) => (
+            <View
+              key={e.id}
+              accessible
+              accessibilityLabel={t('histRowA11y', { name: refName(e.ref), action: t(ACTION_LABEL[e.action]), v: e.version, where: t(VIA_LABEL[e.via]), at: e.at })}
+              style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.line, gap: 4 }}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: space.s1 }}>
+                <Body weight="medium" style={{ flex: 1 }}>{refName(e.ref)}</Body>
+                <Pill tone={e.action === 'granted' ? 'ink' : 'neutral'}>{t(ACTION_LABEL[e.action])}</Pill>
+              </View>
+              <Meta size={14}>
+                {`${t('histVersion')} `}
+                <Mono size={14} tone="ink2">{e.version}</Mono>
+                {` · ${t(VIA_LABEL[e.via])}${e.live ? ` · ${t('thisPhone')}` : ''}`}
+              </Meta>
+              <Mono size={12} tone="ink3">{`${fmtDate(e.at.slice(0, 10))} · ${e.at.slice(11)}`}</Mono>
+            </View>
+          ))}
+          {histRows.length > HIST_SHORT ? (
+            <Button variant="link" onPress={() => setHistAll((v) => !v)}>
+              {histAll ? t('histFewer') : `${t('histAll')} (${histRows.length})`}
+            </Button>
+          ) : null}
         </Card>
       </View>
 
@@ -297,7 +397,7 @@ function Trust() {
         />
         <Meta>{format === 'fhir' ? t('fhirNote') : t('jsonNote')}</Meta>
         {exp === 'idle' ? (
-          <DaybreakButton icon="download" onPress={() => setExp('requested')}>
+          <DaybreakButton icon="download" onPress={() => setExpAuth(true)}>
             {t('request')}
           </DaybreakButton>
         ) : (
@@ -379,6 +479,7 @@ function Trust() {
           checked={research}
           onChange={(v) => {
             setResearch(v)
+            recordConsent('research', v ? 'granted' : 'withdrawn')
             setToast(v ? t('researchOn') : t('researchOff'))
           }}
           label={t('researchL')}
@@ -395,18 +496,24 @@ function Trust() {
         {(
           [
             ['briefcase', t('empHead'), t('empBody', { min: TENANT.minCohort, cell: TENANT.minCell })],
-            ['shield', t('insHead'), t('insBody')],
+            ['shield', t('insHead'), insurer === 'granted' ? t('insGrantedBody') : insurer === 'declined' ? t('insDeclinedBody') : t('insAskedBody')],
             ['lock', t('venHead'), t('venBody')],
           ] as [IconName, string, string][]
-        ).map(([icon, head, body]) => (
+        ).map(([icon, head, body], i) => (
           <Card key={head} tone="sunk" style={{ gap: 6 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Icon name={icon} size={17} color={c.ink2} />
               <Body weight="medium" style={{ flex: 1 }}>
                 {head}
               </Body>
+              {i === 1 ? <Pill tone={insurer === 'granted' ? 'ink' : 'neutral'}>{insState}</Pill> : null}
             </View>
             <Meta>{body}</Meta>
+            {i === 1 ? (
+              <Button size="sm" variant="secondary" onPress={() => setInsOpen(true)} style={{ alignSelf: 'flex-start' }}>
+                {insurer === 'not-granted' ? t('reviewStar') : t('changeAnswer')}
+              </Button>
+            ) : null}
           </Card>
         ))}
       </View>
@@ -529,31 +636,64 @@ function Trust() {
             </View>
           </>
         ) : (
-          <>
-            <View style={{ alignItems: 'center', gap: space.s1 }}>
-              <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: c.paperSunk, alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name="key" size={28} color={c.ink} />
-              </View>
-              <Body weight="medium">{t('confirmYou')}</Body>
-              <Meta align="center">{t('stepUp')}</Meta>
-            </View>
-            <View style={{ flexDirection: 'row', gap: space.s1, justifyContent: 'flex-end' }}>
-              <Button variant="ghost" onPress={closeDel}>
-                {tc('cancel')}
-              </Button>
-              <Button
-                variant="ink"
-                icon="key"
-                onPress={() => {
-                  setScheduled(true)
-                  closeDel()
-                }}
-              >
-                {t('usePasskey')}
-              </Button>
-            </View>
-          </>
+          <StepUp
+            why={t('suWhyErase')}
+            onBack={() => setDel('confirm')}
+            onCancel={closeDel}
+            onVerified={() => {
+              setScheduled(true)
+              closeDel()
+            }}
+          />
         )}
+      </Sheet>
+
+      {/* Step-up before an export is prepared */}
+      <Sheet open={expAuth} onClose={() => setExpAuth(false)} title={t('suTitleExport')}>
+        {expAuth ? (
+          <StepUp
+            why={t('suWhyExport')}
+            onCancel={() => setExpAuth(false)}
+            onVerified={() => {
+              setExpAuth(false)
+              setShared(false)
+              setShareFailed(false)
+              setExp('requested')
+            }}
+          />
+        ) : null}
+      </Sheet>
+
+      {/* Star Health's request: grant aggregates only, decline, or stay undecided */}
+      <Sheet
+        open={insOpen}
+        onClose={() => setInsOpen(false)}
+        title={t('starTitle')}
+        footer={
+          <View style={{ gap: 8 }}>
+            <Button variant="ink" block onPress={() => decideInsurer('granted')}>
+              {t('grantAgg')}
+            </Button>
+            <Button variant="secondary" block onPress={() => decideInsurer('declined')}>
+              {t('decline')}
+            </Button>
+            {insurer !== 'not-granted' ? (
+              <Button variant="ghost" block onPress={() => decideInsurer('not-granted')}>
+                {t('undecided')}
+              </Button>
+            ) : null}
+          </View>
+        }
+      >
+        <Body>{t('starBody')}</Body>
+        <Meta tone="ink">{t('insRowState', { state: insState })}</Meta>
+        <Card tone="sunk" padding={16} style={{ gap: 0 }}>
+          <KeyValue k={t('wouldSee')}>{t('groupAverages')}</KeyValue>
+          <KeyValue k={t('smallestGroup')}>{t('peopleNoCell', { a: TENANT.minCohort, b: TENANT.minCell })}</KeyValue>
+          <KeyValue k={t('never')}>{t('neverList')}</KeyValue>
+          <KeyValue k={t('premium')} last>{t('notAffected')}</KeyValue>
+        </Card>
+        <Meta size={14} tone="ink3">{`${t('artefact', { v: ARTEFACT_VERSION.insurer })} · ${t('withdrawAnyTime')}`}</Meta>
       </Sheet>
 
       <Sheet

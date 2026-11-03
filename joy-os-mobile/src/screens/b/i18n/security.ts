@@ -1,0 +1,33 @@
+import type { Dict } from '@/lib/i18n'
+
+// This phone's security (Architecture p21, client security): the jailbreak / root warning.
+export const SECURITY = {
+  eyebrow: { en: 'This phone · security', ta: 'இந்தத் தொலைபேசி · பாதுகாப்பு', hi: 'यह फ़ोन · सुरक्षा' },
+  titleA: { en: 'Is this phone ', ta: 'இந்தத் தொலைபேசி Joy OS-க்கு ', hi: 'क्या यह फ़ोन Joy OS के लिए ' },
+  titleSerif: { en: 'safe', ta: 'பாதுகாப்பானதா', hi: 'सुरक्षित' },
+  titleB: { en: ' for Joy OS?', ta: '?', hi: ' है?' },
+  lead: { en: 'Joy OS keeps your record on this phone encrypted, with the key held by the phone itself. A jailbroken or rooted phone can let other apps reach it. We warn you; we never lock you out.', ta: 'Joy OS உங்கள் பதிவை இந்தத் தொலைபேசியில் மறையாக்கம் செய்து வைக்கிறது; அதன் சாவி தொலைபேசியிடமே இருக்கும். jailbreak அல்லது root செய்யப்பட்ட தொலைபேசியில் மற்ற செயலிகள் அதை அணுகக்கூடும். நாங்கள் எச்சரிப்போம்; உங்களை ஒருபோதும் வெளியே பூட்ட மாட்டோம்.', hi: 'Joy OS आपका रिकॉर्ड इस फ़ोन पर एन्क्रिप्ट करके रखता है, जिसकी चाबी फ़ोन के ही पास रहती है। jailbreak या root किए फ़ोन पर दूसरे ऐप उस तक पहुँच सकते हैं। हम आगाह करते हैं; आपको कभी बाहर नहीं रोकते।' },
+  check: { en: 'The check', ta: 'சரிபார்ப்பு', hi: 'जाँच' },
+  kSignals: { en: 'Jailbreak or root', ta: 'Jailbreak அல்லது root', hi: 'Jailbreak या root' },
+  none: { en: 'No signals found', ta: 'எந்தச் சமிக்ஞையும் இல்லை', hi: 'कोई संकेत नहीं मिला' },
+  foundDemo: { en: 'Signals found (specimen demo)', ta: 'சமிக்ஞைகள் கண்டறியப்பட்டன (மாதிரி செயல்விளக்கம்)', hi: 'संकेत मिले (नमूना डेमो)' },
+  foundDevice: { en: 'Signals found by this phone’s check', ta: 'இந்தத் தொலைபேசியின் சரிபார்ப்பில் சமிக்ஞைகள் கண்டறியப்பட்டன', hi: 'इस फ़ोन की जाँच में संकेत मिले' },
+  checking: { en: 'Checking…', ta: 'சரிபார்க்கிறது…', hi: 'जाँच हो रही है…' },
+  kHow: { en: 'How', ta: 'எப்படி', hi: 'कैसे' },
+  howPhone: { en: 'The phone’s own signals, read when Joy OS opens (an early check: it can miss some).', ta: 'Joy OS திறக்கும்போது படிக்கப்படும் தொலைபேசியின் சொந்தச் சமிக்ஞைகள் (தொடக்கநிலைச் சரிபார்ப்பு: சிலவற்றைத் தவறவிடலாம்).', hi: 'Joy OS खुलते समय पढ़े गए फ़ोन के अपने संकेत (शुरुआती जाँच: कुछ छूट सकते हैं)।' },
+  howWeb: { en: 'A browser cannot see this, so the web build relies on the demo switch below.', ta: 'உலாவியால் இதைப் பார்க்க முடியாது, அதனால் இணையப் பதிப்பு கீழே உள்ள செயல்விளக்க ஸ்விட்சைச் சார்ந்துள்ளது.', hi: 'ब्राउज़र इसे नहीं देख सकता, इसलिए वेब संस्करण नीचे दिए डेमो स्विच पर चलता है।' },
+  kDevice: { en: 'This phone', ta: 'இந்தத் தொலைபேசி', hi: 'यह फ़ोन' },
+  meansTitle: { en: 'What this means for you', ta: 'இது உங்களுக்கு என்ன பொருள்', hi: 'आपके लिए इसका मतलब' },
+  means1: { en: 'Everything keeps working: Today, the Ledger, your Index, your people.', ta: 'எல்லாம் தொடர்ந்து வேலை செய்யும்: இன்று, லெட்ஜர், உங்கள் குறியீடு, உங்கள் மனிதர்கள்.', hi: 'सब कुछ चलता रहेगा: आज, लेजर, आपका इंडेक्स, आपके लोग।' },
+  means2: { en: 'What Joy OS keeps on this phone is less protected than on a phone that has not been changed.', ta: 'மாற்றப்படாத தொலைபேசியை விட, Joy OS இந்தத் தொலைபேசியில் வைத்திருப்பவை குறைவான பாதுகாப்பில் உள்ளன.', hi: 'Joy OS इस फ़ोन पर जो रखता है, वह बिना बदले फ़ोन की तुलना में कम सुरक्षित है।' },
+  means3: { en: 'You can turn on the biometric lock in Settings, or use Joy OS on the web instead.', ta: 'அமைப்புகளில் பயோமெட்ரிக் பூட்டை இயக்கலாம், அல்லது அதற்குப் பதிலாக இணையத்தில் Joy OS-ஐப் பயன்படுத்தலாம்.', hi: 'आप सेटिंग्स में बायोमेट्रिक लॉक चालू कर सकते हैं, या इसके बजाय वेब पर Joy OS इस्तेमाल कर सकते हैं।' },
+  okTitle: { en: 'Nothing to do', ta: 'செய்ய வேண்டியது எதுவும் இல்லை', hi: 'कुछ करने की ज़रूरत नहीं' },
+  okBody: { en: 'Your record on this phone is encrypted with a key the phone keeps in its secure store.', ta: 'இந்தத் தொலைபேசியில் உள்ள உங்கள் பதிவு, தொலைபேசி தன் பாதுகாப்பான சேமிப்பில் வைத்திருக்கும் சாவியால் மறையாக்கம் செய்யப்பட்டுள்ளது.', hi: 'इस फ़ोन पर आपका रिकॉर्ड उस चाबी से एन्क्रिप्ट है जिसे फ़ोन अपने सुरक्षित भंडार में रखता है।' },
+  carryOn: { en: 'I understand, carry on', ta: 'புரிந்தது, தொடர்கிறேன்', hi: 'समझ गया, आगे बढ़ें' },
+  acked: { en: 'You have read this. The banner is off until the next signal.', ta: 'இதைப் படித்துவிட்டீர்கள். அடுத்த சமிக்ஞை வரும் வரை அறிவிப்புப் பட்டை காட்டப்படாது.', hi: 'आपने यह पढ़ लिया है। अगले संकेत तक बैनर नहीं दिखेगा।' },
+  showAgain: { en: 'Show the banner again', ta: 'அறிவிப்புப் பட்டையை மீண்டும் காட்டு', hi: 'बैनर फिर दिखाएँ' },
+  lockLink: { en: 'Biometric lock is in Settings', ta: 'பயோமெட்ரிக் பூட்டு அமைப்புகளில் உள்ளது', hi: 'बायोमेट्रिक लॉक सेटिंग्स में है' },
+  demo: { en: 'Specimen demo', ta: 'மாதிரி செயல்விளக்கம்', hi: 'नमूना डेमो' },
+  demoToggle: { en: 'Show this phone as jailbroken or rooted', ta: 'இந்தத் தொலைபேசியை jailbreak அல்லது root செய்யப்பட்டதாகக் காட்டு', hi: 'इस फ़ोन को jailbreak या root किया हुआ दिखाएँ' },
+  demoToggleD: { en: 'Nothing on the phone changes. Joy OS behaves as it would if the check found signals.', ta: 'தொலைபேசியில் எதுவும் மாறாது. சரிபார்ப்பில் சமிக்ஞைகள் கிடைத்தால் Joy OS எப்படி நடக்குமோ அப்படியே நடக்கும்.', hi: 'फ़ोन पर कुछ नहीं बदलता। जाँच में संकेत मिलने पर Joy OS जैसा बर्ताव करता, वैसा ही करेगा।' },
+} satisfies Dict

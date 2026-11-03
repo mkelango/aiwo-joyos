@@ -18,6 +18,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Linking, Platform, Pressable, ScrollView, Text, View, useColorScheme } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { CrisisSheet } from '../src/components/CrisisSheet'
+import { LockScreen } from '../src/components/LockScreen'
+import { sessionStore, useStore } from '../src/screens/b/bStore'
 import { kit } from '../src/components/_i18n'
 import { AppProvider, useApp, type Lang } from '../src/lib/store'
 import { ThemeProvider, useTheme } from '../src/theme/ThemeProvider'
@@ -59,7 +61,10 @@ export default function RootLayout() {
 
 function RootNavigator() {
   const { scheme, c } = useTheme()
-  const { lang } = useApp()
+  const { lang, locked } = useApp()
+  const [session] = useStore(sessionStore)
+  // Biometric lock: only a signed-in member has anything to lock.
+  const showLock = locked && session.signedIn
   // Web: tell the browser (and screen readers) which language the page is in.
   useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') document.documentElement.lang = lang === 'en' ? 'en' : `${lang}-IN`
@@ -76,15 +81,22 @@ function RootNavigator() {
   return (
     <NavThemeProvider value={navTheme}>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.paper } }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="index-take" options={{ presentation: 'fullScreenModal' }} />
-        <Stack.Screen name="check" options={{ presentation: 'fullScreenModal' }} />
-        <Stack.Screen name="onboarding" options={{ presentation: 'fullScreenModal' }} />
-        <Stack.Screen name="welcome" options={{ presentation: 'fullScreenModal' }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <CrisisSheet />
+      <View
+        style={{ flex: 1 }}
+        accessibilityElementsHidden={showLock}
+        importantForAccessibility={showLock ? 'no-hide-descendants' : 'auto'}
+        aria-hidden={showLock || undefined}
+      >
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.paper } }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="index-take" options={{ presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="check" options={{ presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="onboarding" options={{ presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="welcome" options={{ presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="+not-found" />
+        </Stack>
+      </View>
+      {showLock ? <LockScreen /> : <CrisisSheet />}
     </NavThemeProvider>
   )
 }

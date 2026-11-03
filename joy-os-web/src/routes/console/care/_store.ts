@@ -18,6 +18,8 @@ export type MemberWork = {
   audit?: AuditEvent[]
 }
 export type CircleWork = { attended: string[]; savedAt: string | null; room: 'closed' | 'open' }
+/** What the circle lead did with a member's report (Architecture 8e-30: moderation and report). */
+export type ModerationWork = { status: 'spoken' | 'concern' | 'no-action'; at: string; note?: string; alertId?: string }
 
 // The concierge desk's work: bookings, home draws, pre-arrival and the Day 60 talk.
 export type BookingWork = { status: 'requested' | 'offered' | 'confirmed' | 'cancelled'; when?: string; reason?: string; at?: string }
@@ -35,7 +37,16 @@ export type ConciergeWork = {
 }
 const emptyConcierge = (): ConciergeWork => ({ bookings: {}, added: [], draws: {}, arrivals: {}, talks: {}, log: [] })
 
-type State = { tasks: CoachTask[]; members: Record<string, MemberWork>; circles: Record<string, CircleWork>; concierge: ConciergeWork }
+type State = {
+  tasks: CoachTask[]
+  members: Record<string, MemberWork>
+  circles: Record<string, CircleWork>
+  concierge: ConciergeWork
+  /** Circle reports from members, keyed by report id. */
+  moderation: Record<string, ModerationWork>
+  /** score.issued events the coach has seen in the new scores feed. */
+  scoresSeen: string[]
+}
 
 const KEY = 'joyos:care:coach:v2'
 
@@ -43,7 +54,7 @@ const seedTasks = (): CoachTask[] =>
   DRIFT_TASKS.map((t) => ({ ...t, ...(DRIFT_OVERRIDES[t.id] ?? {}) }))
 
 function load(): State {
-  const fresh: State = { tasks: seedTasks(), members: {}, circles: {}, concierge: emptyConcierge() }
+  const fresh: State = { tasks: seedTasks(), members: {}, circles: {}, concierge: emptyConcierge(), moderation: {}, scoresSeen: [] }
   try {
     const raw = sessionStorage.getItem(KEY)
     if (!raw) return fresh
@@ -54,6 +65,8 @@ function load(): State {
       members: parsed.members ?? {},
       circles: parsed.circles ?? {},
       concierge: c && typeof c === 'object' ? { ...emptyConcierge(), ...c, added: Array.isArray(c.added) ? c.added : [], log: Array.isArray(c.log) ? c.log : [] } : emptyConcierge(),
+      moderation: parsed.moderation && typeof parsed.moderation === 'object' ? parsed.moderation : {},
+      scoresSeen: Array.isArray(parsed.scoresSeen) ? parsed.scoresSeen : [],
     }
   } catch {
     return fresh
@@ -99,8 +112,21 @@ export const coach = {
   updateConcierge(f: (w: ConciergeWork) => ConciergeWork) {
     emit({ ...state, concierge: f(state.concierge) })
   },
+  /** Add a task to the queue (a clinical task for a concern the coach raised). */
+  addTask(t: CoachTask) {
+    emit({ ...state, tasks: [t, ...state.tasks] })
+  },
+  moderate(reportId: string, w: ModerationWork | null) {
+    const next = { ...state.moderation }
+    if (w) next[reportId] = w
+    else delete next[reportId]
+    emit({ ...state, moderation: next })
+  },
+  seeScores(ids: string[]) {
+    emit({ ...state, scoresSeen: Array.from(new Set([...state.scoresSeen, ...ids])) })
+  },
   reset() {
-    emit({ tasks: seedTasks(), members: {}, circles: {}, concierge: emptyConcierge() })
+    emit({ tasks: seedTasks(), members: {}, circles: {}, concierge: emptyConcierge(), moderation: {}, scoresSeen: [] })
   },
 }
 

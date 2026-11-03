@@ -33,10 +33,15 @@ import { H2, useLocal, usePlanned } from '@/screens/a/local'
 import { actionsFor } from '@/screens/a/spacesData'
 import { joyspanIndex } from '@/shared/indexEngine'
 import { measuredScore, type MeasuredIndex } from '@/shared/indexScoring'
+import { useSignOffTimer, useSubmittedIndex } from '@/lib/indexRecord'
+import { isMinor, onboardingAccountStore } from '@/lib/onboardingAccount'
+import { useStore } from '@/screens/b/bStore'
+import { TAKE } from '@/screens/b/i18n/indexTake'
+import type { IndexScore } from '@/shared/types'
 import { HISTORY_METHOD, INDEX_HISTORY, MEMBER, METHOD_V10_PUBLISHED, methodOf } from '@/shared/member'
 import { termByKey } from '@/shared/terms'
 import type { Band, TermKey } from '@/shared/types'
-import { BAND, useTx } from '@/screens/b/i18n/common'
+import { BAND, useCommon, useTx } from '@/screens/b/i18n/common'
 import { kit } from '@/components/_i18n'
 import { useTheme } from '@/theme/ThemeProvider'
 import { memberOnly } from '@/screens/b/parts'
@@ -49,16 +54,53 @@ import { txFor } from '@/screens/a/i18n'
 // concrete next step, history across methods (with the v1.0 marker), and how a gap is shown.
 // A sitting taken on this phone (useLocal('measuredIndex')) is the newest entry when present.
 // One Daybreak: plan the next step for today.
+// A Clinical-grade Day-90 re-measure signed by the physician (the chain from the Day-76
+// invite, see Day 90) becomes the newest measure; while it awaits sign-off its number is not
+// shown. An Index taken here can be corrected (append-only, /index-take?amend=1). The printable
+// card carries the ten fields of Playbook p59.
 
-export default memberOnly(IndexResult)
+export default memberOnly(IndexResultGate)
+
+/** Minors gate: a member under 18 is never scored, so there is no Index to show. */
+function IndexResultGate() {
+  const [account] = useStore(onboardingAccountStore)
+  const t = useDict(TAKE)
+  const tc = useCommon()
+  const { space } = useTheme()
+  if (!isMinor(account)) return <IndexResult />
+  return (
+    <Screen>
+      <ScreenHeader
+        back
+        eyebrow={t('minorEyebrow')}
+        title={
+          <>
+            {t('minorA')}<Serif>{t('minorSerif')}</Serif>{t('minorB')}
+          </>
+        }
+        lead={t('minorLead')}
+      />
+      <View style={{ gap: space.s1 }}>
+        <DaybreakButton onPress={() => router.replace('/')}>{tc('backToday')}</DaybreakButton>
+      </View>
+    </Screen>
+  )
+}
 
 function IndexResult() {
   const th = useTheme()
-  const { c, space } = th
+  const { c, space, radius } = th
   const [measured, setMeasured] = useLocal<MeasuredIndex>('measuredIndex', null)
   const [confirmClear, setConfirmClear] = useState(false)
-  // Newest first: the measure taken on this phone, then the recorded ones.
-  const rows = measured ? [measuredScore(measured), ...INDEX_HISTORY] : INDEX_HISTORY
+  const [submitted, , , clearSubmitted] = useSubmittedIndex()
+  const rm = useSignOffTimer()
+  // The signed Day-90 re-measure, as a Clinical-grade row (released only once signed).
+  const day90: IndexScore | null =
+    rm.stage === 'signed' && rm.result
+      ? { ...measuredScore(rm.result), id: 'ix_day90', grade: 'clinical', signedBy: rm.signedBy, nextMeasure: '2027-07-04' }
+      : null
+  // Newest first: the signed Day-90 measure, the measure taken on this phone, then the recorded ones.
+  const rows = [...(day90 ? [day90] : []), ...(measured ? [measuredScore(measured)] : []), ...INDEX_HISTORY]
   const latest = rows[0]
   const previous = rows[1]
   const [selRaw, setSel] = useState<TermKey | null>(null)
@@ -102,6 +144,10 @@ function IndexResult() {
         <Card tone="soft" style={{ gap: space.s1 }}>
           <Eyebrow tone="daybreak">{t('phoneMeasured', { date: fmtDate(measured.at) })}</Eyebrow>
           <Meta>{t('phoneBody')}</Meta>
+          {submitted && submitted.amendments.length ? <Meta tone="ink">{t('corrected', { n: submitted.amendments.length })}</Meta> : null}
+          <ArrowLink icon="edit-3" onPress={() => router.push('/index-take?amend=1')}>
+            {t('correct')}
+          </ArrowLink>
           {confirmClear ? (
             <View style={{ gap: 4 }} accessibilityLiveRegion="polite">
               <Meta tone="ink">{t('clearQ')}</Meta>
@@ -111,6 +157,7 @@ function IndexResult() {
                   size="sm"
                   onPress={() => {
                     setMeasured(null)
+                    clearSubmitted()
                     setConfirmClear(false)
                     setSel(null)
                   }}
@@ -127,6 +174,16 @@ function IndexResult() {
               {t('clearMeasured')}
             </Button>
           )}
+        </Card>
+      ) : null}
+
+      {rm.stage === 'awaiting' ? (
+        <Card tone="sunk" style={{ gap: space.s1 }}>
+          <Eyebrow tone="daybreak">{t('awaitEyebrow')}</Eyebrow>
+          <Meta tone="ink">{t('awaitBody')}</Meta>
+          <ArrowLink icon="clock" onPress={() => router.push('/day-90')}>
+            {t('awaitLink')}
+          </ArrowLink>
         </Card>
       ) : null}
 
@@ -162,15 +219,21 @@ function IndexResult() {
             {t('howBody')}
           </Meta>
         </View>
-        <MethodLine method={latest.method} grade={latest.grade} next={latest.nextMeasure} />
+        <MethodLine method={latest.method} grade={latest.grade} next={latest.nextMeasure} signedBy={latest.grade === 'clinical' ? latest.signedBy : undefined} />
       </Card>
 
       {/* Petals */}
       <Card tone="raised" style={{ gap: space.s2 }}>
         <Eyebrow {...H2}>{t('tapPetal')}</Eyebrow>
         <View style={{ alignItems: 'center' }}>
-          <JoyspanWheel terms={latest.terms} size={232} highlight={sel} onSelect={setSel} value={latest.value} />
+          <JoyspanWheel terms={latest.terms} size={232} highlight={sel} onSelect={setSel} value={latest.value} baseline={latest.id === INDEX_HISTORY[0].id ? null : INDEX_HISTORY[0].terms} />
         </View>
+        {latest.id !== INDEX_HISTORY[0].id ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'center' }}>
+            <View style={{ width: 18, height: 0, borderTopWidth: 1.5, borderColor: c.wheelGhost }} />
+            <Meta size={13}>{kit(lang, 'wheelGhost')}</Meta>
+          </View>
+        ) : null}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }} accessibilityRole="tablist">
           {latest.terms.map((x) => {
             const on = x.key === sel
@@ -436,6 +499,21 @@ function IndexResult() {
             {t('shareCard')}
           </Button>
         </View>
+        <ArrowLink icon="calendar" onPress={() => router.push('/day-90')}>
+          {t('day76')}
+        </ArrowLink>
+      </Card>
+
+      {/* Print artefacts (Memo p17): the Index card, the Day-40 page, the Joyspan Letter */}
+      <Card tone="raised" style={{ gap: space.s1 }}>
+        <Eyebrow {...H2}>{t('onPaper')}</Eyebrow>
+        <Meta>{t('onPaperBody')}</Meta>
+        <ArrowLink icon="file-text" onPress={() => router.push('/day-40')}>
+          {t('day40Link')}
+        </ArrowLink>
+        <ArrowLink icon="mail" onPress={() => router.push('/letter')}>
+          {t('letterLink')}
+        </ArrowLink>
       </Card>
 
       {/* Not yet measured */}
@@ -494,33 +572,69 @@ function IndexResult() {
         }
       >
         <Meta>{t('cardBody')}</Meta>
-        <Card tone="raised" style={{ gap: space.s2, borderWidth: 1, borderColor: c.line }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-            <Eyebrow>{t('cardEyebrow', { date: fmtDate(latest.takenOn) })}</Eyebrow>
-            <SpecimenTag />
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s2 }}>
-            <JoyspanWheel terms={latest.terms} size={120} animate={false} />
-            <View style={{ flex: 1, gap: 4 }}>
-              <Numeral size={56} accessibilityLabel={t('idxA11y', { v: latest.value })}>
-                {latest.value}
-              </Numeral>
-              <BandLabel band={latest.band} />
+        {/* The Index card (Playbook p59): ten fields, a Daybreak painted edge on the long side. */}
+        <View style={{ borderRadius: radius.card, borderWidth: 1, borderColor: c.line, backgroundColor: c.paperRaised, overflow: 'hidden' }}>
+          <View style={{ padding: space.s2, gap: space.s2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+              <Eyebrow tone="ink2">{t('cardYour')}</Eyebrow>
+              <SpecimenTag />
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s2 }}>
+              <View style={{ flex: 1, gap: 4 }}>
+                {/* 01 the Index, the largest element · 02 of 100, the date, the method */}
+                <Numeral size={64} accessibilityLabel={t('idxA11y', { v: latest.value })}>
+                  {latest.value}
+                </Numeral>
+                <Eyebrow>{t('cardOf', { date: fmtDate(latest.takenOn) })}</Eyebrow>
+                <Eyebrow>{t('cardMethod', { m: methodOf(latest) })}</Eyebrow>
+              </View>
+              {/* 03 the Wheel, with guides */}
+              <JoyspanWheel terms={latest.terms} size={112} animate={false} />
+            </View>
+            {/* 04 six term scores with their chips · 05 a band each · 06 Burden with its minus, in Amber */}
+            <View style={{ gap: 2 }}>
+              {latest.terms.map((x) => (
+                <View key={x.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 26 }} accessible accessibilityLabel={`${tt.name(x.key)} ${x.key === 'B' ? t('minus') : ''}${x.value ?? '—'}, ${bandWord(x.band)}`}>
+                  <TermDot term={x.key} size={8} />
+                  <Meta size={14} tone="ink" style={{ flex: 1 }}>
+                    {tt.name(x.key)}
+                  </Meta>
+                  <Mono size={14} color={x.key === 'B' ? c.termBInk : undefined} tone="ink" style={{ minWidth: 36, textAlign: 'right' }}>
+                    {x.value === null ? '—' : `${x.key === 'B' ? '−' : ''}${x.value}`}
+                  </Mono>
+                  <BandLabel band={x.band} style={{ minWidth: 72, alignItems: 'flex-end' }} />
+                </View>
+              ))}
+            </View>
+            {/* 07 the lowest term, named · 08 one next step, in one sentence */}
+            {nextStep ? (
+              <View style={{ gap: 4 }}>
+                <Eyebrow>{t('cardNextStep')}</Eyebrow>
+                <Body size={15}>{t('cardStepLine', { name: tt.name(low), step: ax(nextStep.title) })}</Body>
+              </View>
+            ) : null}
+            {/* 09 the next measure date · 10 the signing physician, by name */}
+            <View style={{ gap: 2 }}>
+              <Eyebrow tone="ink2">{t('cardNext', { date: fmtDate(latest.nextMeasure) })}</Eyebrow>
+              <Eyebrow tone="ink2">{latest.grade === 'clinical' && latest.signedBy ? t('cardSigned', { who: latest.signedBy }) : t('cardUnsigned')}</Eyebrow>
+            </View>
+            <Divider />
+            <Meta size={13} tone="ink2">
+              {`${t('cardFormulaHead')} = ${(['H', 'P', 'R', 'F', 'D'] as TermKey[]).map((k) => tt.name(k)).join(' + ')} − ${tt.name('B')}`}
+            </Meta>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+              <Body size={15}>
+                <Serif>{t('cardTagline')}</Serif>
+              </Body>
+              <Eyebrow size={11}>{t('cardFooter')}</Eyebrow>
             </View>
           </View>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s2, rowGap: 4 }}>
-            {latest.terms.map((x) => (
-              <View key={x.key} style={{ width: '45%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <TermDot term={x.key} size={8} />
-                  <Meta size={14}>{tt.space(x.key)}</Meta>
-                </View>
-                <Mono size={14} tone="ink">{`${x.key === 'B' ? '−' : ''}${x.value}`}</Mono>
-              </View>
-            ))}
-          </View>
-          <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />
-        </Card>
+          {/* The Daybreak painted edge */}
+          <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ height: 6, backgroundColor: c.daybreak }} />
+        </View>
+        <Meta size={13} tone="ink3">
+          {t('cardEdgeNote')}
+        </Meta>
       </Sheet>
     </Screen>
   )

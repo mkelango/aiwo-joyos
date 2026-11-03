@@ -15,6 +15,8 @@ import { COACH_CASELOAD, CURATED_ACTIONS, DAY_N, OVERRIDE_REASONS, PRIYA, digest
 import { PreviewBanner, useConsoleAccess } from './_gate'
 import { AccessNote, AuditList, CardHead, ConsoleTermChip, SlaChip, areaCls, fieldCls, fmtClock, labelCls, parseIst, useConsoleNow, type AuditEvent } from './_parts'
 import { useClinicalState } from './_clinicalStore'
+import { RaiseConcernSheet, type ConcernTarget } from './_concern'
+import { COACH_PURPOSES, ReasonGate } from './_purpose'
 import { coach, isClinicalTask, taskLabel, useCoachState } from './_store'
 
 // MEMBER DIGEST for the coach (Memo p.18, p.24 coach_digest): a VIVA-drafted quarter
@@ -30,8 +32,8 @@ const ALL_ACTIONS = [
   ...CURATED_ACTIONS,
 ]
 
+// The opening of this digest is written when the coach gives a reason (ReasonedDigest below).
 const baseAudit = (d: CoachDigest): AuditEvent[] => [
-  { at: `${TODAY} · 21:10`, who: PRIYA.name, what: 'Opened member digest (term scores, bands, Ledger counts)', purpose: `coach_digest · Care consent v3 (granted ${d.consentGranted})` },
   ...(d.summaryPaused ? [] : [
     { at: '27 Jan 2027 · 18:02', who: PRIYA.name, what: 'Reviewed VIVA quarter summary', purpose: 'Weekly review' },
     { at: '27 Jan 2027 · 17:55', who: 'VIVA · coach_digest', what: 'Drafted quarter summary from scoped fields', purpose: 'Care · prompt coach_digest@1.2.0' },
@@ -43,8 +45,41 @@ export default function CoachMember() {
   const { id } = useParams()
   const d = digestFor(id)
   if (!d) return <NotInCaseload id={id} />
-  // key resets every form on this page when the route moves to another member.
-  return <Digest key={d.id} d={d} />
+  // key resets every form on this page, and asks for the reason again, when the route moves to another member.
+  return <ReasonedDigest key={d.id} d={d} />
+}
+
+/** Opening a member record asks for the reason first; nothing is read until one is given. */
+function ReasonedDigest({ d }: { d: CoachDigest }) {
+  const navigate = useNavigate()
+  const now = useConsoleNow()
+  const [params] = useSearchParams()
+  const [reason, setReason] = useState<string | null>(null)
+  if (reason) return <Digest d={d} reason={reason} onChangeReason={() => setReason(null)} />
+  const suggested = params.get('task') ? 'Drift task follow-up' : DAY_N.some((x) => d.day >= x.window[0] && d.day <= x.window[1]) ? 'Day-N review or call preparation' : 'Weekly digest review'
+  const open = (purpose: string) => {
+    coach.updateMember(d.id, (w) => ({ ...w, audit: [{ at: `${TODAY} · ${fmtClock(now)}`, who: PRIYA.name, what: 'Opened member digest (term scores, bands, Ledger counts)', purpose: `coach_digest · ${purpose} · Care consent v3 (granted ${d.consentGranted})` }, ...(w.audit ?? [])] }))
+    setReason(purpose)
+  }
+  return (
+    <div>
+      <Link to="/console/coach" className="mb-5 inline-flex items-center gap-1.5 text-[14px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring">
+        <ArrowLeft size={15} aria-hidden /> Caseload
+      </Link>
+      <PageHeader eyebrow={<>Member digest · {d.id}</>} title={<>{d.name}</>} lead="Say why you are opening this digest. It is the first line of the audit for this visit." actions={<SpecimenTag />} />
+      <PreviewBanner path="/console/coach" />
+      <ReasonGate
+        who={d.name}
+        recordLabel="coach_digest"
+        purposes={COACH_PURPOSES}
+        suggested={suggested}
+        consent={<>Read under Care consent v3, granted <span className="num">{d.consentGranted}</span>.</>}
+        onOpen={open}
+        onBack={() => navigate('/console/coach')}
+        backLabel="Not now · back to the caseload"
+      />
+    </div>
+  )
 }
 
 function NotInCaseload({ id }: { id?: string }) {
@@ -72,7 +107,7 @@ function NotInCaseload({ id }: { id?: string }) {
   )
 }
 
-function Digest({ d }: { d: CoachDigest }) {
+function Digest({ d, reason, onChangeReason }: { d: CoachDigest; reason: string; onChangeReason: () => void }) {
   const now = useConsoleNow()
   const { canAct } = useConsoleAccess('/console/coach')
   const [params] = useSearchParams()
@@ -104,6 +139,8 @@ function Digest({ d }: { d: CoachDigest }) {
 
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(summary)
+  const [concern, setConcern] = useState<ConcernTarget | null>(null)
+  const memberOpenAlerts = memberAlerts.filter((a) => a.status !== 'closed')
 
   const [callOutcome, setCallOutcome] = useState('')
   const [callNote, setCallNote] = useState('')
@@ -172,14 +209,27 @@ function Digest({ d }: { d: CoachDigest }) {
         eyebrow={<>Member digest · {d.id}</>}
         title={<>{d.name}</>}
         lead={<>Day <span className="num">{d.day}</span> of 90 · {d.cation} · {d.circle}. {d.age}, {d.city}.</>}
-        actions={<SpecimenTag />}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" size="sm" disabled={!canAct} onClick={() => setConcern({ name: d.name, memberId: d.id, context: 'member digest' })}><ShieldAlert size={14} aria-hidden /> Raise a concern</Button>
+            <SpecimenTag />
+          </div>
+        }
       />
 
       <PreviewBanner path="/console/coach" />
 
       <AccessNote className="mb-8" icon="shield">
-        Opened for purpose <span className="num text-ink">coach_digest</span> under Care consent v3 (granted <span className="num">{d.consentGranted}</span>). This read is logged and {d.firstName} sees it in the trust centre. Raw biomarkers, Ease screen answers and Ledger words are not available here.
+        Opened for purpose <span className="num text-ink">coach_digest</span> · <span className="text-ink">{reason}</span>, under Care consent v3 (granted <span className="num">{d.consentGranted}</span>). This read is logged and {d.firstName} sees it in the trust centre. Raw biomarkers, Ease screen answers and Ledger words are not available here.{' '}
+        <button type="button" onClick={onChangeReason} className="text-ink underline underline-offset-4 focus-ring">Change the reason</button>
       </AccessNote>
+
+      {!d.safetyHold && memberOpenAlerts.some((a) => a.id.startsWith('cc-')) && (
+        <p className="mb-6 flex items-start gap-2 rounded-lg bg-paper-sunk px-4 py-3 text-[14px] text-ink-2" role="status"><Lock size={14} className="mt-0.5 shrink-0" aria-hidden /> Your concern is with {memberOpenAlerts.find((a) => a.id.startsWith('cc-'))?.owner}. The clinical team holds it; you will see here when it is closed.</p>
+      )}
+      {!d.safetyHold && !memberOpenAlerts.some((a) => a.id.startsWith('cc-')) && memberAlerts.some((a) => a.id.startsWith('cc-') && a.status === 'closed') && (
+        <p className="mb-6 flex items-start gap-2 rounded-lg bg-paper-sunk px-4 py-3 text-[14px] text-ink-2" role="status"><Check size={14} className="mt-0.5 shrink-0" aria-hidden /> Your concern was closed by {memberAlerts.find((a) => a.id.startsWith('cc-') && a.status === 'closed')?.owner} in the clinical portal. What was found stays with the clinical team.</p>
+      )}
 
       {d.safetyHold && holdLifted && (
         <Card tone="outline" className="mb-6 flex items-start gap-4">
@@ -473,6 +523,8 @@ function Digest({ d }: { d: CoachDigest }) {
           </div>
         </Card>
       </div>
+
+      <RaiseConcernSheet target={concern} onClose={() => setConcern(null)} canAct={canAct} />
 
       {/* Audit trail */}
       <Card className="mt-6">

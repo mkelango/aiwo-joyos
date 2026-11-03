@@ -17,8 +17,9 @@
   }
   /* Script fallbacks live in tokens.css (:root:lang(ta|hi)); an element marked lang inside
      an English page (the language picker) still gets a Tamil or Devanagari face. */
-  [lang|='hi']:not(html) { font-family: 'Avenir Next', 'Nunito Sans', 'Mukta', 'Noto Sans Devanagari', system-ui, sans-serif; }
-  [lang|='ta']:not(html) { font-family: 'Avenir Next', 'Nunito Sans', 'Mukta Malar', 'Noto Sans Tamil', system-ui, sans-serif; }
+  [lang|='hi']:not(html) { font-family: 'Avenir Next', 'Nunito Sans', 'Mukta', 'Noto Sans Devanagari', system-ui, sans-serif; --font-serif: 'Newsreader', 'Tiro Devanagari Hindi', 'Mukta', Georgia, serif; }
+  [lang|='ta']:not(html) { font-family: 'Avenir Next', 'Nunito Sans', 'Mukta Malar', 'Noto Sans Tamil', system-ui, sans-serif; --font-serif: 'Newsreader', 'Noto Serif Tamil', 'Mukta Malar', Georgia, serif; }
+  [lang|='en']:not(html) { --font-serif: 'Newsreader', Georgia, serif; }
   ::selection { background: var(--daybreak-soft); color: var(--ink); }
   :focus-visible { outline: 2px solid var(--daybreak); outline-offset: 2px; border-radius: 6px; }
   h1, h2, h3 { font-weight: 300; letter-spacing: -0.01em; }

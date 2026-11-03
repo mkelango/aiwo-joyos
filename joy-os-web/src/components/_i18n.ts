@@ -23,6 +23,8 @@ export const SHARED = {
   trust: { en: 'Trust centre', ta: 'நம்பிக்கை மையம்', hi: 'भरोसा केंद्र' },
   profile: { en: 'Profile', ta: 'சுயவிவரம்', hi: 'प्रोफ़ाइल' },
   settings: { en: 'Settings', ta: 'அமைப்புகள்', hi: 'सेटिंग्स' },
+  day40: { en: 'The Day-40 page', ta: 'நாள்-40 பக்கம்', hi: 'दिन-40 का पन्ना' },
+  letter: { en: 'The Joyspan Letter', ta: 'ஜாய்ஸ்பான் கடிதம்', hi: 'जॉयस्पैन पत्र' },
   nextMeasureOn: { en: 'Next measure {date}', ta: 'அடுத்த அளவீடு {date}', hi: 'अगला माप {date}' },
   offlineNone: {
     en: 'Offline. Today, the Ledger and the Practice still work; anything you add waits here and syncs when you’re back.',
@@ -139,4 +141,6 @@ export const SHARED = {
   wheel: { en: 'Joyspan Wheel', ta: 'ஜாய்ஸ்பான் சக்கரம்', hi: 'जॉयस्पैन चक्र' },
   wheelIndex: { en: ', Index {v}', ta: ', குறியீடு {v}', hi: ', इंडेक्स {v}' },
   minus: { en: 'minus ', ta: 'கழித்தல் ', hi: 'माइनस ' },
+  wheelDay0: { en: '. Day 0 outline: {list}', ta: '. நாள் 0 வெளிக்கோடு: {list}', hi: '। दिन 0 की रूपरेखा: {list}' },
+  wheelGhostKey: { en: 'Outline: where each petal stood on Day 0', ta: 'வெளிக்கோடு: நாள் 0 அன்று ஒவ்வொரு இதழும் இருந்த அளவு', hi: 'रूपरेखा: दिन 0 पर हर पंखुड़ी कहाँ थी' },
 } satisfies Dict

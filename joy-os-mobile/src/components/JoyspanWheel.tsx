@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
 import { Pressable, View, useWindowDimensions } from 'react-native'
 import Svg, { Circle, ClipPath, Defs, G, Path, Text as SvgText } from 'react-native-svg'
 import { TERM_TEXT, useLang } from '../lib/i18n'
 import { useReduceMotion, type Lang } from '../lib/store'
 import type { TermKey, TermScore } from '../shared/types'
 import { useTheme } from '../theme/ThemeProvider'
+import { palettes, termColors } from '../theme/tokens'
 import { HatchPattern, useSvgId } from './Term'
+import { InkSurface } from './Text'
 import { kit, type KitKey } from './_i18n'
 
 // The Joyspan Wheel (Brand Identity Playbook p45, p62, p65) — react-native-svg port of
@@ -15,6 +17,8 @@ import { kit, type KitKey } from './_i18n'
 // the Burden petal is hatched Amber and signed with a minus. The fill blooms over 960 ms
 // (skipped under Reduce Motion, the system's or the member's own). VoiceOver reads each petal with term, score and band
 // (Architecture p21): one image label listing all six, or one button per petal when onSelect.
+// With `baseline` (the Day-0 measure) each petal also carries the Day-0 outline: a 14% Ink
+// ghost of where that petal stood at the start of the ninety days (Playbook p45), read aloud too.
 
 export const WHEEL_ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 
@@ -28,6 +32,8 @@ interface Props {
   onSelect?: (k: TermKey) => void
   animate?: boolean
   guide?: boolean
+  /** The Day-0 terms. Draws the 14% Ink outline of each petal's Day-0 extent. */
+  baseline?: TermScore[] | null
 }
 
 const ease = (x: number) => 1 - Math.pow(1 - x, 3)
@@ -64,21 +70,26 @@ function useBloom(enabled: boolean) {
 
 const BAND_KEY: Record<string, KitKey> = { steady: 'bandSteady', uneven: 'bandUneven', thin: 'bandThin', 'not-yet-measured': 'bandNone' }
 
-function petalLabel(lang: Lang, k: TermKey, tv: TermScore | undefined, nullSep = ', ') {
+function petalLabel(lang: Lang, k: TermKey, tv: TermScore | undefined, nullSep = ', ', base?: TermScore) {
   const head = `${TERM_TEXT[k].space[lang]}, ${TERM_TEXT[k].name[lang]}`
   if (!tv || tv.value === null) return `${head}${nullSep}${kit(lang, 'notYetMeasured')}`
   const band = BAND_KEY[tv.band] ? kit(lang, BAND_KEY[tv.band]) : tv.band
-  return `${head} ${k === 'B' ? kit(lang, 'minus') : ''}${tv.value}, ${band}`
+  const day0 = base && base.value !== null ? kit(lang, 'wheelDay0', { v: `${k === 'B' ? kit(lang, 'minus') : ''}${base.value}` }) : ''
+  return `${head} ${k === 'B' ? kit(lang, 'minus') : ''}${tv.value}, ${band}${day0}`
 }
 
-export function describeWheel(terms: TermScore[], value?: number | null, lang: Lang = 'en') {
-  const parts = WHEEL_ORDER.map((k) => petalLabel(lang, k, terms.find((x) => x.key === k)))
+export function describeWheel(terms: TermScore[], value?: number | null, lang: Lang = 'en', baseline?: TermScore[] | null) {
+  const parts = WHEEL_ORDER.map((k) => petalLabel(lang, k, terms.find((x) => x.key === k), ', ', baseline?.find((x) => x.key === k)))
   return `${kit(lang, 'wheel')}${value != null ? kit(lang, 'wheelIndex', { v: value }) : ''}. ${parts.join('; ')}.`
 }
 
-export function JoyspanWheel({ terms, size = 240, value, showLabels = false, highlight = null, onSelect, animate = true, guide = true }: Props) {
+export function JoyspanWheel({ terms, size = 240, value, showLabels = false, highlight = null, onSelect, animate = true, guide = true, baseline = null }: Props) {
   const t = useTheme()
-  const { c, fonts } = t
+  // On a warm Ink ground (Day 90) the Wheel takes the dark palette's soft tints, guides and ghost.
+  const onInk = useContext(InkSurface)
+  const c = onInk ? palettes.dark : t.c
+  const term = (k: TermKey) => (onInk ? termColors(palettes.dark, k) : t.term(k))
+  const { fonts } = t
   const uid = useSvgId('wheel')
   const lang = useLang()
   const progress = useBloom(animate)
@@ -115,7 +126,7 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
     <View
       accessible={!interactive}
       accessibilityRole={interactive ? undefined : 'image'}
-      accessibilityLabel={interactive ? undefined : describeWheel(terms, value, lang)}
+      accessibilityLabel={interactive ? undefined : describeWheel(terms, value, lang, baseline)}
       style={{ width: px, height: px, maxWidth: '100%' }}
       onLayout={(e) => {
         const w = e.nativeEvent.layout.width
@@ -126,6 +137,22 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
       <Svg width={px} height={px} viewBox={`0 0 ${box} ${box}`}>
         <Defs>
           <HatchPattern id={`${uid}-hatch`} main={c.termB} soft={c.termBSoft} />
+          {baseline ? (
+            <ClipPath id={`${uid}-petal`}>
+              <Path d={full} />
+            </ClipPath>
+          ) : null}
+          {baseline
+            ? WHEEL_ORDER.map((k) => {
+                const b = baseline.find((x) => x.key === k)?.value ?? null
+                if (b === null) return null
+                return (
+                  <ClipPath key={`b-${k}`} id={`${uid}-base-${k}`}>
+                    <Circle cx={cx} cy={cx} r={inner + len * Math.max(0.06, b / 100)} />
+                  </ClipPath>
+                )
+              })
+            : null}
           {WHEEL_ORDER.map((k, i) => {
             const v = terms.find((x) => x.key === k)?.value ?? null
             const target = v === null ? 0 : inner + len * Math.max(0.06, v / 100)
@@ -142,8 +169,10 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
         {guide && <Circle cx={cx} cy={cx} r={inner + len * 0.5} fill="none" stroke={c.wheelGuide} strokeWidth={1} strokeDasharray="1 5" />}
         {WHEEL_ORDER.map((k, i) => {
           const v = terms.find((x) => x.key === k)?.value ?? null
-          const col = t.term(k)
+          const col = term(k)
           const dim = highlight !== null && highlight !== k
+          const b = baseline?.find((x) => x.key === k)?.value ?? null
+          const rb = b === null ? 0 : inner + len * Math.max(0.06, b / 100)
           return (
             <G key={k} transform={`rotate(${i * 60} ${cx} ${cx})`} opacity={dim ? 0.28 : 1}>
               <Path
@@ -154,7 +183,11 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
                 strokeDasharray={v === null ? '3 3' : undefined}
                 strokeWidth={0.8}
               />
+              {/* Day-0 ghost, under the fill: where the petal stood at the start. */}
+              {b !== null && <Path d={full} fill={c.wheelGhost} clipPath={`url(#${uid}-base-${k})`} />}
               {v !== null && <Path d={full} fill={k === 'B' ? `url(#${uid}-hatch)` : col.main} clipPath={`url(#${uid}-clip-${k})`} />}
+              {/* ...and its outline across the petal, over the fill, so a rise shows the line it passed. */}
+              {b !== null && <Circle cx={cx} cy={cx} r={rb} fill="none" stroke={c.wheelGhost} strokeWidth={1.5} clipPath={`url(#${uid}-petal)`} />}
             </G>
           )
         })}
@@ -192,7 +225,7 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
               key={`hit-${k}`}
               onPress={() => onSelect!(k)}
               accessibilityRole="button"
-              accessibilityLabel={petalLabel(lang, k, tv, ' ')}
+              accessibilityLabel={petalLabel(lang, k, tv, ' ', baseline?.find((x) => x.key === k))}
               accessibilityState={{ selected: highlight === k }}
               aria-selected={highlight === k}
               style={{ position: 'absolute', left: (cx + Math.cos(a) * rr) * scale - hit / 2, top: (cx + Math.sin(a) * rr) * scale - hit / 2, width: hit, height: hit, borderRadius: hit / 2 }}

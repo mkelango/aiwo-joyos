@@ -56,6 +56,33 @@ export interface JourneyState {
   weeksUnmarked: number[]
   /** Practice weeks whose Mentor audio is kept on this device for offline play. */
   offlineWeeks: number[]
+  /** Joyspan Occasion requests sent to the concierge. */
+  occasionRequests: OccasionRequest[]
+  /** Specimen switch: show the ’Cation tab as a member who has not taken a ’cation yet. */
+  demoNoCation: boolean
+}
+
+export type OccasionGeneration = 'elders' | 'middle' | 'young'
+
+export interface OccasionGuest {
+  id: string
+  name: string
+  generation: OccasionGeneration
+  /** Takes their own Day-0 Index at the Occasion (each guest consents for themselves). */
+  measured: boolean
+  /** Elder mode on the day: large type, voice-first, a family member helps. */
+  elder: boolean
+}
+
+export interface OccasionRequest {
+  ref: string
+  template: 'birthday60' | 'anniversary' | 'homecoming'
+  honoree: string
+  window: string
+  venue: string
+  guests: OccasionGuest[]
+  outcome: string
+  sentOn: string
 }
 
 const KEY = 'joyos:journey'
@@ -93,13 +120,31 @@ const initial: JourneyState = {
   reflections: {},
   weeksUnmarked: [],
   offlineWeeks: [],
+  occasionRequests: [],
+  demoNoCation: false,
+}
+
+// Offline audio is kept on the device, so its record lives in localStorage and
+// survives closing the tab, unlike the rest of the session's journey state.
+const OFFLINE_KEY = 'joyos:journey:offline'
+
+function loadOffline(): number[] | null {
+  try {
+    const raw = window.localStorage.getItem(OFFLINE_KEY)
+    if (!raw) return null
+    const v = JSON.parse(raw) as unknown
+    return Array.isArray(v) ? v.filter((n): n is number => typeof n === 'number') : null
+  } catch {
+    return null
+  }
 }
 
 function load(): JourneyState {
   try {
     const raw = window.sessionStorage.getItem(KEY)
-    if (!raw) return initial
-    return { ...initial, ...(JSON.parse(raw) as Partial<JourneyState>) }
+    const base: JourneyState = raw ? { ...initial, ...(JSON.parse(raw) as Partial<JourneyState>) } : initial
+    const offline = loadOffline()
+    return offline ? { ...base, offlineWeeks: offline } : base
   } catch {
     return initial
   }
@@ -110,6 +155,7 @@ const listeners = new Set<() => void>()
 
 function emit() {
   try { window.sessionStorage.setItem(KEY, JSON.stringify(state)) } catch { /* storage blocked: state lives in memory */ }
+  try { window.localStorage.setItem(OFFLINE_KEY, JSON.stringify(state.offlineWeeks)) } catch { /* storage blocked */ }
   listeners.forEach((l) => l())
 }
 
@@ -197,6 +243,68 @@ export function setWeekPractised(week: number, on: boolean) {
 
 export function setOffline(week: number, on: boolean) {
   setJourney((s) => ({ ...s, offlineWeeks: on ? Array.from(new Set([...s.offlineWeeks, week])) : s.offlineWeeks.filter((w) => w !== week) }))
+}
+
+export function addOccasionRequest(r: OccasionRequest) {
+  setJourney((s) => ({ ...s, occasionRequests: [r, ...s.occasionRequests.filter((x) => x.ref !== r.ref)] }))
+}
+
+export function withdrawOccasionRequest(ref: string) {
+  setJourney((s) => ({ ...s, occasionRequests: s.occasionRequests.filter((x) => x.ref !== ref) }))
+}
+
+export function setDemoNoCation(on: boolean) {
+  setJourney((s) => ({ ...s, demoNoCation: on }))
+}
+
+// ─── Circle reports (W6) ──────────────────────────────────────────────────
+// A member's report about someone in their circle, read by the coach console
+// as a moderation item. Shared contract: localStorage 'joyos:circle:reports',
+// a JSON array of { id, about, reason, at }. SPECIMEN.
+
+export interface CircleReport { id: string; about: string; reason: string; at: string }
+
+const REPORTS_KEY = 'joyos:circle:reports'
+const reportListeners = new Set<() => void>()
+let reportsCache: CircleReport[] | null = null
+
+function readReports(): CircleReport[] {
+  try {
+    const raw = window.localStorage.getItem(REPORTS_KEY)
+    const v = raw ? (JSON.parse(raw) as unknown) : []
+    return Array.isArray(v) ? (v as CircleReport[]).filter((x) => x && typeof x.id === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function writeReports(next: CircleReport[]) {
+  reportsCache = next
+  try { window.localStorage.setItem(REPORTS_KEY, JSON.stringify(next)) } catch { /* storage blocked: kept in memory */ }
+  reportListeners.forEach((l) => l())
+}
+
+const reportsSnapshot = () => (reportsCache ??= typeof window === 'undefined' ? [] : readReports())
+const subscribeReports = (l: () => void) => {
+  reportListeners.add(l)
+  // Another tab (the coach console) may mark one as seen or remove it.
+  const onStorage = (e: StorageEvent) => { if (e.key === REPORTS_KEY) { reportsCache = readReports(); l() } }
+  window.addEventListener('storage', onStorage)
+  return () => { reportListeners.delete(l); window.removeEventListener('storage', onStorage) }
+}
+
+export function useCircleReports(): CircleReport[] {
+  return useSyncExternalStore(subscribeReports, reportsSnapshot, reportsSnapshot)
+}
+
+export function addCircleReport(about: string, reason: string) {
+  const r: CircleReport = { id: `cr-${Date.now().toString(36)}`, about, reason, at: new Date().toISOString() }
+  writeReports([r, ...readReports()])
+  return r
+}
+
+export function withdrawCircleReport(id: string) {
+  writeReports(readReports().filter((r) => r.id !== id))
 }
 
 export const holderName = `${MEMBER.firstName} ${MEMBER.lastName}`

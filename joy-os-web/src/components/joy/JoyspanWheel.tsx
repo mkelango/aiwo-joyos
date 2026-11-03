@@ -11,6 +11,8 @@ import { useBandText } from './primitives'
 // Each petal fills from the centre in proportion to its score over a pale ghost of
 // itself; the Burden petal is hatched Amber and signed with a minus.
 // VoiceOver reads each petal with term, score and band (Architecture p21).
+// With a baseline, each petal also carries the Day-0 outline: a 14% Ink ghost of where it
+// stood at the start of the loop (Playbook p45), so a rise or a fall reads at a glance.
 
 const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 const SOFT: Record<TermKey, string> = {
@@ -27,9 +29,11 @@ interface Props {
   onSelect?: (k: TermKey) => void
   animate?: boolean
   guide?: boolean
+  /** The Day-0 terms, drawn as a 14% Ink outline inside each petal. */
+  baseline?: TermScore[] | null
 }
 
-export function JoyspanWheel({ terms, size = 240, value, showLabels = false, highlight = null, onSelect, animate = true, guide = true }: Props) {
+export function JoyspanWheel({ terms, size = 240, value, showLabels = false, highlight = null, onSelect, animate = true, guide = true, baseline = null }: Props) {
   const reduce = useReducedMotion()
   const tx = useDict(SHARED)
   const tt = useTermText()
@@ -55,7 +59,12 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
   // "Ease minus 24, steady" — the minus only belongs to a Burden that has a value.
   const readTerm = (k: TermKey, v: number | null, band?: TermScore['band']) =>
     v === null ? `${tt.name(k)} ${tx('bandNone')}` : `${tt.name(k)} ${k === 'B' ? tx('minus') : ''}${v}${band ? ', ' + bandText(band) : ''}`
-  const describe = terms.map((t) => readTerm(t.key, t.value, t.band)).join('; ')
+  const base = (k: TermKey) => baseline?.find((x) => x.key === k)?.value ?? null
+  const ghostTo = (v: number) => inner + len * Math.max(0.06, v / 100)
+  const describeBase = baseline
+    ? tx('wheelDay0', { list: ORDER.filter((k) => base(k) !== null).map((k) => `${tt.name(k)} ${k === 'B' ? tx('minus') : ''}${base(k)}`).join(', ') })
+    : ''
+  const describe = terms.map((t) => readTerm(t.key, t.value, t.band)).join('; ') + describeBase
   const interactive = !!onSelect
 
   return (
@@ -103,6 +112,15 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
             </clipPath>
             <path d={full} fill={v === null ? 'none' : SOFT[k]} stroke={v === null ? 'var(--ink-3)' : termColor[k]} strokeOpacity={v === null ? 0.6 : 0.35} strokeDasharray={v === null ? '3 3' : undefined} strokeWidth={0.8} />
             {v !== null && <path d={full} fill={isB ? `url(#hatch-${uid})` : termColor[k]} clipPath={`url(#${clipId})`} />}
+            {/* The Day-0 outline: the petal's edge up to where it stood, closed by an arc at that level. */}
+            {base(k) !== null && (
+              <g aria-hidden>
+                <clipPath id={`${clipId}-g`}><circle cx={c} cy={c} r={ghostTo(base(k)!)} /></clipPath>
+                <clipPath id={`${clipId}-s`}><path d={full} /></clipPath>
+                <path d={full} fill="none" stroke="var(--wheel-ghost)" strokeWidth={1.5} clipPath={`url(#${clipId}-g)`} />
+                <circle cx={c} cy={c} r={ghostTo(base(k)!)} fill="none" stroke="var(--wheel-ghost)" strokeWidth={1.5} clipPath={`url(#${clipId}-s)`} />
+              </g>
+            )}
             {/* Focus ring: outline on an SVG <g> is unreliable in Safari and Firefox, so the petal itself is stroked (index.css .wheel-petal). */}
             {interactive && <path d={full} fill="none" className="wheel-petal-ring" aria-hidden />}
           </g>
@@ -131,5 +149,19 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
           )
         })}
     </svg>
+  )
+}
+
+/** The key for a Wheel drawn with its Day-0 outline. */
+export function WheelGhostKey({ className }: { className?: string }) {
+  const tx = useDict(SHARED)
+  return (
+    <span className={`inline-flex items-center gap-2 text-[13px] text-ink-3 ${className ?? ''}`}>
+      <svg width="18" height="12" viewBox="0 0 18 12" aria-hidden>
+        <path d="M1 11 C 5 2, 13 2, 17 11" fill="none" stroke="var(--wheel-ghost)" strokeWidth="1.5" />
+        <path d="M1 11 C 5 2, 13 2, 17 11" fill="none" stroke="var(--ink-3)" strokeOpacity="0.35" strokeWidth="1" />
+      </svg>
+      {tx('wheelGhostKey')}
+    </span>
   )
 }

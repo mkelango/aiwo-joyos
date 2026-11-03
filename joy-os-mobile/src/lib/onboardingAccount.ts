@@ -15,7 +15,21 @@ export interface OnboardingAccount {
   aiwoId: string | null
   /** Household invitations made in onboarding (ids in the account store's invites). */
   invited: string[]
+  /** Minors gate (Architecture: "no scoring; verifiable parental consent"). Null until answered. */
+  age: null | 'adult' | 'minor'
+  /** A parent or guardian's consent, verified by a code sent to their phone. Specimen. */
+  guardian: GuardianConsent
 }
+
+export interface GuardianConsent {
+  name: string
+  phone: string
+  /** sent: a code went to the guardian's phone · verified: they read it back. */
+  status: null | 'sent' | 'verified'
+  at?: string
+}
+
+export const EMPTY_GUARDIAN: GuardianConsent = { name: '', phone: '', status: null }
 
 export const onboardingAccountStore = createStore<OnboardingAccount>('onbAccount', {
   name: '',
@@ -25,7 +39,24 @@ export const onboardingAccountStore = createStore<OnboardingAccount>('onbAccount
   verified: null,
   aiwoId: null,
   invited: [],
+  age: null,
+  guardian: EMPTY_GUARDIAN,
 })
+
+/** A member who said they are under 18: never scored, and only with a guardian's verified consent. */
+export const isMinor = (a: Pick<OnboardingAccount, 'age'>) => a.age === 'minor'
+
+/** The specimen code the guardian "receives" (shown on screen in the specimen). */
+export const GUARDIAN_CODE = '418203'
+
+/** Guardian problems as message keys, so the screen can translate them. */
+export function guardianProblems(g: GuardianConsent) {
+  const out: { name?: 'mgErrName'; phone?: 'mgErrPhone' } = {}
+  if (g.name.trim().length < 2) out.name = 'mgErrName'
+  const d = g.phone.replace(/\D/g, '')
+  if (!(d.length === 10 || (d.length === 12 && d.startsWith('91')))) out.phone = 'mgErrPhone'
+  return out
+}
 
 // ─── Onboarding step layout ───────────────────────────────────────────────
 // The draft saves its step as an index. The first layout had six steps (Language, Intent,

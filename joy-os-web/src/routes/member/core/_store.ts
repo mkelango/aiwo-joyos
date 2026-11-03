@@ -1,5 +1,5 @@
 import { useCallback, useSyncExternalStore } from 'react'
-import type { LedgerEntry, TermKey, TermScore } from '@/domain/types'
+import type { LedgerEntry, MethodVersion, TermKey, TermScore } from '@/domain/types'
 import { LEDGER, LEDGER_WEEK, MEMBER } from '@/data/member'
 import { DAY90_DATES, LEDGER_WEEK_ENTRIES } from './_data'
 import { DEVICES } from '@/routes/member/account/_data'
@@ -197,10 +197,88 @@ export interface MeasuredIndex {
   phqFlag: boolean
   /** Every wearable signal was off (by choice, or because no device was connected): scored from answers and in-app logs only. */
   surveyOnly?: boolean
+  /** The answers as scored, kept so a later correction can be appended and re-scored. */
+  answers?: Record<string, number>
+  signalsOff?: string[]
+  /** The score as first issued, before any amendment (never overwritten). */
+  original?: { value: number; terms: TermScore[]; lowestTerm: TermKey }
+  /** Append-only corrections after scoring (Architecture p26, "Correct"). */
+  amendments?: Amendment[]
 }
 export function useMeasured() {
   return useLocal<MeasuredIndex | null>('measured-index', null)
 }
+
+// ─── Correct right: append-only amendments after scoring ────────────────────
+// Before scoring the member edits answers freely (the review step). After scoring an
+// answer is never overwritten: a correction is appended with what it replaced, when and
+// why, the Index is re-scored from the answers as amended, and the first score is kept.
+export interface Amendment {
+  id: string
+  itemId: string
+  /** The answer value it replaces (the latest value for that item at the time). */
+  from: number
+  to: number
+  reason: string
+  at: string
+  /** The Index before and after this amendment. */
+  before: number
+  after: number
+}
+
+/** The answers as amended: the original answers with every amendment applied in order. */
+export function amendedAnswers(answers: Record<string, number>, amendments: Amendment[] = []) {
+  const out = { ...answers }
+  for (const a of amendments) out[a.itemId] = a.to
+  return out
+}
+
+// ─── The re-measure chain (Architecture 8b-14): Day-76 invite → Clinical-grade
+// assessment → awaiting physician sign-off → Day-90 card ───────────────────────
+// One record under joyos:core:clinical-remeasure. The member app writes every stage up
+// to 'awaiting'; the clinical portal (console/care/_remeasure.ts) reads it into the
+// sign-off queue and, when the physician signs, writes status 'signed' with signedBy and
+// signedAt back to the same record. Nothing here sets signedBy or submittedAt early,
+// because the portal reads either as a stage.
+export type RemeasureStatus = 'invited' | 'in-progress' | 'awaiting' | 'signed'
+export interface ClinicalRemeasure {
+  status: RemeasureStatus
+  memberId: string
+  member: string
+  aiwoId: string
+  grade: 'clinical'
+  method: MethodVersion
+  engine: string
+  /** Day 76 on the specimen clock: the invite. */
+  invitedAt: string
+  startedAt?: string
+  /** The home blood draw, booked in the assessment. */
+  draw?: { slot: string }
+  /** The capacity battery the member timed at home; grip is measured at the draw. */
+  capacity?: { sitToStand: number }
+  // Set on submission:
+  submittedAt?: string
+  takenOn?: string
+  value?: number
+  gm?: number
+  burden?: number
+  terms?: TermScore[]
+  lowestTerm?: TermKey
+  answers?: Record<string, number>
+  signalsOff?: string[]
+  amendments?: Amendment[]
+  // Set by the clinical portal on sign-off:
+  signed?: boolean
+  signedBy?: string
+  signedAt?: string
+  signedIndex?: number
+}
+export const REMEASURE_KEY = 'clinical-remeasure'
+export function useRemeasure() {
+  return useLocal<ClinicalRemeasure | null>(REMEASURE_KEY, null)
+}
+/** The specimen date the Clinical-grade sittings are taken on (two days into the window). */
+export const REMEASURE_TAKEN = addDays(DAY90_DATES.day0, 78)
 
 // ─── Signals down ───────────────────────────────────────────────────────────
 // The device record kept by /app/devices (joyos:acct:devices) is the one source of truth.

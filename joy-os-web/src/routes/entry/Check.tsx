@@ -11,14 +11,19 @@ import { INSTRUMENT_NOTE, useDict, useLang, useTermText } from '@/lib/i18n'
 import type { Band, TermKey, TermScore } from '@/domain/types'
 import { BAND_PETAL, BAND_PETAL_BURDEN, CHECK_STATEMENTS, COUNTRIES, EMAIL_RE, SCALE, SCALE_BURDEN, checkBand, checkStanding, countryName, phoneError, type CountryCode } from './_data'
 import { CK, E } from './_i18n'
-import { CHECK_KEY, CHECK_PROGRESS_KEY, readJSON, removeKey, writeJSON, type CheckProgress, type SavedCheck } from './_store'
+import { CHECK_KEY, CHECK_PROGRESS_KEY, checkAsksPhone, readJSON, removeKey, writeJSON, type CheckProgress, type SavedCheck } from './_store'
 import { FlowTopBar, LMethodLine, LTermChip, rich, useBand, useFmtDate } from './_parts'
 
 // THE JOYSPAN CHECK (Memo p.10, Grade 1): 18 statements, free, five minutes, no login.
 // Bands only (steady · uneven · thin), never a number. The lowest term is named with
 // one next step, then three doors: the Joyspan Letter, a baseline Index, or the app.
+// Whether the Check stays anonymous or asks for a phone number is an open question
+// (Arch p34), so it is a flag set in the ops console ('joyos:flag:check-asks-phone').
+// Off (the default): fully anonymous. On: an optional number, with consent, before
+// the bands.
 
-type Phase = 'intro' | 'q' | 'result'
+type Phase = 'intro' | 'q' | 'phone' | 'result'
+type Contact = NonNullable<SavedCheck['phone']>
 const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 const TOTAL = CHECK_STATEMENTS.length
 /** Where to pick up: the first statement not yet answered (the last one when all are). */
@@ -41,6 +46,9 @@ export default function Check() {
   const [last, setLast] = useState<SavedCheck | null>(() => readJSON<SavedCheck>(CHECK_KEY))
   // When re-opening a saved result, keep its original date rather than stamping today.
   const [resultAt, setResultAt] = useState<string | null>(null)
+  // The flag as it was when the Check opened, so one sitting never changes mid-way.
+  const [asksPhone] = useState(checkAsksPhone)
+  const [contact, setContact] = useState<Contact | null>(null)
   const t = useDict(CK)
 
   // Coming back to the intro mid-Check: the resume card shows these answers, not the
@@ -67,15 +75,29 @@ export default function Check() {
     setDir(1)
     setI((n) => {
       if (n >= TOTAL - 1) {
-        setPhase('result')
-        removeKey(CHECK_PROGRESS_KEY)
-        setProgress(null)
+        // With the phone flag on, the optional number comes first; the answers stay
+        // saved until the bands open, so a reload there resumes at the last statement.
+        if (asksPhone) {
+          setPhase('phone')
+        } else {
+          setPhase('result')
+          removeKey(CHECK_PROGRESS_KEY)
+          setProgress(null)
+        }
         window.scrollTo({ top: 0 })
         return n
       }
       return n + 1
     })
-  }, [])
+  }, [asksPhone])
+
+  const toResult = (c: Contact | null) => {
+    setContact(c)
+    removeKey(CHECK_PROGRESS_KEY)
+    setProgress(null)
+    setPhase('result')
+    window.scrollTo({ top: 0 })
+  }
 
   const goBack = useCallback(() => {
     clearPending()
@@ -130,6 +152,7 @@ export default function Check() {
     setProgress(null)
     setLast(null)
     setResultAt(null)
+    setContact(null)
     setAnswers({})
     setI(0)
     setDir(1)
@@ -148,17 +171,19 @@ export default function Check() {
           <Intro
             progress={progress}
             last={last}
+            asksPhone={asksPhone}
             onBegin={() => {
               // Coming back from statement 1 keeps the answers given so far.
-              setResultAt(null); setPhase('q'); setI(0); setDir(1)
+              setResultAt(null); setContact(null); setPhase('q'); setI(0); setDir(1)
             }}
-            onResume={(p) => { setResultAt(null); setAnswers((a) => ({ ...p.answers, ...a })); setI(Math.min(TOTAL - 1, Math.max(0, p.i))); setDir(1); setPhase('q') }}
-            onStartOver={() => { setResultAt(null); removeKey(CHECK_PROGRESS_KEY); setProgress(null); setAnswers({}); setI(0); setDir(1); setPhase('q') }}
-            onSeeLast={(l) => { setAnswers(l.answers); setResultAt(l.at); setPhase('result'); window.scrollTo({ top: 0 }) }}
+            onResume={(p) => { setResultAt(null); setContact(null); setAnswers((a) => ({ ...p.answers, ...a })); setI(Math.min(TOTAL - 1, Math.max(0, p.i))); setDir(1); setPhase('q') }}
+            onStartOver={() => { setResultAt(null); setContact(null); removeKey(CHECK_PROGRESS_KEY); setProgress(null); setAnswers({}); setI(0); setDir(1); setPhase('q') }}
+            onSeeLast={(l) => { setAnswers(l.answers); setResultAt(l.at); setContact(l.phone ?? null); setPhase('result'); window.scrollTo({ top: 0 }) }}
           />
         )}
         {phase === 'q' && <Question i={i} dir={dir} answers={answers} onAnswer={answer} onBack={goBack} onNext={goNext} />}
-        {phase === 'result' && <Result answers={answers} savedAt={resultAt} onRestart={restart} onSaved={setLast} />}
+        {phase === 'phone' && <PhoneStep onBack={() => { setDir(-1); setPhase('q') }} onDone={toResult} />}
+        {phase === 'result' && <Result answers={answers} savedAt={resultAt} contact={contact} onRemoveContact={() => setContact(null)} onRestart={restart} onSaved={setLast} />}
       </main>
     </div>
   )
@@ -166,7 +191,7 @@ export default function Check() {
 
 // ─── Intro ─────────────────────────────────────────────────────────────────
 
-function Intro({ progress, last, onBegin, onResume, onStartOver, onSeeLast }: { progress: CheckProgress | null; last: SavedCheck | null; onBegin: () => void; onResume: (p: CheckProgress) => void; onStartOver: () => void; onSeeLast: (l: SavedCheck) => void }) {
+function Intro({ progress, last, asksPhone, onBegin, onResume, onStartOver, onSeeLast }: { progress: CheckProgress | null; last: SavedCheck | null; asksPhone: boolean; onBegin: () => void; onResume: (p: CheckProgress) => void; onStartOver: () => void; onSeeLast: (l: SavedCheck) => void }) {
   const ghost: TermScore[] = ORDER.map((k) => ({ key: k, value: null, band: 'not-yet-measured' }))
   const done = progress ? Object.keys(progress.answers).length : 0
   const t = useDict(CK)
@@ -244,7 +269,7 @@ function Intro({ progress, last, onBegin, onResume, onStartOver, onSeeLast }: { 
         <Card tone="sunk">
           <Eyebrow>{t('card2H')}</Eyebrow>
           <p className="mt-3 text-[17px] leading-relaxed text-ink">
-            {t('card2B')}
+            {t(asksPhone ? 'card2BPhone' : 'card2B')}
           </p>
           <p className="mt-3 flex items-start gap-1.5 text-[14px] text-ink-3"><Lock size={14} className="mt-0.5 shrink-0" aria-hidden /> {t('card2Note')}</p>
         </Card>
@@ -374,9 +399,82 @@ function Question({ i, dir, answers, onAnswer, onBack, onNext }: { i: number; di
   )
 }
 
+// ─── Optional phone number (only with the flag on) ─────────────────────────
+
+function PhoneStep({ onBack, onDone }: { onBack: () => void; onDone: (c: Contact | null) => void }) {
+  const t = useDict(CK)
+  const te = useDict(E)
+  const lang = useLang()
+  const [country, setCountry] = useState<CountryCode>('+91')
+  const [phone, setPhone] = useState('')
+  const [agreed, setAgreed] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const c = COUNTRIES.find((x) => x.code === country)!
+  const headingRef = useCallback((el: HTMLHeadingElement | null) => { el?.focus({ preventScroll: true }) }, [])
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault()
+    // No number: the Check simply stays anonymous.
+    if (!phone.trim()) return onDone(null)
+    const err = phoneError(country, phone, lang)
+    if (err) return setError(err)
+    if (!agreed) return setError(t('pNeedConsent'))
+    onDone({ number: `${country} ${phone.trim()}`, consentAt: new Date().toISOString() })
+  }
+
+  return (
+    <form onSubmit={submit} noValidate className="mx-auto flex w-full max-w-3xl flex-col px-4 pb-28 pt-8 md:px-6 md:pb-16 md:pt-14">
+      <p className="eyebrow mb-3 text-daybreak-ink">{t('pEyebrow')}</p>
+      <h1 ref={headingRef} tabIndex={-1} className="break-words text-[2rem] font-light leading-tight tracking-tight text-ink outline-none md:text-[2.6rem]">
+        {rich(t('pH'), { em: <em>{t('pHem')}</em> })}
+      </h1>
+      <p className="mt-3 text-[17px] leading-relaxed text-ink-2">{t('pLead')}</p>
+
+      <Card className="mt-8">
+        <label htmlFor="ck-phone" className="text-[14px] text-ink-2">{te('mobileNumber')} <span className="text-ink-3">{t('optional')}</span></label>
+        <div className="mt-1.5 flex gap-2">
+          <label htmlFor="ck-cc" className="sr-only">{te('countryCode')}</label>
+          <select id="ck-cc" value={country} onChange={(e) => { setCountry(e.target.value as CountryCode); setError(null) }} className="num h-12 w-[7.5rem] shrink-0 rounded-full border border-line-strong bg-paper px-3 text-[15px] text-ink focus-ring sm:w-auto">
+            {COUNTRIES.map((x) => <option key={x.code} value={x.code}>{x.code} {countryName(x.code, lang)}</option>)}
+          </select>
+          <input
+            id="ck-phone"
+            type="tel"
+            inputMode="numeric"
+            autoComplete="tel-national"
+            value={phone}
+            onChange={(e) => { setPhone(e.target.value); setError(null) }}
+            aria-invalid={!!error}
+            aria-describedby={error ? 'ck-phone-err' : undefined}
+            placeholder={c.placeholder}
+            className={clsx('num h-12 min-w-0 flex-1 rounded-full border bg-paper px-4 text-[16px] text-ink placeholder:text-ink-3 focus-ring', error ? 'border-error' : 'border-line-strong')}
+          />
+        </div>
+        <label className="mt-5 flex cursor-pointer items-start gap-3">
+          <input type="checkbox" checked={agreed} onChange={(e) => { setAgreed(e.target.checked); setError(null) }} className="peer sr-only" />
+          <span className={clsx('mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-colors peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[color:var(--daybreak)]', agreed ? 'border-ink bg-ink text-paper' : 'border-line-strong bg-paper')} aria-hidden>
+            {agreed && <CheckIcon size={15} />}
+          </span>
+          <span className="min-w-0 text-[15px] leading-relaxed text-ink">{t('pConsent')}</span>
+        </label>
+        {error && <p id="ck-phone-err" role="alert" className="mt-3 text-[14px] text-error">{error}</p>}
+        <p className="mt-4 flex items-start gap-1.5 text-[14px] text-ink-3"><Lock size={14} className="mt-0.5 shrink-0" aria-hidden /> <span>{t('pFine')} {t('pSpec')}</span></p>
+      </Card>
+
+      <div className="mt-10 flex flex-col-reverse gap-3 border-t border-line pt-6 sm:flex-row sm:items-center sm:justify-between">
+        <Button type="button" variant="ghost" onClick={onBack}><ArrowLeft size={16} aria-hidden /> {te('back')}</Button>
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
+          <Button type="button" variant="secondary" onClick={() => onDone(null)}>{t('pSkip')}</Button>
+          <DaybreakButton type="submit" className="w-full sm:w-auto">{t('pSee')} <ArrowRight size={20} aria-hidden /></DaybreakButton>
+        </div>
+      </div>
+    </form>
+  )
+}
+
 // ─── Result: bands only ───────────────────────────────────────────────────
 
-function Result({ answers, savedAt, onRestart, onSaved }: { answers: Record<string, number>; savedAt: string | null; onRestart: () => void; onSaved: (c: SavedCheck) => void }) {
+function Result({ answers, savedAt, contact, onRemoveContact, onRestart, onSaved }: { answers: Record<string, number>; savedAt: string | null; contact: Contact | null; onRemoveContact: () => void; onRestart: () => void; onSaved: (c: SavedCheck) => void }) {
   const nav = useNavigate()
   const result = useMemo(() => {
     const rows = ORDER.map((k) => {
@@ -405,11 +503,12 @@ function Result({ answers, savedAt, onRestart, onSaved }: { answers: Record<stri
       bands: Object.fromEntries(result.rows.map((r) => [r.key, r.band])) as SavedCheck['bands'],
       lowest: result.lowest,
       at: savedAt ?? new Date().toISOString(),
+      ...(contact ? { phone: contact } : {}),
     }
     writeJSON(CHECK_KEY, saved)
     onSaved(saved)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result])
+  }, [result, contact])
 
   const t = useDict(CK)
   const te = useDict(E)
@@ -591,6 +690,16 @@ function Result({ answers, savedAt, onRestart, onSaved }: { answers: Record<stri
         </div>
       </section>
 
+      {contact && (
+        <div role="status" className="mt-10 flex flex-col gap-3 rounded-card border border-line bg-paper-raised p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="flex min-w-0 items-start gap-2 text-[15px] text-ink-2">
+            <Smartphone size={16} className="mt-0.5 shrink-0" aria-hidden />
+            <span className="min-w-0">{rich(t('pKept'), { phone: <span className="num text-ink">{contact.number}</span>, date: <span className="num">{shortDate(contact.consentAt)}</span> })} <span className="text-ink-3">{t('pSpec')}</span></span>
+          </p>
+          <Button variant="ghost" size="sm" onClick={onRemoveContact}>{t('pRemove')}</Button>
+        </div>
+      )}
+
       <div className="mt-12 flex flex-col gap-4 border-t border-line pt-6 md:flex-row md:items-center md:justify-between">
         <p className="max-w-2xl text-[14px] text-ink-3">
           {t('footer')}
@@ -631,6 +740,7 @@ function LetterDoor({ lowestName }: { lowestName: string }) {
             <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
               {t('lB', { name: lowestName })}
             </p>
+            <Link to="/app/letter" className="link mt-2 self-start text-[14px]">{t('lRead')}</Link>
             <label htmlFor="letter-email" className="mt-5 text-[14px] text-ink-2">{te('email')} <span className="text-ink-3">{t('optional')}</span></label>
             <div className="relative mt-1.5">
               <Mail size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-3" aria-hidden />
@@ -668,6 +778,7 @@ function LetterDoor({ lowestName }: { lowestName: string }) {
               {rich(t('lThanks'), { email: <span className="break-all text-ink">{email.trim()}</span> })}
             </p>
             <p className="mt-2 text-[15px] text-ink-2">{t('lQuarter')}</p>
+            <Link to="/app/letter" className="link mt-3 self-start text-[15px]">{t('lRead')}</Link>
             <Button variant="link" className="mt-auto self-start pt-6" onClick={() => { setSent(false); setEmail('') }}>{te('diffEmail')}</Button>
           </motion.div>
         )}

@@ -7,7 +7,9 @@ import { DaybreakButton, Delta, Eyebrow, MethodLine, SpecimenTag, TermChip, Term
 import { Button, Card, PageHeader, Pill, Sheet, Tabs, Toggle } from '@/components/ui'
 import { TENANT } from '@/data/platform'
 import { termByKey, termColor } from '@/data/terms'
-import { EAP_ROUTING, INSURER, INSURER_FLAGS, INSURER_PROFILE, TENANT_FLAGS, TENANT_KIND, TENANT_PROFILE, type AdminRole, type TenantKind } from './_data'
+import type { TermKey } from '@/domain/types'
+import { AGG_COHORTS, AGG_PERIODS, EAP_ROUTING, INSURER, INSURER_FLAGS, INSURER_PROFILE, TENANT_FLAGS, TENANT_KIND, TENANT_PROFILE, publishedDepartments, type AdminRole, type AggCohortKey, type AggPeriod, type PublishedDept, type TenantKind } from './_data'
+import { AGG_TERMS, AggregateFilters, ApiAccessCard, BrandLineCard, ClinicalFeaturesCard, type AggTermFilter } from './_tenantExtras'
 import { AccessNote, CardHead, ChartLead, Field, Kpi, Legend, Meter, Row, ScrollTabs, StatusTag, Swatch, downloadHtml, esc, fieldCls, fmtDate, inr, pct, tabPanelProps, tick, tipLabel, tipStyle, useTabParam } from './_parts'
 
 // TENANT ADMIN (Memo p.25; Architecture p.24): Joyspan@Work and insurer tenants.
@@ -95,7 +97,7 @@ export default function Tenant() {
           { value: 'outcomes', label: 'Outcomes' },
           { value: 'enrolment', label: view === 'employer' ? 'Eligibility & enrolment' : 'Policyholder eligibility' },
           { value: 'access', label: 'Sign-in & admins' },
-          { value: 'settings', label: 'Region & flags' },
+          { value: 'settings', label: 'Settings & API' },
         ]}
       />
 
@@ -241,28 +243,93 @@ function ReportLibrary({ view, reports, stepUp, onDownloaded, className }: { vie
 
 // ─── Outcomes ────────────────────────────────────────────────────────────
 
+const COHORT_KEYS = AGG_COHORTS.map((c) => c.value)
+const PERIOD_KEYS = AGG_PERIODS.map((p) => p.value)
+/** Department JI is a group mean; the term view offsets each department from its cohort's term mean by the same gap. */
+const DEPT_REF = { ji: 53, delta: 5 }
+
 function Outcomes() {
-  const remeasured = Math.round(TENANT.measured * TENANT.remeasureRate)
+  const [cohort, setCohort] = useTabParam<AggCohortKey>(COHORT_KEYS, 'all', 'cohort')
+  const [term, setTerm] = useTabParam<AggTermFilter>(AGG_TERMS, 'all', 'term')
+  const [period, setPeriod] = useTabParam<AggPeriod>(PERIOD_KEYS, 'change', 'period')
+  const c = AGG_COHORTS.find((x) => x.value === cohort) ?? AGG_COHORTS[0]
+  const filters = <AggregateFilters cohort={cohort} term={term} period={period} onCohort={setCohort} onTerm={setTerm} onPeriod={setPeriod} />
+
+  if (c.enrolled < TENANT.minCohort || c.remeasured < TENANT.minCohort) {
+    return (
+      <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
+        {filters}
+        <Card className="lg:col-span-12">
+          <div className="flex items-start gap-3">
+            <Lock size={20} className="mt-1 shrink-0 text-ink-3" aria-hidden />
+            <div>
+              <p className="text-[1.35rem] font-light leading-snug text-ink">Suppressed · fewer than {TENANT.minCohort} in this cohort</p>
+              <p className="mt-2 max-w-2xl text-[15px] text-ink-2">{c.label}. {c.note} An employer sees a group only once it holds {TENANT.minCohort} or more people, so no count, mean or chart is shown, not even a rounded one.</p>
+              <Button variant="secondary" size="sm" className="mt-4" onClick={() => setCohort('all')}>Back to everyone enrolled</Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    )
+  }
+
+  const remeasured = c.remeasured
+  const rate = c.remeasured / c.measured
+  const top = c.invited ?? TENANT.eligible
   const funnel = [
-    { label: 'Eligible', n: TENANT.eligible, note: 'From the eligibility file' },
-    { label: 'Enrolled', n: TENANT.enrolled, note: `${pct(TENANT.enrolled / TENANT.eligible)} of eligible` },
-    { label: 'Measured at Day 0', n: TENANT.measured, note: `${pct(TENANT.measured / TENANT.enrolled)} of enrolled` },
-    { label: 'Re-measured at Day 90', n: remeasured, note: `${pct(TENANT.remeasureRate)} of measured` },
+    c.invited === null
+      ? { label: 'Eligible', n: TENANT.eligible, note: 'From the eligibility file' }
+      : { label: 'Invited in this wave', n: c.invited, note: c.note },
+    { label: 'Enrolled', n: c.enrolled, note: `${pct(c.enrolled / top)} of ${c.invited === null ? 'eligible' : 'invited'}` },
+    { label: 'Measured at Day 0', n: c.measured, note: `${pct(c.measured / c.enrolled)} of enrolled` },
+    { label: 'Re-measured at Day 90', n: remeasured, note: `${pct(rate)} of measured` },
   ]
-  const termData = TENANT.termMeans.map((t) => ({ ...t, name: termByKey(t.key).space }))
-  const bD0 = TENANT.termMeans.find((t) => t.key === 'B')!
+  const terms = c.termMeans.filter((t) => term === 'all' || t.key === term)
+  const termData = terms.map((t) => ({ ...t, name: termByKey(t.key).space }))
+  const focus = c.termMeans.find((t) => t.key === (term === 'all' ? 'B' : term))!
+  const focusB = focus.key === 'B'
+  const showD0 = period !== 'd90'
+  const showD90 = period !== 'd0'
+  const sign = (k: TermKey) => (k === 'B' ? '−' : '')
+  const periodName = period === 'd0' ? 'Day 0' : period === 'd90' ? 'Day 90' : 'Day 0 and Day 90'
+  const termTitle =
+    term !== 'all'
+      ? `${termByKey(term).name}, ${period === 'change' ? 'Day 0 to Day 90' : periodName}`
+      : period === 'change'
+        ? 'Every term rose; Preventable Suffering fell'
+        : `Six term means at ${periodName}`
+  const depts = publishedDepartments(c.value, TENANT.minCohort)
+  const withheld = depts.filter((d) => d.status === 'complement').length
+  const deptValue = (d: PublishedDept) => {
+    if (d.status !== 'shown' || d.ji === null || d.delta === null) return null
+    if (term === 'all') return { d0: d.ji - d.delta, d90: d.ji, delta: d.delta }
+    const t = c.termMeans.find((x) => x.key === term)!
+    const off = d.ji - DEPT_REF.ji
+    const isB = term === 'B'
+    const delta = t.d90 - t.d0 + (isB ? -(d.delta - DEPT_REF.delta) : d.delta - DEPT_REF.delta)
+    const d90 = t.d90 + (isB ? -off : off)
+    return { d0: d90 - delta, d90, delta }
+  }
+  const valueCol = `Mean ${term === 'all' ? 'Index' : termByKey(term).name}${period === 'change' ? ', Day 90' : period === 'd0' ? ', Day 0' : ', Day 90'}`
 
   return (
     <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
+      {filters}
       <div className="grid gap-4 sm:grid-cols-2 lg:col-span-12 xl:grid-cols-4">
-        <Kpi label="Enrolled" value={TENANT.enrolled.toLocaleString('en-IN')} sub={<>of {TENANT.eligible.toLocaleString('en-IN')} eligible</>} />
-        <Kpi label="Day-90 re-measure rate" value={pct(TENANT.remeasureRate)} sub="The Milk gate is 70%" foot={<Meter value={TENANT.remeasureRate * 100} target={70} label="Re-measure rate against the 70% gate" />} />
-        <Kpi label="Improved their lowest term" value={pct(TENANT.improvedLowest)} sub="The falsifier line is 50%" foot={<Meter value={TENANT.improvedLowest * 100} target={50} label="Share improving lowest term against the 50% falsifier" />} />
-        <Kpi label="Preventable Suffering, mean" value={<span className="flex items-baseline gap-3">−{bD0.d90}<Delta value={bD0.d90 - bD0.d0} inverse className="text-[15px]" /></span>} sub={<>Eased from −{bD0.d0} at Day 0. Lower is better.</>} />
+        <Kpi label="Enrolled" value={c.enrolled.toLocaleString('en-IN')} sub={<>of {top.toLocaleString('en-IN')} {c.invited === null ? 'eligible' : 'invited'}</>} />
+        <Kpi label="Day-90 re-measure rate" value={pct(rate)} sub="The Milk gate is 70%" foot={<Meter value={rate * 100} target={70} label="Re-measure rate against the 70% gate" />} />
+        <Kpi label="Improved their lowest term" value={pct(c.improvedLowest)} sub="By Day 90 · the falsifier line is 50%" foot={<Meter value={c.improvedLowest * 100} target={50} label="Share improving lowest term against the 50% falsifier" />} />
+        <Kpi
+          label={`${termByKey(focus.key).name}, mean`}
+          value={
+            period === 'd0' ? <>{sign(focus.key)}{focus.d0}</> : <span className="flex items-baseline gap-3">{sign(focus.key)}{focus.d90}<Delta value={focus.d90 - focus.d0} inverse={focusB} className="text-[15px]" /></span>
+          }
+          sub={period === 'd0' ? <>At Day 0, 23 Oct 2026.{focusB ? ' Lower is better.' : ''}</> : focusB ? <>Eased from −{focus.d0} at Day 0. Lower is better.</> : <>Up from {focus.d0} at Day 0.</>}
+        />
       </div>
 
       <Card className="lg:col-span-5">
-        <CardHead eyebrow="Funnel · Cycle 1" title="From eligible to re-measured" />
+        <CardHead eyebrow={`Funnel · ${c.label}`} title={c.invited === null ? 'From eligible to re-measured' : 'From invited to re-measured'} />
         <ol className="space-y-4">
           {funnel.map((f, i) => (
             <li key={f.label}>
@@ -271,22 +338,25 @@ function Outcomes() {
                 <span className="num text-[1.4rem] font-light text-ink">{f.n.toLocaleString('en-IN')}</span>
               </div>
               <div className="mt-1.5 h-2.5 w-full rounded-full bg-paper-sunk">
-                <motion.div className="h-full rounded-full" style={{ background: i === funnel.length - 1 ? 'var(--ink-2)' : 'var(--ink)', opacity: 1 - i * 0.12 }} initial={{ width: 0 }} animate={{ width: `${(f.n / TENANT.eligible) * 100}%` }} transition={{ duration: 0.24, delay: i * 0.05 }} />
+                <motion.div className="h-full rounded-full" style={{ background: i === funnel.length - 1 ? 'var(--ink-2)' : 'var(--ink)', opacity: 1 - i * 0.12 }} initial={{ width: 0 }} animate={{ width: `${(f.n / top) * 100}%` }} transition={{ duration: 0.24, delay: i * 0.05 }} />
               </div>
               <p className="mt-1 text-[13px] text-ink-3">{f.note}</p>
             </li>
           ))}
         </ol>
-        <MethodLine method="v1.0" grade="index" takenOn="2027-01-21" className="mt-6" />
+        <MethodLine method="v1.0" grade="index" takenOn={period === 'd0' ? '2026-10-23' : '2027-01-21'} className="mt-6" />
       </Card>
 
       <Card className="lg:col-span-7">
-        <CardHead eyebrow="Term means · Day 0 and Day 90" title="Every term rose; Preventable Suffering fell" />
-        <ChartLead>Mean score for each of the six terms across the {remeasured} people re-measured, at Day 0 (outline) and Day 90 (filled). For Ease the bar is the burden, so a shorter Day-90 bar is the improvement.</ChartLead>
+        <CardHead eyebrow={`Term means · ${periodName}`} title={termTitle} />
+        <ChartLead>
+          Mean score {term === 'all' ? 'for each of the six terms' : `for ${termByKey(term).name}`} across the {remeasured} people re-measured in this cohort
+          {period === 'change' ? ', at Day 0 (outline) and Day 90 (filled)' : `, at ${periodName}`}. For Ease the bar is the burden, so a shorter bar is the better place to be.
+        </ChartLead>
         <div className="-mx-1 overflow-x-auto px-1">
-        <div className="h-[240px] min-w-[420px]" aria-hidden>
+        <div className={clsx('h-[240px]', term === 'all' && 'min-w-[420px]')} aria-hidden>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={termData} margin={{ top: 4, right: 4, bottom: 0, left: -24 }} barGap={3}>
+            <BarChart data={termData} margin={{ top: 4, right: 4, bottom: 0, left: -24 }} barGap={3} maxBarSize={56}>
               <defs>
                 <pattern id="hatch-b-tn" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
                   <rect width="5" height="5" fill="var(--term-b-soft)" />
@@ -296,22 +366,29 @@ function Outcomes() {
               <XAxis dataKey="name" tickLine={false} axisLine={{ stroke: 'var(--line)' }} tick={tick} interval={0} />
               <YAxis tickLine={false} axisLine={false} tick={tick} domain={[0, 80]} ticks={[0, 40, 80]} />
               <Tooltip cursor={{ fill: 'var(--paper-sunk)' }} contentStyle={tipStyle} labelStyle={tipLabel} formatter={(v, n) => [String(v), n === 'd0' ? 'Day 0' : 'Day 90']} />
-              <Bar dataKey="d0" radius={[3, 3, 0, 0]} isAnimationActive={false} fill="var(--paper-sunk)" stroke="var(--line-strong)" />
-              <Bar dataKey="d90" radius={[3, 3, 0, 0]} isAnimationActive={false}>
-                {termData.map((d) => <Cell key={d.key} fill={d.key === 'B' ? 'url(#hatch-b-tn)' : termColor[d.key]} />)}
-              </Bar>
+              {showD0 && (
+                <Bar dataKey="d0" radius={[3, 3, 0, 0]} isAnimationActive={false} fill={period === 'd0' ? undefined : 'var(--paper-sunk)'} stroke={period === 'd0' ? undefined : 'var(--line-strong)'}>
+                  {period === 'd0' && termData.map((d) => <Cell key={d.key} fill={d.key === 'B' ? 'url(#hatch-b-tn)' : termColor[d.key]} />)}
+                </Bar>
+              )}
+              {showD90 && (
+                <Bar dataKey="d90" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+                  {termData.map((d) => <Cell key={d.key} fill={d.key === 'B' ? 'url(#hatch-b-tn)' : termColor[d.key]} />)}
+                </Bar>
+              )}
             </BarChart>
           </ResponsiveContainer>
         </div>
         </div>
-        <ul className="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 border-t border-line pt-4 sm:grid-cols-2" aria-label="Term means, Day 0 to Day 90">
-          {TENANT.termMeans.map((t) => {
-            const term = termByKey(t.key)
+        <ul className="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 border-t border-line pt-4 sm:grid-cols-2" aria-label={`Term means, ${periodName}`}>
+          {terms.map((t) => {
             const isB = t.key === 'B'
             return (
               <li key={t.key} className="flex items-center justify-between gap-3 text-[14px]">
-                <span className="flex items-center gap-2 text-ink-2"><TermDot term={t.key} /> {term.name}</span>
-                <span className="num text-ink">{isB ? `−${t.d0} → −${t.d90}` : `${t.d0} → ${t.d90}`} <Delta value={t.d90 - t.d0} inverse={isB} className="ml-1.5 text-[13px]" /></span>
+                <span className="flex items-center gap-2 text-ink-2"><TermDot term={t.key} /> {termByKey(t.key).name}</span>
+                <span className="num text-ink">
+                  {period === 'change' ? <>{sign(t.key)}{t.d0} → {sign(t.key)}{t.d90} <Delta value={t.d90 - t.d0} inverse={isB} className="ml-1.5 text-[13px]" /></> : <>{sign(t.key)}{period === 'd0' ? t.d0 : t.d90}</>}
+                </span>
               </li>
             )
           })}
@@ -320,35 +397,38 @@ function Outcomes() {
 
       <Card className="lg:col-span-7">
         <CardHead
-          eyebrow="Departments"
+          eyebrow={`Departments · ${c.label}`}
           title="Groups of fifty or more"
           aside={<Pill>Minimum group {TENANT.minCohort} · cell {TENANT.minCell}</Pill>}
         />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[520px] border-collapse text-left text-[14px]">
-            <caption className="sr-only">Department aggregates. Groups under {TENANT.minCohort} are suppressed.</caption>
+            <caption className="sr-only">Department aggregates for {c.label}. Groups under {TENANT.minCohort} are suppressed, and any row that would reveal one by subtraction is withheld.</caption>
             <thead>
               <tr className="border-b border-line">
-                {['Department', 'People', 'Mean Index', 'Change since Day 0'].map((h, i) => (
+                {['Department', 'People', valueCol, period === 'change' ? 'Change since Day 0' : 'At'].map((h, i) => (
                   <th key={h} scope="col" className={clsx('eyebrow whitespace-nowrap py-3 pr-4 font-normal text-ink-3', i > 0 && 'text-right')}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {TENANT.departments.map((d) => {
-                const suppressed = d.n < TENANT.minCohort || d.ji === null
+              {depts.map((d) => {
+                const v = deptValue(d)
+                const isB = term === 'B'
                 return (
                   <tr key={d.name} className="border-b border-line/70 last:border-0">
                     <th scope="row" className="py-3 pr-4 font-normal text-ink">{d.name}</th>
-                    <td className="num py-3 pr-4 text-right text-ink-2">{suppressed ? `<${TENANT.minCohort}` : d.n}</td>
-                    {suppressed ? (
+                    <td className="num py-3 pr-4 text-right text-ink-2">{d.status === 'small' ? `<${TENANT.minCohort}` : d.status === 'complement' ? '—' : d.n}</td>
+                    {!v ? (
                       <td colSpan={2} className="py-3 pr-4 text-right">
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line-strong px-2.5 py-0.5 text-[12px] text-ink-3"><Lock size={12} aria-hidden /> suppressed · fewer than {TENANT.minCohort}</span>
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line-strong px-2.5 py-0.5 text-[12px] text-ink-3">
+                          <Lock size={12} aria-hidden /> {d.status === 'complement' ? 'withheld · would reveal a smaller group by subtraction' : `suppressed · fewer than ${TENANT.minCohort}`}
+                        </span>
                       </td>
                     ) : (
                       <>
-                        <td className="num py-3 pr-4 text-right text-[16px] text-ink">{d.ji}</td>
-                        <td className="py-3 pr-4 text-right"><Delta value={d.delta} /></td>
+                        <td className="num py-3 pr-4 text-right text-[16px] text-ink">{isB ? '−' : ''}{period === 'd0' ? v.d0 : v.d90}</td>
+                        <td className="py-3 pr-4 text-right">{period === 'change' ? <Delta value={v.delta} inverse={isB} /> : <span className="num text-ink-3">{period === 'd0' ? 'Day 0' : 'Day 90'}</span>}</td>
                       </>
                     )}
                   </tr>
@@ -357,14 +437,28 @@ function Outcomes() {
             </tbody>
           </table>
         </div>
-        <p className="mt-4 text-[14px] text-ink-2">No department can be opened to its members. Rows are not clickable by design, and there is no filter by team, manager or location below a group of {TENANT.minCohort}.</p>
+        <p className="mt-4 text-[14px] text-ink-2">No department can be opened to its members. Rows are not clickable by design, and there is no filter by team, manager or location below a group of {TENANT.minCohort}.{depts.every((d) => d.status === 'small') ? ' Every department in this cohort is under fifty, so the cohort is reported only as a whole.' : depts.every((d) => d.status !== 'shown') ? ' No department can be shown for this cohort without giving away a smaller group elsewhere, so the cohort is reported only as a whole.' : ''}</p>
+        {withheld > 0 && (
+          <p className="mt-2 text-[14px] text-ink-2">
+            Withheld rows are fifty or more on their own, but shown beside the {c.value === 'all' ? 'cohort total or the wave cohorts' : 'tenant-wide table or this cohort’s total'} they would let anyone subtract their way to a group under fifty. So they are hidden too, and whatever can still be worked out is a group of fifty or more.
+          </p>
+        )}
       </Card>
 
       <Card className="lg:col-span-5">
         <CardHead eyebrow="EAP routing volume" title="Ease flags, routed by AIWO" />
-        <ChartLead>How many times an Ease flag was routed to the employee assistance programme or to an AIWO clinician each month. Counts only: who, why and what was said stay with AIWO.</ChartLead>
-        <EapBars />
-        <Legend className="mt-4" items={[{ label: 'To the EAP', swatch: <Swatch color="var(--ink)" /> }, { label: 'To an AIWO clinician', swatch: <Swatch color="var(--ink-3)" /> }]} />
+        {cohort === 'all' ? (
+          <>
+            <ChartLead>How many times an Ease flag was routed to the employee assistance programme or to an AIWO clinician each month. Counts only: who, why and what was said stay with AIWO.</ChartLead>
+            <EapBars />
+            <Legend className="mt-4" items={[{ label: 'To the EAP', swatch: <Swatch color="var(--ink)" /> }, { label: 'To an AIWO clinician', swatch: <Swatch color="var(--ink-3)" /> }]} />
+          </>
+        ) : (
+          <div className="flex items-start gap-3 rounded-card bg-paper-sunk p-4 text-[14px] text-ink-2">
+            <Lock size={15} className="mt-0.5 shrink-0 text-ink-3" aria-hidden />
+            <p>Routing counts are published for the whole tenant only. Split by cohort, most months fall under ten, so no cohort figure is shown. <button className="underline decoration-line-strong underline-offset-2 hover:text-ink focus-ring" onClick={() => setCohort('all')}>See the tenant total</button></p>
+          </div>
+        )}
       </Card>
     </div>
   )
@@ -867,7 +961,7 @@ function ReadOnly({ label, value, copied, onCopy }: { label: string; value: stri
   )
 }
 
-// ─── Region & flags ──────────────────────────────────────────────────────
+// ─── Settings: region, flags, brand line, clinical features, API ──────────────────────────────────────────────────────
 
 function Settings({ kind, lastPublished }: { kind: View; lastPublished: string }) {
   const emp = kind === 'employer'
@@ -898,7 +992,6 @@ function Settings({ kind, lastPublished }: { kind: View; lastPublished: string }
           <Row k="Recovery region" v={prof.recovery} />
           <Row k="Encryption" v={prof.keys} />
           <Row k="Tenancy" v={emp ? 'Pooled tables, tenant ID and row-level security' : 'Pooled now; a bridge schema with its own key at J4'} />
-          <Row k="Brand line" v="A line of type under the Joy OS mark; never your logo" />
           <Row k="Last aggregate published" v={<span className="num">{lastPublished}</span>} />
         </dl>
       </Card>
@@ -918,6 +1011,10 @@ function Settings({ kind, lastPublished }: { kind: View; lastPublished: string }
           ))}
         </ul>
       </Card>
+
+      <BrandLineCard kind={kind} />
+      <ClinicalFeaturesCard kind={kind} />
+      <ApiAccessCard kind={kind} />
     </div>
   )
 }
