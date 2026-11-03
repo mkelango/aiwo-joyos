@@ -414,7 +414,22 @@ function NewHookForm({ onAdd, onCancel }: { onAdd: (h: { url: string; events: We
 export type AggTermFilter = 'all' | TermKey
 export const AGG_TERMS: AggTermFilter[] = ['all', 'H', 'P', 'R', 'F', 'D', 'B']
 
-export function AggregateFilters({ cohort, term, period, onCohort, onTerm, onPeriod }: { cohort: AggCohortKey; term: AggTermFilter; period: AggPeriod; onCohort: (v: AggCohortKey) => void; onTerm: (v: AggTermFilter) => void; onPeriod: (v: AggPeriod) => void }) {
+/**
+ * Cohort, term and period filters, mirrored as the partner API query. The employer's wave cohorts and threshold of
+ * fifty are the default; the insurer view passes its policy-type cohorts, its own periods and its threshold of ten.
+ */
+export function AggregateFilters<C extends string = AggCohortKey>({ cohort, term, period, onCohort, onTerm, onPeriod, cohorts, periods = AGG_PERIODS, minGroup = 50 }: {
+  cohort: C
+  term: AggTermFilter
+  period: AggPeriod
+  onCohort: (v: C) => void
+  onTerm: (v: AggTermFilter) => void
+  onPeriod: (v: AggPeriod) => void
+  cohorts?: { value: C; label: string; enrolled: number }[]
+  periods?: { value: AggPeriod; label: string }[]
+  minGroup?: number
+}) {
+  const options = cohorts ?? (AGG_COHORTS as unknown as { value: C; label: string; enrolled: number }[])
   const id = useId()
   const [copied, setCopied] = useState(false)
   const query = `GET /partner/v1/aggregates?cohort=${cohort}&term=${term === 'all' ? 'all' : term}&period=${period}`
@@ -422,8 +437,8 @@ export function AggregateFilters({ cohort, term, period, onCohort, onTerm, onPer
     <Card tone="sunk" className="lg:col-span-12">
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Cohort" htmlFor={`${id}-c`}>
-          <select id={`${id}-c`} className={fieldCls} value={cohort} onChange={(e) => onCohort(e.target.value as AggCohortKey)}>
-            {AGG_COHORTS.map((c) => <option key={c.value} value={c.value}>{c.label}{c.enrolled < 50 ? ' · under 50' : ''}</option>)}
+          <select id={`${id}-c`} className={fieldCls} value={cohort} onChange={(e) => onCohort(e.target.value as C)}>
+            {options.map((c) => <option key={c.value} value={c.value}>{c.label}{c.enrolled < minGroup ? ` · under ${minGroup}` : ''}</option>)}
           </select>
         </Field>
         <Field label="Term" htmlFor={`${id}-t`}>
@@ -433,7 +448,7 @@ export function AggregateFilters({ cohort, term, period, onCohort, onTerm, onPer
         </Field>
         <Field label="Period" htmlFor={`${id}-p`}>
           <select id={`${id}-p`} className={fieldCls} value={period} onChange={(e) => onPeriod(e.target.value as AggPeriod)}>
-            {AGG_PERIODS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+            {periods.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
           </select>
         </Field>
       </div>

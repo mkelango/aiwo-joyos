@@ -7,6 +7,7 @@ import { DaybreakButton, Eyebrow, TermChip, TermDot, useFmtDate } from '@/compon
 import { Button, Card, PageHeader, Pill, SectionTitle, Tabs } from '@/components/ui'
 import { CATIONS, CATION_PHASES } from '@/data/platform'
 import { INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
+import { useScoresHidden } from '@/lib/minor'
 import { CATION_DETAIL, buildItinerary, type ItinDay } from './_data'
 import { JourneyEmpty, PrimaryChip, fade, kindIcon } from './_parts'
 // One shared emergency intercept for every member free-text field (Memo p.24).
@@ -40,6 +41,8 @@ export default function CationDetail() {
   const tabId = useId()
   const { hash } = useLocation()
   const { t, r, tx, term, termLabel, status } = useJ()
+  // A member under 18 is never scored (Architecture p26): no term value on the pill.
+  const minor = useScoresHidden()
 
   // Arriving from the Passport (“See the request”) lands on the request panel.
   useEffect(() => {
@@ -90,7 +93,7 @@ export default function CationDetail() {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <PrimaryChip primary={c.primary} size="md" />
-              {isLowest && <Pill tone="daybreak">{r('yourLowestScore', { v: { n: primaryScore ?? '' } })}</Pill>}
+              {isLowest && <Pill tone="daybreak">{minor ? t('forLowest') : r('yourLowestScore', { v: { n: primaryScore ?? '' } })}</Pill>}
             </div>
             {d.secondary.length > 0 && (
               <p className="mt-4 flex flex-wrap items-center gap-2 text-[14px] text-ink-2">

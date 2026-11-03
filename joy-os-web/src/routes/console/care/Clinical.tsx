@@ -8,6 +8,7 @@ import { DaybreakButton, Delta, Eyebrow, MethodLine, SpecimenTag, TermDot } from
 import { Avatar, Button, Card, PageHeader, Pill, Sheet } from '@/components/ui'
 import { termByKey } from '@/data/terms'
 import { joyspanIndex } from '@/domain/indexEngine'
+import type { TermKey } from '@/domain/types'
 import {
   CLINICAL_RECORDS, CLOSE_OUTCOMES, EXTRA_FORMULARY, EXTRA_INTERACTIONS, FORMULARY, MD_CONFIG, MEERA, MEMBER_IDS, RETURN_REASONS, SCREEN_ROUTES, SCREEN_ROUTE_OWNER,
   type SafetyAlert,
@@ -55,6 +56,8 @@ function remeasureItem(rm: Remeasure, work: RemeasureWork): SignItem | null {
     notes: work.notes,
     signed: rm.phase === 'signed' ? `Signed · ${rm.signedBy ?? MEERA.name}${rm.signedMs ? ` · ${fmtClock(rm.signedMs)}` : ''}` : null,
     returned: rm.phase === 'signed' ? null : work.returned,
+    missing: rm.missing,
+    surveyOnly: rm.surveyOnly,
   }
 }
 
@@ -167,7 +170,8 @@ export default function Clinical() {
   const p0Late = p0Reached.filter((r) => r && !r.within).length
   const p1Open = alerts.filter((a) => a.priority === 'P1' && a.status !== 'closed')
   const p1InSla = p1Open.filter((a) => +new Date(a.openedAt) + a.slaMinutes * 60000 > now).length
-  const pendingSign = signoffs.filter((s) => !s.signed && !s.returned).length
+  // A draft with a term not yet measured waits on the member, not on a signature.
+  const pendingSign = signoffs.filter((s) => !s.signed && !s.returned && !s.missing?.length).length
   const pendingAi = drafts.filter((d) => d.state === 'pending').length
   const unassigned = screens.filter((s) => s.route === 'Unassigned').length
 
@@ -523,11 +527,20 @@ function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canA
 /** Where the member's own Day-90 re-measure stands, above the sign-off queue. */
 function RemeasureNote({ rm }: { rm: Remeasure }) {
   const first = rm.member.split(' ')[0]
+  const so = rm.surveyOnly ? ' Scored from the survey alone: no wearable signals were available for this sitting.' : ''
+  if (rm.phase === 'pending' && rm.missing.length) {
+    return (
+      <p role="status" className="mb-4 flex items-start gap-2.5 rounded-card border border-line-strong bg-paper-raised px-4 py-3 text-[15px] text-ink">
+        <Smartphone size={17} className="mt-0.5 shrink-0" aria-hidden />
+        <span>{rm.member} submitted the Clinical-grade re-measure{rm.submittedMs ? <> at <span className="num">{fmtClock(rm.submittedMs)}</span></> : null} with {termList(rm.missing)} not yet measured. The Index is withheld, so there is nothing to sign yet. {first} measures {rm.missing.length === 1 ? 'it' : 'them'} later in the app and the draft comes back here complete.{so}</span>
+      </p>
+    )
+  }
   if (rm.phase === 'pending') {
     return (
       <p role="status" className="mb-4 flex items-start gap-2.5 rounded-card border border-ink bg-paper-raised px-4 py-3 text-[15px] text-ink">
         <Smartphone size={17} className="mt-0.5 shrink-0" aria-hidden />
-        <span>New from the app: {rm.member} completed the Clinical-grade re-measure{rm.submittedMs ? <> at <span className="num">{fmtClock(rm.submittedMs)}</span></> : null}. It is first in the queue. {first}’s Day-90 card reads “awaiting physician sign-off” until you sign.</span>
+        <span>New from the app: {rm.member} completed the Clinical-grade re-measure{rm.submittedMs ? <> at <span className="num">{fmtClock(rm.submittedMs)}</span></> : null}. It is first in the queue. {first}’s Day-90 card reads “awaiting physician sign-off” until you sign.{so}</span>
       </p>
     )
   }
@@ -535,7 +548,7 @@ function RemeasureNote({ rm }: { rm: Remeasure }) {
     return (
       <p role="status" className="mb-4 flex items-start gap-2.5 rounded-card bg-paper-sunk px-4 py-3 text-[15px] text-ink">
         <FileSignature size={17} className="mt-0.5 shrink-0" aria-hidden />
-        <span>{rm.member}’s Day-90 re-measure is signed{rm.signedBy ? <> by {rm.signedBy}</> : null}. {first}’s Day-90 card now shows the signed delta, and the score is issued to the coach.</span>
+        <span>{rm.member}’s Day-90 re-measure is signed{rm.signedBy ? <> by {rm.signedBy}</> : null}. {first}’s Day-90 card now shows the signed delta, and the score is issued to the coach.{rm.surveyOnly ? ' It is marked survey only.' : ''}</span>
       </p>
     )
   }
@@ -544,6 +557,12 @@ function RemeasureNote({ rm }: { rm: Remeasure }) {
       <span className="text-ink">{rm.member}’s Day-90 re-measure joins this queue from the app.</span> The Day-76 invite opens the window; once {first} completes the Clinical-grade assessment it waits here for your signature.{rm.phase === 'in-progress' ? ' He has started it; there is nothing to sign yet.' : ''}
     </AccessNote>
   )
+}
+
+/** "Purpose", "Purpose and Freedom", "Health, Purpose and Freedom". */
+function termList(keys: TermKey[]) {
+  const names = keys.map((k) => termByKey(k).name)
+  return names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
 }
 
 /** A returned draft becomes a home redraw on the concierge desk (_concierge.tsx reads REDRAW). */
@@ -567,13 +586,14 @@ function SignOff({ items, setItems, now, onOpen, canActOn, log }: { items: SignI
     log({ what: `Read the Clinical-grade draft and lab inputs · ${item.occasion}`, purpose: 'Sign-off review', kind: 'read', memberId: item.memberId })
   }, [item.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const missing = item.missing ?? []
   const sign = () => {
-    if (!canAct) return
+    if (!canAct || missing.length) return
     setItems((xs) => xs.map((x) => (x.id === item.id ? { ...x, signed: `Signed · ${signer} · ${fmtClock(now)}` } : x)))
-    log({ what: `Signed Clinical grade · ${item.occasion} · Index ${nowJI?.value ?? '—'} under method ${item.method}`, purpose: 'Clinical-grade sign-off', memberId: item.memberId })
+    log({ what: `Signed Clinical grade · ${item.occasion} · Index ${nowJI?.value ?? '—'} under method ${item.method}${item.surveyOnly ? ' · survey only' : ''}`, purpose: 'Clinical-grade sign-off', memberId: item.memberId })
     setAttest(false)
   }
-  const nextUnsigned = items.find((x) => !x.signed && !x.returned && x.id !== item.id)
+  const nextUnsigned = items.find((x) => !x.signed && !x.returned && !x.missing?.length && x.id !== item.id)
   const redraw = recordOf(useClinicalState(), item.memberId).orders.find((o) => o.test === redrawTest(item))
   const select = (id: string) => { setSel(id); setAttest(false); setReturning(false); setRetErr('') }
   const doReturn = () => {
@@ -626,7 +646,12 @@ function SignOff({ items, setItems, now, onOpen, canActOn, log }: { items: SignI
         <CardHead
           eyebrow={<>{item.occasion} · drafted {item.drafted}</>}
           title={<MemberLink name={item.member} onOpen={onOpen} />}
-          aside={item.signed ? <Pill tone="ink"><FileSignature size={12} aria-hidden /> {item.signed}</Pill> : item.returned ? <Pill>Returned to the lab · {item.returned.at}</Pill> : <Pill tone="daybreak">Awaiting physician sign-off</Pill>}
+          aside={
+            <span className="flex flex-wrap justify-end gap-1.5">
+              {item.surveyOnly && <Pill>Survey only · no wearable signals</Pill>}
+              {item.signed ? <Pill tone="ink"><FileSignature size={12} aria-hidden /> {item.signed}</Pill> : item.returned ? <Pill>Returned to the lab · {item.returned.at}</Pill> : missing.length ? <Pill>Awaiting the member · not yet measured</Pill> : <Pill tone="daybreak">Awaiting physician sign-off</Pill>}
+            </span>
+          }
         />
         <div className="flex flex-wrap items-end gap-6 border-b border-line pb-5">
           <div>
@@ -636,11 +661,12 @@ function SignOff({ items, setItems, now, onOpen, canActOn, log }: { items: SignI
               <Delta value={nowJI && prevJI ? nowJI.value - prevJI.value : null} />
               <span className="text-[14px] text-ink-3">from <span className="num">{prevJI?.value ?? '—'}</span></span>
             </p>
+            {missing.length > 0 && <p className="mt-1.5 text-[13px] text-ink-2">Withheld · {termList(missing)} not yet measured. Never imputed.</p>}
           </div>
-          <div className="text-[13px] text-ink-2">
+          {nowJI && <div className="text-[13px] text-ink-2">
             <p>GM(H,P,R,F,D) = <span className="num text-ink">{nowJI?.gm}</span> · λ·B = <span className="num text-ink">{nowJI?.burden}</span></p>
             <p className="mt-0.5">λ = <span className="num">{nowJI?.lambda}</span> · {item.engine}</p>
-          </div>
+          </div>}
         </div>
         <MethodLine className="mt-3" method={item.method} grade="clinical" signedBy={item.signed ? signerOf(item.signed) : undefined} />
 
@@ -653,13 +679,13 @@ function SignOff({ items, setItems, now, onOpen, canActOn, log }: { items: SignI
               <tbody>
                 {item.now.map((s) => {
                   const p = item.prev.find((x) => x.key === s.key)!
-                  const d = (s.value ?? 0) - (p.value ?? 0)
+                  const d = s.value !== null && p.value !== null ? s.value - p.value : null
                   return (
                     <tr key={s.key} className="border-b border-line last:border-0">
                       <td className="py-2 pr-3"><span className="flex items-center gap-2 text-ink"><TermDot term={s.key} /> {termByKey(s.key).name}</span></td>
-                      <td className="num py-2 pr-3 text-ink-2">{s.key === 'B' ? `−${p.value}` : p.value}</td>
-                      <td className="num py-2 pr-3 text-ink">{s.key === 'B' ? `−${s.value}` : s.value}</td>
-                      <td className="py-2"><Delta value={d} inverse={s.key === 'B'} /></td>
+                      <td className="num py-2 pr-3 text-ink-2">{p.value === null ? '—' : s.key === 'B' ? `−${p.value}` : p.value}</td>
+                      <td className={clsx('py-2 pr-3', s.value === null ? 'text-[13px] text-ink-3' : 'num text-ink')}>{s.value === null ? 'not yet measured' : s.key === 'B' ? `−${s.value}` : s.value}</td>
+                      <td className="py-2">{d === null ? <span className="num text-ink-3">—</span> : <Delta value={d} inverse={s.key === 'B'} />}</td>
                     </tr>
                   )
                 })}
@@ -734,6 +760,11 @@ function SignOff({ items, setItems, now, onOpen, canActOn, log }: { items: SignI
               <Button variant="ink" type="submit"><Undo2 size={15} aria-hidden /> Return draft</Button>
             </div>
           </form>
+        ) : !item.signed && missing.length ? (
+          <div role="status" className="mt-6 rounded-lg border border-dashed border-line-strong p-4">
+            <p className="text-[15px] text-ink">Nothing to sign yet: {termList(missing)} {missing.length === 1 ? 'is' : 'are'} not yet measured, so the Index is withheld.</p>
+            <p className="mt-1 text-[14px] text-ink-2">{item.member.split(' ')[0]} measures {missing.length === 1 ? 'it' : 'them'} later in the app, from Day 90. The draft returns to this queue complete, and you sign it then. A term is never filled in for the member.</p>
+          </div>
         ) : !item.signed ? (
           <div className="mt-6 flex flex-col gap-4 rounded-lg bg-paper-sunk p-4 md:flex-row md:items-center md:justify-between">
             <label className="flex items-start gap-3 text-[15px] text-ink">
@@ -1424,7 +1455,11 @@ function MedicalDirector({ canAct, active, history, log }: { canAct: boolean; ac
     setVals(active.values)
   }
   const [why, setWhy] = useState('')
-  const [proposal, setProposal] = useState<null | { version: string; changes: string[]; why: string }>(null)
+  const [proposal, setProposal] = useState<null | { version: string; changes: string[]; why: string; by: string; byRole: string }>(null)
+  // The proposal and the first signature are the signed-in person's, whoever that is.
+  const acc = useConsoleAccess('/console/clinical')
+  const signer = useSigner()
+  const signerRole = signer === MEERA.name ? 'Medical Director' : acc.roleLabel
   const [justActivated, setJustActivated] = useState<string | null>(null)
   const [err, setErr] = useState('')
   const nextVersion = `v${Number(active.version.slice(1)) + 1}`
@@ -1436,7 +1471,7 @@ function MedicalDirector({ canAct, active, history, log }: { canAct: boolean; ac
     if (!changes.length) return setErr('Change at least one threshold.')
     if (why.trim().length < 15) return setErr('Write the clinical rationale. It is published with the version.')
     for (const t of base) if (Number.isNaN(vals[t.key]) || vals[t.key] < t.min || vals[t.key] > t.max) return setErr(`${t.label} must be between ${t.min} and ${t.max}.`)
-    setProposal({ version: nextVersion, changes, why: why.trim() })
+    setProposal({ version: nextVersion, changes, why: why.trim(), by: signer, byRole: signerRole })
     log({ what: `Proposed thresholds ${nextVersion} for second signature · ${changes.join('; ')}`, purpose: 'Medical Director config' })
     setJustActivated(null)
     setErr('')
@@ -1450,10 +1485,10 @@ function MedicalDirector({ canAct, active, history, log }: { canAct: boolean; ac
   const activate = () => {
     if (!proposal || !canAct) return
     const hash = `cfg:${Math.random().toString(16).slice(2, 6)}…${Math.random().toString(16).slice(2, 6)}`
-    const signers = ['Dr Meera Iyer · Medical Director', 'Dr Sanjay Menon · Lead Psychologist']
+    const signers = [`${proposal.by} · ${proposal.byRole}`, 'Dr Sanjay Menon · Lead Psychologist']
     clinical.activateMd(
       { version: proposal.version, signedOn: '28 Jan 2027', signers, hash, values: { ...vals } },
-      { version: proposal.version, date: '28 Jan 2027', change: proposal.changes.join('; '), signers: 'Dr Meera Iyer, Dr Sanjay Menon', hash },
+      { version: proposal.version, date: '28 Jan 2027', change: proposal.changes.join('; '), signers: `${proposal.by}, Dr Sanjay Menon`, hash },
     )
     log({ what: `Activated thresholds ${proposal.version} · second signature by Dr Sanjay Menon (simulated) · ${hash}`, purpose: 'Medical Director config' })
     setJustActivated(proposal.version)
@@ -1524,7 +1559,7 @@ function MedicalDirector({ canAct, active, history, log }: { canAct: boolean; ac
 
         {proposal && (
           <div className="mt-5 rounded-lg border border-line bg-paper-sunk p-4">
-            <p className="eyebrow text-ink-3">{proposal.version} · proposed by Dr Meera Iyer · awaiting second signer</p>
+            <p className="eyebrow text-ink-3">{proposal.version} · proposed by {proposal.by} · awaiting second signer</p>
             <ul className="mt-2 space-y-1 text-[15px] text-ink">{proposal.changes.map((c) => <li key={c}>{c}</li>)}</ul>
             <p className="mt-2 text-[14px] text-ink-2">{proposal.why}</p>
             <div className="mt-4 flex flex-wrap items-center gap-3">

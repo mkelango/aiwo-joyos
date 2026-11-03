@@ -601,10 +601,41 @@ export const VENUE_COHORTS = [
   { id: 'vc4', name: 'AIWO Joyspan 2027 · Fairmont', n: 600, remeasured: null, improvedLowest: null, deltas: null, inLoop: 23 },
 ]
 
-export const WEBHOOK_EVENTS = ['arrival.created', 'arrival.updated', 'itinerary.published', 'pass.checked_in', 'zone.capacity', 'signal_point.status']
+export const WEBHOOK_EVENTS = ['arrival.created', 'arrival.updated', 'itinerary.published', 'pass.checked_in', 'zone.capacity', 'signal_point.status', 'enrolment.created']
 export const WEBHOOKS = [
-  { id: 'wh1', url: 'https://ops.fairmont-mumbai.example/joyos/hooks', events: ['arrival.created', 'arrival.updated', 'itinerary.published'], status: 'healthy', last: '21:04 · 200 · 142 ms' },
+  { id: 'wh1', url: 'https://ops.fairmont-mumbai.example/joyos/hooks', events: ['arrival.created', 'arrival.updated', 'itinerary.published', 'enrolment.created'], status: 'healthy', last: '21:04 · 200 · 142 ms' },
   { id: 'wh2', url: 'https://pms-bridge.example/aiwo', events: ['pass.checked_in', 'zone.capacity'], status: 'healthy', last: '20:51 · 200 · 88 ms' },
+]
+
+/**
+ * Guest invitations the venue sends through the partner API (POST /partner/v1/invitations;
+ * Architecture p21). An invitation carries a name, a contact, the stay and the arrival date,
+ * nothing else; the venue sees whether the guest accepted or declined, never anything about
+ * their health. An acceptance comes back as a status and the webhook enrolment.created.
+ */
+export type InvitationStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'revoked'
+export interface GuestInvitation {
+  id: string
+  guest: string
+  contact: string
+  channel: 'email' | 'whatsapp'
+  stay: string
+  /** YYYY-MM-DD */
+  arrival: string
+  status: InvitationStatus
+  sends: number
+  /** "28 Jan · 21:10" on the console clock. */
+  sentAt?: string
+  decidedAt?: string
+  reason?: string
+  history: { at: string; what: string }[]
+}
+export const INVITE_STAYS = ['Healthcation · 4 nights', 'Healthcation · 4 nights · sea view', 'Joycation · 5 nights · couple', 'AIWO Joyspan 2027 · Fairmont']
+export const INVITE_DECLINE_REASONS = ['The dates do not work', 'Not interested for now', 'Booked elsewhere', 'No reason given']
+export const GUEST_INVITATIONS: GuestInvitation[] = [
+  { id: 'INV-2038', guest: 'Ms Priyanka Desai', contact: 'priyanka.desai@example.com', channel: 'email', stay: 'AIWO Joyspan 2027 · Fairmont', arrival: '2027-02-05', status: 'accepted', sends: 1, sentAt: '26 Jan · 11:20', decidedAt: '26 Jan · 18:02', history: [{ at: '26 Jan · 11:20', what: 'Sent by email' }, { at: '26 Jan · 18:02', what: 'Accepted by the guest' }] },
+  { id: 'INV-2039', guest: 'Mr Rohan & Mrs Isha Kapoor', contact: '+91 98200 41736', channel: 'whatsapp', stay: 'Healthcation · 4 nights · sea view', arrival: '2027-02-11', status: 'sent', sends: 1, sentAt: '27 Jan · 16:45', history: [{ at: '27 Jan · 16:45', what: 'Sent by WhatsApp' }] },
+  { id: 'INV-2040', guest: 'Mr Daniel Fernandes', contact: 'daniel.f@example.com', channel: 'email', stay: 'Joycation · 5 nights · couple', arrival: '2027-02-03', status: 'declined', sends: 2, sentAt: '26 Jan · 10:05', decidedAt: '27 Jan · 09:30', reason: 'The dates do not work', history: [{ at: '25 Jan · 10:05', what: 'Sent by email' }, { at: '26 Jan · 10:05', what: 'Resent by email' }, { at: '27 Jan · 09:30', what: 'Declined · the dates do not work' }] },
 ]
 
 // ─── Coach console additions ───────────────────────────────────────────────

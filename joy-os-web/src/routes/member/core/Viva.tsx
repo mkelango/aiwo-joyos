@@ -16,6 +16,9 @@ import { HumanWritten, Provenance, Switch } from './_parts'
 import { useLocal } from './_store'
 import { useBandText } from '@/components/joy/primitives'
 import { ACTION_TEXT, GUARDRAIL_TEXT, MEMORY_TEXT, PRACTICE_TITLE, TERM_DETAIL_TEXT, TOOL_TEXT, rich, useCore } from './_i18n'
+import { useX } from './_i18nX'
+import { useIsMinor } from '@/lib/minor'
+import { careThreadHref, postCareMessage } from '@/routes/member/account/_careInbox'
 
 // VIVA COMPANION (Memo p.27; Plan §4B, pattern 7 "memory the member can see and edit").
 // Typed tools, scripted replies (no live model in this front end), provenance on every
@@ -53,6 +56,11 @@ const GUARDRAIL_EXAMPLES = [
 ]
 
 const SPACE_ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
+// Guardrail replies carry a readable label in the provenance line; tool ids stay code tags.
+const GUARDRAIL_TOOL = { 'guardrail.no_diagnosis': 'pvGrNoDx', 'guardrail.no_financial_advice': 'pvGrNoMoney', 'guardrail.adviser_question': 'pvGrAdviser' } as const
+type GuardrailTool = keyof typeof GUARDRAIL_TOOL
+// A member under 18 is never scored (Architecture p26): the Index tool explains the method only.
+const MINOR_INDEX_ASK = 'How is the Index built?'
 const MEMORY_ON: Record<TermKey, boolean> = { H: true, P: true, R: true, F: true, D: true, B: false }
 let seq = 0
 const greeting = (h = new Date().getHours()) => (h < 5 ? 'vvHello' : h < 12 ? 'vvMorning' : h < 17 ? 'vvAfternoon' : 'vvEvening')
@@ -64,6 +72,8 @@ export default function Viva() {
   const { setCrisisOpen } = useApp()
   const core = useCore()
   const { t: c, space, pick } = core
+  const x = useX()
+  const minor = useIsMinor()
   const who = useMemberName()
   const band = useBandText()
   const inputId = useId()
@@ -114,7 +124,7 @@ export default function Viva() {
     if (!ask) return
     const id = window.setTimeout(() => {
       const tool = TOOLS.find((t) => t.id === ask)
-      if (tool) respond(pick(TOOL_TEXT[tool.id]?.ask, tool.ask), tool.ask)
+      if (tool) respond(...askOf(tool))
       setParams((p) => {
         const next = new URLSearchParams(p)
         next.delete('ask')
@@ -124,6 +134,10 @@ export default function Viva() {
     return () => window.clearTimeout(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /** What a tool card asks, shown and routed (a minor's Index tool asks about the method). */
+  const askOf = (tool: (typeof TOOLS)[number]): [string, string] =>
+    minor && tool.id === 'index_explainer' ? [x('vvMinorAsk'), MINOR_INDEX_ASK] : [pick(TOOL_TEXT[tool.id]?.ask, tool.ask), tool.ask]
 
   /** `text` is what the member sees; `routeText` (English) is what the scripted router reads. */
   const respond = (text: string, routeText = text) => {
@@ -141,8 +155,10 @@ export default function Viva() {
     }
     setMsgs((m) => [...m, mine])
     setTyping(true)
-    const reply = route(routeText, memoryOn, memory, core, band)
+    const reply = route(routeText, memoryOn, memory, core, band, x, minor)
     if (reply.extra === 'route-adviser') reply.question = text
+    // No diagnosis: the question goes to Dr Meera's Care thread, as the reply says (K1).
+    if (reply.extra === 'route-meera') postCareMessage({ to: 'physician', from: 'viva', subject: x('vvDxSubject'), body: text, ref: 'viva:no-diagnosis' })
     const id = window.setTimeout(() => {
       timers.current = timers.current.filter((x) => x !== id)
       if (timers.current.length === 0) setTyping(false)
@@ -201,10 +217,10 @@ export default function Viva() {
           <section aria-label={c('vvToolsAria')}>
             <SectionTitle aside={<span className="eyebrow text-ink-3">{c('vvTyped')}</span>}>{c('vvSixTools')}</SectionTitle>
             <ul className="grid grid-cols-2 gap-3 md:grid-cols-3">
-              {TOOLS.map((t) => { const tt = TOOL_TEXT[t.id]; return (
+              {TOOLS.map((t) => { const tt = TOOL_TEXT[t.id]; const methodOnly = minor && t.id === 'index_explainer'; return (
                 <li key={t.id}>
                   <button
-                    onClick={() => respond(pick(tt?.ask, t.ask), t.ask)}
+                    onClick={() => respond(...askOf(t))}
                     disabled={unavailable}
                     className="group flex h-full w-full flex-col rounded-card border border-line bg-paper-raised p-4 text-left shadow-card transition-colors hover:border-line-strong hover:bg-paper-sunk focus-ring disabled:cursor-not-allowed disabled:opacity-55"
                   >
@@ -212,8 +228,8 @@ export default function Viva() {
                       <t.icon size={18} className="text-ink-2" aria-hidden />
                       {t.term && <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-ink-3"><TermDot term={t.term} size={8} /> {space(t.term)}</span>}
                     </span>
-                    <span className="mt-3 break-words text-[15px] font-medium text-ink">{pick(tt?.title, t.title)}</span>
-                    <span className="mt-1 break-words text-[13px] leading-snug text-ink-2">{pick(tt?.does, t.does)}</span>
+                    <span className="mt-3 break-words text-[15px] font-medium text-ink">{methodOnly ? x('vvMinorAskTitle') : pick(tt?.title, t.title)}</span>
+                    <span className="mt-1 break-words text-[13px] leading-snug text-ink-2">{methodOnly ? x('vvMinorDoes') : pick(tt?.does, t.does)}</span>
                     <span className="num mt-3 break-all text-[11px] text-ink-3">{t.id}</span>
                   </button>
                 </li>
@@ -426,6 +442,8 @@ function MemoryRow({ item, onForget }: { item: MemoryItem; onForget: () => void 
 // ─── Message bubble ─────────────────────────────────────────────────────────
 function Bubble({ m, onAdd }: { m: Msg; onAdd: (m: Msg) => void }) {
   const { t: c, space } = useCore()
+  const x = useX()
+  const toolLabel = (tool = 'router') => (tool in GUARDRAIL_TOOL ? x(GUARDRAIL_TOOL[tool as GuardrailTool]) : tool)
   if (m.from === 'me')
     return (
       <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="flex justify-end">
@@ -460,7 +478,7 @@ function Bubble({ m, onAdd }: { m: Msg; onAdd: (m: Msg) => void }) {
           {m.extra && m.extra !== 'relay' && <Extra kind={m.extra} question={m.question} onAdd={onAdd} />}
         </div>
       )}
-      {m.kind !== 'suffering' && <Provenance tool={m.tool ?? 'router'} className="mt-2" />}
+      {m.kind !== 'suffering' && <Provenance tool={toolLabel(m.tool)} className="mt-2" />}
     </motion.div>
   )
 }
@@ -469,14 +487,20 @@ function Relay({ text }: { text: string }) {
   const priya = TEAM.find((p) => p.id === 'p_priya')
   const [sent, setSent] = useState(false)
   const { t: c } = useCore()
+  const x = useX()
+  // The member's own words go to Priya's Care thread (K1), relayed by VIVA while it rests.
+  const send = () => {
+    postCareMessage({ to: 'coach', from: 'viva', subject: x('vvRelaySubject'), body: text, ref: 'viva:resting' })
+    setSent(true)
+  }
   return sent ? (
     <div role="status" className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-paper-sunk px-3 py-2.5 text-[14px] text-ink-2">
       <Check size={15} aria-hidden className="text-ink" /> {c('vvSentTo', { name: priya?.name ?? 'Priya' })}
-      <Link to="/app/care/messages" className="inline-flex items-center gap-1 text-ink underline-offset-4 hover:underline focus-ring">{c('vvOpenCareMsgs')} <ArrowRight size={13} /></Link>
+      <Link to={careThreadHref('coach')} className="inline-flex items-center gap-1 text-ink underline-offset-4 hover:underline focus-ring">{c('vvOpenCareMsgs')} <ArrowRight size={13} /></Link>
     </div>
   ) : (
     <div className="mt-3 flex flex-wrap items-center gap-2">
-      <Button variant="secondary" size="sm" onClick={() => setSent(true)} aria-label={c('vvSendPriyaAria', { text })}>
+      <Button variant="secondary" size="sm" onClick={send} aria-label={c('vvSendPriyaAria', { text })}>
         <Send size={14} /> {c('vvSendPriya')}
       </Button>
       <Link to="/app/care/messages" className="inline-flex h-9 items-center gap-1 rounded-full px-3 text-[14px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring">{c('vvOpenCare')}</Link>
@@ -486,7 +510,10 @@ function Relay({ text }: { text: string }) {
 
 function Extra({ kind, question, onAdd }: { kind: Exclude<NonNullable<Msg['extra']>, 'relay'>; question?: string; onAdd: (m: Msg) => void }): ReactNode {
   const { t: c, space } = useCore()
+  const minor = useIsMinor()
   if (kind === 'index') {
+    // Never a term score for a member under 18.
+    if (minor) return null
     const latest = INDEX_HISTORY[0]
     return (
       <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
@@ -507,7 +534,7 @@ function Extra({ kind, question, onAdd }: { kind: Exclude<NonNullable<Msg['extra
         <div className="min-w-0 text-[14px]">
           <p className="text-ink">{c('vvRoutedTo', { name: meera.name })}</p>
           <p className="text-ink-3">{c('vvGate')}</p>
-          <Link to="/app/care/messages" className="mt-1 inline-flex items-center gap-1 text-ink underline-offset-4 hover:underline focus-ring">{c('vvOpenCareMsgs')} <ArrowRight size={13} /></Link>
+          <Link to={careThreadHref('physician')} className="mt-1 inline-flex items-center gap-1 text-ink underline-offset-4 hover:underline focus-ring">{c('vvOpenCareMsgs')} <ArrowRight size={13} /></Link>
         </div>
       </div>
     )
@@ -537,7 +564,7 @@ function AdviserNote({ question, onAdd }: { question?: string; onAdd: (m: Msg) =
                 id: mid(),
                 from: 'viva',
                 kind: 'reply',
-                tool: 'guardrail · question for adviser',
+                tool: 'guardrail.adviser_question',
                 extra: undefined,
                 text: c('vvAdviserMsg', { q: question.replace(/[?.!।]+$/, '') }),
               })
@@ -552,7 +579,7 @@ function AdviserNote({ question, onAdd }: { question?: string; onAdd: (m: Msg) =
 }
 
 // ─── Scripted router (no live model in this front end) ──────────────────────
-function route(text: string, memoryOn: Record<TermKey, boolean>, memory: Record<TermKey, MemoryItem[]>, core: Core, band: Band): Msg {
+function route(text: string, memoryOn: Record<TermKey, boolean>, memory: Record<TermKey, MemoryItem[]>, core: Core, band: Band, x: ReturnType<typeof useX>, minor: boolean): Msg {
   const { t: c, lang, name, pick, when } = core
   const t = text.toLowerCase()
   const latest = INDEX_HISTORY[0]
@@ -569,7 +596,7 @@ function route(text: string, memoryOn: Record<TermKey, boolean>, memory: Record<
     }
   if (/\b(diagnos|insomnia|disorder|depress|melatonin|medicine|medication|dose|tablet|prescri|apnoea|apnea)/.test(t))
     return viva(
-      'guardrail · no diagnosis',
+      'guardrail.no_diagnosis',
       /sleep|insomnia|melatonin|apn/.test(t)
         ? c('rtNoDxSleep')
         : c('rtNoDx'),
@@ -577,9 +604,9 @@ function route(text: string, memoryOn: Record<TermKey, boolean>, memory: Record<
       'refusal',
     )
   if (/\b(savings|invest|equity|mutual fund|stocks?|shares|loan|money|portfolio|sip)\b/.test(t))
-    return viva('guardrail · no financial advice', c('rtMoney', { term: name('F') }), 'route-adviser', 'refusal')
+    return viva('guardrail.no_financial_advice', c('rtMoney', { term: name('F') }), 'route-adviser', 'refusal')
   if (/\b(sleep|slept|steps|resting heart|heart rate|oura|body|walk(ing)?|tired|energy)\b/.test(t))
-    return viva(
+    return minor ? viva('index_explainer', x('rtBodyMinor')) : viva(
       'index_explainer',
       c('rtBody', {
         moved: TERM_DETAIL.H.moved.map((m, i) => pick(TERM_DETAIL_TEXT.H?.moved[i], m)).join(c('rtJoin')),
@@ -589,6 +616,7 @@ function route(text: string, memoryOn: Record<TermKey, boolean>, memory: Record<
       }),
     )
   if (/\b(index|score|64|lowest|wheel|band)\b/.test(t)) {
+    if (minor) return viva('index_explainer', x('rtIndexMinor'))
     const e = joyspanIndex(latest.terms)!
     const lifted = joyspanIndex(latest.terms.map((s) => (s.key === latest.lowestTerm ? { ...s, value: (s.value ?? 0) + 10 } : s)))!
     return viva(

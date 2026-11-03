@@ -5,7 +5,8 @@ import { dateTemplate, localWhen } from './_when'
 // Care, Trust and Account lane: every member-facing string, in English, Tamil and Hindi.
 // English is the source and must not change. Stays English by design: questionnaire
 // items (the Check statements and their answer scale), people's own words (coach and
-// clinician messages, results notes, prescriptions, what the member typed), names,
+// clinician messages, results notes, what the member typed), names, drug names (their
+// directions are translated),
 // brand and product names (AIWO, Joy OS, VIVA, LifeOS, Tele-MANAS, WhatsApp, plan
 // names, ’Cation names), numbers, dates in Mono, units and scientific abbreviations.
 
@@ -133,6 +134,10 @@ export const DATA = {
   resSleepLab: { en: 'AIWO sleep partner · WatchPAT', ta: 'AIWO தூக்கக் கூட்டாளர் · WatchPAT', hi: 'AIWO स्लीप पार्टनर · WatchPAT' },
   resCapacity: { en: 'Capacity battery', ta: 'உடல் திறன் சோதனைகள்', hi: 'क्षमता जाँच' },
   resCapacityLab: { en: 'Signal Point · Fairmont Mumbai', ta: 'Signal Point · Fairmont மும்பை', hi: 'Signal Point · Fairmont मुंबई' },
+  mkVitD: { en: 'Vitamin D (25-OH)', ta: 'வைட்டமின் D (25-OH)', hi: 'विटामिन D (25-OH)' },
+  // Prescription directions (the clinician's sig, read to the member in their language)
+  rxSigVitD: { en: 'One sachet weekly, after a meal, for 8 weeks', ta: 'வாரம் ஒரு பாக்கெட், உணவுக்குப் பின், 8 வாரங்களுக்கு', hi: 'हफ़्ते में एक पाउच, खाने के बाद, 8 हफ़्तों तक' },
+  rxSigMelatonin: { en: 'One tablet at 22:00 for 3 weeks, then stop', ta: '22:00-க்கு ஒரு மாத்திரை, 3 வாரங்களுக்கு, பிறகு நிறுத்தவும்', hi: '22:00 बजे एक गोली, 3 हफ़्तों तक, फिर बंद' },
   mkGlucose: { en: 'Fasting glucose', ta: 'வெறும் வயிற்று குளுக்கோஸ்', hi: 'फ़ास्टिंग ग्लूकोज़' },
   mkGrip: { en: 'Grip strength (best of 3)', ta: 'பிடி வலிமை (3 இல் சிறந்தது)', hi: 'पकड़ की ताक़त (3 में सबसे अच्छी)' },
   mkSit: { en: '5× sit-to-stand', ta: '5× உட்கார்ந்து எழுதல்', hi: '5× बैठकर खड़े होना' },
@@ -758,6 +763,7 @@ export const MSG = {
   signedBy: { en: '· Signed, {name}', ta: '· கையொப்பம், {name}', hi: '· हस्ताक्षर, {name}' },
   draftedVia: { en: 'drafted with VIVA, edited and sent by a person', ta: 'VIVA உதவியுடன் வரைந்தது, ஒரு மனிதர் திருத்தி அனுப்பியது', hi: 'VIVA से मसौदा, किसी इंसान ने बदलकर भेजा' },
   clinicalDot: { en: '· Clinical', ta: '· மருத்துவம்', hi: '· क्लिनिकल' },
+  viaViva: { en: '· Passed on by VIVA', ta: '· VIVA வழியாக அனுப்பப்பட்டது', hi: '· VIVA के ज़रिए भेजा गया' },
 } satisfies Dict
 
 export const NOTIF = {
@@ -968,6 +974,7 @@ export const HH = {
   pageTitle: { en: 'Only what you {em} share', ta: 'நீங்கள் {em} பகிர்வது மட்டும்', hi: 'सिर्फ़ वही जो आप {em} साझा करें' },
   pageEm: { en: 'both', ta: 'இருவரும்', hi: 'दोनों' },
   pageLead: { en: 'If one of you has not agreed, nothing appears — not even a blank. This is what both of you see.', ta: 'உங்களில் ஒருவர் ஒப்புக்கொள்ளவில்லை என்றால் எதுவும் தெரியாது — ஒரு வெற்றிடம் கூட. நீங்கள் இருவரும் பார்ப்பது இதுதான்.', hi: 'अगर आप में से किसी एक ने हाँ नहीं कहा, तो कुछ नहीं दिखता — ख़ाली जगह भी नहीं। आप दोनों यही देखते हैं।' },
+  minorCouple: { en: 'Under 18, nothing here is scored: the household page, share grants and the Couples Check are for the adults. Your answers stay yours.', ta: '18 வயதுக்குக் கீழ், இங்கே எதற்கும் மதிப்பெண் இல்லை: குடும்பப் பக்கம், பகிர்வு அனுமதிகள், தம்பதியர் சோதனை ஆகியவை பெரியவர்களுக்கானவை. உங்கள் பதில்கள் உங்களுடையவையே.', hi: '18 से कम उम्र में यहाँ कुछ भी स्कोर नहीं होता: परिवार पेज, साझा करने की अनुमतियाँ और कपल्स चेक बड़ों के लिए हैं। आपके जवाब आपके ही रहते हैं।' },
   indexNotShared: { en: 'Index not shared.', ta: 'குறியீடு பகிரப்படவில்லை.', hi: 'इंडेक्स साझा नहीं।' },
   allShared: { en: 'All six terms are shared by both of you.', ta: 'ஆறு அம்சங்களையும் நீங்கள் இருவரும் பகிர்கிறீர்கள்.', hi: 'छहों पहलू आप दोनों साझा करते हैं।' },
   notShownOne: { en: '{spaces} is not shown — not shared by both.', ta: '{spaces} காட்டப்படவில்லை — இருவரும் பகிரவில்லை.', hi: '{spaces} नहीं दिखाया गया — दोनों ने साझा नहीं किया।' },
@@ -1436,6 +1443,7 @@ export const TRUST = {
   stReady: { en: 'Ready to download', ta: 'பதிவிறக்கத் தயார்', hi: 'डाउनलोड के लिए तैयार' },
   export: { en: 'Export', ta: 'ஏற்றுமதி', hi: 'निर्यात' },
   exportTitle: { en: 'Take a full copy, in an open format', ta: 'திறந்த வடிவத்தில் முழு நகலை எடுங்கள்', hi: 'खुले फ़ॉर्मैट में पूरी कॉपी लें' },
+  exportBodyMinor: { en: 'Answers, signals, Ledger, messages and your clinical record. No Index: nothing is scored under 18. Ready within 72 hours; the link lasts 7 days.', ta: 'பதில்கள், சிக்னல்கள், லெட்ஜர், செய்திகள், உங்கள் மருத்துவப் பதிவு. குறியீடு இல்லை: 18 வயதுக்குக் கீழ் எதுவும் மதிப்பிடப்படுவதில்லை. 72 மணி நேரத்துக்குள் தயாராகும்; இணைப்பு 7 நாட்கள் இருக்கும்.', hi: 'जवाब, सिग्नल, लेजर, संदेश और आपका क्लिनिकल रिकॉर्ड। कोई इंडेक्स नहीं: 18 से कम उम्र में कुछ भी स्कोर नहीं होता। 72 घंटे में तैयार; लिंक 7 दिन चलता है।' },
   exportBody: { en: 'Index history with methods, answers, signals, Ledger, messages and your clinical record. Ready within 72 hours; the link lasts 7 days.', ta: 'முறைகளுடன் குறியீட்டு வரலாறு, பதில்கள், சிக்னல்கள், லெட்ஜர், செய்திகள், உங்கள் மருத்துவப் பதிவு. 72 மணி நேரத்துக்குள் தயாராகும்; இணைப்பு 7 நாட்கள் இருக்கும்.', hi: 'विधियों के साथ इंडेक्स का इतिहास, जवाब, सिग्नल, लेजर, संदेश और आपका क्लिनिकल रिकॉर्ड। 72 घंटे में तैयार; लिंक 7 दिन चलता है।' },
   format: { en: 'Format', ta: 'வடிவம்', hi: 'फ़ॉर्मैट' },
   exportFormat: { en: 'Export format', ta: 'ஏற்றுமதி வடிவம்', hi: 'निर्यात का फ़ॉर्मैट' },
@@ -1624,6 +1632,9 @@ export const WA = {
   c4c: { en: 'Three doors from here: the Letter, a baseline, or the app.', ta: 'இங்கிருந்து மூன்று வழிகள்: கடிதம், ஓர் அடிப்படை அளவீடு, அல்லது செயலி.', hi: 'यहाँ से तीन रास्ते: चिट्ठी, एक बेसलाइन, या ऐप।' },
   rLetter: { en: 'Send me the Letter', ta: 'எனக்குக் கடிதத்தை அனுப்புங்கள்', hi: 'मुझे चिट्ठी भेजें' },
   rApp: { en: 'Open the app', ta: 'செயலியைத் திறக்கவும்', hi: 'ऐप खोलें' },
+  c0Minor: { en: 'The Joyspan Check: 18 statements, about five minutes. Under 18 it gives no bands and no number. Ready?', ta: 'ஜாய்ஸ்பான் Check: 18 கூற்றுகள், சுமார் ஐந்து நிமிடம். 18 வயதுக்குக் கீழ் நிலைகளும் இல்லை, எண்ணும் இல்லை. தயாரா?', hi: 'जॉयस्पैन Check: 18 कथन, लगभग पाँच मिनट। 18 से कम उम्र में न बैंड मिलते हैं, न कोई अंक। तैयार हैं?' },
+  c4bMinor: { en: 'Thank you. Nothing is scored while you are under 18 — no bands, no number.', ta: 'நன்றி. 18 வயதுக்குக் கீழ் எதுவும் மதிப்பிடப்படுவதில்லை — நிலைகளும் இல்லை, எண்ணும் இல்லை.', hi: 'शुक्रिया। 18 से कम उम्र में कुछ भी स्कोर नहीं होता — न बैंड, न अंक।' },
+  c5Minor: { en: 'Done. No bands were made, so there is nothing to keep.', ta: 'முடிந்தது. நிலைகள் எதுவும் உருவாக்கப்படவில்லை, எனவே வைத்திருக்க எதுவும் இல்லை.', hi: 'हो गया। कोई बैंड नहीं बने, इसलिए रखने को कुछ नहीं है।' },
   c5: { en: 'Done. Your bands are saved to your AIWO ID. If you never sign in, they are deleted after 30 days.', ta: 'முடிந்தது. உங்கள் நிலைகள் உங்கள் AIWO ID-யில் சேமிக்கப்பட்டன. நீங்கள் ஒருபோதும் உள்நுழையவில்லை என்றால், 30 நாட்களுக்குப் பிறகு அவை நீக்கப்படும்.', hi: 'हो गया। आपके बैंड आपकी AIWO ID में सहेजे गए। अगर आप कभी साइन इन न करें, तो 30 दिन बाद ये मिटा दिए जाते हैं।' },
   clater: { en: 'No hurry. Reply CHECK whenever you like.', ta: 'அவசரமில்லை. விரும்பும்போது CHECK என்று பதில் அனுப்புங்கள்.', hi: 'कोई जल्दी नहीं। जब चाहें CHECK लिखें।' },
   r0: { en: 'Your circle meets Monday at 7 pm with Priya — thirty minutes, the same eight people.', ta: 'உங்கள் வட்டம் திங்கள் இரவு 7 மணிக்கு Priya-வுடன் கூடுகிறது — முப்பது நிமிடம், அதே எட்டுப் பேர்.', hi: 'आपका सर्कल सोमवार शाम 7 बजे Priya के साथ मिलता है — तीस मिनट, वही आठ लोग।' },
@@ -1669,6 +1680,8 @@ export const WA = {
   restart: { en: 'Restart', ta: 'மறுதொடக்கம்', hi: 'फिर से शुरू करें' },
   simulation: { en: 'Simulation · not a live chat', ta: 'உருவகப்படுத்தல் · நேரலை உரையாடல் அல்ல', hi: 'नक़ल · असली चैट नहीं' },
   tryTyping: { en: 'Try typing', ta: 'தட்டச்சு செய்து பாருங்கள்', hi: 'लिखकर देखें' },
+  tryResults: { en: 'my blood results?', ta: 'என் இரத்தப் பரிசோதனை முடிவுகள்?', hi: 'मेरी खून की जाँच के नतीजे?' },
+  tryLunch: { en: 'Lunch with Kavya', ta: 'Kavya-வுடன் மதிய உணவு', hi: 'Kavya के साथ लंच' },
   tryX: { en: 'Try “{x}”', ta: '“{x}” முயற்சிக்கவும்', hi: '“{x}” आज़माएँ' },
   yourConsent: { en: 'Your WhatsApp consent', ta: 'உங்கள் WhatsApp ஒப்புதல்', hi: 'आपकी WhatsApp सहमति' },
   consentOn: { en: 'On — Ledger prompts and reminders', ta: 'இயக்கத்தில் — லெட்ஜர் கேள்விகளும் நினைவூட்டல்களும்', hi: 'चालू — लेजर के सवाल और रिमाइंडर' },

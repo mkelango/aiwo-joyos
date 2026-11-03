@@ -127,6 +127,7 @@ export default function Notifications() {
 
           {visible.length === 0 ? (
             <EmptyState
+              illustration="letter"
               title={t('caughtUp')}
               body={t('caughtUpBody')}
               action={<Button variant="secondary" onClick={() => switchTab('all')}>{t('showAll')}</Button>}

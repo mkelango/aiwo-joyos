@@ -5,7 +5,7 @@ import Svg, { Circle, Defs, Line, Path, Rect } from 'react-native-svg'
 import { Body, Eyebrow, HatchPattern, Icon, InkSurface, Meta, Mono, TermDot, useSvgId, type IconName } from '@/components'
 import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
-import { palettes } from '@/theme/tokens'
+import { fonts, palettes } from '@/theme/tokens'
 import { useA } from './i18n'
 
 // Lane A helpers: sparkline, chips, text field, provenance, Ink ground screen.
@@ -182,12 +182,14 @@ export function TermName({ term, withSpace = true, size }: { term: TermKey; with
 }
 
 /** Horizontal bar with a label and a mono value. */
-export function BarRow({ label, value, max, color, suffix = '', note, hatched }: { label: string; value: number; max: number; color: string; suffix?: string; note?: string; hatched?: boolean }) {
+/** `label` may carry Mono numbers (a ReactNode); then `labelText` is its words for the screen reader. */
+export function BarRow({ label, labelText, value, max, color, suffix = '', note, hatched }: { label: ReactNode; labelText?: string; value: number; max: number; color: string; suffix?: string; note?: string; hatched?: boolean }) {
   const { c, term } = useTheme()
   const hatchId = useSvgId('bar')
   const pct = Math.max(0, Math.min(100, (value / max) * 100))
+  const spoken = labelText ?? (typeof label === 'string' ? label : '')
   return (
-    <View style={{ gap: 6 }} accessible accessibilityLabel={`${label}, ${value}${suffix}${note ? `, ${note}` : ''}`}>
+    <View style={{ gap: 6 }} accessible accessibilityLabel={`${spoken}, ${value}${suffix}${note ? `, ${note}` : ''}`}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
         <Meta tone="ink" style={{ flex: 1 }}>
           {label}
@@ -331,6 +333,47 @@ export function NotScored({ body, children }: { body: string; children?: ReactNo
       <Body size={22} weight="medium">{t('Not scored while under 18.')}</Body>
       <Body tone="ink2">{body}</Body>
       {children}
+    </View>
+  )
+}
+
+/**
+ * The verse of the Practice register (Playbook p63): the Thirukkural, kural 39 (Arattuppal · Aran
+ * Valiyuruttal), public domain, the same kural as the web. Set in Tamil with the English beneath, in
+ * every language. The Tamil stays upright (a slanted Tamil would be a fake oblique) in the script's
+ * sans; the English beneath is the quotation register, Newsreader italic, whatever the language.
+ */
+export const KURAL = {
+  n: 39,
+  ta: ['அறத்தான் வருவதே இன்பம்மற் றெல்லாம்', 'புறத்த புகழும் இல.'],
+  en: ['Only the joy that comes of living rightly is joy;', 'all else is outward show, and brings no praise.'],
+}
+
+export function Verse() {
+  const { c, space } = useTheme()
+  const { t } = useA()
+  return (
+    <View style={{ gap: space.s1 + 4 }} accessibilityRole="summary">
+      <Eyebrow>{t('Thirukkural · kural {n}', { n: KURAL.n })}</Eyebrow>
+      <View style={{ gap: 2 }} accessibilityLanguage="ta">
+        {KURAL.ta.map((l) => (
+          <Body key={l} size={21} weight="light">
+            {l}
+          </Body>
+        ))}
+      </View>
+      <View style={{ gap: 0 }} accessibilityLanguage="en">
+        {KURAL.en.map((l) => (
+          <Body key={l} size={19} tone="ink2" style={{ fontFamily: fonts.serifLightItalic }}>
+            {l}
+          </Body>
+        ))}
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <View style={{ width: 28, height: 1, backgroundColor: c.lineStrong }} />
+        <Meta tone="ink">{t('Thiruvalluvar')}</Meta>
+        <Eyebrow>{t('The Book of Virtue · On the strength of virtue')}</Eyebrow>
+      </View>
     </View>
   )
 }

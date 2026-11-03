@@ -117,6 +117,21 @@ export const THREADS: Thread[] = [
   },
 ]
 
+/** Lakshmi's own inbox (elder mode): her concierge about the Session afternoon. People's own words stay in English. */
+export const THREADS_LAKSHMI: Thread[] = [
+  {
+    id: 't_ravi_lk', personId: 'p_ravi', subject: 'Joyspan Session · Chennai, 20 Feb', unread: 1,
+    messages: [
+      { id: 'm1', from: 'them', at: '2027-01-19T10:20', body: 'Vanakkam, Lakshmi-amma. Arjun asked me to keep you a place for the afternoon of Saturday 20 February at Joyspan House Chennai. Your seat is on the ground floor, near the door, and a helper will meet you at arrival. Reply here or ask Arjun if anything should change.', signed: 'Ravi Shankar' },
+    ],
+  },
+]
+
+/** Each account's specimen threads: Arjun's three, Lakshmi's own, none yet for a new member. */
+export function specimenThreads(account: 'arjun' | 'lakshmi' | 'new'): Thread[] {
+  return account === 'arjun' ? THREADS : account === 'lakshmi' ? THREADS_LAKSHMI : []
+}
+
 // ─── Household ────────────────────────────────────────────────────────────
 
 export const HOUSEHOLD_MINOR = { id: 'h_ananya', name: 'Ananya Rao', role: 'Daughter · 15', initials: 'AR', tone: brand.slate } // a fixed ground: Paper initials stay legible in both schemes

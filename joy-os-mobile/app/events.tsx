@@ -1,14 +1,15 @@
 import { router } from 'expo-router'
 import { useState, type ReactNode } from 'react'
 import { View } from 'react-native'
-import { AiwoMark, ArrowLink, BandLabel, Body, Button, Card, DaybreakButton, Eyebrow, Icon, JoyspanWheel, Meta, MethodLine, Mono, Pill, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, SpecimenTag, TermChip, TermDot, Title, Toggle, fmtDate } from '@/components'
+import { AiwoMark, ArrowLink, BandLabel, Body, Button, Card, DaybreakButton, EmptyIllustration, Eyebrow, Icon, JoyspanWheel, Meta, MethodLine, Mono, Pill, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, SpecimenTag, TermChip, TermDot, Title, Toggle, fmtDate } from '@/components'
 import { brand } from '@/theme/tokens'
 import { HOUSEHOLD, INDEX_HISTORY, MEMBER, TEAM } from '@/shared/member'
 import { COHORTS, EVENTS } from '@/shared/platform'
 import { useTheme } from '@/theme/ThemeProvider'
-import { EVENT_DATES, FLAGSHIP_NEXT, FLAGSHIP_RECAP, NYE_PROGRAMME, PASSES, SALONS, SESSIONS_OPEN, SESSION_SCHEDULE, ZONES } from '@/screens/b/journeyData'
-import { accountStore, occasionsStore, refCode, useStore, type AccountState, type BookedPass } from '@/screens/b/bStore'
-import { Done, Field, KeyValue, SpecimenQR, TimelineStep, fmtWhen, memberOnly, shareOrCopy, useAccount, useCrisisGuard, useSheetCrisisGuard } from '@/screens/b/parts'
+import { EVENT_DATES, FLAGSHIP_NEXT, FLAGSHIP_RECAP, NYE_PROGRAMME, PASSES, PASSPORT, SALONS, SESSIONS_OPEN, SESSION_SCHEDULE, ZONES } from '@/screens/b/journeyData'
+import { accountStore, occasionsStore, refCode, useStore, type AccountState, type BadgeDiet, type BookedPass } from '@/screens/b/bStore'
+import { Done, Field, FilterChips, KeyValue, SpecimenQR, TimelineStep, fmtWhen, memberOnly, shareOrCopy, useAccount, useCrisisGuard, useSheetCrisisGuard } from '@/screens/b/parts'
+import { useIsMinor } from '@/lib/minor'
 import type { TermKey } from '@/shared/types'
 import { useDict, useTermText } from '@/lib/i18n'
 import { EVENTS_T, PASS_STATUS, EVENT_KIND, PASS_TEXT, RECAP_SESSION_TEXT, SCHEDULE_TEXT, ZONE_TEXT, SESSION_OPEN_TEXT, SALON_TITLE, NYE_TEXT } from '@/screens/b/i18n/journey'
@@ -22,6 +23,10 @@ import { OCC } from '@/screens/b/i18n/occasions'
 // A Session booked here, or a salon booked in Circles, becomes a full pass (QR, gate, wallet).
 // The personal schedule is the member's to edit; two things at the same time swap. New Year's
 // Eve ends with the Declaration at 23:50 and the card the member signs (Playbook p61).
+// Playbook p61 also gives the edition's invitation ("… are invited to begin the year with joy",
+// letterpress on cotton) and the delegate badge (name 22 pt, consent as a word: PHOTOGRAPHY,
+// TABLE, DIET). Both are kept here from Joyspan 2027; the request for the next edition carries the
+// photography consent and diet its badge will print. Under 18 the recap shows no Wheel or Index.
 
 type Open = (typeof SESSIONS_OPEN)[number]
 type PassView = { key: string; code: string; kind: string; name: string; when: string; where: string; gate: string; seat: string; valid: boolean; booked: boolean }
@@ -37,7 +42,11 @@ const around = (filled: string, node: ReactNode): ReactNode => {
 const monoDigits = (text: string, size?: number, color?: string): ReactNode =>
   text.split(/(\d[\d:.]*)/).map((part, i) => (/^\d/.test(part) ? <Mono key={i} size={size} color={color}>{part}</Mono> : part))
 
+/** The badge number is the Joy Passport's own (JP-2027-0142). */
+const PASSPORT_NO = PASSPORT.number.split('-').slice(-1)[0]
 const CONCIERGE = TEAM.find((p) => p.role === 'Concierge')!.name.split(' ')[0]
+const DIETS: BadgeDiet[] = ['Vegetarian', 'Non-vegetarian', 'Vegan', 'Jain']
+const DIET_KEY: Record<BadgeDiet, 'dietVeg' | 'dietNonVeg' | 'dietVegan' | 'dietJain'> = { Vegetarian: 'dietVeg', 'Non-vegetarian': 'dietNonVeg', Vegan: 'dietVegan', Jain: 'dietJain' }
 const PARTNER = HOUSEHOLD.find((p) => p.role === 'Partner')!.name.split(' ')[0]
 
 export default memberOnly(Events)
@@ -55,6 +64,9 @@ function Events() {
   const [reqOpen, setReqOpen] = useState(false)
   const [reqGuests, setReqGuests] = useState<'1' | '2'>('2')
   const [reqNote, setReqNote] = useState('')
+  const [reqPhoto, setReqPhoto] = useState<'yes' | 'no'>('yes')
+  const [reqDiet, setReqDiet] = useState<BadgeDiet>('Vegetarian')
+  const minor = useIsMinor()
   const [withdrawn, setWithdrawn] = useState(false)
   const guard = useSheetCrisisGuard()
   const req = acct.flagshipRequest ?? null
@@ -135,7 +147,7 @@ function Events() {
     const note = reqNote.trim()
     // Emergency intercept first: the note never reaches the concierge until support has been offered.
     if (note && !guard(note, () => setReqOpen(false))) return
-    setAcct((a) => ({ ...a, flagshipRequest: { ref: refCode('AJ28-REQ'), guests: reqGuests === '1' ? 1 : 2, note, at: new Date().toISOString() } }))
+    setAcct((a) => ({ ...a, flagshipRequest: { ref: refCode('AJ28-REQ'), guests: reqGuests === '1' ? 1 : 2, note, at: new Date().toISOString(), photo: reqPhoto === 'yes', diet: reqDiet } }))
     setWithdrawn(false)
     setReqOpen(false)
   }
@@ -228,7 +240,10 @@ function Events() {
         ) : null}
         <Card tone="raised">
           {schedRows.length === 0 ? (
-            <Meta>{t('emptySched')}</Meta>
+            <View style={{ gap: space.s1, alignItems: 'flex-start' }}>
+              <EmptyIllustration kind="occasions" />
+              <Meta>{t('emptySched')}</Meta>
+            </View>
           ) : (
             schedRows.map((s, n) => {
               const key = `ev2-${s.i}`
@@ -287,17 +302,24 @@ function Events() {
         </View>
         <Card tone="raised" style={{ gap: space.s2 }}>
           <Eyebrow>{t('indexIssued', { where: flagship.where })}</Eyebrow>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s2, flexWrap: 'wrap' }}>
-            <JoyspanWheel terms={flagshipIndex.terms} size={120} animate={false} />
-            <View style={{ flex: 1, minWidth: 140, gap: 6 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
-                <Mono size={44} tone="ink">{String(flagshipIndex.value)}</Mono>
-                <BandLabel band={flagshipIndex.band} />
+          {minor ? (
+            // Under 18 (Architecture p26): no Wheel, Index, band or lowest term.
+            <Body>{t('minorRecap')}</Body>
+          ) : (
+            <>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s2, flexWrap: 'wrap' }}>
+                <JoyspanWheel terms={flagshipIndex.terms} size={120} animate={false} />
+                <View style={{ flex: 1, minWidth: 140, gap: 6 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
+                    <Mono size={44} tone="ink">{String(flagshipIndex.value)}</Mono>
+                    <BandLabel band={flagshipIndex.band} />
+                  </View>
+                  <Meta>{t('measuredBody', { d: fmtDate(flagshipIndex.takenOn), c: fmtDate(FLAGSHIP_RECAP.cardHanded), term: tt.name(flagshipIndex.lowestTerm) })}</Meta>
+                </View>
               </View>
-              <Meta>{t('measuredBody', { d: fmtDate(flagshipIndex.takenOn), c: fmtDate(FLAGSHIP_RECAP.cardHanded), term: tt.name(flagshipIndex.lowestTerm) })}</Meta>
-            </View>
-          </View>
-          <MethodLine method={flagshipIndex.method} grade={flagshipIndex.grade} takenOn={flagshipIndex.takenOn} next={flagshipIndex.nextMeasure} signedBy={flagshipIndex.signedBy} />
+              <MethodLine method={flagshipIndex.method} grade={flagshipIndex.grade} takenOn={flagshipIndex.takenOn} next={flagshipIndex.nextMeasure} signedBy={flagshipIndex.signedBy} />
+            </>
+          )}
         </Card>
         <Card tone="sunk" style={{ gap: space.s1 }}>
           <Eyebrow>{t('attended')}</Eyebrow>
@@ -325,6 +347,13 @@ function Events() {
         onSign={(name) => setAcct((a) => ({ ...a, declaration: name ? { name, signedAt: new Date().toISOString() } : null }))}
       />
 
+      {/* The invitation and the delegate badge (Playbook p61) */}
+      <InvitationAndBadge
+        invitee={account.id === 'arjun' ? { who: 'Mr and Mrs Rao', two: true } : { who: account.name, two: false }}
+        holder={account.name}
+        flagshipWhere={flagship.where}
+      />
+
       {/* The next edition: request a place */}
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{t('upcomingTitle')}</SectionTitle>
@@ -339,6 +368,11 @@ function Events() {
             <Card tone="sunk" padding={16} style={{ gap: 6 }}>
               <Done>{req.guests === 1 ? t('reqReceived1') : t('reqReceived2')}</Done>
               <Meta>{t('reqBody', { c: CONCIERGE, date: fmtDate(FLAGSHIP_NEXT.confirmFrom), ref: req.ref })}</Meta>
+              {req.photo !== undefined || req.diet ? (
+                <Meta size={14} tone="ink2">
+                  {t('reqBadge', { photo: req.photo === false ? t('photoNo') : t('photoYes'), diet: t(DIET_KEY[req.diet ?? 'Vegetarian']) })}
+                </Meta>
+              ) : null}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s2 }}>
                 <Button variant="link" onPress={() => router.push('/messages')}>
                   {t('messageC', { c: CONCIERGE })}
@@ -364,6 +398,8 @@ function Events() {
                 icon="calendar"
                 onPress={() => {
                   setReqNote('')
+                  setReqPhoto('yes')
+                  setReqDiet('Vegetarian')
                   setReqOpen(true)
                 }}
               >
@@ -542,6 +578,19 @@ function Events() {
             { value: '2', label: t('meAnd', { p: PARTNER }) },
           ]}
         />
+        <Eyebrow>{t('badgePhoto')}</Eyebrow>
+        <Segmented<'yes' | 'no'>
+          value={reqPhoto}
+          onChange={setReqPhoto}
+          items={[
+            { value: 'yes', label: t('photoYes') },
+            { value: 'no', label: t('photoNo') },
+          ]}
+          style={{ flexWrap: 'wrap' }}
+        />
+        <Eyebrow>{t('badgeDiet')}</Eyebrow>
+        <FilterChips<BadgeDiet> label={t('badgeDiet')} value={reqDiet} onChange={setReqDiet} items={DIETS.map((d) => ({ value: d, label: t(DIET_KEY[d]) }))} />
+        <Meta size={14} tone="ink3">{t('badgeCarries')}</Meta>
         <Field label={t('noteFor', { c: CONCIERGE })} value={reqNote} onChangeText={setReqNote} placeholder={t('notePh')} maxLength={240} multiline />
         <Meta size={14} tone="ink3">{t('noPayment')}</Meta>
       </Sheet>
@@ -697,6 +746,80 @@ function NewYearsEve({ flagshipName, flagshipWhere, lowest, signed, holder, onSi
         </View>
       )}
       <Meta size={14} tone="ink3">{monoDigits(t('declFoot', { name: flagshipName, d: 90 }), 14)}</Meta>
+    </View>
+  )
+}
+
+/**
+ * The Joyspan 2027 invitation and delegate badge (Playbook p61). The invitation: letterpress on
+ * cotton, "… are invited to begin the year with joy", with one Daybreak stroke. The badge: the
+ * name at 22 pt, then PROGRAMME, TABLE, PHOTOGRAPHY and DIET, with consent written as a word, a
+ * photo box and the badge number. Both are keepsakes of the edition attended (specimen).
+ */
+function InvitationAndBadge({ invitee, holder, flagshipWhere }: { invitee: { who: string; two: boolean }; holder: string; flagshipWhere: string }) {
+  const { c, space, radius } = useTheme()
+  const t = useDict(EVENTS_T)
+  const tx = useTx()
+  const city = flagshipWhere.split(' ').slice(-1)[0]
+  const rows: { k: string; v: ReactNode }[] = [
+    { k: t('badgeProgramme'), v: <>{'Joycation · '}<Mono size={15} tone="ink">{fmtWhen({ date: '2026-12-31', to: '2027-01-05' })}</Mono></> },
+    { k: t('badgeTable'), v: monoDigits(tx(PASS_TEXT.ev1?.seat, 'Table 14'), 15) },
+    { k: t('badgePhoto'), v: t('photoYes') },
+    { k: t('badgeDiet'), v: t('dietVeg') },
+  ]
+  return (
+    <View style={{ gap: space.s2 }}>
+      <View style={{ gap: 8 }}>
+        <SectionTitle>{t('keepsTitle')}</SectionTitle>
+        <SpecimenTag />
+      </View>
+      <Body tone="ink2">{t('keepsBody')}</Body>
+
+      {/* The invitation */}
+      <View
+        accessible
+        accessibilityLabel={`${t('inviteEyebrow')}. ${invitee.two ? t('invitedTwo', { who: invitee.who }) : t('invitedOne', { who: invitee.who })}`}
+        style={{ backgroundColor: c.paperRaised, borderWidth: 1, borderColor: c.line, borderRadius: radius.card, padding: space.s3, gap: space.s2 }}
+      >
+        <Eyebrow>{t('inviteEyebrow')}</Eyebrow>
+        <Serif size={24} color={c.ink} style={{ lineHeight: 24 * 1.3 }}>
+          {invitee.two ? t('invitedTwo', { who: invitee.who }) : t('invitedOne', { who: invitee.who })}
+        </Serif>
+        <View style={{ width: 3, height: 26, borderRadius: 2, backgroundColor: c.daybreak, transform: [{ rotate: '-24deg' }], marginLeft: 6 }} />
+        <Meta size={13} tone="ink3">{t('inviteFoot')}</Meta>
+      </View>
+
+      {/* The delegate badge */}
+      <View accessible accessibilityLabel={t('badgeA11y', { name: holder, table: tx(PASS_TEXT.ev1?.seat, 'Table 14'), photo: t('photoYes'), diet: t('dietVeg') })} style={{ borderWidth: 1, borderColor: c.lineStrong, borderRadius: radius.card, overflow: 'hidden', backgroundColor: c.paperRaised }}>
+        <View style={{ backgroundColor: c.ink, paddingHorizontal: space.s2, paddingVertical: 14, gap: 6 }}>
+          <AiwoMark size={14} color={c.paper} />
+          <Eyebrow color={c.paper} style={{ opacity: 0.8 }}>{'Joyspan Summit 2027'}</Eyebrow>
+        </View>
+        <View style={{ padding: space.s2, gap: space.s1 }}>
+          <View style={{ gap: 2 }}>
+            <Title size={22}>{holder}</Title>
+            <Meta size={14}>{t('badgeRole', { city })}</Meta>
+          </View>
+          <View>
+            {rows.map((r, i) => (
+              <View key={r.k} style={{ flexDirection: 'row', alignItems: 'baseline', gap: 12, paddingVertical: 8, borderTopWidth: i ? 1 : 0, borderTopColor: c.line }}>
+                <Eyebrow style={{ width: 104 }}>{r.k}</Eyebrow>
+                <Body size={15} style={{ flex: 1 }}>{r.v}</Body>
+              </View>
+            ))}
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <View style={{ borderWidth: 1, borderColor: c.ink, paddingHorizontal: 6, paddingVertical: 2 }}>
+              <Eyebrow tone="ink">{t('badgePhotoBox')}</Eyebrow>
+            </View>
+            <Meta size={13} tone="ink2">
+              {'No. '}
+              <Mono size={13} tone="ink2">{PASSPORT_NO}</Mono>
+            </Meta>
+          </View>
+        </View>
+      </View>
+      <Meta size={14} tone="ink3">{t('badgeFoot')}</Meta>
     </View>
   )
 }

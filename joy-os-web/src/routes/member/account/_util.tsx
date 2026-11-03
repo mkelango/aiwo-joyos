@@ -115,7 +115,8 @@ export function useMemberProfile() {
 }
 
 const MOTION_STYLE_ID = 'joyos-reduce-motion'
-/** Reduce motion everywhere: a data attribute plus a stylesheet that stills CSS motion. */
+/** Reduce motion everywhere: a data attribute plus a stylesheet that turns CSS motion into a
+ *  120 ms opacity fade (Playbook p53), the same rule as the OS-level prefers-reduced-motion one. */
 export function applyReducedMotion(on: boolean) {
   try {
     const el = document.documentElement
@@ -125,7 +126,7 @@ export function applyReducedMotion(on: boolean) {
     if (on && !style) {
       style = document.createElement('style')
       style.id = MOTION_STYLE_ID
-      style.textContent = '[data-motion="reduce"] *, [data-motion="reduce"] *::before, [data-motion="reduce"] *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }'
+      style.textContent = '[data-motion="reduce"] *, [data-motion="reduce"] *::before, [data-motion="reduce"] *::after { animation-duration: 120ms !important; animation-iteration-count: 1 !important; animation-delay: 0ms !important; transition-property: opacity !important; transition-duration: 120ms !important; transition-timing-function: ease-out !important; transition-delay: 0ms !important; scroll-behavior: auto !important; }'
       document.head.appendChild(style)
     }
     if (!on && style) style.remove()

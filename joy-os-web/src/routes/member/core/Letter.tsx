@@ -91,12 +91,15 @@ export default function Letter() {
   const [replies, setReplies] = useLocal<Reply[]>('letter-replies', [])
   const [draft, setDraft] = useState('')
   const [sent, setSent] = useState<string | null>(null)
+  // Held after the emergency intercept: nothing is kept or sent, and support stays one tap away.
+  const [held, setHeld] = useState(false)
   const issue = ISSUES.find((i) => i.n === sel) ?? ISSUES[0]
   const mine = replies.filter((r) => r.issue === issue.n)
 
   const open = (n: number) => {
     setSel(n)
     setSent(null)
+    setHeld(false)
     setDraft('')
     if (!read.includes(n)) setRead((r) => [...new Set([...r, n])])
   }
@@ -106,6 +109,8 @@ export default function Letter() {
     // Free text: the emergency intercept runs before anything is kept (Memo p.24).
     if (interceptsCrisis(text)) {
       setCrisisOpen(true)
+      setSent(null)
+      setHeld(true)
       return
     }
     // On the specimen clock, like a Ledger entry: the specimen day at the real local time.
@@ -113,6 +118,7 @@ export default function Letter() {
     const at = `${SPECIMEN_TODAY}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
     setReplies((r) => [...r, { id: `lr_${Date.now().toString(36)}`, issue: issue.n, text, at }])
     setSent(at)
+    setHeld(false)
     setDraft('')
   }
 
@@ -188,7 +194,7 @@ export default function Letter() {
               <span className="sr-only">{x('ltWriteBack')}</span>
               <textarea
                 value={draft}
-                onChange={(e) => { setDraft(e.target.value); setSent(null) }}
+                onChange={(e) => { setDraft(e.target.value); setSent(null); setHeld(false) }}
                 rows={4}
                 maxLength={1200}
                 placeholder={x('ltPlaceholder')}
@@ -199,6 +205,12 @@ export default function Letter() {
               <span className="num text-[13px] text-ink-3">{draft.length} / 1200</span>
               <DaybreakButton onClick={send} disabled={!draft.trim()}>{x('ltSend')}</DaybreakButton>
             </div>
+            {held && (
+              <div role="status" className="mt-3 rounded-lg bg-paper-sunk px-3 py-2.5 text-[14px] text-ink-2">
+                <p>{x('ltHeld')}</p>
+                <Button variant="secondary" size="sm" className="mt-2" onClick={() => setCrisisOpen(true)}>{x('amTalkNow')}</Button>
+              </div>
+            )}
             {sent && (
               <p role="status" className="mt-3 flex items-start gap-2 rounded-lg bg-paper-sunk px-3 py-2 text-[14px] text-ink-2">
                 <Check size={15} className="mt-0.5 shrink-0" aria-hidden /> {rich(x('ltSent'), { date: <span className="num">{fmtDate(sent.slice(0, 10))}</span> })}

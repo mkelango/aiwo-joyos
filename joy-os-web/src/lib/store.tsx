@@ -22,6 +22,43 @@ export interface SyncItem { id: string; kind: SyncKind; at: string }
 /** idle: nothing moving · syncing: back online, sending the queue · synced: just finished. */
 export type SyncState = 'idle' | 'syncing' | 'synced'
 
+/** P0 crisis log (specimen): one record per incident, read by the clinical console's P0 board.
+ *  Holds where and when it happened, never what the member wrote (Memo p.24, p.27). */
+export const CRISIS_EVENTS_KEY = 'joyos:crisis:events'
+export interface CrisisEvent { id: string; at: string; source: string; memberId: 'm_0001' }
+export function readCrisisEvents(): CrisisEvent[] {
+  try {
+    const raw = localStorage.getItem(CRISIS_EVENTS_KEY)
+    const v = raw ? (JSON.parse(raw) as unknown) : []
+    return Array.isArray(v) ? (v as CrisisEvent[]) : []
+  } catch {
+    return []
+  }
+}
+/** One incident: a repeat intercept from the same screen inside this window (a held entry's
+ *  "Talk now", a second try at the same text) reuses the open record, so the P0 board shows one
+ *  alert per incident instead of one per tap. */
+const CRISIS_DEDUPE_MS = 30 * 60 * 1000
+/** Append an intercept to the P0 log. Returns the record's id — an existing one when the same
+ *  screen already logged an intercept inside the window — or null when this browser could not
+ *  keep it (so the sheet never claims a record that does not exist). */
+export function logCrisisEvent(source: string): string | null {
+  try {
+    const events = readCrisisEvents()
+    const now = Date.now()
+    const recent = [...events].reverse().find((e) => e && e.memberId === 'm_0001' && e.source === source)
+    if (recent && typeof recent.id === 'string') {
+      const age = now - new Date(recent.at).getTime()
+      if (age >= 0 && age < CRISIS_DEDUPE_MS) return recent.id
+    }
+    const ev: CrisisEvent = { id: `p0_${now.toString(36)}${Math.random().toString(36).slice(2, 6)}`, at: new Date(now).toISOString(), source, memberId: 'm_0001' }
+    localStorage.setItem(CRISIS_EVENTS_KEY, JSON.stringify([...events, ev]))
+    return ev.id
+  } catch {
+    return null
+  }
+}
+
 interface AppState {
   theme: Theme
   setTheme: (t: Theme) => void
@@ -53,6 +90,9 @@ interface AppState {
   crisisOpen: CrisisReason
   /** true means an intercept; pass 'manual' from a plain "Talk to someone" button. */
   setCrisisOpen: (v: boolean | CrisisReason) => void
+  /** The P0 record written when the sheet last opened from an intercept (null for a manual open,
+   *  or when the record could not be kept). */
+  crisisEventId: string | null
 }
 
 const Ctx = createContext<AppState | null>(null)
@@ -177,7 +217,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(t)
   }, [syncState])
   const [crisisOpen, setCrisisReason] = useState<CrisisReason>(false)
-  const setCrisisOpen = useCallback((v: boolean | CrisisReason) => setCrisisReason(v === true ? 'intercept' : v), [])
+  const [crisisEventId, setCrisisEventId] = useState<string | null>(null)
+  const setCrisisOpen = useCallback((v: boolean | CrisisReason) => {
+    const reason: CrisisReason = v === true ? 'intercept' : v
+    // An intercept is logged the moment the sheet opens: the screen it came from, not the text.
+    // A manual "Talk to someone" is the member's choice and is not a P0. Closing keeps the last id.
+    // Repeat intercepts from the same screen ("Talk now" on a held entry) reuse the open record.
+    if (reason === 'intercept') setCrisisEventId(logCrisisEvent(window.location.pathname))
+    else if (reason === 'manual') setCrisisEventId(null)
+    setCrisisReason(reason)
+  }, [])
 
   // Layout effect, so a change applies before the browser paints (the first paint is covered by
   // applyStoredPrefs() at module load, below).
@@ -196,9 +245,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
       offline, setOffline, syncQueue, queueSync, unqueueSync, syncState, syncedCount,
       paymentsGrace, setPaymentsGrace,
-      crisisOpen, setCrisisOpen,
+      crisisOpen, setCrisisOpen, crisisEventId,
     }),
-    [theme, setTheme, textSize, setTextSize, lang, setLang, role, setRole, actionDone, setActionDone, ledger, setLedger, offline, setOffline, syncQueue, queueSync, unqueueSync, syncState, syncedCount, paymentsGrace, setPaymentsGrace, crisisOpen, setCrisisOpen],
+    [theme, setTheme, textSize, setTextSize, lang, setLang, role, setRole, actionDone, setActionDone, ledger, setLedger, offline, setOffline, syncQueue, queueSync, unqueueSync, syncState, syncedCount, paymentsGrace, setPaymentsGrace, crisisOpen, setCrisisOpen, crisisEventId],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

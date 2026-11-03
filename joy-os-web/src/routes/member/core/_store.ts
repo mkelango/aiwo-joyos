@@ -271,8 +271,11 @@ export interface ClinicalRemeasure {
   lowestTerm?: TermKey
   answers?: Record<string, number>
   signalsOff?: string[]
-  /** Terms skipped for now in the Clinical-grade sitting. */
+  /** Terms skipped for now in the Clinical-grade sitting: their value is null in `terms`
+   *  (not yet measured, never imputed) until measured later from Day 90. */
   skipped?: TermKey[]
+  /** Every wearable signal was off: scored from answers and in-app logs only, and flagged so on Day 90, the card and in the portal. */
+  surveyOnly?: boolean
   /** The submission as first scored, kept when a correction is appended. */
   original?: { value: number | null; terms: TermScore[]; lowestTerm: TermKey }
   amendments?: Amendment[]
@@ -290,6 +293,40 @@ export function useRemeasure() {
 }
 /** The specimen date the Clinical-grade sittings are taken on (two days into the window). */
 export const REMEASURE_TAKEN = addDays(DAY90_DATES.day0, 78)
+
+/**
+ * A correction or a term measured later, appended to the Clinical-grade record: re-scored,
+ * the first score kept, back to 'awaiting'. A signature already given is withdrawn into
+ * priorSignatures, so the physician signs the amended record again.
+ */
+export function amendRemeasure(prev: ClinicalRemeasure, added: Amendment[], r: { value: number | null; engine: { gm: number; burden: number }; terms: TermScore[]; lowest: TermKey }, skipped?: TermKey[]): ClinicalRemeasure {
+  const { signed: _s, signedBy, signedAt, signedIndex, ...rest } = prev
+  void _s
+  const wasSigned = prev.status === 'signed'
+  const at = added[added.length - 1]?.at ?? new Date().toISOString()
+  return {
+    ...rest,
+    status: 'awaiting',
+    original: prev.original ?? { value: prev.value ?? null, terms: prev.terms ?? [], lowestTerm: prev.lowestTerm ?? r.lowest },
+    value: r.value,
+    gm: r.engine.gm,
+    burden: r.engine.burden,
+    terms: r.terms,
+    lowestTerm: r.lowest,
+    ...(skipped ? { skipped } : {}),
+    amendments: [...(prev.amendments ?? []), ...added],
+    priorSignatures: wasSigned && signedBy ? [...(prev.priorSignatures ?? []), { by: signedBy, at: signedAt ?? at, ...(signedIndex !== undefined ? { index: signedIndex } : {}) }] : prev.priorSignatures,
+  }
+}
+
+/** The Day-90 call: a request to move it, sent to the physician's Care thread. */
+export interface CallRequest {
+  slot: string
+  at: string
+}
+export function useCallRequest() {
+  return useLocal<CallRequest | null>('day90-call-request', null)
+}
 
 // ─── Signals down ───────────────────────────────────────────────────────────
 // The device record kept by /app/devices (joyos:acct:devices) is the one source of truth.

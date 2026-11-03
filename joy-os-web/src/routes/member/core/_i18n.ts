@@ -912,9 +912,9 @@ export const CORE = {
   d9Choose: { en: 'Choose another time', ta: 'வேறு நேரத்தைத் தேர்ந்தெடுக்கவும்', hi: 'कोई और समय चुनें' },
   d9Booked: { en: 'booked', ta: 'பதிவானது', hi: 'बुक है' },
   d9Asked: {
-    en: 'Asked to move to {slot}. Dr Meera will confirm in Care; until she does, {day} stays in your calendar.',
-    ta: '{slot} க்கு மாற்றக் கேட்கப்பட்டது. Dr Meera கவனிப்பு பகுதியில் உறுதிசெய்வார்; அதுவரை {day} நேரமே உங்கள் நாட்காட்டியில் இருக்கும்.',
-    hi: '{slot} पर बदलने का अनुरोध भेजा गया। Dr Meera ‘देखभाल’ में पुष्टि करेंगी; तब तक {day} का समय ही आपके कैलेंडर में रहेगा।',
+    en: 'Asked to move to {slot}. Dr Meera will confirm in Care; until she does, the call stays on {day}.',
+    ta: '{slot} க்கு மாற்றக் கேட்கப்பட்டது. Dr Meera கவனிப்பு பகுதியில் உறுதிசெய்வார்; அதுவரை அழைப்பு {day} அன்றே இருக்கும்.',
+    hi: '{slot} पर बदलने का अनुरोध भेजा गया। Dr Meera ‘देखभाल’ में पुष्टि करेंगी; तब तक कॉल {day} को ही रहेगी।',
   },
   d9ChangeReq: { en: 'Change the request', ta: 'கோரிக்கையை மாற்றவும்', hi: 'अनुरोध बदलें' },
   d9ChangeTime: { en: 'Change the time', ta: 'நேரத்தை மாற்றவும்', hi: 'समय बदलें' },

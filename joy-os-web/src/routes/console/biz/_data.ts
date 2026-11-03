@@ -914,3 +914,156 @@ export const ACCESS_REVIEW = {
     { id: 'g12', who: 'Neha Iyer', role: 'DPO', access: 'Audit read · JIT approver', lastUsed: '28 Jan 2027', self: true },
   ] as AccessGrant[],
 }
+
+// ─── Tenant admin · which tenant the role belongs to ─────────────────────
+// The tenant admin role is one tenant's role: Rhea Kapoor and the Northwind Capital People team (ACCESS_REVIEW g10).
+// Any other tenant shown in this console (the Star Health insurer view) is a read-only specimen preview: a tenant
+// admin's sign-in reaches its own tenant's writes only, and in production would not open another tenant at all.
+export const TENANT_HOME: TenantKind = 'employer'
+
+// ─── Insurer view · aggregate filters (specimen, J3 projection) ──────────
+// Same partner endpoint as the employer (GET /partner/v1/aggregates?cohort=&term=&period=), with the insurer's
+// threshold of ten. Policy-type cohorts sum to the pilot totals (enrolled 5,000, measured 3,860). Day 0 was measured
+// at enrolment from 2 Dec 2026; every Day-90 figure is projected from direct-member cohorts until 2 Mar 2027.
+
+export type InsurerCohortKey = 'all' | 'retail' | 'group' | 'senior' | 'late'
+export type InsurerCohort = {
+  value: InsurerCohortKey
+  label: string
+  note: string
+  enrolled: number
+  measured: number
+  remeasureRate: number
+  improvedLowest: number
+  termMeans: AggTerm[]
+  /** Projected Burden change at Day 90: fell ≥5, fell 1–4, unchanged, rose. */
+  bands: number[]
+}
+export const INSURER_COHORTS: InsurerCohort[] = [
+  {
+    value: 'all', label: 'Pilot cohort · every policyholder enrolled', note: 'Day 0 measured from 2 Dec 2026.', enrolled: 5000, measured: 3860, remeasureRate: 0.68, improvedLowest: 0.54,
+    termMeans: tm([58, 61], [57, 60], [55, 58], [46, 50], [52, 55], [41, 35]), bands: [0.39, 0.19, 0.24, 0.18],
+  },
+  {
+    value: 'retail', label: 'Individual and family floater policies', note: 'Retail policies renewed or bought from Dec 2026.', enrolled: 2900, measured: 2210, remeasureRate: 0.66, improvedLowest: 0.53,
+    termMeans: tm([58, 61], [56, 59], [54, 57], [45, 49], [51, 54], [42, 36]), bands: [0.37, 0.2, 0.24, 0.19],
+  },
+  {
+    value: 'group', label: 'Group health policies', note: 'Employer-bought group cover; the employer sees nothing of it.', enrolled: 1740, measured: 1380, remeasureRate: 0.71, improvedLowest: 0.57,
+    termMeans: tm([60, 63], [58, 61], [56, 60], [48, 52], [53, 57], [39, 33]), bands: [0.43, 0.18, 0.23, 0.16],
+  },
+  {
+    value: 'senior', label: 'Senior citizen policies', note: 'Policyholders 60 and over.', enrolled: 360, measured: 270, remeasureRate: 0.69, improvedLowest: 0.5,
+    termMeans: tm([50, 52], [60, 63], [57, 60], [47, 50], [54, 56], [44, 39]), bands: [0.33, 0.2, 0.27, 0.2],
+  },
+  {
+    value: 'late', label: 'Joined after the pilot cohort closed', note: 'Enrolled since 20 Jan 2027; not in the pilot totals. Under ten, so nothing is reported.', enrolled: 8, measured: 0, remeasureRate: 0, improvedLowest: 0,
+    termMeans: [], bands: [],
+  },
+]
+export const INSURER_BAND_LABELS = ['Burden fell ≥5', 'Burden fell 1–4', 'Unchanged', 'Burden rose']
+export const INSURER_PERIODS: { value: AggPeriod; label: string }[] = [
+  { value: 'change', label: 'Day 0 → Day 90 · projected' },
+  { value: 'd0', label: 'Day 0 · measured, Dec 2026' },
+  { value: 'd90', label: 'Day 90 · projected, from Mar 2027' },
+]
+
+// Insurer routing volume — counts only, the whole pilot (Memo p.25: the insurer is told the count of offers, nothing
+// more). Clinician offers come from an Ease screen over threshold at any sitting, and from Day 90 when Burden rose;
+// EAP routings go to Star Health's tele-counselling line. Dec and Jan are counted from the Day-0 sittings and the
+// fortnightly screens; Feb to Apr are projected, and the Day-90 offers in Mar and Apr add up to INSURER.routed.
+const DAY90_MAR = Math.round(INSURER.routed * 0.62)
+export const INSURER_ROUTING: { month: string; clinician: number; eap: number; projected: boolean }[] = [
+  { month: 'Dec', clinician: 46, eap: 31, projected: false },
+  { month: 'Jan', clinician: 38, eap: 27, projected: false },
+  { month: 'Feb', clinician: 34, eap: 24, projected: true },
+  { month: 'Mar', clinician: 32 + DAY90_MAR, eap: 22, projected: true },
+  { month: 'Apr', clinician: 30 + (INSURER.routed - DAY90_MAR), eap: 21, projected: true },
+]
+
+// ─── Science Office · method definition, stored as data (Architecture p.11) ───
+// The engine reads this JSON by version. Variable names are the instrument scores each formula combines.
+export const TERM_VARS: Record<string, string> = {
+  'LE8 self-report': 'le8', 'Capacity battery': 'capacity', 'Self-rated health': 'selfRated',
+  'Ikigai-9': 'ikigai9', 'MLQ-Presence': 'mlqP',
+  '100 − UCLA-3': '(100-ucla3)', 'LSNS-6': 'lsns6', 'Support items': 'support',
+  'Autonomy (BPNSFS)': 'autonomy', 'Time affluence': 'timeAffluence', 'CFPB Financial WB': 'financialWb',
+  'SPANE balance': 'spaneB', 'Joy moments': 'joyMoments', Savouring: 'savouring',
+  'Mood (PHQ-4)': 'mood', 'Sleep (ISI)': 'sleep', 'Stress (PSS-4)': 'stress', Pain: 'pain', Avoidance: 'avoid',
+}
+/**
+ * Minimum answered items before a term is scored; fewer and the term is "not yet measured", never imputed.
+ * P 9 and R 6 are the Architecture's method definition; the other four are Science Office specimen values.
+ */
+export const MIN_ITEMS: Record<TermKey, number> = { H: 8, P: 9, R: 6, F: 8, D: 12, B: 10 }
+export const METHOD_SIGNER_ROLES = ['head-of-science', 'medical-director']
+
+// ─── Control plane · signal quality and dedupe (Architecture p.12) ───────
+// Quality: wear time, gaps and outliers are flagged on the Observation record and never silently dropped; the
+// flag travels with the reading and the feature layer decides what to use. Dedupe: the ingest API drops a batch
+// whose source id it has already stored, so a retry or a replay is never counted twice. Last 24 hours, specimen.
+// No member and no reading value reaches this console: an observation id, its type and the rule that flagged it.
+export type QualityFlag = { obs: string; type: string; flag: 'wear' | 'gap' | 'outlier'; rule: string; at: string }
+export type DuplicateRow = { sourceId: string; first: string; again: string; cause: string }
+export const SIGNAL_QUALITY: Record<string, {
+  received: number
+  duplicates: number
+  /** Duplicates a replay adds: every re-sent batch already stored is dropped by source id. */
+  replayDuplicates: number
+  wear: { median: string; low: number; lowRule: string } | null
+  gaps: number
+  outliers: number
+  dropped: 0
+  flags: QualityFlag[]
+  dupes: DuplicateRow[]
+}> = {
+  healthkit: {
+    received: 44160, duplicates: 312, replayDuplicates: 128, dropped: 0,
+    wear: { median: '19.4 h', low: 41, lowRule: 'watch worn under 10 h in the member-day' }, gaps: 57, outliers: 23,
+    flags: [
+      { obs: 'obs_hk_8f21c4', type: 'heart_rate', flag: 'outlier', rule: 'Outside the plausible range 25–230 bpm', at: '28 Jan 20:41' },
+      { obs: 'obs_hk_8f1e90', type: 'sleep_session', flag: 'wear', rule: 'Watch off for 3 h 10 m inside the session', at: '28 Jan 07:12' },
+      { obs: 'obs_hk_8f1a33', type: 'steps', flag: 'gap', rule: 'No samples for 7 h while the phone was on', at: '27 Jan 23:58' },
+      { obs: 'obs_hk_8f17b2', type: 'hrv_rmssd', flag: 'outlier', rule: 'More than 4 SD from the 28-day baseline', at: '27 Jan 06:40' },
+    ],
+    dupes: [
+      { sourceId: 'hk:anchor:7Q2…41:heart_rate', first: '28 Jan 20:02', again: '28 Jan 20:06', cause: 'Device bridge retried after an upload timeout' },
+      { sourceId: 'hk:anchor:7Q2…3F:steps', first: '28 Jan 18:30', again: '28 Jan 22:30', cause: 'Same anchor sent again after the app was reinstalled' },
+    ],
+  },
+  health_connect: {
+    received: 26880, duplicates: 1184, replayDuplicates: 96, dropped: 0,
+    wear: { median: '16.8 h', low: 63, lowRule: 'watch or band worn under 10 h in the member-day' }, gaps: 142, outliers: 17,
+    flags: [
+      { obs: 'obs_hc_41d0a9', type: 'steps', flag: 'gap', rule: 'Background work deferred by the OEM for 9 h', at: '28 Jan 19:20' },
+      { obs: 'obs_hc_41cf12', type: 'heart_rate', flag: 'wear', rule: 'Band off for 11 h of the member-day', at: '28 Jan 08:05' },
+      { obs: 'obs_hc_41ca7e', type: 'sleep_session', flag: 'outlier', rule: 'Session longer than 16 h; likely band left on a table', at: '27 Jan 10:44' },
+    ],
+    dupes: [
+      { sourceId: 'hc:changes:tok_93a…e1:steps', first: '28 Jan 17:45', again: '28 Jan 18:00', cause: 'Changes token re-read after a WorkManager restart' },
+      { sourceId: 'hc:changes:tok_93a…d7:heart_rate', first: '28 Jan 16:15', again: '28 Jan 16:30', cause: 'Periodic sync overlapped the previous window' },
+    ],
+  },
+  terra: {
+    received: 63600, duplicates: 268, replayDuplicates: 40, dropped: 0,
+    wear: { median: '22.1 h', low: 19, lowRule: 'ring or watch worn under 10 h in the member-day' }, gaps: 31, outliers: 12,
+    flags: [
+      { obs: 'obs_tr_c27e55', type: 'resting_heart_rate', flag: 'outlier', rule: 'More than 4 SD from the 28-day baseline', at: '28 Jan 06:58' },
+      { obs: 'obs_tr_c27b10', type: 'sleep_session', flag: 'gap', rule: 'Ring battery ran out mid-night', at: '28 Jan 03:22' },
+    ],
+    dupes: [
+      { sourceId: 'terra:evt_4be1…90', first: '28 Jan 07:01', again: '28 Jan 07:02', cause: 'Vendor redelivered the webhook before our 200 reached it' },
+    ],
+  },
+  labs: {
+    received: 336, duplicates: 2, replayDuplicates: 0, dropped: 0,
+    wear: null, gaps: 0, outliers: 3,
+    flags: [
+      { obs: 'obs_lab_0a91f3', type: 'hba1c', flag: 'outlier', rule: 'Outside the reference interval; held for physician review', at: '28 Jan 11:30' },
+      { obs: 'obs_lab_0a90c8', type: 'vitamin_d', flag: 'outlier', rule: 'Unit missing; normalised to UCUM ng/mL and flagged', at: '27 Jan 15:05' },
+    ],
+    dupes: [
+      { sourceId: 'fhir:Observation/thy-77812', first: '27 Jan 14:50', again: '28 Jan 09:10', cause: 'Partner lab re-sent the bundle with an amended note' },
+    ],
+  },
+}

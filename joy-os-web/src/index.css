@@ -24,8 +24,15 @@
   :focus-visible { outline: 2px solid var(--daybreak); outline-offset: 2px; border-radius: 6px; }
   h1, h2, h3 { font-weight: 300; letter-spacing: -0.01em; }
   em, .em { font-family: var(--font-serif); font-style: italic; font-weight: 300; }
+  /* Reduced motion: every animation becomes a 120 ms opacity fade, never a jump (Playbook p53).
+     Same rule as the app's own Reduce motion setting (account/_util.tsx applyReducedMotion). */
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    *, *::before, *::after {
+      animation-duration: 120ms !important; animation-iteration-count: 1 !important; animation-delay: 0ms !important;
+      transition-property: opacity !important; transition-duration: 120ms !important;
+      transition-timing-function: ease-out !important; transition-delay: 0ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 

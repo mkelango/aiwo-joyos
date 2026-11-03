@@ -5,16 +5,23 @@ import { ArrowLink, Body, Button, Card, Divider, Eyebrow, Icon, Meta, Mono, Shee
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { shiftTime, useLocal } from '@/screens/a/local'
 import { BarRow, HumanWritten, IconButton, OptionRow, TextField } from '@/screens/a/parts'
-import { BURDEN_PARTS, JOURNAL_START, KEEP_MEANING_START, PHQ4_ITEMS, PHQ4_OPTIONS, SCREEN_HISTORY, SCREEN_META, SPACE_TODAY, WIND_DOWN, type EaseScreen } from '@/screens/a/spacesData'
+import { BURDEN_PARTS, JOURNAL_START, KEEP_MEANING_START, SCREEN_FORMS, SCREEN_HISTORY, SCREEN_META, SCREEN_ROUTE, SPACE_TODAY, WIND_DOWN, type EaseScreen } from '@/screens/a/spacesData'
+import { messagesStore, useAccountThreads, useStore } from '@/screens/b/bStore'
+import type { Msg } from '@/screens/b/accountData'
+import { termByKey } from '@/shared/terms'
 import { useTheme } from '@/theme/ThemeProvider'
 import { INSTRUMENT_NOTE } from '@/lib/i18n'
-import { useA } from '../i18n'
+import { useIsMinor } from '@/lib/minor'
+import { Rich, useA } from '../i18n'
+import { formulaIn } from '../i18n/formula'
 import { ToolCard, ToolsHeading, shortDate } from './common'
 
 // EASE (Burden — inverse, shown with a minus): the Second Arrow journal (crisis intercept
 // before anything else), the keep-meaning-to list, what Burden is made of, the sleep plan,
 // the screens with pre-approved, human-written copy only (never AI text) and clinician
-// routing over a threshold, and Tele-MANAS.
+// routing over a threshold, and Tele-MANAS. All four screens (PHQ-4, ISI, PSS-4, Pain) can be taken
+// on the phone, as on the web; a result that routes is written to that person's Care thread, so
+// the note that says it was shared is true and links to it.
 
 export function EaseTools() {
   const { t } = useA()
@@ -99,18 +106,41 @@ function SecondArrow() {
 
 function Parts() {
   const { term } = useTheme()
-  const { t, tx, name, space } = useA()
+  const { t, tx, name, space, lang } = useA()
   const col = term('B')
   const heaviest = [...BURDEN_PARTS].sort((a, b) => b.value * b.weight - a.value * a.weight)[0]
+  // Under 18 nothing is scored: the parts and their weights stay, their values do not.
+  const minor = useIsMinor()
   return (
-    <ToolCard title={t('What Burden is made of')} lead={t('Five parts, weighted. Lower is better. {k} is the heaviest part of what is left.', { k: tx(heaviest.key) })}>
+    <ToolCard title={t('What Burden is made of')} lead={minor ? t('Five parts, weighted. Lower is better. Under 18 none of them is scored.') : t('Five parts, weighted. Lower is better. {k} is the heaviest part of what is left.', { k: tx(heaviest.key) })}>
       <View style={{ gap: 12 }}>
-        {BURDEN_PARTS.map((p) => (
-          <BarRow key={p.key} label={t('{k} · weight {w}', { k: tx(p.key), w: p.weight.toFixed(2) })} value={p.value} max={100} color={col.main} hatched note={undefined} />
-        ))}
+        {BURDEN_PARTS.map((p) =>
+          minor ? (
+            <View key={p.key} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+              <Meta tone="ink" style={{ flex: 1 }}>
+                <Rich text={t('{k} · weight *{w}*', { k: tx(p.key), w: p.weight.toFixed(2) })} wrap={(w) => <Mono tone="ink" size={14}>{w}</Mono>} />
+              </Meta>
+              <Meta size={14} tone="ink3">{t('Not scored while under 18.')}</Meta>
+            </View>
+          ) : (
+          <BarRow
+            key={p.key}
+            label={<Rich text={t('{k} · weight *{w}*', { k: tx(p.key), w: p.weight.toFixed(2) })} wrap={(w) => <Mono tone="ink" size={14}>{w}</Mono>} />}
+            labelText={t('{k} · weight {w}', { k: tx(p.key), w: p.weight.toFixed(2) })}
+            value={p.value}
+            max={100}
+            color={col.main}
+            hatched
+            note={undefined}
+          />
+          ),
+        )}
       </View>
       <Meta size={14} tone="ink3">
-        {`${space('B')} · ${name('B')} · B = 0.30·Mood + 0.25·Sleep + 0.20·Stress + 0.15·Pain + 0.10·Avoidance`}
+        {`${space('B')} · ${name('B')} · `}
+        <Mono size={13} tone="ink3">
+          {formulaIn(termByKey('B').formula, lang)}
+        </Mono>
       </Meta>
     </ToolCard>
   )
@@ -160,21 +190,77 @@ function SleepPlan() {
   )
 }
 
+type Taken = { date: string; score: number; /** The Care thread the result was written to, when it routed. */ thread?: string }
+
+/** Screens taken on the phone. PHQ-4 keeps its original key, so earlier retakes are still there. */
+function useTaken() {
+  const [phq, setPhq] = useLocal<Taken[]>('phq4Retakes', [])
+  const [rest, setRest] = useLocal<Partial<Record<EaseScreen, Taken[]>>>('screenRetakes', {})
+  const of = (n: EaseScreen) => (n === 'PHQ-4' ? phq : rest[n] ?? [])
+  // A second sitting today corrects today's result rather than adding another.
+  const add = (n: EaseScreen, x: Taken) =>
+    n === 'PHQ-4' ? setPhq((r) => [...r.filter((e) => e.date !== x.date), x]) : setRest((r) => ({ ...r, [n]: [...(r[n] ?? []).filter((e) => e.date !== x.date), x] }))
+  return { of, add }
+}
+
+const bandOf = (n: EaseScreen, score: number) => {
+  const meta = SCREEN_META[n]
+  return meta.bands.find((b) => score <= b.upTo) ?? meta.bands[meta.bands.length - 1]
+}
+/** A result goes to a person when its band routes to a clinician, or (PSS-4, higher) when the copy says the coach will be in touch. */
+const routes = (n: EaseScreen, score: number) => {
+  const b = bandOf(n, score)
+  return b.route || (n === 'PSS-4' && b === SCREEN_META['PSS-4'].bands[SCREEN_META['PSS-4'].bands.length - 1])
+}
+
+/**
+ * Writes a routed result into the person's Care messages thread (the thread Messages reads), starting
+ * one when the signed-in account has none with them. Returns the thread id for the link.
+ */
+function useShareToCare() {
+  const [msgs, setMsgs] = useStore(messagesStore)
+  const threads = useAccountThreads()
+  return (n: EaseScreen, score: number) => {
+    const r = SCREEN_ROUTE[n]
+    const meta = SCREEN_META[n]
+    const band = bandOf(n, score)
+    const id = threads.find((x) => x.personId === r.personId)?.id ?? msgs.started.find((x) => x.personId === r.personId)?.id ?? `t_screens_${r.personId}`
+    const isNew = !threads.some((x) => x.id === id) && !msgs.started.some((x) => x.id === id)
+    const d = new Date()
+    const at = `${SPACE_TODAY}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    // The clinical record stays in English, as the questionnaire does.
+    const m: Msg = { id: `s${Date.now()}`, from: 'me', at, clinical: n !== 'PSS-4', body: `Shared from Ease · ${n} ${score}/${meta.max}, ${band.label}. Scored on my phone; the pre-approved copy I was shown: “${band.copy}”` }
+    setMsgs((s) => ({
+      ...s,
+      started: isNew ? [{ id, personId: r.personId, subject: 'Ease screens', clinical: n !== 'PSS-4', unread: 0, messages: [] }, ...s.started] : s.started,
+      sent: { ...s.sent, [id]: [...(s.sent[id] ?? []), m] },
+    }))
+    return id
+  }
+}
+
 function Screens() {
   const { c, space } = useTheme()
   const { t, tx, lang } = useA()
   const names = Object.keys(SCREEN_META) as EaseScreen[]
-  const [retakes, setRetakes] = useLocal<{ date: string; score: number }[]>('phq4Retakes', [])
+  const taken = useTaken()
+  const share = useShareToCare()
+  // The screen whose sheet is shown; it stays mounted while the sheet fades out.
+  const [sheet, setSheet] = useState<EaseScreen | null>(null)
   const [open, setOpen] = useState(false)
+  // Each opening starts a fresh sitting.
+  const [sitting, setSitting] = useState(0)
   return (
     <ToolCard title={t('Your screens')} lead={t('Short, validated questionnaires. Results are explained in pre-approved words only; a clinician reads anything over a threshold.')}>
       {lang !== 'en' ? <Meta size={14} tone="ink2">{INSTRUMENT_NOTE[lang]}</Meta> : null}
       <View>
         {names.map((n, i) => {
           const meta = SCREEN_META[n]
-          const hist = n === 'PHQ-4' ? [...SCREEN_HISTORY[n], ...retakes] : SCREEN_HISTORY[n]
+          const form = SCREEN_FORMS[n]
+          const mine = taken.of(n)
+          const hist: Taken[] = [...SCREEN_HISTORY[n], ...mine]
           const last = hist[hist.length - 1]
-          const band = meta.bands.find((b) => last.score <= b.upTo) ?? meta.bands[meta.bands.length - 1]
+          const band = bandOf(n, last.score)
           return (
             <View key={n} style={{ gap: 6, paddingVertical: space.s2, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: c.line }}>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
@@ -194,73 +280,111 @@ function Screens() {
               <Eyebrow tone="ink2">{tx(band.label)}</Eyebrow>
               <Body tone="ink2">{tx(band.copy)}</Body>
               <Meta size={13} tone="ink3">
-                {t('{date} · {cadence} · earlier {list}', { date: fmtDate(last.date, lang), cadence: tx(meta.cadence), list: hist.slice(0, -1).map((h) => h.score).join(', ') })}
+                <Rich
+                  text={t('*{date}* · {cadence} · earlier *{list}*', { date: fmtDate(last.date, lang), cadence: tx(meta.cadence), list: hist.slice(0, -1).map((h) => h.score).join(', ') })}
+                  wrap={(w) => <Mono size={12} tone="ink3">{w}</Mono>}
+                />
               </Meta>
-              {band.route ? <CareRouted today={band.copy.includes('today')} /> : null}
-              {n === 'PHQ-4' ? (
-                <Button size="sm" variant="secondary" icon="edit-3" onPress={() => setOpen(true)} accessibilityHint={t('Four questions about the last two weeks')}>
-                  {t('Retake PHQ-4')}
-                </Button>
-              ) : null}
+              {routes(n, last.score) ? <CareRouted screen={n} today={band.copy.includes('today')} thread={last.thread} /> : null}
+              <Button
+                size="sm"
+                variant="secondary"
+                icon="edit-3"
+                onPress={() => (setSheet(n), setSitting((x) => x + 1), setOpen(true))}
+                accessibilityHint={n === 'Pain' ? t('One rating, 0 to 10') : t('{k} questions, about {m} min', { k: form.items.length, m: form.minutes })}
+                style={{ alignSelf: 'flex-start' }}
+              >
+                {mine.length ? t('Retake {n}', { n: tx(n) }) : t('Take {n} now', { n: tx(n) })}
+              </Button>
             </View>
           )
         })}
       </View>
       <HumanWritten by="Dr Sanjay Menon" />
-      <Phq4Sheet open={open} onClose={() => setOpen(false)} onScored={(score) => setRetakes((r) => [...r, { date: SPACE_TODAY, score }])} />
+      {sheet ? (
+        <ScreenSheet
+          key={`${sheet}-${sitting}`}
+          screen={sheet}
+          open={open}
+          onClose={() => setOpen(false)}
+          onScored={(score) => {
+            const thread = routes(sheet, score) ? share(sheet, score) : undefined
+            taken.add(sheet, { date: SPACE_TODAY, score, thread })
+            return thread
+          }}
+        />
+      ) : null}
     </ToolCard>
   )
 }
 
-/** Pre-approved routing note when a screen crosses a threshold (Memo p.24). */
-function CareRouted({ today = false }: { today?: boolean }) {
+/**
+ * Pre-approved routing note when a screen crosses a threshold (Memo p.24), naming who reads it
+ * (as on the web). With `thread`, the result was written to that Care thread and the link opens it.
+ */
+function CareRouted({ screen, today = false, thread }: { screen: EaseScreen; today?: boolean; thread?: string }) {
   const { c, space } = useTheme()
   const { t } = useA()
+  const r = SCREEN_ROUTE[screen]
+  const text =
+    screen === 'PSS-4'
+      ? t('Shared with Coach Priya. She will be in touch this week.')
+      : today
+        ? t('{name} will call you today. You do not need to do anything.', { name: r.name })
+        : t('{name} will read this within 48 hours. You do not need to do anything.', { name: r.name })
   return (
     <Card tone="sunk" padding={14} style={{ gap: space.s1 }}>
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <Icon name="user-check" size={16} color={c.ink} />
-        <Body style={{ flex: 1 }}>{today ? t('Dr Sanjay Menon will call you today. You do not need to do anything.') : t('Dr Sanjay Menon will read this within 48 hours. You do not need to do anything.')}</Body>
+        <Body style={{ flex: 1 }}>{text}</Body>
       </View>
-      <ArrowLink icon="message-square" onPress={() => router.push('/messages?compose=1&to=p_sanjay')}>
-        {t('Message him in Care')}
+      {thread ? <Meta size={14}>{t('Your result is in your Care messages with {name}.', { name: r.name })}</Meta> : null}
+      <ArrowLink icon="message-square" onPress={() => router.push(thread ? `/messages?t=${thread}` : `/messages?compose=1&to=${r.personId}`)}>
+        {thread ? t('Open the thread in Care') : t('Message {name} in Care', { name: r.name })}
       </ArrowLink>
     </Card>
   )
 }
 
-/** PHQ-4 retake: four items, scored on the phone; only pre-approved band copy is shown. */
-function Phq4Sheet({ open, onClose, onScored }: { open: boolean; onClose: () => void; onScored: (score: number) => void }) {
-  const { space } = useTheme()
+const WINDOW: Record<EaseScreen, '{n} · last two weeks' | '{n} · last month' | '{n} · last week'> = {
+  'PHQ-4': '{n} · last two weeks',
+  ISI: '{n} · last two weeks',
+  'PSS-4': '{n} · last month',
+  Pain: '{n} · last week',
+}
+
+/** Any of the four screens: items scored on the phone (Pain is one 0–10 rating); only pre-approved band copy is shown. */
+function ScreenSheet({ screen, open, onClose, onScored }: { screen: EaseScreen; open: boolean; onClose: () => void; onScored: (score: number) => string | undefined }) {
+  const { c, space, radius } = useTheme()
   const { t, tx, lang } = useA()
   const { setCrisisOpen } = useApp()
-  const [answers, setAnswers] = useState<(number | undefined)[]>([undefined, undefined, undefined, undefined])
+  const form = SCREEN_FORMS[screen]
+  const meta = SCREEN_META[screen]
+  const pain = screen === 'Pain'
+  const [answers, setAnswers] = useState<(number | undefined)[]>(() => form.items.map(() => undefined))
   const [score, setScore] = useState<number | null>(null)
+  const [thread, setThread] = useState<string | undefined>(undefined)
   const done = answers.every((a) => a !== undefined)
-  const meta = SCREEN_META['PHQ-4']
-  const band = score === null ? null : meta.bands.find((b) => score <= b.upTo) ?? meta.bands[meta.bands.length - 1]
-  const close = () => {
-    onClose()
-    setAnswers([undefined, undefined, undefined, undefined])
-    setScore(null)
-  }
+  const band = score === null ? null : bandOf(screen, score)
   const submit = () => {
-    const s = answers.reduce<number>((a, b) => a + (b ?? 0), 0)
+    const top = form.options.length - 1
+    const s = pain ? (answers[0] ?? 0) : answers.reduce<number>((sum, a, i) => sum + (form.reverse?.includes(i) ? top - (a ?? 0) : (a ?? 0)), 0)
     setScore(s)
-    onScored(s)
+    setThread(onScored(s))
   }
+  const choose = (i: number, v: number) => setAnswers((a) => a.map((x, j) => (j === i ? v : x)))
   return (
     <Sheet
       open={open}
-      onClose={close}
-      title={score === null ? t('PHQ-4 · last two weeks') : t('PHQ-4 · your result')}
+      onClose={onClose}
+      title={score === null ? t(WINDOW[screen], { n: tx(screen) }) : t('{n} · your result', { n: tx(screen) })}
       footer={
         score === null ? (
           <Button variant="ink" block onPress={submit} disabled={!done} accessibilityHint={t('Scores your answers on this phone')}>
             {t('See my result')}
           </Button>
         ) : (
-          <Button variant="ink" block onPress={close}>
+          <Button variant="ink" block onPress={onClose}>
             {t('Done')}
           </Button>
         )
@@ -269,32 +393,64 @@ function Phq4Sheet({ open, onClose, onScored }: { open: boolean; onClose: () => 
       {score === null ? (
         <>
           {lang === 'en' ? (
-            <Meta>Over the last two weeks, how often have you been bothered by the following? Scored on this phone; no AI reads your answers.</Meta>
+            <Meta>{`${form.stem} Scored on this phone; no AI reads your answers.`}</Meta>
           ) : (
             <>
               <Meta tone="ink2">{INSTRUMENT_NOTE[lang]}</Meta>
               <Meta>{t('Scored on this phone; no AI reads your answers.')}</Meta>
-              <Meta>Over the last two weeks, how often have you been bothered by the following?</Meta>
+              <Meta>{form.stem}</Meta>
             </>
           )}
-          {PHQ4_ITEMS.map((item, i) => (
-            <View key={item} style={{ gap: space.s1 }} accessibilityRole="radiogroup" accessibilityLabel={item}>
-              <View style={{ flexDirection: 'row', gap: 10, alignItems: 'baseline' }}>
-                <Mono size={13} tone="ink3">{`${i + 1}/4`}</Mono>
-                <Body weight="medium" style={{ flex: 1 }}>
-                  {item}
-                </Body>
+          {pain ? (
+            <View style={{ gap: space.s1 }} accessibilityRole="radiogroup" accessibilityLabel={form.items[0]}>
+              <Body weight="medium">{form.items[0]}</Body>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {Array.from({ length: 11 }, (_, v) => {
+                  const on = answers[0] === v
+                  return (
+                    <Pressable
+                      key={v}
+                      onPress={() => choose(0, v)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: on }}
+                      aria-checked={on}
+                      accessibilityLabel={t('{v} of 10', { v })}
+                      style={({ pressed }) => ({ width: 48, height: 48, borderRadius: radius.card, borderWidth: on ? 2 : 1, borderColor: on ? c.ink : c.line, backgroundColor: on ? c.ink : pressed ? c.paperSunk : c.paperRaised, alignItems: 'center', justifyContent: 'center' })}
+                    >
+                      <Mono size={17} color={on ? c.paper : c.ink}>
+                        {String(v)}
+                      </Mono>
+                    </Pressable>
+                  )
+                })}
               </View>
-              {PHQ4_OPTIONS.map((o, v) => (
-                <OptionRow key={o} label={o} index={v} selected={answers[i] === v} onPress={() => setAnswers((a) => a.map((x, j) => (j === i ? v : x)))} />
-              ))}
-              {i < PHQ4_ITEMS.length - 1 ? <Divider /> : null}
+              <Meta size={14} tone="ink3">
+                <Rich text={t('*0* is no pain; *10* is the worst pain you can imagine.')} wrap={(w) => <Mono size={13} tone="ink3">{w}</Mono>} />
+              </Meta>
             </View>
-          ))}
+          ) : (
+            form.items.map((item, i) => (
+              <View key={item} style={{ gap: space.s1 }} accessibilityRole="radiogroup" accessibilityLabel={item}>
+                <View style={{ flexDirection: 'row', gap: 10, alignItems: 'baseline' }}>
+                  <Mono size={13} tone="ink3">{`${i + 1}/${form.items.length}`}</Mono>
+                  <Body weight="medium" style={{ flex: 1 }}>
+                    {item}
+                  </Body>
+                </View>
+                {(form.itemOptions?.[i] ?? form.options).map((o, v) => (
+                  <OptionRow key={o} label={o} index={v} selected={answers[i] === v} onPress={() => choose(i, v)} />
+                ))}
+                {i < form.items.length - 1 ? <Divider /> : null}
+              </View>
+            ))
+          )}
+          <Mono size={12} tone="ink3">
+            {form.source}
+          </Mono>
         </>
       ) : band ? (
         <View style={{ gap: space.s2 }} accessibilityLiveRegion="polite">
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }} accessible accessibilityLabel={t('PHQ-4 {s} of {max}, {label}', { s: score, max: meta.max, label: tx(band.label) })}>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }} accessible accessibilityLabel={t('{n} {s} of {max}, {label}', { n: tx(screen), s: score, max: meta.max, label: tx(band.label) })}>
             <Mono tone="ink" size={48} weight="light">
               {String(score)}
             </Mono>
@@ -302,7 +458,7 @@ function Phq4Sheet({ open, onClose, onScored }: { open: boolean; onClose: () => 
           </View>
           <Eyebrow tone="ink2">{tx(band.label)}</Eyebrow>
           <Body>{tx(band.copy)}</Body>
-          {band.route ? <CareRouted today={band.copy.includes('today')} /> : <Meta>{t('Kept with your screens. Next due in two weeks.')}</Meta>}
+          {routes(screen, score) ? <CareRouted screen={screen} today={band.copy.includes('today')} thread={thread} /> : <Meta>{t('Kept with your screens · {cadence}', { cadence: tx(meta.cadence) })}</Meta>}
           <HumanWritten by="Dr Sanjay Menon" />
           <Button variant="link" icon="life-buoy" onPress={() => setCrisisOpen(true)}>
             {t('If it feels heavier than this, talk to someone now')}

@@ -8,8 +8,9 @@ import { Avatar, Button, Card, PageHeader, Pill, Sheet, Tabs } from '@/component
 import { TEAM } from '@/data/member'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { AUTO_REPLY, PEOPLE_DETAIL, THREADS, type Msg, type Thread } from './_data'
+import { CARE_INBOX_CHANGED, isClinicalPerson, specimenNow } from './_careInbox'
 import { TeleManasStrip } from './_parts'
-import { fmtDay, fmtShortDate, fmtTime, rich, usePersisted } from './_util'
+import { fmtDay, fmtShortDate, fmtTime, readPersisted, rich, usePersisted } from './_util'
 import { useDict } from '@/lib/i18n'
 import { MSG, useData } from './_i18n'
 
@@ -18,10 +19,7 @@ import { MSG, useData } from './_i18n'
 // composer runs the emergency intercept before anything else (Memo p.24).
 type Filter = 'all' | 'clinical' | 'unread'
 
-const isClinicalPerson = (id: string) => { const r = TEAM.find((m) => m.id === id)?.role; return r !== 'Coach' && r !== 'Concierge' }
 const newThread = (p: string): Thread => ({ id: `t_${p}`, personId: p, subject: 'New conversation', unread: 0, clinical: isClinicalPerson(p), messages: [] })
-/** "Now" in the specimen world (Thu 28 Jan 2027) at today's clock time, so new messages sit after the seeded ones. */
-const specimenNow = () => { const d = new Date(); return new Date(2027, 0, 28, d.getHours(), d.getMinutes(), d.getSeconds()).toISOString() }
 const shortName = (name: string) => (name.startsWith('Dr') ? name.split(' ').slice(0, 2).join(' ') : name.split(' ')[0])
 
 export default function Messages() {
@@ -43,6 +41,12 @@ export default function Messages() {
       const next = fn(withDraft(s.list))
       return { list: next.filter((t) => t.messages.length > 0 || s.list.some((x) => x.id === t.id)) }
     })
+  // A message handed on from another screen (VIVA, Body, Day 90) while this one is open joins the list.
+  useEffect(() => {
+    const onInbox = () => { const fresh = readPersisted<{ list: Thread[] }>('threads'); if (fresh?.list) setStore({ list: fresh.list }) }
+    window.addEventListener(CARE_INBOX_CHANGED, onInbox)
+    return () => window.removeEventListener(CARE_INBOX_CHANGED, onInbox)
+  }, [setStore])
   const initial = threads.find((t) => t.personId === params.get('p'))?.id ?? null
   const [activeId, setActiveId] = useState<string | null>(initial)
   const activeIdRef = useRef<string | null>(initial)
@@ -297,7 +301,7 @@ export default function Messages() {
 function Bubble({ m }: { m: Msg }) {
   const tr = useDict(MSG)
   if (m.from === 'system') {
-    return <p className="mx-auto flex w-fit items-center gap-1.5 rounded-full bg-paper-sunk px-3 py-1.5 text-center text-[13px] text-ink-2" role="status"><Clock size={13} className="text-ink-3" /> {m.body}</p>
+    return <p className="mx-auto flex w-fit items-center gap-1.5 rounded-full bg-paper-sunk px-3 py-1.5 text-center text-[13px] text-ink-2" role="status"><Clock size={13} className="text-ink-3" /> {m.sys ? tr(m.sys.k, { name: m.sys.name }) : m.body}</p>
   }
   const mine = m.from === 'me'
   return (
@@ -312,6 +316,7 @@ function Bubble({ m }: { m: Msg }) {
           {m.signed && <span>{tr('signedBy', { name: m.signed })}</span>}
           {m.drafted && <span className="inline-flex items-center gap-1">· <Sparkles size={11} /> {tr('draftedVia')}</span>}
           {m.clinical && <span>{tr('clinicalDot')}</span>}
+          {m.via === 'viva' && <span className="inline-flex items-center gap-1"><Sparkles size={11} /> {tr('viaViva')}</span>}
         </p>
       </div>
     </div>

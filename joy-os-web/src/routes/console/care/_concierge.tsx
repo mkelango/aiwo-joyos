@@ -90,7 +90,7 @@ export function ConciergeDesk({ deskSwitch }: { deskSwitch: ReactNode }) {
     if (!phleb) return setDrawErr('Choose who goes. A draw is dispatched to a named phlebotomist.')
     const p = PHLEBOTOMISTS.find((x) => x.id === phleb)!
     const who = `${p.name} · ${p.partner}`
-    setDraw(d, { status: 'dispatched', phleb: who, slot, at: clock }, `Home draw dispatched by concierge Ravi · ${who} · ${slot.toLowerCase()}`)
+    setDraw(d, { status: 'dispatched', phleb: who, slot, at: clock }, `Home draw dispatched by ${actor} · ${who} · ${slot.toLowerCase()}`)
     log(`Dispatched a home draw for ${d.member} · ${who} · ${slot}`, 'Home-draw dispatch')
     setDispatching(null)
     setFocus(null)

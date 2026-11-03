@@ -6,6 +6,7 @@ import { useDict } from '@/lib/i18n'
 import { useApp } from '@/lib/store'
 import { H2 } from '@/screens/a/local'
 import { KeyValue } from '@/screens/b/parts'
+import { sessionStore, useStore } from '@/screens/b/bStore'
 import { SECURITY } from '@/screens/b/i18n/security'
 import { useTheme } from '@/theme/ThemeProvider'
 
@@ -13,12 +14,16 @@ import { useTheme } from '@/theme/ThemeProvider'
 // not block)"). Reached from the app-wide banner when a signal is found, from Sign in and from the
 // lock screen's settings. The check is expo-device's isRootedExperimentalAsync on the phone build;
 // a browser cannot see it, so the specimen demo switch stands in. Nothing is ever blocked.
+// Signed out, the app-lock step points to Sign in first (Settings is a member screen).
 // One Daybreak, only while there is a warning to read: "I understand, carry on".
 
 export default function DeviceSecurity() {
   const { c, space } = useTheme()
   const { rootedDevice, rootedDemo, setRootedDemo, rootedAck, setRootedAck, deviceAtRisk } = useApp()
   const t = useDict(SECURITY)
+  // Open to anyone (Sign in links here). The app lock lives in Settings, which needs a member, so
+  // a signed-out phone is told so and sent to Sign in rather than bounced to Welcome.
+  const [session] = useStore(sessionStore)
   const web = Platform.OS === 'web'
   const result = rootedDevice === null ? t('checking') : rootedDevice ? t('foundDevice') : rootedDemo ? t('foundDemo') : t('none')
   const phone = [Device.manufacturer, Device.modelName, Device.osName && `${Device.osName} ${Device.osVersion ?? ''}`.trim()].filter(Boolean).join(' · ')
@@ -67,9 +72,18 @@ export default function DeviceSecurity() {
               <Body style={{ flex: 1 }}>{t(k)}</Body>
             </View>
           ))}
-          <ArrowLink icon="lock" onPress={() => router.push('/settings')}>
-            {t('lockLink')}
-          </ArrowLink>
+          {session.signedIn ? (
+            <ArrowLink icon="lock" onPress={() => router.push('/settings')}>
+              {t('lockLink')}
+            </ArrowLink>
+          ) : (
+            <View style={{ gap: 4 }}>
+              <Meta tone="ink">{t('lockSignedOut')}</Meta>
+              <ArrowLink icon="log-in" onPress={() => router.push('/signin')}>
+                {t('lockSignIn')}
+              </ArrowLink>
+            </View>
+          )}
         </Card>
       ) : (
         <Card tone="sunk" style={{ gap: 4 }}>

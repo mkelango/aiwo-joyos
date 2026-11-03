@@ -9,7 +9,7 @@ import type { Role } from '@/domain/types'
 import { PreviewBanner, useConsoleAccess, useConsoleRole } from '../care/_gate'
 import { DURATIONS, PURPOSES, access, addAccessRequest, decideAccessRequest, isLive, standingRequest, statusLabel, useAccessRequests, type AccessRequest } from '../care/_accessStore'
 import { fmtClock, fmtDuration } from '../care/_parts'
-import { AI_TOOLS, AUDIT, CELLS, CHECK_PHONE_KEY, COSTS, FLAG_COHORTS, FLAG_RELEASES, FLAG_ROLLOUTS, JIT_REQUESTS, RED_TEAM, RELEASE_FLAGS, RELEASE_FLAGS_KEY, RIGHTS_JOBS, RIGHTS_STORES, SIGNAL_SOURCES, SLOS, TENANTS, TRACES, TRACE_GUARD, TRACE_REVIEWERS, type FlagTarget, type Trace, type TraceFinding, type TraceGuard } from './_data'
+import { AI_TOOLS, AUDIT, CELLS, CHECK_PHONE_KEY, COSTS, FLAG_COHORTS, FLAG_RELEASES, FLAG_ROLLOUTS, JIT_REQUESTS, RED_TEAM, RELEASE_FLAGS, RELEASE_FLAGS_KEY, RIGHTS_JOBS, RIGHTS_STORES, SIGNAL_QUALITY, SIGNAL_SOURCES, SLOS, TENANTS, TRACES, TRACE_GUARD, TRACE_REVIEWERS, type FlagTarget, type Trace, type TraceFinding, type TraceGuard } from './_data'
 import { AccessNote, CanActProvider, CardHead, ChartLead, Field, Kpi, Legend, Meter, Row, ScrollTabs, StatusTag, Swatch, Writes, areaCls, fieldCls, pct, readStored, tabPanelProps, tick, tipLabel, tipStyle, useCanAct, useStored, useTabParam, writeStored, type StatusTone } from './_parts'
 import { AccessReview, CheckVariantCard, DriftDashboard, LiveSample, OnCall, ToolRegistrySheet, UnusualReads, type Log } from './_opsExtras'
 
@@ -1234,11 +1234,65 @@ function JitSheet({ open, onClose, chosen, roleLabel, person, standing, now, onS
 
 // ─── Signals ingest ──────────────────────────────────────────────────────
 
+/** A source's quality and dedupe figures, last 24 h. A replay that drained adds the re-sent batches it dropped by source id. */
+function qualityOf(key: string, rp: RunState) {
+  const q = SIGNAL_QUALITY[key]
+  const replayed = rp === 'done' ? q.replayDuplicates : 0
+  return { ...q, duplicates: q.duplicates + replayed, received: q.received + replayed, replayed }
+}
+const QUALITY_FLAG_LABEL = { wear: 'Wear time', gap: 'Gap', outlier: 'Outlier' } as const
+
 function Signals({ flags, replay, onReplay }: { flags: Record<string, boolean>; replay: Record<string, RunState>; onReplay: (key: string, name: string) => void }) {
   const canAct = useCanAct()
+  const [detail, setDetail] = useState<string | null>(null)
+  const open = SIGNAL_SOURCES.find((s) => s.key === detail) ?? null
+  const rows = SIGNAL_SOURCES.map((s) => ({ s, q: qualityOf(s.key, replay[s.key] ?? 'idle') }))
+  const totals = rows.reduce((a, { q }) => ({ received: a.received + q.received, duplicates: a.duplicates + q.duplicates, flagged: a.flagged + (q.wear?.low ?? 0) + q.gaps + q.outliers }), { received: 0, duplicates: 0, flagged: 0 })
   return (
     <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
       <p className="text-[15px] text-ink-2 lg:col-span-12">Freshness is the time from a reading on the device to a feature in the record, p95 over the last twelve hours. The objective is 95% within fifteen minutes; vendor readiness or strain scores are kept as signals and never enter the Index.</p>
+
+      <Card className="lg:col-span-12">
+        <CardHead
+          eyebrow="Quality and dedupe · last 24 h"
+          title="Flagged, never silently dropped"
+          aside={<Pill>Dropped for quality · <span className="num">0</span></Pill>}
+          lead="Wear time, gaps and outliers are flagged on the observation and kept; the feature layer decides what to use and the flag travels with it. The ingest API drops a batch only when its source id is already stored, so a retry or a replay is never counted twice."
+        />
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="rounded-card bg-paper-sunk p-4"><p className="eyebrow text-ink-3">Batches received</p><p className="num mt-1 text-[1.6rem] font-light text-ink">{totals.received.toLocaleString('en-IN')}</p></div>
+          <div className="rounded-card bg-paper-sunk p-4"><p className="eyebrow text-ink-3">Duplicates dropped by source id</p><p className="num mt-1 text-[1.6rem] font-light text-ink">{totals.duplicates.toLocaleString('en-IN')} <span className="text-[14px] text-ink-3">{pct(totals.duplicates / totals.received, 1)}</span></p></div>
+          <div className="rounded-card bg-paper-sunk p-4"><p className="eyebrow text-ink-3">Readings flagged and kept</p><p className="num mt-1 text-[1.6rem] font-light text-ink">{totals.flagged.toLocaleString('en-IN')}</p></div>
+        </div>
+        <div className="mt-5 overflow-x-auto">
+          <table className="w-full min-w-[720px] border-collapse text-left text-[14px]">
+            <caption className="sr-only">Quality flags and duplicates by source, last 24 hours</caption>
+            <thead>
+              <tr className="border-b border-line">
+                {['Source', 'Wear time, median', 'Low wear', 'Gaps', 'Outliers', 'Duplicates', 'Dropped', ''].map((h, i) => (
+                  <th key={h || i} scope="col" className={clsx('eyebrow whitespace-nowrap py-3 pr-4 font-normal text-ink-3', i > 0 && i < 7 && 'text-right')}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(({ s, q }) => (
+                <tr key={s.key} className="border-b border-line/70 last:border-0">
+                  <th scope="row" className="whitespace-nowrap py-3 pr-4 font-normal text-ink">{s.name}</th>
+                  <td className="num py-3 pr-4 text-right text-ink-2">{q.wear ? q.wear.median : '—'}</td>
+                  <td className="num py-3 pr-4 text-right text-ink">{q.wear ? q.wear.low : '—'}</td>
+                  <td className="num py-3 pr-4 text-right text-ink">{q.wear ? q.gaps : '—'}</td>
+                  <td className="num py-3 pr-4 text-right text-ink">{q.outliers}</td>
+                  <td className="num py-3 pr-4 text-right text-ink">{q.duplicates.toLocaleString('en-IN')}</td>
+                  <td className="num py-3 pr-4 text-right text-ink-2">{q.dropped}</td>
+                  <td className="py-3 text-right"><Button variant="ghost" size="sm" onClick={() => setDetail(s.key)} aria-label={`${s.name}: quality flags and duplicates`}>View <ChevronRight size={14} aria-hidden /></Button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-3 text-[13px] text-ink-3">Low wear and gaps are member-days; outliers are readings. Lab results have no wear time: an out-of-range value is flagged for physician review, never dropped.</p>
+      </Card>
+
       {SIGNAL_SOURCES.map((s) => {
         const series = s.p95Series.map((v, i) => ({ h: `${i - 11}h`, v }))
         const batch = s.key === 'labs'
@@ -1273,8 +1327,22 @@ function Signals({ flags, replay, onReplay }: { flags: Record<string, boolean>; 
             <p className="sr-only">p95 freshness over twelve hours ranged from {Math.min(...s.p95Series)} to {Math.max(...s.p95Series)} minutes.</p>
             <p className="mt-3 text-[14px] text-ink-2">
               <span className="num text-ink">{s.members}</span> members connected.{' '}
-              {paused ? <>Paused by the <code className="font-mono text-[13px]">{flag}</code> flag. Readings queue on the device and backfill when it returns.</> : rp === 'done' ? 'Replay drained the deferred batches; the last twelve hours are complete.' : s.note}
+              {paused ? <>Paused by the <code className="font-mono text-[13px]">{flag}</code> flag. Readings queue on the device and backfill when it returns.</> : rp === 'done' ? `Replay drained the deferred batches; the last twelve hours are complete. ${SIGNAL_QUALITY[s.key].replayDuplicates.toLocaleString('en-IN')} re-sent batches were already stored and dropped by source id.` : s.note}
             </p>
+            <button type="button" onClick={() => setDetail(s.key)} className="mt-3 flex w-full flex-wrap items-center gap-x-4 gap-y-1 rounded-card bg-paper-sunk px-3 py-2 text-left text-[13px] text-ink-2 hover:text-ink focus-ring" aria-label={`${s.name}: quality flags and duplicates`}>
+              {(() => {
+                const q = qualityOf(s.key, rp)
+                return (
+                  <>
+                    {q.wear && <span>Wear <span className="num text-ink">{q.wear.median}</span></span>}
+                    {q.wear && <span>Gaps <span className="num text-ink">{q.gaps}</span></span>}
+                    <span>Outliers <span className="num text-ink">{q.outliers}</span></span>
+                    <span>Duplicates <span className="num text-ink">{q.duplicates.toLocaleString('en-IN')}</span></span>
+                    <span className="ml-auto flex items-center gap-1 text-ink">Flags and duplicates <ChevronRight size={13} aria-hidden /></span>
+                  </>
+                )
+              })()}
+            </button>
             {!batch && !paused && (
               <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-line pt-4">
                 <Button variant="ghost" size="sm" onClick={() => onReplay(s.key, s.name)} disabled={rp === 'running' || !canAct}>
@@ -1286,6 +1354,62 @@ function Signals({ flags, replay, onReplay }: { flags: Record<string, boolean>; 
           </Card>
         )
       })}
+
+      <Sheet open={!!open} onClose={() => setDetail(null)} title={open ? `${open.name} · quality and duplicates` : ''}>
+        {open && <SignalQualityDetail key={open.key} name={open.name} q={qualityOf(open.key, replay[open.key] ?? 'idle')} />}
+      </Sheet>
+    </div>
+  )
+}
+
+function SignalQualityDetail({ name, q }: { name: string; q: ReturnType<typeof qualityOf> }) {
+  const [filter, setFilter] = useState<'all' | 'wear' | 'gap' | 'outlier'>('all')
+  const flags = q.flags.filter((f) => filter === 'all' || f.flag === filter)
+  const dupes = [
+    ...(q.replayed ? [{ sourceId: `${q.dupes[0]?.sourceId.split(':')[0] ?? 'src'}:replay · ${q.replayed} batches`, first: 'Already stored', again: 'Replay, this session', cause: 'Replay of the last 12 h re-sent batches the store already held' }] : []),
+    ...q.dupes,
+  ]
+  return (
+    <div className="space-y-6">
+      <p className="text-[15px] leading-relaxed text-ink-2">Specimen, last 24 hours. This console sees an observation id, its type and the rule that flagged it: never a member, and never the reading’s value.</p>
+      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[['Received', q.received.toLocaleString('en-IN')], ['Duplicates', q.duplicates.toLocaleString('en-IN')], ['Flagged', String((q.wear?.low ?? 0) + q.gaps + q.outliers)], ['Dropped', String(q.dropped)]].map(([k, v]) => (
+          <div key={k} className="rounded-card bg-paper-sunk p-3"><dt className="eyebrow text-ink-3">{k}</dt><dd className="num mt-1 text-[1.3rem] font-light text-ink">{v}</dd></div>
+        ))}
+      </dl>
+      {q.wear && <p className="text-[14px] text-ink-2">Wear time: median <span className="num text-ink">{q.wear.median}</span> a member-day; <span className="num text-ink">{q.wear.low}</span> member-days flagged low ({q.wear.lowRule}). Their readings stay in the record with the flag.</p>}
+
+      <div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Eyebrow>Quality flags · latest</Eyebrow>
+          <Tabs<'all' | 'wear' | 'gap' | 'outlier'> value={filter} onChange={setFilter} items={[{ value: 'all', label: 'All' }, { value: 'wear', label: 'Wear' }, { value: 'gap', label: 'Gaps' }, { value: 'outlier', label: 'Outliers' }]} />
+        </div>
+        <ul className="mt-3 divide-y divide-line">
+          {flags.length === 0 && <li className="py-3 text-[14px] text-ink-2">No {filter === 'all' ? '' : `${QUALITY_FLAG_LABEL[filter].toLowerCase()} `}flags from {name} in the sample.</li>}
+          {flags.map((f) => (
+            <li key={f.obs} className="py-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="flex items-center gap-2 text-[14px] text-ink"><code className="num text-[13px]">{f.obs}</code> · {f.type}</span>
+                <span className="flex items-center gap-2"><StatusTag tone="watch">{QUALITY_FLAG_LABEL[f.flag]}</StatusTag><StatusTag tone="ok">Kept</StatusTag></span>
+              </div>
+              <p className="mt-1 text-[13px] text-ink-2">{f.rule} · <span className="num">{f.at}</span></p>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div>
+        <Eyebrow>Duplicates dropped by source id</Eyebrow>
+        <ul className="mt-3 divide-y divide-line">
+          {dupes.map((d) => (
+            <li key={d.sourceId} className="py-3">
+              <code className="num block break-all text-[13px] text-ink">{d.sourceId}</code>
+              <p className="mt-1 text-[13px] text-ink-2">First stored <span className="num">{d.first}</span> · seen again <span className="num">{d.again}</span></p>
+              <p className="mt-0.5 text-[13px] text-ink-3">{d.cause}. The second copy was not written; the first is the record.</p>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   )
 }

@@ -48,11 +48,13 @@ export interface IndexCardProps {
   /** Day-0 terms, drawn as the Wheel's outline ghost. */
   baseline?: TermScore[] | null
   title?: string
+  /** Scored with every wearable signal off: flagged on the card wherever it is shown. */
+  surveyOnly?: boolean
   printable?: boolean
   className?: string
 }
 
-export function IndexCardView({ id, value, terms, takenOn, method, grade, next, lowest, step, signedBy, signedOn, awaiting = false, baseline = null, title, printable = true, className }: IndexCardProps) {
+export function IndexCardView({ id, value, terms, takenOn, method, grade, next, lowest, step, signedBy, signedOn, awaiting = false, baseline = null, title, surveyOnly = false, printable = true, className }: IndexCardProps) {
   const x = useX()
   const { t: c, name } = useCore()
   const band = useBandText()
@@ -101,6 +103,7 @@ export function IndexCardView({ id, value, terms, takenOn, method, grade, next, 
               )}
               <p className="eyebrow mt-3 text-ink-2">{x('icOf100', { date: dotDate(takenOn) })}</p>
               <p className="eyebrow text-ink-2">{x('icMethod', { m: method })}</p>
+              {surveyOnly && <p className="eyebrow text-ink-2">{c('soPill')}</p>}
 
               <div className="mt-6">
                 <p className="text-[14px] font-medium text-ink">{x('icNextStepH')}</p>

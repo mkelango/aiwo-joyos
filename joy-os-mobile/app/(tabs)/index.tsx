@@ -33,13 +33,14 @@ import {
 import { useApp } from '@/lib/store'
 import { useT } from '@/lib/i18n'
 import { CIRCLE } from '@/shared/platform'
-import { INDEX_HISTORY, LEDGER_WEEK, MEMBER, TODAY_ACTION } from '@/shared/member'
+import { LEDGER_WEEK, MEMBER, TODAY_ACTION } from '@/shared/member'
 import { termByKey } from '@/shared/terms'
 import { useTheme } from '@/theme/ThemeProvider'
-import { actionsFor } from '@/screens/a/spacesData'
-import { isSpecimenToday, useLocal, usePlanned } from '@/screens/a/local'
-import { measuredScore, type MeasuredIndex } from '@/shared/indexScoring'
-import type { TermKey } from '@/shared/types'
+import { actionsFor, todayActionFor } from '@/screens/a/spacesData'
+import { isSpecimenToday, usePlanned } from '@/screens/a/local'
+import { useCalendarConsent } from '@/screens/a/tools/freedom'
+import { useLatestIndex } from '@/lib/indexRecord'
+import type { Action, TermKey } from '@/shared/types'
 import { Rich, useA } from '@/screens/a/i18n'
 import { NotScored } from '@/screens/a/parts'
 import { useIsMinor } from '@/lib/minor'
@@ -49,6 +50,8 @@ import { useIsMinor } from '@/lib/minor'
 // Mobile port of joy-os-web/src/routes/member/core/Today.tsx — the exemplar for every screen.
 // Under 18 (minors gate) nothing is scored: no Index, Wheel, delta, band or term values, no
 // re-measure or signed delta in the ninety days; the action, circle and Ledger stay.
+// The one action follows the lowest term of the latest Index (re-taken on this phone or not), so
+// the eyebrow, the action and its "Why" always name the same term.
 
 /** Monday to Wednesday from the specimen; Thursday (today) comes from the Ledger itself. */
 const LEDGER_PAST = [true, true, true]
@@ -56,6 +59,12 @@ const TODAY_INDEX = 3
 const MILESTONE_LINK: Record<number, { route: string; hint: 'Opens the re-measure' | 'Opens the Day 90 result' }> = {
   76: { route: '/index-take', hint: 'Opens the re-measure' },
   90: { route: '/day-90', hint: 'Opens the Day 90 result' },
+}
+const WHEN: Record<Action['timeOfDay'], 'in the morning' | 'in the afternoon' | 'in the evening' | 'at any time of day'> = {
+  morning: 'in the morning',
+  afternoon: 'in the afternoon',
+  evening: 'in the evening',
+  any: 'at any time of day',
 }
 const MILESTONES: [number, 'Measured' | 'Review' | 'Next step' | 'Re-measure' | 'Signed delta'][] = [
   [0, 'Measured'],
@@ -84,22 +93,27 @@ export default function Today() {
   const [whyOpen, setWhyOpen] = useState(false)
   const minor = useIsMinor()
 
-  // A sitting taken on this phone is the newest Index (as on the Index result); a survey-only
-  // sitting (signals down) says so here too.
-  const [measured] = useLocal<MeasuredIndex>('measuredIndex', null)
-  const latest = measured ? measuredScore(measured) : INDEX_HISTORY[0]
-  const previous = measured ? INDEX_HISTORY[0] : INDEX_HISTORY[1]
+  // A sitting taken on this phone is the newest Index (as on the Index result, shared contract L1);
+  // a survey-only sitting (signals down) says so here too.
+  const latest = useLatestIndex()
+  const previous = latest.previous
   const change = latest.value - previous.value
   const lowest = termByKey(latest.lowestTerm)
   const lowestScore = latest.terms.find((s) => s.key === latest.lowestTerm)?.value
-  const action = TODAY_ACTION
+  // The one action is for the current lowest term (under 18 there is none: the gentlest start).
+  const action = todayActionFor(minor ? null : latest.lowestTerm)
+  const specimenAction = action.id === TODAY_ACTION.id
+  const calendarOn = useCalendarConsent()
+  // The written "why" belongs to the specimen Index; and the specimen's names the calendar, so it
+  // is shown only while calendar consent stands.
+  const showWhy = !minor && !latest.onPhone && (!specimenAction || calendarOn)
   const day = MEMBER.dayOfLoop
   const ledgerToday = ledger.filter(isSpecimenToday).length
   const ledgerDays = WEEK.map((_, i) => (i < TODAY_INDEX ? LEDGER_PAST[i] : i === TODAY_INDEX ? ledgerToday > 0 : false))
   const ledgerCount = ledgerDays.filter(Boolean).length
   // Actions planned in a space with "Plan it for today", shown beside the one action.
   const alsoPlanned = (Object.entries(planned) as [TermKey, string][])
-    .map(([k, id]) => ({ k, action: actionsFor(k).find((a) => a.id === id) }))
+    .map(([k, id]) => ({ k, action: actionsFor(k, action.id).find((a) => a.id === id) }))
     .filter((x): x is { k: TermKey; action: NonNullable<typeof x.action> } => !!x.action)
 
   return (
@@ -207,7 +221,7 @@ export default function Today() {
       {/* The one action */}
       <Card tone="sunk" style={{ gap: space.s2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s1, flexWrap: 'wrap' }}>
-          <Eyebrow tone="daybreak" style={{ flexShrink: 1 }}>{`${t('today')} · ${name(minor ? action.term : lowest.key)}`}</Eyebrow>
+          <Eyebrow tone="daybreak" style={{ flexShrink: 1 }}>{`${t('today')} · ${name(action.term)}`}</Eyebrow>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Icon name="clock" size={14} color={c.ink3} />
             <Meta tone="ink3" size={14}>
@@ -218,9 +232,16 @@ export default function Today() {
 
         {actionState === 'todo' ? (
           <>
-            <Title size={26}>
-              <Rich text={tx(`${action.title.replace('.', '')}. *Notice* three things.`)} wrap={(w) => <Serif>{w}</Serif>} />
-            </Title>
+            {specimenAction ? (
+              <Title size={26}>
+                <Rich text={tx(`${action.title.replace('.', '')}. *Notice* three things.`)} wrap={(w) => <Serif>{w}</Serif>} />
+              </Title>
+            ) : (
+              <View style={{ gap: 4 }}>
+                <Title size={26}>{tx(action.title)}</Title>
+                <Body tone="ink2">{tx(action.detail)}</Body>
+              </View>
+            )}
             <Pressable
               onPress={() => setWhyOpen(true)}
               accessibilityRole="button"
@@ -246,13 +267,15 @@ export default function Today() {
               {actionState === 'skipped' ? (
                 ta('That’s fine. Tomorrow will bring another.')
               ) : (
-                <Rich text={ta('Done, with the family. *Thank you.*')} wrap={(w) => <Serif>{w}</Serif>} />
+                <Rich text={ta(action.shared ? 'Done, with the family. *Thank you.*' : 'Done. *Thank you.*')} wrap={(w) => <Serif>{w}</Serif>} />
               )}
             </Title>
             <Meta>
               {actionState === 'skipped'
                 ? ta('“Not today” is always allowed, and never counted against you.')
-                : ta('Mindful minutes written back to Apple Health, as you allowed.')}
+                : specimenAction
+                  ? ta('Mindful minutes written back to Apple Health, as you allowed.')
+                  : ta('Marked as done for today. You can undo it.')}
             </Meta>
             <Button variant="link" onPress={() => setActionState('todo')}>
               {ta('Undo')}
@@ -425,7 +448,7 @@ export default function Today() {
           <TermChip term={action.term} withSpace />
           <Eyebrow>next_best_action · rules v1.0</Eyebrow>
         </View>
-        {minor ? null : <Body>{tx(action.why)}</Body>}
+        {showWhy ? <Body>{tx(action.why)}</Body> : null}
         <View style={{ gap: space.s2 }} accessibilityRole="list">
           {[
             [
@@ -434,11 +457,18 @@ export default function Today() {
                 ? ta('Not scored under 18, so this comes from {name}, the gentlest place to begin. No safety flag is open.', { name: name(action.term) })
                 : ta('The lowest term on your latest Index is {name} ({score}). No ’cation protocol or safety flag is open.', { name: name(lowest.key), score: String(lowestScore) }),
             ],
-            [ta('Candidates.'), ta('40 curated {space} actions, each claims-gated and tagged with evidence.', { space: spaceName(lowest.key) })],
-            [ta('Fit.'), ta('Calendar clear after 7 pm (consented), Kavya linked, sunset 18:12.')],
+            [ta('Candidates.'), ta('40 curated {space} actions, each claims-gated and tagged with evidence.', { space: spaceName(action.term) })],
+            [
+              ta('Fit.'),
+              specimenAction ? (
+                calendarOn ? ta('Calendar clear after 7 pm (consented), Kavya linked, sunset 18:12.') : ta('Your calendar is not read: consent is off in the Trust centre. Kavya linked, sunset 18:12.')
+              ) : (
+                <Rich key="fit" text={ta(action.shared ? 'Fits in *{n}* minutes, {when}, with Kavya.' : 'Fits in *{n}* minutes, {when}.', { n: action.minutes, when: ta(WHEN[action.timeOfDay]) })} wrap={(w) => <Mono size={14} tone="ink2">{w}</Mono>} />
+              ),
+            ],
             [ta('One.'), ta('Shown with one reason. “Not today” is never punished.')],
           ].map(([head, text], i) => (
-            <View key={head} style={{ flexDirection: 'row', gap: 12 }}>
+            <View key={String(head)} style={{ flexDirection: 'row', gap: 12 }}>
               <Mono tone="ink3">{String(i + 1)}</Mono>
               <Meta style={{ flex: 1 }}>
                 <Meta tone="ink" weight="semibold">

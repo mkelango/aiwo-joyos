@@ -34,13 +34,17 @@ import { PrimaryChip } from '@/screens/b/parts'
 import { AudioPlayer } from '@/screens/a/audio'
 import { Rich, useA } from '@/screens/a/i18n'
 import { useLocal } from '@/screens/a/local'
+import { NotScored, Verse } from '@/screens/a/parts'
+import { useIsMinor } from '@/lib/minor'
 import { SPACE_TODAY, SPACE_TODAY_INDEX } from '@/screens/a/spacesData'
 import type { TermKey } from '@/shared/types'
 import type { MeasuredIndex } from '@/shared/indexScoring'
 
 // THE JOYSPIRATION PRACTICE (Memo p.21): eight weeks; five-minute audio in the Mentor's
 // voice, a science note from the faculty, one practice daily / weekly / yearly, the weekly
-// circle, and the Index before and after. One Daybreak: “Practised today”.
+// circle, and the Index before and after. One Daybreak: “Practised today”. The Mentor's words
+// sit beside the Practice register's verse: the Thirukkural in Tamil with the English beneath
+// (Playbook p63). Under 18 nothing is scored (minors gate): no Index before and after.
 
 const CURRENT = CIRCLE.week
 
@@ -49,6 +53,7 @@ const PRACTISED = [true, true, false, true, false, false, false]
 export default function Practice() {
   const { c, space, radius } = useTheme()
   const { t, tx, lang, name, week: DAYS, weekFull: DAYS_FULL } = useA()
+  const minor = useIsMinor()
   const week = PRACTICE_WEEKS.find((w) => w.week === CURRENT)!
   const content = PRACTICE_CONTENT.find((p) => p.week === CURRENT)!
   const before = INDEX_HISTORY[0]
@@ -72,7 +77,7 @@ export default function Practice() {
       <ScreenHeader
         eyebrow={t('The Joyspiration Practice · Week {n} of 8', { n: CURRENT })}
         title={<Rich text={t('Don’t postpone *joy*.')} wrap={(w) => <Serif>{w}</Serif>} />}
-        lead={t('Five minutes a day in the Mentor’s voice, a note from the faculty on why it works, and your circle every Monday. Eight weeks, measured before and after.')}
+        lead={minor ? t('Five minutes a day in the Mentor’s voice, a note from the faculty on why it works, and your circle every Monday. Eight weeks.') : t('Five minutes a day in the Mentor’s voice, a note from the faculty on why it works, and your circle every Monday. Eight weeks, measured before and after.')}
       />
 
       {/* The eight weeks */}
@@ -218,10 +223,18 @@ export default function Practice() {
           <Meta tone="ink">C. Sivasankaran</Meta>
           <Eyebrow>{t('Mentor, AIWO Limited')}</Eyebrow>
         </View>
+        <Divider />
+        <Verse />
       </Card>
 
-      {/* Before and after */}
+      {/* Before and after — none under 18 */}
       <View style={{ gap: space.s2 }}>
+        {minor ? (
+          <Card tone="raised" style={{ gap: space.s2 }}>
+            <NotScored body={t('The Practice is yours in full. Your Index is not taken while you are under 18, so there is no before and after to show here.')} />
+          </Card>
+        ) : (
+        <>
         <View style={{ gap: 8 }}>
           <SectionTitle>{t('The Index, before and after')}</SectionTitle>
           <SpecimenTag />
@@ -285,6 +298,8 @@ export default function Practice() {
           </Meta>
           <MethodLine style={{ marginTop: space.s1 }} method={before.method} grade={before.grade} takenOn={before.takenOn} next={before.nextMeasure} />
         </Card>
+        </>
+        )}
 
         <Card tone="sunk" style={{ gap: space.s2 }}>
           <Eyebrow>{t('Between the measures')}</Eyebrow>

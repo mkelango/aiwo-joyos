@@ -2,7 +2,6 @@ import { useSyncExternalStore } from 'react'
 import { INDEX_HISTORY } from '@/data/member'
 import { bandFor } from '@/domain/indexEngine'
 import type { MethodVersion, TermKey, TermScore } from '@/domain/types'
-import { DAY90_TERMS } from '@/routes/member/core/_data'
 import { CLINICAL_RECORDS } from './_data'
 
 // THE RE-MEASURE CHAIN, console side (Architecture 8b-14, 8f-33). The member's app runs
@@ -16,6 +15,12 @@ import { CLINICAL_RECORDS } from './_data'
 // `status`, `state`, `stage` or `step`; terms as TermScore[] or a { H, P, R, F, D, B } map;
 // a submitted time in `submittedAt`, `completedAt`, `takenAt` or `at`. Signing keeps every
 // field the member side wrote and sets the status field to 'signed' with signedBy/signedAt.
+//
+// The portal shows the member's own submission and nothing else. A term skipped in the sitting
+// (null, or left out of the record's terms) reads "not yet measured"; it is never filled from a
+// specimen. While any term is not yet measured the Index is withheld and cannot be signed; the
+// member measures it later in the app and the record comes back complete. A record taken with
+// no wearable connected carries `surveyOnly`, and the portal says so beside the draft.
 
 export const REMEASURE_KEY = 'joyos:core:clinical-remeasure'
 const CORE_EVT = 'joyos:core-change'
@@ -33,8 +38,12 @@ export type Remeasure = {
   member: string
   method: MethodVersion
   engine: string
-  /** The Clinical-grade terms the member submitted (specimen Day-90 terms when the record carries none). */
+  /** The Clinical-grade terms the member submitted, in H P R F D B order; value null = not yet measured. */
   terms: TermScore[]
+  /** Terms the member has not measured yet (skipped for now). The Index is withheld until there are none. */
+  missing: TermKey[]
+  /** Scored from the survey alone: no wearable signals were available for this sitting. */
+  surveyOnly: boolean
   /** The Day-0 terms the delta is measured against. */
   prev: TermScore[]
   submittedMs: number | null
@@ -75,18 +84,35 @@ function phaseOf(r: Raw | null): RemeasurePhase {
   return s ? 'in-progress' : 'none'
 }
 
+const valueOf = (v: unknown): number | null | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : v === null ? null : undefined)
+
+/**
+ * The six terms as the member submitted them. A term the record does not score (null, or left
+ * out) is "not yet measured", never imputed. Null when the record carries no terms at all.
+ */
 function termsOf(v: unknown): TermScore[] | null {
+  let got: Partial<Record<TermKey, number | null>> | null = null
   if (Array.isArray(v)) {
-    const out = v
-      .filter((x): x is { key: TermKey; value: number } => !!x && typeof x === 'object' && ORDER.includes((x as { key: TermKey }).key) && typeof (x as { value: unknown }).value === 'number')
-      .map((x) => ({ key: x.key, value: x.value, band: bandFor(x.value, x.key === 'B') }))
-    return out.length === 6 ? ORDER.map((k) => out.find((x) => x.key === k)!) : null
-  }
-  if (v && typeof v === 'object') {
+    got = {}
+    for (const x of v) {
+      if (!x || typeof x !== 'object') continue
+      const k = (x as { key?: unknown }).key as TermKey
+      const val = valueOf((x as { value?: unknown }).value)
+      if (ORDER.includes(k) && val !== undefined) got[k] = val
+    }
+  } else if (v && typeof v === 'object') {
     const m = v as Record<string, unknown>
-    if (ORDER.every((k) => typeof m[k] === 'number')) return ORDER.map((k) => ({ key: k, value: m[k] as number, band: bandFor(m[k] as number, k === 'B') }))
+    got = {}
+    for (const k of ORDER) {
+      const val = valueOf(m[k])
+      if (val !== undefined) got[k] = val
+    }
   }
-  return null
+  if (!got || Object.keys(got).length === 0) return null
+  return ORDER.map((k) => {
+    const value = got![k] ?? null
+    return { key: k, value, band: bandFor(value, k === 'B') }
+  })
 }
 
 function parse(rawStr: string | null): Remeasure {
@@ -102,6 +128,8 @@ function parse(rawStr: string | null): Remeasure {
   const memberId = str(raw?.memberId) ?? 'm_0001'
   // The specimen member's Day-0 Index (signed at the Joycation) is the baseline for the delta.
   const day0 = INDEX_HISTORY[0]
+  // No terms on a submitted record means nothing was measured: all six read "not yet measured".
+  const terms = termsOf(raw?.terms) ?? termsOf(raw?.scores) ?? ORDER.map((k) => ({ key: k, value: null, band: bandFor(null) }))
   return {
     phase: phaseOf(raw),
     raw,
@@ -109,7 +137,9 @@ function parse(rawStr: string | null): Remeasure {
     member: str(raw?.member) ?? str(raw?.name) ?? CLINICAL_RECORDS[memberId]?.name ?? 'Arjun Rao',
     method: (str(raw?.method) as MethodVersion | null) ?? 'v1.0',
     engine: str(raw?.engine) ?? str(raw?.engineBuild) ?? 'engine 1.0.4',
-    terms: termsOf(raw?.terms) ?? termsOf(raw?.scores) ?? DAY90_TERMS.map((t) => ({ ...t })),
+    terms,
+    missing: terms.filter((t) => t.value === null).map((t) => t.key),
+    surveyOnly: raw?.surveyOnly === true,
     prev: day0.terms.map((t) => ({ ...t })),
     submittedMs: msOf(raw?.submittedAt) ?? msOf(raw?.completedAt) ?? msOf(raw?.takenAt) ?? msOf(raw?.at),
     signedBy: str(raw?.signedBy),
@@ -167,7 +197,8 @@ export const remeasure = {
   /** Sign the Clinical-grade assessment: the same record, every member-side field kept. */
   sign(by: string, ms: number, index: number | null) {
     const cur = snapshot()
-    if (!cur.raw || cur.phase !== 'pending') return false
+    // An Index with a term not yet measured is withheld: there is nothing to sign until it is measured.
+    if (!cur.raw || cur.phase !== 'pending' || cur.missing.length > 0) return false
     const field = statusOf(cur.raw)?.field ?? 'status'
     write({ ...cur.raw, [field]: 'signed', signed: true, signedBy: by, signedAt: signedAtFor(cur, ms), ...(index !== null ? { signedIndex: index } : {}) })
     return true

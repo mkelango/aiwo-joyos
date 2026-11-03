@@ -1,11 +1,11 @@
 import { router, useLocalSearchParams } from 'expo-router'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { KeyboardAvoidingView, Platform, Pressable, View } from 'react-native'
-import { ArrowLink, Avatar, Body, Button, Card, DaybreakButton, Eyebrow, Icon, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Serif } from '@/components'
+import { ArrowLink, Avatar, Body, Button, Card, DaybreakButton, EmptyIllustration, Eyebrow, Icon, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Serif } from '@/components'
 import { TEAM } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
-import { PEOPLE_DETAIL, SPECIMEN_NOW, THREADS, type Msg, type Thread } from '@/screens/b/accountData'
-import { messagesStore, useStore } from '@/screens/b/bStore'
+import { PEOPLE_DETAIL, SPECIMEN_NOW, type Msg, type Thread } from '@/screens/b/accountData'
+import { messagesStore, useAccountThreads, useStore } from '@/screens/b/bStore'
 import { ChoiceCard, Done, Field, useCrisisGuard, memberOnly } from '@/screens/b/parts'
 import { useDict, useLang } from '@/lib/i18n'
 import { MSG, REPLIES_TEXT, SUBJECT_T } from '@/screens/b/i18n/messages'
@@ -34,11 +34,13 @@ const KeyboardSafe = ({ children }: { children: ReactNode }) => (
   </KeyboardAvoidingView>
 )
 
+/** The signed-in account's threads (L2): its specimen ones and the ones it started, with what it sent. */
 function useThreads() {
   const [state, set] = useStore(messagesStore)
+  const specimen = useAccountThreads()
   const all: Thread[] = useMemo(
-    () => [...state.started, ...THREADS].map((t) => ({ ...t, messages: [...t.messages, ...(state.sent[t.id] ?? [])] })),
-    [state],
+    () => [...state.started, ...specimen].map((t) => ({ ...t, messages: [...t.messages, ...(state.sent[t.id] ?? [])] })),
+    [state, specimen],
   )
   const isUnread = (t: Thread) => t.unread > 0 && !state.read.includes(t.id) && t.messages[t.messages.length - 1].from === 'them'
   return { all, state, set, isUnread }
@@ -93,6 +95,13 @@ function Inbox() {
         <SectionTitle>{t('threads')}</SectionTitle>
         <Meta size={14}>{unread ? t('newReplies', { n: unread }) : t('allRead')}</Meta>
       </View>
+      {all.length === 0 ? (
+        <Card tone="sunk" style={{ gap: space.s1, alignItems: 'flex-start' }}>
+          <EmptyIllustration kind="letter" />
+          <Body weight="medium">{t('emptyTitle')}</Body>
+          <Meta>{t('emptyBody')}</Meta>
+        </Card>
+      ) : (
       <Card tone="raised" padding={0}>
         {all.map((th, i) => {
           const p = person(th.personId)
@@ -127,6 +136,7 @@ function Inbox() {
           )
         })}
       </Card>
+      )}
       <DaybreakButton icon="edit-3" onPress={() => router.push('/messages?compose=1')}>
         {t('newMessage')}
       </DaybreakButton>

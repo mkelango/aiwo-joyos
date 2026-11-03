@@ -17,6 +17,7 @@ export const CARE = dict({
   '{name}, {subject}{unread}. {body}': ['{name}, {subject}{unread}. {body}', '{name}, {subject}{unread}। {body}'],
   ', new reply': [', புதிய பதில்', ', नया जवाब'],
   'Open messages': ['செய்திகளைத் திற', 'संदेश खोलें'],
+  'No messages yet. Your care team is one message away.': ['இன்னும் செய்திகள் இல்லை. உங்கள் பராமரிப்புக் குழு ஒரு செய்தி தூரத்தில்.', 'अभी कोई संदेश नहीं। आपकी देखभाल टीम बस एक संदेश दूर है।'],
   'My people': ['என் மனிதர்கள்', 'मेरे लोग'],
   'Four people know your name and your ninety days. If something drifts, it becomes a task for one of them, never an alert on your phone.': ['நான்கு பேருக்கு உங்கள் பெயரும் உங்கள் தொண்ணூறு நாட்களும் தெரியும். ஏதாவது தடுமாறினால், அது அவர்களில் ஒருவருக்கான பணியாகும்; உங்கள் தொலைபேசியில் எச்சரிக்கையாக அல்ல.', 'चार लोग आपका नाम और आपके नब्बे दिन जानते हैं। कुछ भटके, तो वह उनमें से किसी का काम बन जाता है, आपके फ़ोन पर अलर्ट कभी नहीं।'],
   Coach: ['பயிற்றுநர்', 'कोच'],

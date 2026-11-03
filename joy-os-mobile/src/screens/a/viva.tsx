@@ -9,14 +9,18 @@ import { useTheme } from '@/theme/ThemeProvider'
 import { useA } from './i18n'
 import { H2, useLocal } from './local'
 import { TextField } from './parts'
-import { LE8, LE8_SERIES, VIVA_DRAFT, VIVA_MATCH, VIVA_MORE, type Le8Key } from './spacesData'
+import { LE8, LE8_SERIES, NO_LIST_DRAFT_NO_CALENDAR, VIVA_DRAFT, VIVA_MATCH, VIVA_MORE, type Le8Key } from './spacesData'
 import { le8Score } from './tools/body'
+import { useTimeAuditAccess } from './tools/freedom'
 import { VivaExchange, useVivaRun } from './vivaParts'
 
 // The room's VIVA tool (Memo p.19, p.27), as on the web room: the room's named tools as canned
 // prompts, an own question (the emergency intercept reads it first), a specimen draft run here
 // in the room with provenance and its reviewer, and "Ask VIVA about {space}" with the room's context.
 // Never on Ease: the room shows a clinician's note instead.
+// In Freedom the card follows the calendar: with consent withdrawn in the Trust centre (c_cal) or no
+// calendar connected, time_audit_summary is not offered, a typed question about the audit is told
+// why, and the No-list coach drafts without anything read from a calendar.
 
 type Draft = { tool: string; ask: string; draft: string; reviewer: string }
 type Reading = { at: string; v: number; v2?: number }
@@ -36,7 +40,12 @@ export function RoomViva({ term }: { term: TermKey }) {
   const { t, tx, lang, space: spaceName } = useA()
   const { setCrisisOpen } = useApp()
   const info = termByKey(term)
-  const drafts = [VIVA_DRAFT[term], ...VIVA_MORE[term]].filter(Boolean) as Draft[]
+  const audit = useTimeAuditAccess()
+  const calendarless = term === 'F' && audit !== 'open'
+  const noAudit = audit === 'no-consent'
+    ? t('Calendar consent is withdrawn in the Trust centre, so VIVA reads no calendar and gives no time-audit summary.')
+    : t('No calendar is connected, so there is no time audit for VIVA to summarise. Connect one on the time audit card above; VIVA reads only the totals.')
+  const drafts = ([VIVA_DRAFT[term], ...VIVA_MORE[term]].filter(Boolean) as Draft[]).filter((d) => !(calendarless && d.tool === 'time_audit_summary'))
   const { state, turn, run, reset } = useVivaRun()
   const [q, setQ] = useState('')
   const [err, setErr] = useState(false)
@@ -44,6 +53,7 @@ export function RoomViva({ term }: { term: TermKey }) {
 
   /** The draft's words; le8_coach names the two lowest of the eight at ask time. */
   const draftText = (d: Draft) => {
+    if (calendarless && d.tool === 'no_list_coach') return tx(NO_LIST_DRAFT_NO_CALENDAR)
     if (d.tool !== 'le8_coach') return tx(d.draft)
     const [a, b] = lowest
     // Mid-sentence in English the names read in lower case, as the LE8 card does.
@@ -60,6 +70,12 @@ export function RoomViva({ term }: { term: TermKey }) {
       return
     }
     const hit = drafts.find((d) => VIVA_MATCH[d.tool]?.test(v))
+    if (!hit && calendarless && VIVA_MATCH.time_audit_summary.test(v)) {
+      run({ ask: v, text: noAudit })
+      setQ('')
+      setErr(false)
+      return
+    }
     run(hit ? { ask: v, text: draftText(hit), tool: hit.tool, reviewer: tx(hit.reviewer) } : { ask: v, text: t('In this room VIVA can help with {tools}. That question deserves a fuller answer: open VIVA, where your care team can see the thread.', { tools: info.viva.join(', ') }) })
     setQ('')
     setErr(false)
@@ -94,6 +110,14 @@ export function RoomViva({ term }: { term: TermKey }) {
               <Eyebrow size={11}>{t('Tap to ask · {tool}', { tool: d.tool })}</Eyebrow>
             </Pressable>
           ))}
+          {calendarless ? (
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Icon name="calendar" size={14} color={c.ink3} />
+              <Meta size={14} tone="ink3" style={{ flex: 1 }}>
+                {noAudit}
+              </Meta>
+            </View>
+          ) : null}
           <TextField
             label={t('Or ask in your own words')}
             value={q}

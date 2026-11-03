@@ -3,12 +3,13 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, BookOpen, Check, FlaskConical, Lock, MessageCircle, RotateCcw, Users } from 'lucide-react'
 import { useId, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { DaybreakButton, Eyebrow, MethodLine, TermDot, useFmtDate } from '@/components/joy/primitives'
+import { DaybreakButton, Eyebrow, MethodLine, NotScoredNote, TermDot, useFmtDate } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill, SectionTitle } from '@/components/ui'
 import { CIRCLE, PRACTICE_WEEKS } from '@/data/platform'
 import { INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
+import { useScoresHidden } from '@/lib/minor'
 import { PRACTICE_CONTENT } from './_data'
-import { AudioPlayer, JourneyEmpty, PrimaryChip, Quote, fade, useAfterIndex } from './_parts'
+import { AudioPlayer, JourneyEmpty, PrimaryChip, Quote, Verse, fade, useAfterIndex } from './_parts'
 // One shared emergency intercept for every member free-text field (Memo p.24).
 import { useCrisisGuard } from '@/routes/member/spaces/_SpaceShell'
 import { addDays, isoDate, practisedToday, saveReflection, setWeekPractised, togglePractisedToday, useJourney, weekPractised } from './_store'
@@ -38,6 +39,8 @@ function WeekView({ n }: { n: string }) {
   const [held, setHeld] = useState(false)
   const guard = useCrisisGuard()
   const after = useAfterIndex()
+  // A member under 18 is never scored (Architecture p26): no Index, no re-take, no term values.
+  const minor = useScoresHidden()
   const { t, r, tx, term, en } = useJ()
   const fmtDate = useFmtDate()
 
@@ -172,7 +175,16 @@ function WeekView({ n }: { n: string }) {
             </AnimatePresence>
           </Card>
 
-          {num === 8 && (
+          {num === 8 && minor && (
+            <Card tone="soft">
+              <Eyebrow tone="daybreak">{t('minorWeek8Eyebrow')}</Eyebrow>
+              <NotScoredNote className="mt-3" />
+              <p className="mt-4 text-[15px] text-ink-2">{t('minorWeek8', { c: coachFirst })}</p>
+              <Link to="/app/care/messages" className="mt-4 inline-flex h-11 items-center justify-center gap-2 rounded-full border border-line-strong bg-paper-raised px-4 text-[15px] text-ink hover:bg-paper-sunk focus-ring"><MessageCircle size={16} className="shrink-0" /> {t('planNext', { c: coachFirst })}</Link>
+            </Card>
+          )}
+
+          {num === 8 && !minor && (
             <Card tone="soft">
               <Eyebrow tone="daybreak">{t('indexAgain')}</Eyebrow>
               <p className="mt-3 text-[1.15rem] leading-snug text-ink">{t('retakeLine', { c: coachFirst })}</p>
@@ -220,6 +232,11 @@ function WeekView({ n }: { n: string }) {
               <Quote by="C. Sivasankaran" role={t('mentorRoleShort')}>{tx('Your circumstances are part of your life. They do not have to become the whole of your life.')}</Quote>
             </Card>
           )}
+
+          {/* The verse of the Practice register: the Thirukkural in Tamil, the English beneath (Playbook p63) */}
+          <Card tone="outline">
+            <Verse />
+          </Card>
         </div>
       </div>
 

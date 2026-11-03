@@ -18,6 +18,7 @@ import { HH, useData } from './_i18n'
 import { ReadAloud, SpeakAnswer } from './_voice'
 import { useCore } from '@/routes/member/core/_i18n'
 import { useMemberName } from '@/lib/memberName'
+import { useIsMinor } from '@/lib/minor'
 import { CharterCard, FjoOffice, KindStrip, useHouseholdKind } from './_charter'
 
 /** Lakshmi's elder mode and her family helper (by her consent, which she can withdraw and give again). */
@@ -53,6 +54,8 @@ export default function Household() {
   const [elderOpen, setElderOpen] = useState(false)
   const [kindRec, setKind] = useHouseholdKind()
   const me = INDEX_HISTORY[0]
+  // Under 18: never scored, so no Index tag on the member's own card.
+  const minor = useIsMinor()
   const kavyaIndex = CASELOAD.find((c) => c.name === 'Kavya Rao')!.index
   const { firstName: myName, fullName: myFull } = useMemberName()
   const [specimenSelf, kavya, lakshmi] = HOUSEHOLD
@@ -83,7 +86,7 @@ export default function Household() {
       {/* Members */}
       <Section id="members" eyebrow={tr('whoEyebrow')} title={tr('whoTitle')} aside={<SpecimenTag />}>
         <ul className="grid gap-4 md:grid-cols-2">
-          <MemberCard person={arjun} role={tr('youAdult')} detail={tr('youDetail')} tags={[tr('indexN', { n: me.value }), 'Joy OS Plus']} />
+          <MemberCard person={arjun} role={tr('youAdult')} detail={tr('youDetail')} tags={[...(minor ? [] : [rich(tr('indexN'), { n: <span className="num">{me.value}</span> })]), 'Joy OS Plus']} />
           <MemberCard person={kavya} role={tr('partnerAdult')} detail={tr('partnerDetail')} tags={[tr('ownIndex'), tr('ownConsents')]} />
           <MemberCard
             person={lakshmi}
@@ -152,6 +155,12 @@ export default function Household() {
         title={rich(tr('pageTitle'), { em: <em className="font-serif">{tr('pageEm')}</em> })}
         lead={tr('pageLead')}
       >
+        {/* Under 18 nothing here is scored: no one's Index, band or term values, no grants (Architecture p26). */}
+        {minor ? (
+          <Card tone="sunk">
+            <p className="flex items-start gap-2 text-[15px] text-ink-2"><Lock size={15} className="mt-0.5 shrink-0 text-ink-3" /> {tr('minorCouple')}</p>
+          </Card>
+        ) : (
         <Card tone="raised">
           <div className="grid gap-6 md:grid-cols-2">
             {[{ p: arjun, value: me.value, of: (k: TermKey) => me.terms.find((t) => t.key === k)!.value ?? 0 }, { p: kavya, value: kavyaIndex, of: (k: TermKey) => KAVYA_SHARED[k] }].map(({ p, value, of }) => (
@@ -186,9 +195,11 @@ export default function Household() {
             <p className="flex items-center gap-1.5 text-[13px] text-ink-3"><Lock size={13} /> {sharedTerms.length === TERMS.length ? tr('allShared') : tr(TERMS.length - sharedTerms.length === 1 ? 'notShownOne' : 'notShownMany', { spaces: TERMS.filter((t) => !sharedTerms.includes(t)).map((t) => tt.space(t.key)).join(', ') })}</p>
           </div>
         </Card>
+        )}
       </Section>
 
       {/* Share grants */}
+      {!minor && (
       <Section
         id="grants"
         className="mt-16"
@@ -241,9 +252,11 @@ export default function Household() {
           <p className="text-[14px] text-ink-2">{tr('askedPrivately')}</p>
         </div>
       </Section>
+      )}
 
       {/* Couples Check + Charter */}
       <div className="mt-16 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+        {minor ? <div /> : (
         <Section id="couples" eyebrow={tr('couples')} title={rich(tr('couplesTitle'), { em: <em className="font-serif">{tr('couplesEm')}</em> })}>
           <Card>
             <p className="text-[15px] text-ink-2">
@@ -266,6 +279,7 @@ export default function Household() {
             </div>
           </Card>
         </Section>
+        )}
 
         <CharterCard kind={kindRec.kind} adults={[arjun, kavya, lakshmi].map((p) => p.name.split(' ')[0])} minor={HOUSEHOLD_MINOR.name.split(' ')[0]} onToast={showToast} />
       </div>
@@ -520,7 +534,7 @@ function ElderPreview({ open, onClose, elder }: { open: boolean; onClose: () => 
   )
 }
 
-function MemberCard({ person, role, detail, tags, extra, icon }: { person: { name: string; initials: string; tone: string }; role: string; detail: React.ReactNode; tags: string[]; extra?: React.ReactNode; icon?: React.ReactNode }) {
+function MemberCard({ person, role, detail, tags, extra, icon }: { person: { name: string; initials: string; tone: string }; role: string; detail: React.ReactNode; tags: React.ReactNode[]; extra?: React.ReactNode; icon?: React.ReactNode }) {
   return (
     <Card as="li">
       <div className="flex items-start gap-4">
@@ -529,7 +543,7 @@ function MemberCard({ person, role, detail, tags, extra, icon }: { person: { nam
           <p className="text-[17px] text-ink">{person.name}</p>
           <p className="eyebrow mt-0.5 flex items-center gap-1.5 text-ink-3">{icon}{role}</p>
           <p className="mt-3 text-[15px] leading-relaxed text-ink-2">{detail}</p>
-          <div className="mt-3 flex flex-wrap gap-1.5">{tags.map((t) => <Pill key={t}>{t}</Pill>)}</div>
+          <div className="mt-3 flex flex-wrap gap-1.5">{tags.map((t, i) => <Pill key={typeof t === 'string' ? t : i}>{t}</Pill>)}</div>
         </div>
       </div>
       {extra}

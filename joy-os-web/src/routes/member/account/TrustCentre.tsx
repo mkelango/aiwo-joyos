@@ -18,6 +18,7 @@ import { StepUp } from './_stepup'
 import { CONSENT_DEVICE, EXTRA_DEVICE_CONSENTS, disconnectForConsent, type ConsentRecord } from './_links'
 import { useMemberAccessLog, type MemberAccess } from './_access'
 import { useDict, useTermText } from '@/lib/i18n'
+import { useScoresHidden } from '@/lib/minor'
 import { TRUST, useData } from './_i18n'
 
 // TRUST CENTRE (Memo module 14, p.27): who has seen my data, consents by purpose,
@@ -318,6 +319,9 @@ function ExportCard({ list, consents, onDone }: { list: Consent[]; consents: Con
   const t = useDict(TRUST)
   const dx = useData()
   const profile = useMemberProfile()
+  // Under 18 nothing is scored, so the file carries no Index (Architecture p26).
+  const hidden = useScoresHidden()
+  const indexRows = hidden ? [] : INDEX_HISTORY
   // A request in progress is kept per viewer, like the other Trust centre cards.
   const [exp, setExp] = usePersisted<{ format: 'json' | 'fhir'; status: ExportStatus; downloaded: boolean }>('export', { format: 'fhir', status: 'idle', downloaded: false })
   const { format, status, downloaded } = exp
@@ -328,8 +332,8 @@ function ExportCard({ list, consents, onDone }: { list: Consent[]; consents: Con
     // The file says what the screen says: the member's own consent choices, not the seeded ones.
     const granted = (c: Consent) => consents[c.id]?.on ?? c.granted
     const body = format === 'fhir'
-      ? { resourceType: 'Bundle', type: 'collection', timestamp: `${SPECIMEN_NOW}T17:40:00+05:30`, meta: { tag: [{ code: 'specimen', display: 'Specimen · not a real member' }] }, entry: [{ resource: { resourceType: 'Patient', identifier: [{ system: 'https://aiwo.in/id', value: MEMBER.aiwoId }], name: [{ given: [profile.firstName], family: profile.lastName }] } }, ...INDEX_HISTORY.map((ix) => ({ resource: { resourceType: 'Observation', status: 'final', code: { text: 'Joyspan Index' }, effectiveDateTime: ix.takenOn, valueQuantity: { value: ix.value, unit: '/100' }, method: { text: `Method ${ix.method}` } } })), ...list.map((c) => ({ resource: { resourceType: 'Consent', status: granted(c) ? 'active' : 'inactive', scope: { text: c.scope }, category: [{ text: c.name }], dateTime: c.since ?? null, policyRule: { text: c.purpose } } }))] }
-      : { specimen: true, aiwoId: MEMBER.aiwoId, method: 'v1.0', exportedAt: SPECIMEN_NOW, index: INDEX_HISTORY, consents: list.map((c) => ({ ...c, granted: granted(c) })) }
+      ? { resourceType: 'Bundle', type: 'collection', timestamp: `${SPECIMEN_NOW}T17:40:00+05:30`, meta: { tag: [{ code: 'specimen', display: 'Specimen · not a real member' }] }, entry: [{ resource: { resourceType: 'Patient', identifier: [{ system: 'https://aiwo.in/id', value: MEMBER.aiwoId }], name: [{ given: [profile.firstName], family: profile.lastName }] } }, ...indexRows.map((ix) => ({ resource: { resourceType: 'Observation', status: 'final', code: { text: 'Joyspan Index' }, effectiveDateTime: ix.takenOn, valueQuantity: { value: ix.value, unit: '/100' }, method: { text: `Method ${ix.method}` } } })), ...list.map((c) => ({ resource: { resourceType: 'Consent', status: granted(c) ? 'active' : 'inactive', scope: { text: c.scope }, category: [{ text: c.name }], dateTime: c.since ?? null, policyRule: { text: c.purpose } } }))] }
+      : { specimen: true, aiwoId: MEMBER.aiwoId, method: 'v1.0', exportedAt: SPECIMEN_NOW, index: indexRows, consents: list.map((c) => ({ ...c, granted: granted(c) })) }
     try {
       const blob = new Blob([JSON.stringify(body, null, 2)], { type: format === 'fhir' ? 'application/fhir+json' : 'application/json' })
       const url = URL.createObjectURL(blob)
@@ -357,7 +361,7 @@ function ExportCard({ list, consents, onDone }: { list: Consent[]; consents: Con
     <Card className="flex flex-col">
       <div className="flex items-center gap-2"><FileJson size={18} className="text-ink-3" /><p className="eyebrow text-ink-3">{t('export')}</p></div>
       <p className="mt-3 text-[1.25rem] font-light text-ink">{t('exportTitle')}</p>
-      <p className="mt-2 text-[15px] text-ink-2">{t('exportBody')}</p>
+      <p className="mt-2 text-[15px] text-ink-2">{t(hidden ? 'exportBodyMinor' : 'exportBody')}</p>
       <div className="mt-5">
         <p className="mb-2 text-[15px] text-ink">{t('format')}</p>
         <Segmented label={t('exportFormat')} value={format} onChange={setFormat} items={[{ value: 'fhir', label: t('fhir') }, { value: 'json', label: 'JSON' }]} />

@@ -1,5 +1,7 @@
-import { useSyncExternalStore } from 'react'
-import { HITL_QUEUE, MD_CONFIG, SAFETY_ALERTS, SCREEN_QUEUE, SIGNOFF_QUEUE, type SafetyAlert } from './_data'
+import { useEffect, useSyncExternalStore } from 'react'
+import type { TermKey } from '@/domain/types'
+import { CRISIS_EVENTS_KEY, readCrisisEvents, type CrisisEvent } from '@/lib/store'
+import { CLINICAL_RECORDS, HITL_QUEUE, MD_CONFIG, SAFETY_ALERTS, SCREEN_QUEUE, SIGNOFF_QUEUE, type SafetyAlert } from './_data'
 import { coach, getCoachTasks, isClinicalTask } from './_store'
 import { consoleNowMs } from './_parts'
 
@@ -7,7 +9,14 @@ import { consoleNowMs } from './_parts'
 // so alerts, sign-offs, AI reviews, screen routing, the Medical Director's signed config and
 // each member's orders and prescriptions survive leaving the portal. Kept for the browser session.
 
-export type SignItem = (typeof SIGNOFF_QUEUE)[number] & { signed: string | null; returned: { reason: string; note: string; at: string } | null }
+export type SignItem = (typeof SIGNOFF_QUEUE)[number] & {
+  signed: string | null
+  returned: { reason: string; note: string; at: string } | null
+  /** Terms the member has not measured yet: the Index is withheld and the draft cannot be signed. */
+  missing?: TermKey[]
+  /** Scored from the survey alone, with no wearable signals. */
+  surveyOnly?: boolean
+}
 export type Screen = (typeof SCREEN_QUEUE)[number] & { routedAt?: string; alertId?: string }
 export type Draft = (typeof HITL_QUEUE)[number] & { state: 'pending' | 'approved' | 'rejected'; edited: boolean; flagged?: string; reviewer?: string }
 /** The Medical Director's active, signed threshold set. Every tab reads the same version. */
@@ -204,12 +213,118 @@ export const clinical = {
     const entry: ClinicalAudit = { ...e, ms, at: stampOf(ms), id: `au-${state.audit.length + 1}-${ms.toString(36)}` }
     emit({ ...state, audit: [entry, ...state.audit] })
   },
-  /** Back to the specimen start. The audit is append-only, so it stays, and the reset is written to it. */
+  /**
+   * Back to the specimen start. The audit is append-only, so it stays, and the reset is written
+   * to it. P0s from a member's crisis intercept are not specimen: they stay on the board as they are.
+   */
   reset(by?: { who: string; role: string }) {
     const audit = state.audit
-    emit({ ...seed(), audit })
+    const fresh = seed()
+    emit({ ...fresh, alerts: [...fresh.alerts, ...state.alerts.filter((a) => a.id.startsWith(CRISIS_PREFIX))], audit })
     if (by) clinical.log({ ...by, what: 'Reset the clinical specimen to its start', purpose: 'Specimen reset', kind: 'action' })
   },
+}
+
+// ─── P0 from the member app's crisis intercept ─────────────────────────────
+// When the intercept fires in the member app, the app appends { id, at, source, memberId } to
+// localStorage 'joyos:crisis:events' (lib/store.tsx). Never the member's words. Each new event
+// opens a P0 here, owned by the on-call psychologist, on the Medical Director's P0 clock, and
+// the opening is written to the audit; acknowledging and closing it run like any other alert.
+
+const CRISIS_PREFIX = 'crisis-'
+const ON_CALL_PSYCHOLOGIST = 'Dr Sanjay Menon'
+
+/** Where in the member app the intercept fired, from the path the app logged. */
+const SOURCES: [RegExp, string][] = [
+  [/^\/app\/ledger/, 'the Ledger'],
+  [/^\/app\/viva/, 'VIVA'],
+  [/^\/app\/letter/, 'the Day-90 letter reply'],
+  [/^\/app\/index/, 'My Index'],
+  [/^\/app\/spaces/, 'a Space'],
+  [/^\/app\/care\/messages/, 'Care messages'],
+  [/^\/app\/care/, 'Care'],
+  [/^\/app\/whatsapp/, 'WhatsApp'],
+  [/^\/app\/circles/, 'Circles'],
+  [/^\/app\/events/, 'Events'],
+  [/^\/app\/occasions/, 'Occasions'],
+  [/^\/app\/cation/, 'a ’cation'],
+  [/^\/app\/practice/, 'the Practice'],
+  [/^\/app\/household/, 'the Family Joy Charter'],
+  [/^\/app\/day-40/, 'the Day-40 check-in'],
+]
+export const crisisSourceLabel = (source: string) => SOURCES.find(([re]) => re.test(source))?.[1] ?? (source.startsWith('/app') ? 'the member app' : source || 'the member app')
+
+/**
+ * The event's time on the console clock. The member app stamps real time; the consoles run a
+ * specimen clock advancing in step with it, so the same offset keeps the SLA honest.
+ */
+function consoleMsOf(at: string) {
+  const t = new Date(at).getTime()
+  if (Number.isNaN(t)) return consoleNowMs()
+  return consoleNowMs() - (Date.now() - t)
+}
+
+/**
+ * Whether the member has an emergency contact on file, read the way the crisis sheet reads it
+ * (layouts/shared.tsx): no Profile record means the specimen contact; a cleared one means none,
+ * and the sheet shows an "add one" prompt in its place.
+ */
+function emergencyContactOnFile() {
+  try {
+    const raw = localStorage.getItem('joyos:acct:emergency')
+    if (!raw) return true
+    const v = JSON.parse(raw) as { contact?: unknown } | null
+    return v && typeof v === 'object' && 'contact' in v ? !!v.contact : true
+  } catch {
+    return true
+  }
+}
+
+/** Open a P0 for every crisis event not yet on the board. Returns how many were opened. */
+function importCrisis(events: CrisisEvent[] = readCrisisEvents()) {
+  const have = new Set(state.alerts.map((a) => a.id))
+  const fresh = events.filter((e) => e && typeof e.id === 'string' && !have.has(`${CRISIS_PREFIX}${e.id}`))
+  if (!fresh.length) return 0
+  const sla = state.md.values.p0 ?? 15
+  const contactOnFile = emergencyContactOnFile()
+  const alerts: SafetyAlert[] = fresh.map((e) => {
+    const memberId = e.memberId || 'm_0001'
+    return {
+      id: `${CRISIS_PREFIX}${e.id}`,
+      member: CLINICAL_RECORDS[memberId]?.name ?? memberId,
+      memberId,
+      priority: 'P0',
+      kind: 'Crisis intercept · member app',
+      detail: `The crisis intercept fired in ${crisisSourceLabel(e.source)} before any model ran. The member was shown Tele-MANAS 14416 and the on-call clinician${contactOnFile ? ', and their emergency contact' : '. No emergency contact was on file, so the sheet offered to add one on Profile instead'}. What they wrote stayed on their device; it is not sent to this portal.`,
+      openedAt: new Date(consoleMsOf(e.at)).toISOString(),
+      slaMinutes: sla,
+      owner: ON_CALL_PSYCHOLOGIST,
+      status: 'open',
+    }
+  })
+  emit({ ...state, alerts: [...state.alerts, ...alerts] })
+  for (const a of alerts) {
+    clinical.log({ who: 'Joy OS · crisis intercept', role: 'System', what: `Opened P0 · crisis intercept in ${crisisSourceLabel(fresh.find((e) => `${CRISIS_PREFIX}${e.id}` === a.id)?.source ?? '')} · ${a.owner} paged · ${a.slaMinutes}-minute clock`, purpose: 'Safety · P0 intercept', kind: 'action', memberId: a.memberId, member: a.member, ms: +new Date(a.openedAt) })
+  }
+  return alerts.length
+}
+
+/**
+ * Keeps the P0 board in step with the member app's crisis log while any console is open: on
+ * mount, when another tab writes the log, and when this window regains focus.
+ */
+export function useCrisisIntake() {
+  useEffect(() => {
+    importCrisis()
+    const onStorage = (e: StorageEvent) => { if (e.key === null || e.key === CRISIS_EVENTS_KEY) importCrisis() }
+    const onFocus = () => importCrisis()
+    window.addEventListener('storage', onStorage)
+    window.addEventListener('focus', onFocus)
+    return () => {
+      window.removeEventListener('storage', onStorage)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [])
 }
 
 /** "YYYY-MM-DD HH:mm" in IST, from a console-clock time. */

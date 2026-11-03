@@ -1,7 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useLocal } from '@/screens/a/local'
 import { DAY90_DATES } from '@/screens/a/coreData'
-import type { MeasuredIndex } from '@/shared/indexScoring'
+import { measuredScore, type MeasuredIndex } from '@/shared/indexScoring'
+import { INDEX_HISTORY } from '@/shared/member'
+import type { IndexScore } from '@/shared/types'
 import { playSound } from './sound'
 
 // What the Index screens keep on this phone beyond the score itself (all specimen, nothing
@@ -46,6 +48,36 @@ export function effectiveAnswers(s: SubmittedIndex): Record<string, number> {
 
 export function useSubmittedIndex() {
   return useLocal<SubmittedIndex | null>(SUBMITTED_KEY, null)
+}
+
+// ─── The latest Index (shared contract L1) ─────────────────────────────────
+
+/** Where Take the Index keeps the Index measured on this phone (shared contract M2). */
+export const MEASURED_KEY = 'measuredIndex'
+
+/** The member's latest Index, as every screen reads it (IndexScore), plus where it came from. */
+export type LatestIndex = IndexScore & {
+  /** Scored from the answers alone (signals down, or switched off for the sitting). */
+  surveyOnly: boolean
+  /** True when this is the Index taken on this phone rather than the recorded history. */
+  onPhone: boolean
+  /** The measure before it, for the delta and "up from / down from". */
+  previous: IndexScore
+}
+
+/**
+ * The latest Index: the one taken on this phone when there is one, else the newest recorded
+ * measure (INDEX_HISTORY[0]). Same shape the screens use (terms, band, lowestTerm), so the
+ * Spaces hub, each room and Today's one action follow the current lowest term after a re-take.
+ * The Index result keeps its own read, since it also writes the measured record.
+ */
+export function useLatestIndex(): LatestIndex {
+  const [measured] = useLocal<MeasuredIndex>(MEASURED_KEY, null)
+  return useMemo(() => {
+    if (measured) return { ...measuredScore(measured), surveyOnly: !!measured.surveyOnly, onPhone: true, previous: INDEX_HISTORY[0] }
+    const latest = INDEX_HISTORY[0]
+    return { ...latest, surveyOnly: !!latest.surveyOnly, onPhone: false, previous: INDEX_HISTORY[1] }
+  }, [measured])
 }
 
 // ─── The Day-90 re-measure chain ──────────────────────────────────────────

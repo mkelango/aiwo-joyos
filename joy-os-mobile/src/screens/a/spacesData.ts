@@ -1,5 +1,5 @@
 // Ported from joy-os-web/src/routes/member/spaces/_data.ts (Lane A). SPECIMEN — not a real member.
-import type { Action, TermKey } from '@/shared/types'
+import type { Action, IndexScore, TermKey } from '@/shared/types'
 import { ACTION_LIBRARY, INDEX_HISTORY, TODAY_ACTION } from '@/shared/member'
 
 // SPECIMEN DATA for the six spaces — not a real member (Memo p.19).
@@ -39,10 +39,14 @@ export const ROOM_VERDICT: Record<TermKey, string> = {
 
 // ─── 90-day history ────────────────────────────────────────────────────────
 
-/** Weekly short-form pulse across the last ninety days, ending on the specimen today (SPACE_TODAY). */
-export function termHistory(key: TermKey) {
-  const cur = INDEX_HISTORY[0].terms.find((t) => t.key === key)!.value ?? 0
-  const prev = INDEX_HISTORY[1].terms.find((t) => t.key === key)!.value ?? cur
+/**
+ * Weekly short-form pulse across the last ninety days, ending on the specimen today (SPACE_TODAY).
+ * `ends` are the latest measure and the one before it (the Index taken on this phone, when there
+ * is one), so the line ends on the score the room shows; the specimen pair otherwise.
+ */
+export function termHistory(key: TermKey, ends?: { cur: number; prev: number }) {
+  const cur = ends?.cur ?? INDEX_HISTORY[0].terms.find((t) => t.key === key)!.value ?? 0
+  const prev = ends?.prev ?? INDEX_HISTORY[1].terms.find((t) => t.key === key)!.value ?? cur
   const seed = key.charCodeAt(0)
   const end = localDay(SPACE_TODAY)
   return Array.from({ length: 14 }, (_, i) => {
@@ -75,11 +79,45 @@ const OWN_ACTIONS: Action[] = [
   { id: 'a_d_023', term: 'D', title: 'Listen to one raga all the way through.', detail: 'Headphones on, nothing else open.', minutes: 10, timeOfDay: 'evening', shared: false, evidence: 'Absorption deepens savouring (Bryant & Veroff).', why: 'Music is a quiet, steady joy in your Ledger.' },
   { id: 'a_b_009', term: 'B', title: 'Write the second arrow down.', detail: 'The problem, and the extra you are adding.', minutes: 10, timeOfDay: 'evening', shared: false, evidence: 'Cognitive defusion (ACT; Hayes).', why: 'Stress is your second-largest Burden part.' },
   { id: 'a_b_012', term: 'B', title: 'Move one “keep meaning to” item to done.', detail: 'The smallest one.', minutes: 10, timeOfDay: 'any', shared: false, evidence: 'Behavioural activation reduces avoidance.', why: 'Avoidance is small, but it is there.' },
+  // A third of each room's own, so a room still offers three when its library action is Today's.
+  { id: 'a_h_031', term: 'H', title: 'Climb two flights of stairs, twice today.', detail: 'At your own pace; the rail is fine.', minutes: 2, timeOfDay: 'any', shared: false, evidence: 'Short bouts of vigorous activity add up (WHO activity guidance).', why: 'Small, daily movement keeps capacity current.' },
+  { id: 'a_p_015', term: 'P', title: 'Tell one person why your work matters to you.', detail: 'One sentence is enough.', minutes: 2, timeOfDay: 'any', shared: false, evidence: 'Saying a purpose aloud strengthens it (MLQ-P).', why: 'Purpose grows when it is spoken.' },
+  { id: 'a_r_018', term: 'R', title: 'Eat one meal this week with someone in your 15.', detail: 'At the table, not at a desk.', minutes: 30, timeOfDay: 'any', shared: true, evidence: 'Shared meals and social connection (LSNS-6).', why: 'Time together is what your 15 are made of.' },
+  { id: 'a_f_013', term: 'F', title: 'Leave one evening this week unplanned.', detail: 'No calls, no plans. See what you choose.', minutes: 30, timeOfDay: 'evening', shared: false, evidence: 'Unscheduled time and autonomy (Whillans; BPNSFS).', why: 'An evening that is yours is the simplest Freedom.' },
+  { id: 'a_b_015', term: 'B', title: 'Breathe out slowly for two minutes.', detail: 'Out longer than in, ten times.', minutes: 2, timeOfDay: 'any', shared: false, evidence: 'Slow exhalation lowers arousal (paced breathing).', why: 'A small way to set some weight down.' },
 ]
 
-export function actionsFor(key: TermKey): Action[] {
-  const lib = ACTION_LIBRARY.filter((a) => a.term === key && a.id !== TODAY_ACTION.id)
-  return [...lib, ...OWN_ACTIONS.filter((a) => a.term === key)].slice(0, 3)
+/**
+ * Today's one action follows the lowest term on the latest Index: the specimen action when that is
+ * Daily Pleasure, else the first library action for the term. Under 18 (no lowest term) it is the
+ * specimen action.
+ */
+export function todayActionFor(lowest: TermKey | null): Action {
+  if (!lowest || lowest === TODAY_ACTION.term) return TODAY_ACTION
+  return ACTION_LIBRARY.find((a) => a.term === lowest) ?? OWN_ACTIONS.find((a) => a.term === lowest) ?? TODAY_ACTION
+}
+
+/** A room's three actions. Today's one action (`todayId`) is never offered again: planning it would only repeat it on Today. */
+export function actionsFor(key: TermKey, todayId: string = TODAY_ACTION.id): Action[] {
+  const lib = ACTION_LIBRARY.filter((a) => a.term === key && a.id !== todayId)
+  return [...lib, ...OWN_ACTIONS.filter((a) => a.term === key && a.id !== todayId)].slice(0, 3)
+}
+
+/** True when this Index is the specimen's (not one taken on this phone). */
+export const isSpecimenIndex = (ix: IndexScore) => ix.id === INDEX_HISTORY[0].id
+
+/**
+ * A room's one-line verdict. The specimen Index has its written verdicts (ROOM_VERDICT); an Index
+ * taken on this phone gets a plain one from its own numbers (no number in the sentence: the score
+ * and the change sit beside it in Mono). Returns English copy and its vars for tx().
+ */
+export function roomVerdict(k: TermKey, latest: IndexScore): { text: string; vars?: Record<string, string> } {
+  if (isSpecimenIndex(latest)) return { text: ROOM_VERDICT[k] }
+  const d = latest.terms.find((s) => s.key === k)?.delta ?? 0
+  const lowest = latest.lowestTerm === k
+  if (k === 'B') return { text: d < 0 ? 'Burden eased since your last measure.' : d > 0 ? 'Burden is heavier than at your last measure. That is useful to know.' : 'Burden held level since your last measure.' }
+  if (lowest) return { text: 'This is your lowest term on the Index you took on this phone. Start here.' }
+  return { text: d > 0 ? 'Higher than at your last measure.' : d < 0 ? 'Lower than at your last measure. That is useful to know.' : 'Level with your last measure.' }
 }
 
 /** A specimen VIVA draft per space — drafted by VIVA, a person signs. */
@@ -104,6 +142,9 @@ export const VIVA_MORE: Record<TermKey, { tool: string; ask: string; draft: stri
   D: [{ tool: 'savour_prompt', ask: 'Give me a savouring prompt for this evening.', draft: 'When the tea is poured tonight, wait ten seconds before the first sip. Notice the smell and the warmth of the cup. Then tell Kavya one thing from today you would be sorry to have missed.', reviewer: 'From the savouring library · no advice' }],
   B: [],
 }
+
+/** no_list_coach without a calendar (consent withdrawn or none connected): nothing from the time audit. */
+export const NO_LIST_DRAFT_NO_CALENDAR = 'Think of the one meeting or habit that takes the most of your week and was asked of you by someone else. You could try: “I will join the first fifteen minutes and read the notes after.” A smaller yes is still a no to the rest.'
 
 /** Words that send a question typed in a room's VIVA card to one of its tools (specimen matching). */
 export const VIVA_MATCH: Record<string, RegExp> = {
@@ -397,6 +438,63 @@ export const PHQ4_ITEMS = [
   'Feeling down, depressed or hopeless',
 ]
 export const PHQ4_OPTIONS = ['Not at all', 'Several days', 'More than half the days', 'Nearly every day']
+
+/**
+ * Each screen's take-form, as on the web (stem, items, options, scoring). Items and options stay
+ * English: they are the validated instruments. Each item scores 0 to options.length − 1;
+ * itemOptions[i] relabels item i's options (same scoring); reverse items score top − answer.
+ * Pain is a single 0–10 rating.
+ */
+export const SCREEN_FORMS: Record<EaseScreen, { stem: string; items: string[]; options: string[]; itemOptions?: Record<number, string[]>; reverse?: number[]; source: string; minutes: number }> = {
+  'PHQ-4': { stem: 'Over the last two weeks, how often have you been bothered by the following?', items: PHQ4_ITEMS, options: PHQ4_OPTIONS, source: 'PHQ-4 · Kroenke et al., 2009 · public domain', minutes: 1 },
+  ISI: {
+    stem: 'Over the last two weeks, please rate…',
+    items: [
+      'Difficulty falling asleep',
+      'Difficulty staying asleep',
+      'Problems waking up too early',
+      'How satisfied or dissatisfied you are with your current sleep pattern',
+      'How noticeable your sleep problem is to others, in terms of your quality of life',
+      'How worried or distressed you are about your current sleep problem',
+      'How much your sleep problem interferes with your daily functioning',
+    ],
+    options: ['None', 'Mild', 'Moderate', 'Severe', 'Very severe'],
+    itemOptions: {
+      3: ['Very satisfied', 'Satisfied', 'Moderately satisfied', 'Dissatisfied', 'Very dissatisfied'],
+      4: ['Not at all noticeable', 'A little', 'Somewhat', 'Much', 'Very much noticeable'],
+      5: ['Not at all worried', 'A little', 'Somewhat', 'Much', 'Very much worried'],
+      6: ['Not at all interfering', 'A little', 'Somewhat', 'Much', 'Very much interfering'],
+    },
+    source: 'Insomnia Severity Index · Morin et al., 2001 · licensed for Joy OS',
+    minutes: 2,
+  },
+  'PSS-4': {
+    stem: 'In the last month, how often have you felt…',
+    items: [
+      'That you were unable to control the important things in your life?',
+      'Confident about your ability to handle your personal problems?',
+      'That things were going your way?',
+      'That difficulties were piling up so high that you could not overcome them?',
+    ],
+    options: ['Never', 'Almost never', 'Sometimes', 'Fairly often', 'Very often'],
+    reverse: [1, 2],
+    source: 'PSS-4 · Cohen et al., 1983 · free for non-commercial and clinical use',
+    minutes: 1,
+  },
+  Pain: { stem: 'On average over the last week, how much pain have you had?', items: ['Average pain, last week'], options: [], source: 'Numeric rating scale, 0–10', minutes: 1 },
+}
+
+/**
+ * Who reads a result taken on the phone when it routes (as on the web): PHQ-4 to the psychologist,
+ * ISI and Pain to the physician, a higher PSS-4 to the coach. The result is written to the
+ * account's thread with that person (Care messages); one is started when there is none (Dr Sanjay).
+ */
+export const SCREEN_ROUTE: Record<EaseScreen, { personId: string; name: string }> = {
+  'PHQ-4': { personId: 'p_sanjay', name: 'Dr Sanjay Menon' },
+  ISI: { personId: 'p_meera', name: 'Dr Meera Iyer' },
+  'PSS-4': { personId: 'p_priya', name: 'Priya Natarajan' },
+  Pain: { personId: 'p_meera', name: 'Dr Meera Iyer' },
+}
 
 export const BURDEN_PARTS = [
   { key: 'Mood', weight: 0.3, value: 22 },

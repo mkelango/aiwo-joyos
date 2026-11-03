@@ -37,10 +37,22 @@ export const KIT = {
     hi: 'मुफ़्त, गोपनीय, चौबीसों घंटे, आपकी भाषा में। 1-800-891-4416 पर भी कॉल कर सकते हैं।',
   },
   yourPeople: { en: 'Your people', ta: 'உங்கள் மனிதர்கள்', hi: 'आपके अपने लोग' },
-  yourPeopleBody: {
-    en: 'Dr Sanjay Menon, your psychologist, is on call tonight. Kavya is your emergency contact; we only tell her if you ask us to.',
-    ta: 'உங்கள் உளவியலாளர் Dr Sanjay Menon இன்றிரவு பணியில் இருக்கிறார். Kavya உங்கள் அவசரத் தொடர்பு; நீங்கள் கேட்டால் மட்டுமே அவருக்குத் தெரிவிப்போம்.',
-    hi: 'आपके मनोवैज्ञानिक Dr Sanjay Menon आज रात ड्यूटी पर हैं। Kavya आपकी इमरजेंसी संपर्क हैं; हम उन्हें तभी बताएँगे जब आप कहेंगे।',
+  // Your people: the on-call clinician, then whoever the signed-in member named as their
+  // emergency contact (never a fixed name), or an honest empty state when no one is named.
+  yourPeopleOnCall: {
+    en: 'Dr Sanjay Menon, your psychologist, is on call tonight.',
+    ta: 'உங்கள் உளவியலாளர் Dr Sanjay Menon இன்றிரவு பணியில் இருக்கிறார்.',
+    hi: 'आपके मनोवैज्ञानिक Dr Sanjay Menon आज रात ड्यूटी पर हैं।',
+  },
+  yourPeopleContact: {
+    en: '{name} is your emergency contact; we only tell them if you ask us to.',
+    ta: '{name} உங்கள் அவசரத் தொடர்பு; நீங்கள் கேட்டால் மட்டுமே அவருக்குத் தெரிவிப்போம்.',
+    hi: '{name} आपके इमरजेंसी संपर्क हैं; हम उन्हें तभी बताएँगे जब आप कहेंगे।',
+  },
+  yourPeopleNoContact: {
+    en: 'You have not added an emergency contact yet.',
+    ta: 'நீங்கள் இன்னும் அவசரத் தொடர்பு யாரையும் சேர்க்கவில்லை.',
+    hi: 'आपने अभी तक कोई इमरजेंसी संपर्क नहीं जोड़ा है।',
   },
   messageOnCall: { en: 'Message the on-call clinician', ta: 'பணியில் உள்ள மருத்துவருக்குச் செய்தி அனுப்பவும்', hi: 'ड्यूटी पर मौजूद क्लिनिशियन को संदेश भेजें' },
 
@@ -63,6 +75,19 @@ export const KIT = {
   onCallLineHint: { en: 'Calls AIWO’s on-call clinician line', ta: 'AIWO-வின் பணியில் உள்ள மருத்துவர் எண்ணை அழைக்கும்', hi: 'AIWO की ड्यूटी क्लिनिशियन लाइन पर कॉल करता है' },
   onCallLineMeta: { en: 'On-call line (specimen number):', ta: 'பணியில் உள்ள மருத்துவர் எண் (மாதிரி எண்):', hi: 'ड्यूटी लाइन (नमूना नंबर):' },
   emergencyContact: { en: 'Emergency contact · {relation}', ta: 'அவசரத் தொடர்பு · {relation}', hi: 'इमरजेंसी संपर्क · {relation}' },
+  emergencyContactPlain: { en: 'Emergency contact', ta: 'அவசரத் தொடர்பு', hi: 'इमरजेंसी संपर्क' },
+  // No emergency contact on this account yet (a new account, or one removed in Profile).
+  noContactBody: {
+    en: 'No one is added yet. You can add someone in Profile; we would tell them only if you asked us to.',
+    ta: 'இன்னும் யாரும் சேர்க்கப்படவில்லை. சுயவிவரத்தில் ஒருவரைச் சேர்க்கலாம்; நீங்கள் கேட்டால் மட்டுமே அவருக்குத் தெரிவிப்போம்.',
+    hi: 'अभी कोई नहीं जोड़ा गया। आप प्रोफ़ाइल में किसी को जोड़ सकते हैं; हम उन्हें तभी बताएँगे जब आप कहेंगे।',
+  },
+  addContact: { en: 'Add one in Profile', ta: 'சுயவிவரத்தில் சேர்க்கவும்', hi: 'प्रोफ़ाइल में जोड़ें' },
+  addContactHint: {
+    en: 'Closes this and opens Profile, where Edit beside Emergency contact adds someone',
+    ta: 'இதை மூடி சுயவிவரத்தைத் திறக்கும்; அங்கே அவசரத் தொடர்பு அருகே உள்ள மாற்று மூலம் ஒருவரைச் சேர்க்கலாம்',
+    hi: 'इसे बंद करके प्रोफ़ाइल खोलता है, जहाँ इमरजेंसी संपर्क के पास बदलें से किसी को जोड़ सकते हैं',
+  },
 
   // App-wide banners: offline with its sync queue, and payments grace.
   offlineNone: { en: 'Offline. Anything you add is kept on this phone and sent when you are back.', ta: 'இணையம் இல்லை. நீங்கள் சேர்ப்பது இந்தத் தொலைபேசியில் வைக்கப்பட்டு, இணைப்பு வந்ததும் அனுப்பப்படும்.', hi: 'ऑफ़लाइन। आप जो भी जोड़ें, इसी फ़ोन पर रहेगा और वापस जुड़ने पर भेजा जाएगा।' },

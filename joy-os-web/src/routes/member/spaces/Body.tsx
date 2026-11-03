@@ -9,6 +9,7 @@ import { Button, Pill, Sheet, Tabs } from '@/components/ui'
 import { DEVICES as ACCOUNT_DEVICES, type DeviceState } from '@/routes/member/account/_data'
 import { useData as useAccountData } from '@/routes/member/account/_i18n'
 import { usePersisted } from '@/routes/member/account/_util'
+import { postCareMessage } from '@/routes/member/account/_careInbox'
 import { BIOMARKERS, CAPACITY, CAPACITY_HISTORY_START, LE8, LE8_HEIGHT_CM, LE8_KEY, LE8_LOG_START, PANEL_META, SIGNALS, SPACE_TODAY, bmiOf, le8Latest, le8Score, le8Series, le8Status, type Le8Key, type Le8Reading, type Marker, type MarkerStatus } from './_data'
 import { ChartTip, SpaceShell, ToolCard, axisTick, Toggle } from './_SpaceShell'
 import { useSpaceText, type SpKey } from './_i18n'
@@ -500,7 +501,7 @@ function BiomarkerVault() {
             <p className="mt-5 rounded-xl border border-line p-4 text-[14px] text-ink-2">
               <b className="font-medium text-ink">{t('body.bio.notT')}</b> {t('body.bio.notB', { name: PANEL_META.signedBy, date: fmtDate(PANEL_META.signed) })}
             </p>
-            <Link to="/app/care/messages" className="mt-5 inline-flex items-center gap-1.5 text-[15px] text-ink underline underline-offset-4">{t('body.bio.ask', { name: d(open.name) })}</Link>
+            <Link to={PHYSICIAN_THREAD} className="mt-5 inline-flex items-center gap-1.5 text-[15px] text-ink underline underline-offset-4">{t('body.bio.ask', { name: d(open.name) })}</Link>
           </div>
         )}
       </Sheet>
@@ -513,8 +514,12 @@ function BiomarkerVault() {
 // Memo p.19: "protocol and AIWO Daily stack". Supplements follow the protocol-only rule
 // (Arch p.6): they appear only as part of a physician-signed protocol, never as a shop.
 // Today's ticks are kept for the specimen day; there is no streak and no count of days.
+// "Ask about this" posts a member message to the physician's thread in Care messages
+// (/app/care/messages), where her reply arrives; the card links to that thread.
 type StackItem = { id: string; kind: 'practice' | 'supplement'; label: string; dose?: string; why: string }
 const VITAMIN_D = BIOMARKERS.find((b) => b.name === 'Vitamin D (25-OH)')
+/** The physician's thread in Care messages (Dr Meera Iyer, data/member TEAM). */
+const PHYSICIAN_THREAD = '/app/care/messages?p=p_meera'
 
 function DailyStack() {
   const { t, r, dm } = useSpaceText()
@@ -530,6 +535,11 @@ function DailyStack() {
     { id: 's_o3', kind: 'supplement', label: 'AIWO Daily Omega-3', dose: '1 g', why: t('body.st.s2w') },
     { id: 's_mg', kind: 'supplement', label: 'AIWO Daily Magnesium', dose: '200 mg', why: t('body.st.s3w') },
   ]
+  const ask = (i: StackItem) => {
+    if (asked.includes(i.id)) return
+    postCareMessage({ to: 'physician', from: 'member', subject: t('body.st.askSubject', { x: i.label }), body: t('body.st.askMsg', { x: i.label, dose: i.dose ?? '' }), ref: `body.stack.${i.id}` })
+    setAsked((a) => [...a, i.id])
+  }
   const toggle = (id: string, on: boolean) => setDone({ on: SPACE_TODAY, ids: on ? [...today.filter((x) => x !== id), id] : today.filter((x) => x !== id) })
   const n = items.filter((i) => today.includes(i.id)).length
   const row = (i: StackItem) => {
@@ -550,8 +560,8 @@ function DailyStack() {
         {i.kind === 'supplement' && (
           <div className="mt-2 pl-8">
             {wasAsked
-              ? <p className="text-[13px] text-ink-2" role="status">{t('body.st.asked', { name: doc })}</p>
-              : <button type="button" onClick={() => setAsked((a) => [...a, i.id])} aria-label={t('body.st.askAria', { name: doc, x: i.label })} className="rounded text-[13px] text-ink underline underline-offset-4 focus-ring">{t('body.st.ask')}</button>}
+              ? <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-2" role="status"><span>{t('body.st.asked', { name: doc })}</span><Link to={PHYSICIAN_THREAD} className="inline-flex items-center gap-1 rounded text-ink underline underline-offset-4 focus-ring">{t('c.openThread')} <ArrowRight size={13} aria-hidden /></Link></p>
+              : <button type="button" onClick={() => ask(i)} aria-label={t('body.st.askAria', { name: doc, x: i.label })} className="rounded text-[13px] text-ink underline underline-offset-4 focus-ring">{t('body.st.ask')}</button>}
           </div>
         )}
       </li>
@@ -579,7 +589,7 @@ function DailyStack() {
       <p className="mt-5 flex items-start gap-2 rounded-2xl bg-paper-sunk p-4 text-[14px] text-ink-2"><ShieldCheck size={15} className="mt-0.5 shrink-0" aria-hidden /> <span>{t('body.st.rule')}</span></p>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4 text-[13px] text-ink-3">
         <span>{t('body.st.review')} · {t('body.st.change', { name: doc })}</span>
-        <Link to="/app/care/messages" className="inline-flex items-center gap-1.5 rounded text-[14px] text-ink underline underline-offset-4 focus-ring">{r('c.messageX', { name: doc })} <ArrowRight size={14} aria-hidden /></Link>
+        <Link to={PHYSICIAN_THREAD} className="inline-flex items-center gap-1.5 rounded text-[14px] text-ink underline underline-offset-4 focus-ring">{r('c.messageX', { name: doc })} <ArrowRight size={14} aria-hidden /></Link>
       </div>
     </ToolCard>
   )
@@ -817,6 +827,7 @@ function CapacityHistory({ history }: { history: { on: string; values: number[] 
 // ─── Biological age ───────────────────────────────────────────────────────
 
 // The estimate as the physician signs it at Day 45 (specimen): a range, never a single number to chase.
+// "Add to my Day 45 review" asks the physician, in her Care messages thread, to put it on the agenda.
 const BIO_AGE = { low: 49, high: 52 }
 
 function BiologicalAge() {
@@ -825,6 +836,11 @@ function BiologicalAge() {
   const [signedView, setSignedView] = useSpaceState('body.bioAge.signedView.v1', false)
   const { t, dm } = useSpaceText()
   const doc = PANEL_META.signedBy
+  const addToReview = () => {
+    if (asked) return
+    postCareMessage({ to: 'physician', from: 'member', subject: t('body.ba.subject'), body: t('body.ba.msg'), ref: 'body.bioAge.day45' })
+    setAsked(true)
+  }
   return (
     <ToolCard className="w-full" tone="sunk" eyebrow={t('body.ba.eyebrow')} aside={signedView ? <ShieldCheck size={16} className="text-ink-3" aria-hidden /> : <Lock size={16} className="text-ink-3" aria-hidden />}>
       <div className="flex flex-1 flex-col">
@@ -857,7 +873,9 @@ function BiologicalAge() {
         </ol>
         {!signedView && (
           <div className="pt-5">
-            {asked ? <p className="text-[14px] text-ink-2" role="status">{t('body.ba.added')}</p> : <Button size="sm" onClick={() => setAsked(true)}>{t('body.ba.add')}</Button>}
+            {asked
+              ? <p className="text-[14px] text-ink-2" role="status">{t('body.ba.added')} <Link to={PHYSICIAN_THREAD} className="inline-flex items-center gap-1 rounded text-ink underline underline-offset-4 focus-ring">{t('c.openThread')} <ArrowRight size={13} aria-hidden /></Link></p>
+              : <Button size="sm" onClick={addToReview}>{t('body.ba.add')}</Button>}
           </div>
         )}
         <div className="mt-auto pt-5">

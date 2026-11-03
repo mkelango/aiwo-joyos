@@ -4,7 +4,8 @@ import { BellOff, Camera, Check, CloudOff, EyeOff, Lock, MessageCircle, Plus, Re
 import { useEffect, useId, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Bar, BarChart, LabelList, ResponsiveContainer, XAxis, YAxis } from 'recharts'
-import { DaybreakButton, Eyebrow, MethodLine, SpecimenTag, TermChip } from '@/components/joy/primitives'
+import { DaybreakButton, Eyebrow, MethodLine, NotScoredNote, SpecimenTag, TermChip } from '@/components/joy/primitives'
+import { useScoresHidden } from '@/lib/minor'
 import { Button, Card, PageHeader, Pill, SectionTitle } from '@/components/ui'
 import { INDEX_HISTORY, LEDGER, LEDGER_TAGS, MEMBER } from '@/data/member'
 import type { LedgerEntry } from '@/domain/types'
@@ -87,6 +88,8 @@ export default function Ledger() {
   const { active, current, next } = promptState(rows)
   const prompt: 1 | 2 | 3 = current?.prompt ?? 1
   const { t: c, name, space, lang } = useCore()
+  // Under 18 there is no D term score and no method line to sit beside it (Architecture p26).
+  const hidden = useScoresHidden()
 
   return (
     <div>
@@ -136,12 +139,13 @@ export default function Ledger() {
           <Card tone="raised">
             <div className="flex items-center justify-between gap-3">
               <TermChip term="D" />
-              <span className="num text-[2rem] font-light text-ink">{d.value}</span>
+              {!hidden && <span className="num text-[2rem] font-light text-ink">{d.value}</span>}
             </div>
+            {hidden && <NotScoredNote className="mt-3" detail={false} />}
             <p className="mt-3 text-[15px] text-ink-2">
               {rich(c('lgFeeds'), { term: name('D'), f: <span className="num text-ink">{formulaText(termByKey('D').formula, lang)}</span> })}
             </p>
-            <MethodLine className="mt-4" method={latest.method} grade={latest.grade} next={latest.nextMeasure} />
+            {!hidden && <MethodLine className="mt-4" method={latest.method} grade={latest.grade} next={latest.nextMeasure} />}
             <Link to="/app/spaces/pleasure" className="mt-3 inline-block text-[14px] text-ink underline-offset-4 hover:underline focus-ring">{c('openSpace', { space: space('D') })}</Link>
           </Card>
           <PrivacyCard />

@@ -140,4 +140,13 @@ export const PRACTICE = dict({
   'Choose the next ninety days with your coach.': ['உங்கள் பயிற்றுநருடன் அடுத்த தொண்ணூறு நாட்களைத் தேர்ந்தெடுங்கள்.', 'अपनी कोच के साथ अगले नब्बे दिन चुनिए।'],
   'What will you carry into the next ninety days?': ['அடுத்த தொண்ணூறு நாட்களுக்கு எதை எடுத்துச் செல்வீர்கள்?', 'अगले नब्बे दिनों में आप क्या साथ ले जाएँगे?'],
   'Why we re-measure like for like': ['ஏன் அதே முறையில் மீண்டும் அளவிடுகிறோம்', 'हम उसी तरह दोबारा क्यों मापते हैं'],
+  // Minors gate, the verse of the Practice register (Thirukkural 39), the transcript note
+  'Five minutes a day in the Mentor’s voice, a note from the faculty on why it works, and your circle every Monday. Eight weeks.': ['வழிகாட்டியின் குரலில் தினமும் ஐந்து நிமிடங்கள், இது ஏன் பயன் தருகிறது என்று ஆசிரியர் குழுவின் குறிப்பு, ஒவ்வொரு திங்களும் உங்கள் வட்டம். எட்டு வாரங்கள்.', 'हर दिन पाँच मिनट मेंटर की आवाज़ में, फ़ैकल्टी का नोट कि यह क्यों काम करता है, और हर सोमवार आपका सर्कल। आठ हफ़्ते।'],
+  'The Practice is yours in full. Your Index is not taken while you are under 18, so there is no before and after to show here.': ['பயிற்சி முழுவதும் உங்களுடையது. 18 வயது ஆகும் வரை உங்கள் குறியீடு எடுக்கப்படுவதில்லை; அதனால் இங்கே காட்ட முன்னும் பின்னும் இல்லை.', 'अभ्यास पूरी तरह आपका है। 18 साल का होने तक आपका इंडेक्स नहीं लिया जाता, इसलिए यहाँ दिखाने को पहले और बाद नहीं है।'],
+  'Not scored while under 18': ['18 வயது ஆகும் வரை மதிப்பெண் இல்லை', '18 साल का होने तक कोई स्कोर नहीं'],
+  'At the end of the eight weeks, choose one thing for the next ninety days with Priya.': ['எட்டு வாரங்களின் முடிவில், Priya உடன் அடுத்த தொண்ணூறு நாட்களுக்கு ஒன்றைத் தேர்ந்தெடுங்கள்.', 'आठ हफ़्तों के अंत में Priya के साथ अगले नब्बे दिनों के लिए एक चीज़ चुनें।'],
+  'Thirukkural · kural {n}': ['திருக்குறள் · குறள் {n}', 'तिरुक्कुरल · कुरल {n}'],
+  'Thiruvalluvar': ['திருவள்ளுவர்', 'तिरुवल्लुवर'],
+  'The Book of Virtue · On the strength of virtue': ['அறத்துப்பால் · அறன் வலியுறுத்தல்', 'धर्म का खंड · धर्म की महिमा'],
+  'The Mentor’s audio and its transcript are in English for now. His words are kept as he spoke them.': ['வழிகாட்டியின் ஒலிப்பதிவும் அதன் எழுத்துவடிவமும் இப்போது ஆங்கிலத்தில் உள்ளன. அவர் பேசிய சொற்கள் அப்படியே வைக்கப்பட்டுள்ளன.', 'मेंटर का ऑडियो और उसका लिखित पाठ अभी अंग्रेज़ी में है। उनके बोले गए शब्द जैसे के तैसे रखे गए हैं।'],
 })

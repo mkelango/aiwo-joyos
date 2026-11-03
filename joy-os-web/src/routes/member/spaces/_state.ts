@@ -1,6 +1,7 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 import { CONSENTS } from '@/data/member'
 import { ACCT_CHANGED } from '@/routes/member/account/_prefs'
+import { SPACE_TODAY } from './_data'
 
 // What a member saves in a Space stays saved across navigation and reloads.
 // Front end only: it lives in this browser's localStorage (per viewer), and
@@ -129,3 +130,21 @@ export function readCalendarProvider(): CalProvider | null {
 
 export type KeptPrompt = { date: string; id: string; text: string; note?: string }
 export const KEPT_KEY = 'pleasure.kept.v1'
+
+// ─── The digital sabbath Freedom keeps ────────────────────────────────────
+// Freedom saves the plan as 'freedom.sabbath.v1'. It is kept in Joy OS only: the calendar
+// grant is read-only, so no event is ever created and no one is invited. The Spaces hub
+// reads the same record to remind the member of the next one.
+
+export const SABBATH_KEY = 'freedom.sabbath.v1'
+export const SABBATH_DAYS = ['Sat', 'Sun'] as const
+export type SabbathDay = (typeof SABBATH_DAYS)[number]
+export type SabbathPlan = { day: SabbathDay; from: string; to: string; off: { email: boolean; social: boolean; news: boolean; calls: boolean }; withKavya: boolean }
+
+/** The next Saturday or Sunday on or after the specimen today, as 'YYYY-MM-DD'. */
+export function nextSabbathOn(day: SabbathDay): string {
+  const d = new Date(`${SPACE_TODAY}T12:00:00`)
+  const target = day === 'Sat' ? 6 : 0
+  d.setDate(d.getDate() + ((target - d.getDay() + 7) % 7))
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}

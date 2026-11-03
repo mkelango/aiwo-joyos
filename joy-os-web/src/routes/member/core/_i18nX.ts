@@ -437,7 +437,127 @@ export const XTRA = {
     ta: 'சமன்பாடு, குறியீடு, திட்டங்கள் ஆகியவை AIWO-வுக்குச் சொந்தமானவை.',
     hi: 'समीकरण, इंडेक्स और कार्यक्रम AIWO के हैं।',
   },
+
+  // ─── Day 90: the change-time request, sent to the physician's Care thread (K1) ──
+  d9ReqSend: { en: 'Ask {who} to move it', ta: 'மாற்றும்படி {who}-இடம் கேட்கவும்', hi: '{who} से समय बदलने को कहें' },
+  d9ReqKeep: { en: 'Keep the booked time', ta: 'பதிவான நேரத்தையே வைத்திருக்கவும்', hi: 'बुक किया समय ही रखें' },
+  d9ReqSubject: { en: 'Day-90 call: the time', ta: 'நாள்-90 அழைப்பு: நேரம்', hi: 'दिन-90 कॉल: समय' },
+  d9ReqBody: {
+    en: 'Could we move my Day-90 call from {from} to {to}?',
+    ta: 'என் நாள்-90 அழைப்பை {from} இலிருந்து {to} க்கு மாற்ற முடியுமா?',
+    hi: 'क्या मेरी दिन-90 कॉल {from} से {to} पर की जा सकती है?',
+  },
+  d9ReqKeepBody: {
+    en: 'Please keep my Day-90 call at {from}. I no longer need to move it.',
+    ta: 'என் நாள்-90 அழைப்பை {from} நேரத்திலேயே வைத்திருங்கள். இனி மாற்ற வேண்டியதில்லை.',
+    hi: 'कृपया मेरी दिन-90 कॉल {from} पर ही रखें। अब इसे बदलने की ज़रूरत नहीं।',
+  },
+  d9ReqKept: {
+    en: 'Back to the booked time. Your note to {who} is in Care.',
+    ta: 'பதிவான நேரத்துக்கே திரும்பியது. {who}-க்கான உங்கள் குறிப்பு கவனிப்பு பகுதியில் உள்ளது.',
+    hi: 'बुक किए समय पर वापस। {who} के लिए आपका नोट ‘देखभाल’ में है।',
+  },
+  d9ReqThread: { en: 'Open the thread', ta: 'உரையாடலைத் திறக்கவும்', hi: 'बातचीत खोलें' },
+  // ─── Day 90: a term skipped in the Clinical-grade sitting, measured later ──
+  d9MeasureLater: {
+    en: 'Measure it on its own: only that term’s items. The answers join this sitting as answered later, the Index is scored again, and the record goes back to {who} to sign.',
+    ta: 'அதைத் தனியாக அளவிடுங்கள்: அந்த அம்சத்தின் கேள்விகள் மட்டும். பதில்கள் இந்த அமர்வில் “பின்னர் பதிலளித்தவை” எனச் சேரும், குறியீடு மீண்டும் மதிப்பிடப்படும், பதிவு கையொப்பத்துக்காக {who}-இடம் திரும்பச் செல்லும்.',
+    hi: 'इसे अलग से मापें: सिर्फ़ उस पहलू के सवाल। जवाब इस बैठक में “बाद में दिए गए” के रूप में जुड़ेंगे, इंडेक्स दोबारा स्कोर होगा, और रिकॉर्ड हस्ताक्षर के लिए {who} के पास लौटेगा।',
+  },
+  tmBodyClinical: {
+    en: 'Only this term’s items. Your other answers stay as they were scored; these join your Clinical-grade sitting as answered later, the Index is scored again, and the record goes back to {who} to sign.',
+    ta: 'இந்த அம்சத்தின் கேள்விகள் மட்டும். உங்கள் மற்ற பதில்கள் மதிப்பிட்டபடியே இருக்கும்; இவை உங்கள் மருத்துவ நிலை அமர்வில் “பின்னர் பதிலளித்தவை” எனச் சேரும், குறியீடு மீண்டும் மதிப்பிடப்படும், பதிவு கையொப்பத்துக்காக {who}-இடம் திரும்பச் செல்லும்.',
+    hi: 'सिर्फ़ इस पहलू के सवाल। आपके बाक़ी जवाब वैसे ही रहते हैं जैसे स्कोर हुए थे; ये आपकी क्लिनिकल ग्रेड बैठक में “बाद में दिए गए” के रूप में जुड़ते हैं, इंडेक्स दोबारा स्कोर होता है, और रिकॉर्ड हस्ताक्षर के लिए {who} के पास लौटता है।',
+  },
+  tmAddClinical: { en: 'Add to my Clinical-grade sitting', ta: 'என் மருத்துவ நிலை அமர்வில் சேர்க்கவும்', hi: 'मेरी क्लिनिकल ग्रेड बैठक में जोड़ें' },
+  tmBackDay90: { en: 'Back to Day 90', ta: 'நாள் 90-க்குத் திரும்பவும்', hi: 'दिन 90 पर वापस' },
+  tmEnglishName: { en: 'Published as', ta: 'வெளியிடப்பட்ட பெயர்', hi: 'प्रकाशित नाम' },
+
+  // ─── My Index: the member's own signed Day-90 re-measure ────────────────
+  ixOwnMoved: { en: 'Day 0 {a} → Day 90 {b}', ta: 'நாள் 0 {a} → நாள் 90 {b}', hi: 'दिन 0 {a} → दिन 90 {b}' },
+  ixOwnMovedH: { en: 'Your Day-90 re-measure', ta: 'உங்கள் நாள்-90 மறு அளவீடு', hi: 'आपका दिन-90 पुनर्माप' },
+  hsOwnLine: {
+    en: 'The newest row is your own Day-90 Clinical-grade re-measure, signed by {who} on {date}.',
+    ta: 'புதிய வரிசை உங்கள் சொந்த நாள்-90 மருத்துவ நிலை மறு அளவீடு; {date} அன்று {who} கையொப்பமிட்டது.',
+    hi: 'सबसे नई पंक्ति आपका अपना दिन-90 क्लिनिकल ग्रेड पुनर्माप है, {date} को {who} के हस्ताक्षर।',
+  },
+
+  // ─── VIVA: hand-offs to Care (K1), guardrail labels, and a minor's replies ──
+  pvGrNoDx: { en: 'guardrail · no diagnosis', ta: 'காப்பு விதி · நோயறிதல் இல்லை', hi: 'सुरक्षा नियम · कोई निदान नहीं' },
+  pvGrNoMoney: { en: 'guardrail · no financial advice', ta: 'காப்பு விதி · நிதி ஆலோசனை இல்லை', hi: 'सुरक्षा नियम · कोई वित्तीय सलाह नहीं' },
+  pvGrAdviser: { en: 'guardrail · question for adviser', ta: 'காப்பு விதி · ஆலோசகருக்கான கேள்வி', hi: 'सुरक्षा नियम · सलाहकार के लिए सवाल' },
+  vvRelaySubject: { en: 'While VIVA was resting', ta: 'VIVA ஓய்வில் இருந்தபோது', hi: 'जब VIVA आराम कर रहा था' },
+  vvDxSubject: { en: 'A question VIVA passed on', ta: 'VIVA அனுப்பிய ஒரு கேள்வி', hi: 'VIVA का आगे भेजा एक सवाल' },
+  vvMinorAskTitle: { en: 'How the Index works', ta: 'குறியீடு எப்படிச் செயல்படுகிறது', hi: 'इंडेक्स कैसे काम करता है' },
+  vvMinorDoes: {
+    en: 'The six terms and the equation. You are not scored while under 18.',
+    ta: 'ஆறு அம்சங்களும் சமன்பாடும். 18 வயதுக்குக் கீழ் இருக்கும்போது உங்களுக்கு மதிப்பெண் இல்லை.',
+    hi: 'छह पहलू और समीकरण। 18 साल से कम उम्र में आपको स्कोर नहीं किया जाता।',
+  },
+  vvMinorAsk: { en: 'How is the Index built?', ta: 'குறியீடு எப்படி உருவாக்கப்படுகிறது?', hi: 'इंडेक्स कैसे बनता है?' },
+  rtIndexMinor: {
+    en: 'The Index is the geometric mean of five positive terms, minus a quarter of Burden, so the lowest term holds it back most. You are not scored while under 18, so I won’t quote a number for you. From your 18th birthday you can choose to take it.',
+    ta: 'குறியீடு என்பது ஐந்து நேர்மறை அம்சங்களின் பெருக்கல் சராசரியிலிருந்து சுமையின் நான்கில் ஒரு பங்கைக் கழித்தது; எனவே மிகக் குறைந்த அம்சமே அதை அதிகம் பின்னுக்கு இழுக்கிறது. 18 வயதுக்குக் கீழ் இருக்கும்போது உங்களுக்கு மதிப்பெண் இல்லை, எனவே உங்களுக்கான எண் எதையும் சொல்ல மாட்டேன். உங்கள் 18-வது பிறந்தநாளிலிருந்து நீங்கள் விரும்பினால் அதை எடுக்கலாம்.',
+    hi: 'इंडेक्स पाँच सकारात्मक पहलुओं का ज्यामितीय औसत है, जिसमें से बोझ का एक-चौथाई घटाया जाता है, इसलिए सबसे कम पहलू इसे सबसे ज़्यादा रोकता है। 18 साल से कम उम्र में आपको स्कोर नहीं किया जाता, इसलिए मैं आपके लिए कोई संख्या नहीं बताऊँगा। अपने 18वें जन्मदिन से आप चाहें तो इसे ले सकते हैं।',
+  },
+  rtBodyMinor: {
+    en: 'I can describe your signals, never diagnose them. You are not scored while under 18, so I won’t quote a term score. For a sleep concern, Dr Meera is in Care.',
+    ta: 'உங்கள் சிக்னல்களை விவரிக்க முடியும், அவற்றை வைத்து நோயறிதல் செய்ய முடியாது. 18 வயதுக்குக் கீழ் இருக்கும்போது உங்களுக்கு மதிப்பெண் இல்லை, எனவே எந்த அம்ச மதிப்பெண்ணையும் சொல்ல மாட்டேன். தூக்கம் பற்றிய கவலைக்கு, Dr Meera கவனிப்பு பகுதியில் இருக்கிறார்.',
+    hi: 'आपके सिग्नल समझाए जा सकते हैं, उनसे बीमारी नहीं बताई जाती। 18 साल से कम उम्र में आपको स्कोर नहीं किया जाता, इसलिए मैं किसी पहलू का स्कोर नहीं बताऊँगा। नींद की चिंता के लिए Dr Meera ‘देखभाल’ में हैं।',
+  },
+
+  // ─── Day 40, for a member under 18 (no Index, no term score) ────────────
+  d4StartMinor: {
+    en: 'Your first sitting, {date}. You are not scored while under 18, so this page carries no number.',
+    ta: 'உங்கள் முதல் அமர்வு, {date}. 18 வயதுக்குக் கீழ் இருக்கும்போது உங்களுக்கு மதிப்பெண் இல்லை; எனவே இந்தப் பக்கத்தில் எண் எதுவும் இல்லை.',
+    hi: 'आपकी पहली बैठक, {date}। 18 साल से कम उम्र में आपको स्कोर नहीं किया जाता, इसलिए इस पन्ने पर कोई संख्या नहीं है।',
+  },
+  d4PlanMinor: { en: 'Your plan starts with {term}.', ta: 'உங்கள் திட்டம் {term} அம்சத்துடன் தொடங்குகிறது.', hi: 'आपकी योजना {term} से शुरू होती है।' },
+
+  // ─── The Letter: write-back held after the emergency intercept ──────────
+  ltHeld: {
+    en: 'Nothing was sent. What you wrote sounds heavy, so support is open now. Your words stay in the box and are not kept.',
+    ta: 'எதுவும் அனுப்பப்படவில்லை. நீங்கள் எழுதியது கனமாகத் தெரிகிறது; எனவே உதவி இப்போது திறந்துள்ளது. உங்கள் வார்த்தைகள் பெட்டியிலேயே இருக்கும்; சேமிக்கப்படாது.',
+    hi: 'कुछ नहीं भेजा गया। आपने जो लिखा वह भारी लगता है, इसलिए मदद अभी खुली है। आपके शब्द बॉक्स में ही हैं और सहेजे नहीं गए।',
+  },
 } satisfies Dict
+
+/**
+ * Instrument licence attributions (Take the Index intro). Authors and bodies stay as
+ * published; the licence phrase is translated.
+ */
+export const ATTRIBUTION_TEXT: Record<string, { ta: string; hi: string }> = {
+  'American Heart Association · free to use': { ta: 'American Heart Association · பயன்படுத்த இலவசம்', hi: 'American Heart Association · इस्तेमाल के लिए मुफ़्त' },
+  'Imai et al. · author permission (pending, specimen)': { ta: 'Imai et al. · ஆசிரியர் அனுமதி (நிலுவையில், மாதிரி)', hi: 'Imai et al. · लेखक की अनुमति (बाकी, नमूना)' },
+  'Steger et al. · free for research, commercial use confirmed': { ta: 'Steger et al. · ஆய்வுக்கு இலவசம், வணிகப் பயன் உறுதி', hi: 'Steger et al. · शोध के लिए मुफ़्त, व्यावसायिक उपयोग पक्का' },
+  'Hughes et al. · public domain': { ta: 'Hughes et al. · பொதுக் களம்', hi: 'Hughes et al. · सार्वजनिक डोमेन' },
+  'Lubben · terms to confirm (specimen)': { ta: 'Lubben · விதிமுறைகள் உறுதியாக வேண்டும் (மாதிரி)', hi: 'Lubben · शर्तें तय होनी हैं (नमूना)' },
+  'Chen et al. · terms to confirm (specimen)': { ta: 'Chen et al. · விதிமுறைகள் உறுதியாக வேண்டும் (மாதிரி)', hi: 'Chen et al. · शर्तें तय होनी हैं (नमूना)' },
+  'Kasser & Sheldon · free with attribution': { ta: 'Kasser & Sheldon · மேற்கோளுடன் இலவசம்', hi: 'Kasser & Sheldon · श्रेय देकर मुफ़्त' },
+  'US CFPB · public domain': { ta: 'US CFPB · பொதுக் களம்', hi: 'US CFPB · सार्वजनिक डोमेन' },
+  'Diener et al. · free with attribution': { ta: 'Diener et al. · மேற்கோளுடன் இலவசம்', hi: 'Diener et al. · श्रेय देकर मुफ़्त' },
+  'Kroenke et al. · public domain': { ta: 'Kroenke et al. · பொதுக் களம்', hi: 'Kroenke et al. · सार्वजनिक डोमेन' },
+  'Cohen et al. · terms to confirm (specimen)': { ta: 'Cohen et al. · விதிமுறைகள் உறுதியாக வேண்டும் (மாதிரி)', hi: 'Cohen et al. · शर्तें तय होनी हैं (नमूना)' },
+}
+
+/** Instrument names in the member's language (the published English name is shown beneath). */
+export const BLOCK_NAME_TEXT: Record<string, { ta: string; hi: string }> = {
+  'Life’s Essential 8 · self-report': { ta: 'Life’s Essential 8 · சுய அறிக்கை', hi: 'Life’s Essential 8 · स्व-रिपोर्ट' },
+  'Meaning in Life · Presence': { ta: 'வாழ்க்கையின் பொருள் · இருப்பு', hi: 'जीवन का अर्थ · उपस्थिति' },
+  'UCLA Loneliness · three items': { ta: 'UCLA தனிமை · மூன்று கேள்விகள்', hi: 'UCLA अकेलापन · तीन सवाल' },
+  'Lubben Social Network Scale · six items': { ta: 'Lubben சமூக வலைப்பின்னல் அளவுகோல் · ஆறு கேள்விகள்', hi: 'Lubben सामाजिक नेटवर्क पैमाना · छह सवाल' },
+  'Basic Psychological Needs · autonomy': { ta: 'அடிப்படை உளவியல் தேவைகள் · சுயாட்சி', hi: 'बुनियादी मनोवैज्ञानिक ज़रूरतें · स्वायत्तता' },
+  'Time affluence': { ta: 'நேர வளம்', hi: 'समय की भरपूरता' },
+  'Financial Well-Being · five items': { ta: 'நிதி நலம் · ஐந்து கேள்விகள்', hi: 'वित्तीय कल्याण · पाँच सवाल' },
+  'Scale of Positive and Negative Experience': { ta: 'நேர்மறை, எதிர்மறை அனுபவ அளவுகோல்', hi: 'सकारात्मक और नकारात्मक अनुभव का पैमाना' },
+  'Patient Health Questionnaire · four items': { ta: 'நோயாளர் உடல்நலக் கேள்வித்தாள் · நான்கு கேள்விகள்', hi: 'रोगी स्वास्थ्य प्रश्नावली · चार सवाल' },
+  'Perceived Stress Scale · four items': { ta: 'உணரப்பட்ட மன அழுத்த அளவுகோல் · நான்கு கேள்விகள்', hi: 'अनुभूत तनाव पैमाना · चार सवाल' },
+}
+
+/** A table string in the member's language (English stays as published). */
+export function txOf(table: Record<string, { ta: string; hi: string }>, s: string, lang: string) {
+  return lang === 'ta' || lang === 'hi' ? table[s]?.[lang] ?? s : s
+}
 
 /** The second core dictionary's translator. */
 export function useX() {

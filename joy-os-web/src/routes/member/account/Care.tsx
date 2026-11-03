@@ -101,7 +101,7 @@ export default function Care() {
       <div className="mt-16 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
         <Section id="consults" eyebrow={t('consults')} title={t('comingUp')}>
           {consults.length === 0 && (
-            <EmptyState title={t('noConsults')} body={t('noConsultsBody')} action={<Button variant="secondary" onClick={() => findClinician('Psychologist')}>{t('findClinician')}</Button>} />
+            <EmptyState illustration="circle" title={t('noConsults')} body={t('noConsultsBody')} action={<Button variant="secondary" onClick={() => findClinician('Psychologist')}>{t('findClinician')}</Button>} />
           )}
           <ul className="space-y-4">
             <AnimatePresence initial={false}>
@@ -447,7 +447,7 @@ function Prescriptions() {
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-paper-sunk text-ink-2"><PillIcon size={18} /></span>
               <div>
                 <p className="text-[17px] text-ink">{rx.drug}</p>
-                <p className="mt-0.5 text-[15px] text-ink-2">{rx.sig}</p>
+                <p className="mt-0.5 text-[15px] text-ink-2">{dx(rx.sig)}</p>
                 <p className="mt-2 text-[13px] text-ink-3">
                   <Stethoscope size={13} className="mr-1 inline" /> {rx.by} · {t('reg')} <span className="num">{rx.reg}</span> · {dx(rx.check)}
                 </p>
@@ -496,7 +496,7 @@ function Matching({ onBook, role, setRole }: { onBook: (c: (typeof CLINICIANS)[n
       <p className="mt-5 text-[14px] text-ink-2" aria-live="polite"><span className="num">{results.length}</span> {results.length === 1 ? t('matchOne') : t('matchMany')}</p>
       {results.length === 0 ? (
         <div className="mt-3">
-          <EmptyState title={t('noMatch')} body={t('noMatchBody')} action={<Button variant="secondary" onClick={reset}>{t('clearFilters')}</Button>} />
+          <EmptyState illustration="generic" title={t('noMatch')} body={t('noMatchBody')} action={<Button variant="secondary" onClick={reset}>{t('clearFilters')}</Button>} />
         </div>
       ) : (
         <ul className="mt-3 grid gap-4 md:grid-cols-2">

@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { ArrowRight, CalendarClock, Check, FileSignature, Hourglass, MessageCircle, Pencil, ShieldCheck } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { JoyspanWheel, WheelGhostKey } from '@/components/joy/JoyspanWheel'
 import { BandLabel, DaybreakButton, Delta, Eyebrow, MethodLine, SpecimenTag, TermDot, useBandText, useFmtDate } from '@/components/joy/primitives'
@@ -11,8 +11,9 @@ import { termByKey } from '@/data/terms'
 import { METHODS, bandFor, joyspanIndex, lowestTerm } from '@/domain/indexEngine'
 import type { Grade, TermKey, TermScore } from '@/domain/types'
 import { DAY90_DATES, DAY90_TERMS, DAY90_WHY, NEXT_90 } from './_data'
-import { INK_GROUND, PAPER_GROUND } from './_parts'
-import { IN_REMEASURE_WINDOW, REMEASURE_OPENS, addDays, useRemeasure, type Amendment } from './_store'
+import { INK_GROUND, PAPER_GROUND, PrintOnly } from './_parts'
+import { IN_REMEASURE_WINDOW, REMEASURE_OPENS, addDays, amendRemeasure, useCallRequest, useRemeasure, type Amendment } from './_store'
+import { careThreadHref, postCareMessage } from '@/routes/member/account/_careInbox'
 import type { SittingResult } from './_scoring'
 import { AmendPanel } from './_amend'
 import { IndexCardView } from './_card'
@@ -61,11 +62,15 @@ export default function Day90() {
   const signedOn = own ? rec!.signedAt?.slice(0, 10) ?? DAY90_DATES.day90 : '2027-04-06'
   const moved = own ? movedOf(day0.terms, terms90) : DAY90_SPECIMEN.moved
   const x = useX()
-  // The booked call stays until Dr Meera confirms a move; a request is shown beside it.
+  // The booked call stays until Dr Meera confirms a move. A request to move it is kept
+  // (joyos:core:day90-call-request) and sent to her Care thread, where she answers it.
   const slot = DAY90_DATES.call
-  const [requested, setRequested] = useState<string | null>(null)
+  const [request, setRequest] = useCallRequest()
+  const requested = request?.slot ?? null
   const [picking, setPicking] = useState(false)
-  const pointerPick = useRef(false)
+  const [choice, setChoice] = useState<string | null>(null)
+  const [kept, setKept] = useState(false)
+  const target = choice ?? requested ?? slot
   const day = weekdayOf(slot)
   const b0 = day0.terms.find((t) => t.key === 'B')!.value!
   const b90 = terms90.find((t) => t.key === 'B')?.value ?? null
@@ -88,25 +93,24 @@ export default function Day90() {
   const firstValue = own ? (rec!.original ? rec!.original.value : rec!.value ?? null) : null
   const prior = own ? rec!.priorSignatures ?? [] : []
   const lastPrior = prior[prior.length - 1]
-  const onAppend = (a: Amendment, r: SittingResult) =>
-    setRec((prev) => {
-      if (!prev) return prev
-      const { signed: _s, signedBy, signedAt, signedIndex, ...rest } = prev
-      void _s
-      const wasSigned = prev.status === 'signed'
-      return {
-        ...rest,
-        status: 'awaiting',
-        original: prev.original ?? { value: prev.value ?? null, terms: prev.terms ?? [], lowestTerm: prev.lowestTerm ?? r.lowest },
-        value: r.value,
-        gm: r.engine.gm,
-        burden: r.engine.burden,
-        terms: r.terms,
-        lowestTerm: r.lowest,
-        amendments: [...(prev.amendments ?? []), a],
-        priorSignatures: wasSigned && signedBy ? [...(prev.priorSignatures ?? []), { by: signedBy, at: signedAt ?? a.at, ...(signedIndex !== undefined ? { index: signedIndex } : {}) }] : prev.priorSignatures,
-      }
-    })
+  const onAppend = (a: Amendment, r: SittingResult) => setRec((prev) => (prev ? amendRemeasure(prev, [a], r) : prev))
+  const surveyOnly = own && !!rec!.surveyOnly
+  const sendRequest = () => {
+    if (target === slot || target === requested) return
+    postCareMessage({ to: 'physician', from: 'member', subject: x('d9ReqSubject'), body: x('d9ReqBody', { from: when(slot), to: when(target) }), ref: `day90-call:${target}` })
+    setRequest({ slot: target, at: new Date().toISOString() })
+    setKept(false)
+    setChoice(null)
+    setPicking(false)
+  }
+  const keepBooked = () => {
+    if (!requested) return
+    postCareMessage({ to: 'physician', from: 'member', subject: x('d9ReqSubject'), body: x('d9ReqKeepBody', { from: when(slot) }), ref: `day90-call:${slot}` })
+    setRequest(null)
+    setKept(true)
+    setChoice(null)
+    setPicking(false)
+  }
 
   return (
     <div style={INK_GROUND} className="-mx-4 -mb-28 -mt-6 min-h-[calc(100vh-3.5rem)] px-4 pb-36 pt-8 md:mx-0 md:mb-0 md:mt-0 md:min-h-0 md:rounded-[20px] md:px-10 md:pb-12 md:pt-10 lg:px-12">
@@ -156,6 +160,24 @@ export default function Day90() {
             </span>
           </div>
           <p className="mt-6 max-w-[34ch] text-[1.5rem] font-light leading-snug text-ink md:text-[1.7rem]">{sentence}</p>
+          {own && missing.length > 0 && (
+            // A term skipped in the Clinical-grade sitting is measured on its own, then re-signed.
+            <div className="mt-4 max-w-xl">
+              <p className="text-[14px] text-ink-2">{x('d9MeasureLater', { who: meera.name })}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {missing.map((k) => (
+                  <Link key={k} to={`/app/index/take?grade=clinical&term=${k}`} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line-strong px-3 text-[14px] text-ink hover:bg-paper-sunk focus-ring">
+                    <TermDot term={k} /> {x('skMeasureNow', { term: name(k) })}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+          {surveyOnly && (
+            <p className="mt-3 flex flex-wrap items-center gap-2 text-[14px] text-ink-2">
+              <Pill tone="neutral">{c('soPill')}</Pill> {c('soBanner')}
+            </p>
+          )}
           <GradeStatus grade={grade} signer={signer} signedOn={signedOn} />
           {own && grade === 'awaiting' && lastPrior && (
             <p className="mt-3 max-w-xl text-[14px] text-ink-2">{rich(x('d9Resign'), { who: lastPrior.by, date: <span className="num">{fmtDate(lastPrior.at.slice(0, 10))}</span> })}</p>
@@ -197,6 +219,7 @@ export default function Day90() {
           </Card>
         ) : (
           <div style={PAPER_GROUND} className="rounded-[20px] p-4 sm:p-5">
+            <PrintOnly id="joy-day90-card" />
             <IndexCardView
               id="joy-day90-card"
               title={x('d9CardTitle')}
@@ -211,7 +234,7 @@ export default function Day90() {
               signedBy={grade === 'signed' ? signer : null}
               signedOn={signedOn}
               baseline={day0.terms}
-              printable={false}
+              surveyOnly={surveyOnly}
             />
           </div>
         )}
@@ -252,37 +275,55 @@ export default function Day90() {
           <p className="mt-4 text-[1.35rem] font-light leading-snug text-ink">{pick(DAY90_SPECIMEN_TEXT.person, DAY90_SPECIMEN.person)}</p>
           <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px] text-ink-2"><CalendarClock size={15} aria-hidden /> <span className="num">{when(slot)}</span> <span>{c('d9CallMeta')}</span></p>
           {picking && (
-            <fieldset className="mt-4 space-y-2" onKeyDown={() => { pointerPick.current = false }}>
+            <fieldset className="mt-4 space-y-2">
               <legend className="eyebrow mb-2 text-ink-3">{c('d9Choose')}</legend>
               {SLOTS.map((s) => {
-                const on = (requested ?? slot) === s
+                const on = target === s
                 return (
-                  <label key={s} onPointerDown={() => { pointerPick.current = true }} className={clsx('flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-[15px] focus-within:ring-2 focus-within:ring-daybreak', on ? 'border-ink text-ink' : 'border-line text-ink-2')}>
-                    <input type="radio" name="slot" className="sr-only" checked={on} onChange={() => {
-                      setRequested(s === slot ? null : s)
-                      // A tap picks and closes; arrow keys only move the choice, so keyboard
-                      // users can browse the slots and close with the toggle below.
-                      if (pointerPick.current) setPicking(false)
-                      pointerPick.current = false
-                    }} />
+                  <label key={s} className={clsx('flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-[15px] focus-within:ring-2 focus-within:ring-daybreak', on ? 'border-ink text-ink' : 'border-line text-ink-2')}>
+                    {/* Picking only chooses; nothing is sent until the button below. */}
+                    <input type="radio" name="slot" className="sr-only" checked={on} onChange={() => setChoice(s)} />
                     <span className={clsx('flex h-4 w-4 items-center justify-center rounded-full border', on ? 'border-ink' : 'border-line-strong')}>{on && <span className="h-2 w-2 rounded-full bg-ink" />}</span>
                     <span className="num min-w-0">{when(s)}</span>
                     {s === slot && <span className="ml-auto shrink-0 text-[13px] text-ink-3">{c('d9Booked')}</span>}
                   </label>
                 )
               })}
+              {target !== slot && target !== requested && (
+                <Button variant="secondary" size="sm" className="mt-2" onClick={sendRequest}>
+                  <MessageCircle size={15} /> {x('d9ReqSend', { who: meera.name })}
+                </Button>
+              )}
+              {target === slot && requested && (
+                <Button variant="secondary" size="sm" className="mt-2" onClick={keepBooked}>
+                  {x('d9ReqKeep')}
+                </Button>
+              )}
             </fieldset>
           )}
           {requested && !picking && (
-            <p role="status" className="mt-3 flex items-start gap-2 rounded-lg bg-paper-sunk px-3 py-2 text-[14px] text-ink-2">
-              <Check size={15} className="mt-0.5 shrink-0" aria-hidden /> <span>{rich(c('d9Asked'), { slot: <span className="num">{when(requested)}</span>, day: dayT })}</span>
-            </p>
+            <div role="status" className="mt-3 flex items-start gap-2 rounded-lg bg-paper-sunk px-3 py-2 text-[14px] text-ink-2">
+              <Check size={15} className="mt-0.5 shrink-0" aria-hidden />
+              <span>
+                {rich(c('d9Asked'), { slot: <span className="num">{when(requested)}</span>, day: dayT })}{' '}
+                <Link to={careThreadHref('physician')} className="text-ink underline underline-offset-4 focus-ring">{x('d9ReqThread')}</Link>
+              </span>
+            </div>
+          )}
+          {kept && !requested && !picking && (
+            <div role="status" className="mt-3 flex items-start gap-2 rounded-lg bg-paper-sunk px-3 py-2 text-[14px] text-ink-2">
+              <Check size={15} className="mt-0.5 shrink-0" aria-hidden />
+              <span>
+                {x('d9ReqKept', { who: meera.name })}{' '}
+                <Link to={careThreadHref('physician')} className="text-ink underline underline-offset-4 focus-ring">{x('d9ReqThread')}</Link>
+              </span>
+            </div>
           )}
           <div className="mt-auto flex flex-wrap gap-2 pt-5">
-            <Button variant="secondary" size="sm" onClick={() => setPicking((p) => !p)} aria-expanded={picking}>
+            <Button variant="secondary" size="sm" onClick={() => { setPicking((p) => !p); setChoice(null) }} aria-expanded={picking}>
               <CalendarClock size={15} /> {picking ? c('close') : requested ? c('d9ChangeReq') : c('d9ChangeTime')}
             </Button>
-            <Link to="/app/care/messages" className="inline-flex h-9 items-center gap-2 rounded-full px-3 text-[14px] font-medium text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring">
+            <Link to={careThreadHref('physician')} className="inline-flex h-9 items-center gap-2 rounded-full px-3 text-[14px] font-medium text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring">
               <MessageCircle size={15} /> {c('d9Message')}
             </Link>
           </div>

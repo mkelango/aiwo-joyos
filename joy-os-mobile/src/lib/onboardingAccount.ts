@@ -1,4 +1,6 @@
-import { createStore, onboardingStore } from '../screens/b/bStore'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { createStore, onboardingStore, sessionStore } from '../screens/b/bStore'
+import { SESSION_STORAGE_KEY, provesSession } from './sessionKeys'
 
 // The AIWO ID made during onboarding (Plan §4B: welcome → AIWO ID → …). Specimen: no real
 // account is created and nothing leaves the phone; the passkey and the one-time code are
@@ -87,6 +89,39 @@ for (const st of [onboardingStore, onboardingLayoutStore, onboardingAccountStore
     if (migrateOnboardingDraft()) off()
   })
 }
+
+// ─── Signed-out first run (M1) ────────────────────────────────────────────
+// bStore reads a missing session as a returning phone when any Joy OS key is on it, and carries
+// on signed in as the specimen member. But a phone that was never signed in writes such keys too:
+// the app's settings on every launch, this layout migration, a Letter reply, the Check. So the
+// guess is checked here against keys that only a signed-in member's screens write, and the
+// session is then kept on the phone, so the next launch reads it as it is instead of guessing.
+
+/** What was on the phone before this run wrote anything (read beside bStore's own launch read). */
+let launch: null | { sessionKept: boolean; proves: boolean } = null
+const launchRead = Promise.all([AsyncStorage.getItem(SESSION_STORAGE_KEY), AsyncStorage.getAllKeys()])
+  .then(([raw, keys]) => {
+    launch = { sessionKept: raw != null, proves: keys.some(provesSession) }
+  })
+  .catch(() => {
+    launch = { sessionKept: false, proves: false }
+  })
+
+let settled = false
+function settleSession() {
+  if (settled || !launch || !sessionStore.hydrated()) return
+  settled = true
+  offSession()
+  // A session kept on the phone is read as it is.
+  if (launch.sessionKept) return
+  const s = sessionStore.get()
+  // bStore's guess has no sign-in time; a real sign-in in the meantime always does.
+  const guessed = s.signedIn && !s.at && s.account === 'arjun'
+  if (guessed && !launch.proves) sessionStore.set({ signedIn: false, onboarded: false, account: 'arjun' })
+  else sessionStore.set((prev) => prev)
+}
+const offSession = sessionStore.subscribe(settleSession)
+launchRead.then(settleSession)
 
 const ID_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const block = () => Array.from({ length: 4 }, () => ID_CHARS[Math.floor(Math.random() * ID_CHARS.length)]).join('')

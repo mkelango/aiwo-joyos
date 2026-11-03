@@ -4,12 +4,13 @@ import { ArrowRight, BookOpen, Calendar, Check, FlaskConical, Users } from 'luci
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Bar, BarChart, LabelList, ResponsiveContainer, XAxis, YAxis } from 'recharts'
-import { DaybreakButton, Eyebrow, MethodLine, SpecimenTag, TermDot, useFmtDate } from '@/components/joy/primitives'
+import { DaybreakButton, Eyebrow, MethodLine, NotScoredNote, SpecimenTag, TermDot, useFmtDate } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill, SectionTitle } from '@/components/ui'
 import { CIRCLE, PRACTICE_WEEKS } from '@/data/platform'
 import { INDEX_HISTORY, TEAM } from '@/data/member'
+import { useScoresHidden } from '@/lib/minor'
 import { PRACTICE_CONTENT, PRACTICE_PULSE } from './_data'
-import { AudioPlayer, PrimaryChip, Quote, fade, useAfterIndex } from './_parts'
+import { AudioPlayer, PrimaryChip, Quote, Verse, fade, useAfterIndex } from './_parts'
 import { practisedToday, togglePractisedToday, useJourney, weekPractised } from './_store'
 import { useJ } from './_i18n'
 
@@ -31,6 +32,8 @@ export default function Practice() {
   const days = journey.practisedDays
   const nowRef = useRef<HTMLAnchorElement>(null)
   const { t, r, tx, term, locale, en } = useJ()
+  // A member under 18 is never scored (Architecture p26): no Index or term values here.
+  const minor = useScoresHidden()
 
   // On a narrow screen, bring the current week into view in the rail.
   useEffect(() => {
@@ -157,17 +160,24 @@ export default function Practice() {
         </div>
       </div>
 
-      {/* Mentor quote */}
+      {/* Mentor quote, and the verse: the Thirukkural in Tamil with the English beneath (Playbook p63) */}
       <Card tone="soft" className="mt-10 md:p-10">
         <Quote by="C. Sivasankaran" role={t('mentorRole')}>
           {tx('Your circumstances are part of your life. They do not have to become the whole of your life.')}
         </Quote>
+        <Verse className="mt-8 border-t border-line pt-8" />
       </Card>
 
       {/* Before and after */}
       <section className="mt-10" aria-labelledby="ba">
-        <SectionTitle aside={<SpecimenTag />}><span id="ba">{t('baTitle2')}</span></SectionTitle>
+        <SectionTitle aside={minor ? undefined : <SpecimenTag />}><span id="ba">{t(minor ? 'eightWeeks' : 'baTitle2')}</span></SectionTitle>
         <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
+          {minor ? (
+            <Card>
+              <NotScoredNote />
+              <p className="mt-4 text-[15px] text-ink-2">{t('minorPractice')}</p>
+            </Card>
+          ) : (
           <Card>
             <div className="grid grid-cols-[1fr_auto_auto] items-end gap-x-6 gap-y-3">
               <span className="eyebrow text-ink-3">{t('termCol')}</span>
@@ -194,6 +204,7 @@ export default function Practice() {
             <Link to={after.measured ? '/app/index/take' : '/app/practice/week/8'} className="mt-3 inline-flex items-center gap-1.5 text-[15px] text-ink underline-offset-4 hover:underline focus-ring">{t(after.measured ? 'retakeAgain' : 'toWeek8')} <ArrowRight size={15} /></Link>
             <MethodLine className="mt-3" method={before.method} grade={before.grade} takenOn={before.takenOn} next={before.nextMeasure} />
           </Card>
+          )}
           <Card tone="sunk">
             <Eyebrow>{t('between')}</Eyebrow>
             <p className="mt-2 text-[16px] text-ink">{t('joyMomentsLead')}</p>

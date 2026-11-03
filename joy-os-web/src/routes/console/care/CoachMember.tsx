@@ -158,6 +158,8 @@ function Digest({ d, reason, onChangeReason }: { d: CoachDigest; reason: string;
   const override = work.override ?? (shared?.term ? { title: shared.action, term: shared.term, reason: shared.reason, until: shared.until ?? d.day + 7 } : null)
   const reviewed = work.reviewed ?? true
   const reviewedAt = work.reviewedAt ?? '27 Jan 18:02'
+  // The specimen summary was reviewed by the member's coach; any later review names whoever signed in.
+  const reviewedBy = work.reviewedBy ?? PRIYA.name
   const summary = work.summary ?? d.summary.join('\n\n')
   const audit = [...(work.audit ?? []), ...baseAudit(d)]
 
@@ -234,7 +236,7 @@ function Digest({ d, reason, onChangeReason }: { d: CoachDigest; reason: string;
   }
 
   const saveReviewed = (text?: string) => {
-    coach.updateMember(d.id, (w) => ({ ...w, reviewed: true, reviewedAt: `28 Jan ${fmtClock(now)}`, ...(text !== undefined ? { summary: text } : {}) }))
+    coach.updateMember(d.id, (w) => ({ ...w, reviewed: true, reviewedAt: `28 Jan ${fmtClock(now)}`, reviewedBy: actor.who, ...(text !== undefined ? { summary: text } : {}) }))
     addAudit({ what: text !== undefined ? 'Edited and approved the VIVA summary' : 'Marked the VIVA summary reviewed', purpose: 'coach_digest review' })
   }
 
@@ -295,9 +297,9 @@ function Digest({ d, reason, onChangeReason }: { d: CoachDigest; reason: string;
             eyebrow="The quarter, in brief"
             aside={
               d.summaryPaused ? <Pill>Paused</Pill> : reviewed ? (
-                <Pill tone="ink"><Check size={12} aria-hidden /> drafted by VIVA, reviewed by Priya</Pill>
+                <Pill tone="ink"><Check size={12} aria-hidden /> drafted by VIVA, reviewed by {reviewedBy}</Pill>
               ) : (
-                <Pill tone="daybreak"><Sparkles size={12} aria-hidden /> drafted by VIVA · awaiting Priya</Pill>
+                <Pill tone="daybreak"><Sparkles size={12} aria-hidden /> drafted by VIVA · awaiting a reviewer</Pill>
               )
             }
           />
@@ -319,7 +321,7 @@ function Digest({ d, reason, onChangeReason }: { d: CoachDigest; reason: string;
           )}
           {!d.summaryPaused && (
             <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
-              <p className="eyebrow text-ink-3">coach_digest@1.2.0 · method {d.method} · inputs sha256:7e1a…c4f0 · {reviewed ? <>reviewed <span className="num">{reviewedAt}</span></> : 'not yet reviewed'}</p>
+              <p className="eyebrow text-ink-3">coach_digest@1.2.0 · method {d.method} · inputs sha256:7e1a…c4f0 · {reviewed ? <>reviewed by {reviewedBy} <span className="num">{reviewedAt}</span></> : 'not yet reviewed'}</p>
               {!editing && (
                 <div className="flex gap-2">
                   <Button variant="ghost" size="sm" disabled={!canAct} onClick={() => { setDraft(summary); setEditing(true) }}><PenLine size={14} aria-hidden /> Edit</Button>

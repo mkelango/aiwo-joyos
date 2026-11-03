@@ -7,7 +7,7 @@ import { MEMBER } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
 import { ENTITLEMENTS, GSTIN_AIWO, GST_RATE, INVOICES, SPECIMEN_NOW } from '@/screens/b/accountData'
 import { PLANS, inr } from '@/screens/b/_data'
-import { accountStore, refCode, useStore } from '@/screens/b/bStore'
+import { accountStore, refCode, useStore, type Billing } from '@/screens/b/bStore'
 import { CheckLine, ChoiceCard, Done, KeyValue, memberOnly, shareOrCopy } from '@/screens/b/parts'
 import { useDict } from '@/lib/i18n'
 import { MEMBERSHIP, CADENCE, PLAN_POINT, ENTITLEMENT_USE, INVOICE_ITEM, PAY_WORD } from '@/screens/b/i18n/membership'
@@ -16,6 +16,15 @@ import { useCommon, useTx } from '@/screens/b/i18n/common'
 // MEMBERSHIP: the plan you are on, what it includes, the ladder (Free · Plus · Patron) with a
 // confirm step, GST invoices and the payment method on file (never editable here: Razorpay
 // owns card and UPI entry). A missed payment never locks your data. One Daybreak: Upgrade to Patron.
+// Store billing (Arch 8b-19; Memo p26): on the native app, Joy OS Plus is bought through Apple or
+// Google in-app purchase where store rules require it; the web build and Patron use Razorpay.
+// Specimen: no store sheet opens and nothing is charged; the plan and who bills it are kept.
+
+/** The phone's store for Joy OS Plus: the App Store on an iPhone, Google Play on Android, none on the web build. */
+type StoreBilling = Exclude<Billing, 'razorpay'>
+const STORE: StoreBilling | null = Platform.OS === 'ios' ? 'app-store' : Platform.OS === 'android' ? 'google-play' : null
+const STORE_NAME: Record<StoreBilling, string> = { 'app-store': 'App Store', 'google-play': 'Google Play' }
+const STORE_ACCOUNT: Record<StoreBilling, string> = { 'app-store': 'Apple ID', 'google-play': 'Google account' }
 
 type PlanKey = (typeof PLANS)[number]['key']
 const RENEWS = '2027-02-01'
@@ -40,6 +49,10 @@ function Membership() {
   const [changeOpen, setChangeOpen] = useState(false)
   const [pick, setPick] = useState<PlanKey>('Patron')
   const [confirm, setConfirm] = useState(false)
+  // The store purchase step for Joy OS Plus on the native app: confirm in the store, then approving.
+  const [storeStep, setStoreStep] = useState<'idle' | 'store' | 'approving'>('idle')
+  const storeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (storeTimer.current) clearTimeout(storeTimer.current) }, [])
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const { paymentsGrace, setPaymentsGrace } = useApp()
   const paidHere = acct.paidInvoices ?? []
@@ -143,13 +156,37 @@ function Membership() {
   const openChange = (to: PlanKey) => {
     setPick(to)
     setConfirm(false)
+    setStoreStep('idle')
     setChangeOpen(true)
   }
-  const doChange = () => {
-    const upgrade = PLANS.findIndex((p) => p.key === pick) > PLANS.findIndex((p) => p.key === acct.plan)
+  const closeChange = () => {
+    if (storeTimer.current) {
+      clearTimeout(storeTimer.current)
+      storeTimer.current = null
+    }
+    setStoreStep('idle')
+    setChangeOpen(false)
+  }
+  const isUpgrade = PLANS.findIndex((p) => p.key === pick) > PLANS.findIndex((p) => p.key === acct.plan)
+  // Joy OS Plus bought on the phone goes through its store; everything else through Razorpay.
+  const viaStore = STORE && pick === 'Plus' && isUpgrade ? STORE : null
+  const billing: Billing = acct.billing ?? 'razorpay'
+  const storeBilled = billing !== 'razorpay' && acct.plan === 'Plus' ? billing : null
+  const doChange = (by?: Billing) => {
+    const upgrade = isUpgrade
     const effective = upgrade ? SPECIMEN_NOW : renews
-    setAcct((a) => ({ ...a, planChange: { to: pick, effective, ref: refCode('PLN') }, plan: upgrade ? pick : a.plan, planSince: upgrade ? effective : a.planSince }))
+    setAcct((a) => ({ ...a, planChange: { to: pick, effective, ref: refCode('PLN') }, plan: upgrade ? pick : a.plan, planSince: upgrade ? effective : a.planSince, billing: upgrade ? by ?? 'razorpay' : a.billing }))
+    setStoreStep('idle')
     setConfirm(true)
+  }
+  const buyInStore = () => {
+    if (!viaStore) return
+    setStoreStep('approving')
+    // Specimen: the store "approves" after a short, honest pause; nothing is charged anywhere.
+    storeTimer.current = setTimeout(() => {
+      storeTimer.current = null
+      doChange(viaStore)
+    }, 1200)
   }
 
   return (
@@ -276,16 +313,34 @@ function Membership() {
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{t('payment')}</SectionTitle>
         <Card tone="raised" style={{ gap: space.s1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <Icon name="smartphone" size={18} color={c.ink2} />
-            <View style={{ flex: 1 }}>
-              <Body>
-                UPI · <Mono tone="ink">••••@okhdfc</Mono>
-              </Body>
-              <Meta size={14}>{t('autopay')}</Meta>
-            </View>
-          </View>
-          <Meta size={14} tone="ink3">{t('razorpay')}</Meta>
+          {storeBilled ? (
+            <>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <Icon name="smartphone" size={18} color={c.ink2} />
+                <View style={{ flex: 1 }}>
+                  <Body>{t('billedBy', { store: STORE_NAME[storeBilled] })}</Body>
+                  <Meta size={14}>{t('storeManage', { account: STORE_ACCOUNT[storeBilled] })}</Meta>
+                </View>
+              </View>
+              <Meta size={14} tone="ink3">{t('storeNever')}</Meta>
+            </>
+          ) : acct.plan === 'Free' && !paidHere.length ? (
+            <Meta>{t('noMethod')}</Meta>
+          ) : (
+            <>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <Icon name="smartphone" size={18} color={c.ink2} />
+                <View style={{ flex: 1 }}>
+                  <Body>
+                    UPI · <Mono tone="ink">••••@okhdfc</Mono>
+                  </Body>
+                  <Meta size={14}>{t('autopay')}</Meta>
+                </View>
+              </View>
+              <Meta size={14} tone="ink3">{t('razorpay')}</Meta>
+            </>
+          )}
+          <Meta size={14} tone="ink3">{STORE ? t('plusInStore', { store: STORE_NAME[STORE] }) : t('plusOnWeb')}</Meta>
         </Card>
         <Card tone="sunk" padding={16} style={{ flexDirection: 'row', gap: 10 }}>
           <Icon name="shield" size={16} color={c.ink2} />
@@ -348,15 +403,28 @@ function Membership() {
 
       <Sheet
         open={changeOpen}
-        onClose={() => setChangeOpen(false)}
-        title={confirm ? tc('done') : t('changePlan')}
+        onClose={closeChange}
+        title={confirm ? tc('done') : storeStep !== 'idle' && viaStore ? STORE_NAME[viaStore] : t('changePlan')}
         footer={
           confirm ? (
-            <Button variant="secondary" block onPress={() => setChangeOpen(false)}>
+            <Button variant="secondary" block onPress={closeChange}>
               {tc('close')}
             </Button>
+          ) : storeStep !== 'idle' && viaStore ? (
+            <View style={{ gap: 8 }}>
+              <Button variant="ink" block icon="smartphone" disabled={storeStep === 'approving'} onPress={buyInStore}>
+                {storeStep === 'approving' ? t('storeApproving', { store: STORE_NAME[viaStore] }) : t('storeSubscribe')}
+              </Button>
+              <Button variant="secondary" block disabled={storeStep === 'approving'} onPress={() => setStoreStep('idle')}>
+                {tc('back')}
+              </Button>
+            </View>
+          ) : viaStore ? (
+            <Button variant="ink" block icon="smartphone" onPress={() => setStoreStep('store')}>
+              {t('storeContinue', { store: STORE_NAME[viaStore] })}
+            </Button>
           ) : (
-            <Button variant="ink" block onPress={doChange}>
+            <Button variant="ink" block onPress={() => doChange()}>
               {t('confirm', { name: PLANS.find((p) => p.key === pick)!.name })}
             </Button>
           )
@@ -374,7 +442,25 @@ function Membership() {
             <KeyValue k={t('reference')} last>
               <Mono tone="ink">{acct.planChange.ref}</Mono>
             </KeyValue>
-            <Meta>{t('raviLink')}</Meta>
+            <Meta>
+              {acct.planChange.to === acct.plan && acct.billing && acct.billing !== 'razorpay' && acct.planChange.to === 'Plus'
+                ? t('storeDone', { store: STORE_NAME[acct.billing], account: STORE_ACCOUNT[acct.billing] })
+                : acct.planChange.to !== acct.plan && storeBilled
+                  ? t('storeCancel', { store: STORE_NAME[storeBilled], account: STORE_ACCOUNT[storeBilled] })
+                  : t('raviLink')}
+            </Meta>
+          </>
+        ) : storeStep !== 'idle' && viaStore ? (
+          <>
+            <SpecimenTag />
+            <KeyValue k={t('kItem')}>{PLANS.find((p) => p.key === 'Plus')!.name}</KeyValue>
+            <KeyValue k={t('kTotal')}>
+              <Mono tone="ink">{inr(PLANS.find((p) => p.key === 'Plus')!.price)}</Mono>
+              {` ${cad(PLANS.find((p) => p.key === 'Plus')!.cadence)}`}
+            </KeyValue>
+            <KeyValue k={t('kBilledBy')} last>{STORE_NAME[viaStore]}</KeyValue>
+            <Body>{t('storeBody', { store: STORE_NAME[viaStore], account: STORE_ACCOUNT[viaStore] })}</Body>
+            {storeStep === 'approving' ? <Meta accessibilityLiveRegion="polite">{t('storeApproving', { store: STORE_NAME[viaStore] })}</Meta> : null}
           </>
         ) : (
           <>
@@ -391,8 +477,10 @@ function Membership() {
               ))}
             </View>
             <Meta>
-              {PLANS.findIndex((p) => p.key === pick) > PLANS.findIndex((p) => p.key === acct.plan)
-                ? t('upgradeNote')
+              {isUpgrade
+                ? viaStore
+                  ? t('upgradeStoreNote', { store: STORE_NAME[viaStore] })
+                  : t('upgradeNote')
                 : t('downNote', { date: fmtDate(renews) })}
             </Meta>
           </>

@@ -22,7 +22,9 @@ import {
   TermDot,
   Title,
 } from '@/components'
-import { INDEX_HISTORY, MEMBER, TEAM } from '@/shared/member'
+import { MEMBER, TEAM } from '@/shared/member'
+import { useLatestIndex } from '@/lib/indexRecord'
+import { useIsMinor } from '@/lib/minor'
 import { CATIONS, CATION_PHASES } from '@/shared/platform'
 import { termByKey } from '@/shared/terms'
 import { useTheme } from '@/theme/ThemeProvider'
@@ -34,6 +36,7 @@ import { localDate, Rich, useA } from '@/screens/a/i18n'
 // ’CATION DETAIL (Memo p.20): the template as configuration — primary term, Day-90 measure,
 // itinerary day by day, before and after, a named clinician present, and the request.
 // One Daybreak: “Request this ’cation”. The 40% hotel-cost rule is never shown to members.
+// Under 18 nothing is scored: no lowest-term pill with its score, and the Day-90 measure is not taken.
 
 const KIND_ICON: Record<ItemKind, IconName> = {
   Room: 'home',
@@ -56,6 +59,8 @@ export default function CationDetail() {
   const itinerary = useMemo(() => buildItinerary(slug), [slug])
   const [day, setDay] = useState(1)
   const guard = useCrisisGuard()
+  const minor = useIsMinor()
+  const latest = useLatestIndex()
 
   // Request form
   const forTwo = slug === 'lovecation'
@@ -81,8 +86,7 @@ export default function CationDetail() {
   }
 
   const interestOnly = cation.status === 'FY28'
-  const latest = INDEX_HISTORY[0]
-  const isLowest = cation.primary === latest.lowestTerm
+  const isLowest = !minor && cation.primary === latest.lowestTerm
   const primaryScore = cation.primary === 'ALL' ? latest.value : latest.terms.find((t) => t.key === cation.primary)?.value
   const current = itinerary.find((x) => x.day === day) ?? itinerary[0]
   const concierge = TEAM.find((p) => p.role === 'Concierge')!.name
@@ -130,7 +134,7 @@ export default function CationDetail() {
         <View style={{ gap: 4 }}>
           <Eyebrow>{t('Day-90 measure in Joy OS')}</Eyebrow>
           <Body>{tx(cation.day90Measure)}</Body>
-          <Meta>{t('Measured like for like at Day 90 and stored in your record. The delta joins the published cohort aggregate, up or down.')}</Meta>
+          <Meta>{minor ? t('Under 18 nothing is scored: this measure is not taken for you, and nothing joins the cohort.') : t('Measured like for like at Day 90 and stored in your record. The delta joins the published cohort aggregate, up or down.')}</Meta>
         </View>
         {d.note ? (
           <View style={{ flexDirection: 'row', gap: 8 }}>

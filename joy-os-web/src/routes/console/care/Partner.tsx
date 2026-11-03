@@ -7,8 +7,9 @@ import { DaybreakButton, Delta, Eyebrow, SpecimenTag, TermDot } from '@/componen
 import { Button, Card, PageHeader, Pill } from '@/components/ui'
 import { termByKey, termColor } from '@/data/terms'
 import type { TermKey } from '@/domain/types'
-import { ARRIVALS, BLOCK_LIBRARY, ITINERARY_TEMPLATES, PACKAGES, PASSES, RECEIVABLES, SIGNAL_POINTS, VENUE, VENUE_COHORTS, WEBHOOKS, WEBHOOK_EVENTS, ZONES } from './_data'
+import { ARRIVALS, BLOCK_LIBRARY, GUEST_INVITATIONS, ITINERARY_TEMPLATES, PACKAGES, PASSES, RECEIVABLES, SIGNAL_POINTS, VENUE, VENUE_COHORTS, WEBHOOKS, WEBHOOK_EVENTS, ZONES, type GuestInvitation } from './_data'
 import { PreviewBanner, useConsoleAccess } from './_gate'
+import { Invitations, type ApiLog } from './_invitations'
 import { partner, usePartnerField } from './_partnerStore'
 import { CardHead, Kpi, ScrollTabs, fieldCls, fmtClock, inr, labelCls, useConsoleNow, useTabParam } from './_parts'
 
@@ -16,7 +17,7 @@ import { CardHead, Kpi, ScrollTabs, fieldCls, fmtClock, inr, labelCls, useConsol
 // itineraries, Signal Points, passes and zones, the 40% hotel-cost rule, receivables, and
 // aggregate Day-90 deltas (k ≥ 10). Hotels never receive individual health data.
 
-const TABS = ['floor', 'itinerary', 'commerce', 'developers'] as const
+const TABS = ['floor', 'invitations', 'itinerary', 'commerce', 'developers'] as const
 const RULE = 0.4
 const K_MIN = 10
 const TERMS6: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
@@ -61,6 +62,8 @@ export default function Partner() {
   const checkedIn = arrivals.filter((a) => a.status === 'arrived').length
   const newlyIn = arrivals.filter((a) => a.status === 'arrived' && !INITIALLY_IN.has(a.id)).length
   const sellable = PACKAGES.filter((p) => p.hotel / p.price <= RULE)
+  const [invitations] = usePartnerField<GuestInvitation[]>('invitations', () => GUEST_INVITATIONS)
+  const awaitingReply = invitations.filter((i) => i.status === 'sent').length
 
   const deliver: Deliver = (event, detail, env = 'live') => {
     const targets = hooks.filter((h) => h.env === env && h.events.includes(event))
@@ -70,6 +73,12 @@ export default function Partner() {
     setLogs((l) => ({ ...l, [env]: [{ at, event: detail ? `${event} · ${detail}` : event, code: 200, ms }, ...l[env]].slice(0, 8) }))
     setHooks((xs) => xs.map((h) => (targets.some((t) => t.id === h.id) ? { ...h, last: `${at.slice(0, 5)} · 200 · ${ms} ms`, status: 'healthy' } : h)))
     return true
+  }
+  /** A call the venue makes to the partner API, written to the live log beside the webhook deliveries. */
+  const api: ApiLog = (line, code) => {
+    const at = new Date(now).toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata' })
+    const ms = 60 + Math.floor(Math.random() * 60)
+    setLogs((l) => ({ ...l, live: [{ at, event: line, code, ms }, ...l.live].slice(0, 8) }))
   }
 
   return (
@@ -109,6 +118,7 @@ export default function Partner() {
           onChange={setTab}
           items={[
             { value: 'floor', label: 'Arrivals & floor', count: arrivals.length - checkedIn },
+            { value: 'invitations', label: 'Guest invitations', count: awaitingReply },
             { value: 'itinerary', label: 'Itinerary builder' },
             { value: 'commerce', label: 'Commerce & outcomes' },
             { value: 'developers', label: 'API & webhooks' },
@@ -119,6 +129,7 @@ export default function Partner() {
       <div className="mt-6">
         {/* Working tabs stay mounted (hidden) so passes, zones, itineraries and webhooks survive a tab switch. */}
         <div hidden={tab !== 'floor'}><Floor arrivals={arrivals} setArrivals={setArrivals} devices={devices} setDevices={setDevices} now={now} canAct={canAct} onEvent={deliver} /></div>
+        <div hidden={tab !== 'invitations'}><Invitations now={now} canAct={canAct} onApi={api} onEvent={(event, detail) => deliver(event, detail)} /></div>
         <div hidden={tab !== 'itinerary'}><Itinerary now={now} canAct={canAct} onPublish={(guest, v) => deliver('itinerary.published', `${guest} v${v}`)} /></div>
         {tab === 'commerce' && <Commerce />}
         <div hidden={tab !== 'developers'}><Developers logs={logs} setLogs={setLogs} hooks={hooks} setHooks={setHooks} now={now} canAct={canAct} /></div>
@@ -126,7 +137,7 @@ export default function Partner() {
 
       <p className="mt-10 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-3">
         Your work in this console is kept on this device, as specimen data. Published itineraries stay published.
-        <button type="button" disabled={!canAct} onClick={() => { if (window.confirm('Reset the venue console to the specimen start? Arrivals, Signal Points, passes, zones, draft itineraries and webhooks all go back. Published itineraries stay with the guest app and the concierge.')) partner.reset() }} className="text-ink-2 underline underline-offset-4 hover:text-ink focus-ring disabled:opacity-50">Reset the venue specimen</button>
+        <button type="button" disabled={!canAct} onClick={() => { if (window.confirm('Reset the venue console to the specimen start? Arrivals, guest invitations, Signal Points, passes, zones, draft itineraries and webhooks all go back. Published itineraries stay with the guest app and the concierge.')) partner.reset() }} className="text-ink-2 underline underline-offset-4 hover:text-ink focus-ring disabled:opacity-50">Reset the venue specimen</button>
       </p>
     </div>
   )
@@ -840,7 +851,7 @@ function Developers({ logs, setLogs, hooks, setHooks, now, canAct }: {
 
         <Card tone="outline" className="min-w-0">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <Eyebrow>Delivery log · {env}</Eyebrow>
+            <Eyebrow>API calls and deliveries · {env}</Eyebrow>
             <span className="text-[12px] text-ink-3">Retries with backoff for 24 h on non-2xx</span>
           </div>
           {logs[env].length === 0 ? (
@@ -848,7 +859,7 @@ function Developers({ logs, setLogs, hooks, setHooks, now, canAct }: {
           ) : (
             <div className="relative mt-3 overflow-x-auto">
               <table className="w-full min-w-[380px] text-[13px]">
-                <caption className="sr-only">Recent webhook deliveries in {env}</caption>
+                <caption className="sr-only">Recent partner API calls and webhook deliveries in {env}</caption>
                 <thead><tr className="border-b border-line">{['Time', 'Event', 'Status', 'Latency'].map((h) => <th key={h} scope="col" className="eyebrow py-2 pr-3 text-left font-normal text-ink-3">{h}</th>)}</tr></thead>
                 <tbody>
                   {logs[env].map((l, i) => (

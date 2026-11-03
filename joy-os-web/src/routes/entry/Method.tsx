@@ -13,6 +13,7 @@ import { FIVE, METHODS, bandFor, joyspanIndex } from '@/domain/indexEngine'
 import type { MethodVersion, TermKey, TermScore } from '@/domain/types'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
 import { COHORT_TERMS } from './_data'
+import { formulaText } from '@/routes/member/core/_extra'
 import { E, MT, regTx } from './_i18n'
 import { JoyspanCredit, LMethodLine, LSpecimenTag, LTermChip, Section, rich, useBand, useFmtDate } from './_parts'
 
@@ -248,7 +249,7 @@ function TermsSection() {
               <span className="eyebrow text-ink-3">{t('spaceLabel', { space: tt.space(x.key) })}</span>
             </div>
             <p className="mt-4 text-[15px] leading-relaxed text-ink-2">{lang === 'en' ? x.framework : t(`fw_${x.key}`)}</p>
-            <p className="num mt-4 break-words rounded-card bg-paper-sunk px-4 py-3 text-[14px] leading-relaxed text-ink">{x.formula}</p>
+            <p className="num mt-4 break-words rounded-card bg-paper-sunk px-4 py-3 text-[14px] leading-relaxed text-ink">{formulaText(x.formula, lang)}</p>
             <div className="mt-4">
               <p className="eyebrow mb-2 text-ink-3">{t('instruments')}</p>
               <ul className="flex flex-wrap gap-1.5">
@@ -291,7 +292,7 @@ function InstrumentsSection() {
       if (status !== 'all' && i.status !== status) return false
       if (!needle) return true
       const x = termByKey(i.term)
-      return [i.code, i.licence, i.translation, x.name, x.space, regTx(i.licence, lang), regTx(i.translation, lang), tt.name(i.term), tt.space(i.term)].some((s) => s.toLowerCase().includes(needle))
+      return [i.code, i.licence, i.translation, x.name, x.space, regTx(i.code, lang), regTx(i.licence, lang), regTx(i.translation, lang), tt.name(i.term), tt.space(i.term)].some((s) => s.toLowerCase().includes(needle))
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, term, status, lang])
@@ -374,7 +375,7 @@ function InstrumentsSection() {
                 <li key={r.code} className="py-3.5">
                   <div className="flex items-start justify-between gap-3">
                     <span className="min-w-0">
-                      <span className="block text-[16px] font-medium text-ink">{r.code}</span>
+                      <span className="block text-[16px] font-medium text-ink">{regTx(r.code, lang)}</span>
                       <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[14px] text-ink-2"><TermDot term={r.term} size={8} /> {tt.name(r.term)} · {rich(t('nItems'), { n: <span className="num">{r.items}</span> })}</span>
                     </span>
                     <Pill tone={st.tone} className="shrink-0">{r.status === 'gated' && <Lock size={11} aria-hidden />}{st.label}</Pill>
@@ -390,7 +391,7 @@ function InstrumentsSection() {
             rows={rows}
             rowKey={(r) => r.code}
             columns={[
-              { key: 'code', header: t('colInstrument'), render: (r) => <span className="font-medium text-ink">{r.code}</span> },
+              { key: 'code', header: t('colInstrument'), render: (r) => <span className="font-medium text-ink">{regTx(r.code, lang)}</span> },
               { key: 'term', header: t('colTerm'), render: (r) => <span className="inline-flex items-center gap-2 whitespace-nowrap text-ink-2"><TermDot term={r.term} size={8} /> {tt.name(r.term)}</span> },
               { key: 'items', header: t('colItems'), align: 'right', render: (r) => <span className="num">{r.items}</span> },
               { key: 'licence', header: t('colLicence'), render: (r) => <span className="text-ink-2">{regTx(r.licence, lang)}</span> },

@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { motion } from 'framer-motion'
-import { Building2, Check, Copy, Download, FileSpreadsheet, KeyRound, Lock, Mail, Plus, ShieldCheck, Upload, UserMinus, Users } from 'lucide-react'
+import { Building2, Check, Copy, Download, Eye, FileSpreadsheet, KeyRound, Lock, Mail, Plus, ShieldCheck, Upload, UserMinus, Users } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type ChangeEvent, type DragEvent, type ReactNode } from 'react'
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { DaybreakButton, Delta, Eyebrow, MethodLine, SpecimenTag, TermChip, TermDot } from '@/components/joy/primitives'
@@ -8,7 +8,7 @@ import { Button, Card, PageHeader, Pill, Sheet, Tabs, Toggle } from '@/component
 import { TENANT } from '@/data/platform'
 import { termByKey, termColor } from '@/data/terms'
 import type { TermKey } from '@/domain/types'
-import { AGG_COHORTS, AGG_PERIODS, EAP_ROUTING, INSURER, INSURER_FLAGS, INSURER_PROFILE, TENANT_FLAGS, TENANT_KIND, TENANT_PROFILE, publishedDepartments, type AdminRole, type AggCohortKey, type AggPeriod, type PublishedDept, type TenantKind } from './_data'
+import { AGG_COHORTS, AGG_PERIODS, EAP_ROUTING, INSURER, INSURER_BAND_LABELS, INSURER_COHORTS, INSURER_FLAGS, INSURER_PERIODS, INSURER_PROFILE, INSURER_ROUTING, TENANT_FLAGS, TENANT_HOME, TENANT_KIND, TENANT_PROFILE, publishedDepartments, type AdminRole, type AggCohortKey, type AggPeriod, type InsurerCohortKey, type PublishedDept, type TenantKind } from './_data'
 import { AGG_TERMS, AggregateFilters, ApiAccessCard, BrandLineCard, ClinicalFeaturesCard, type AggTermFilter } from './_tenantExtras'
 import { PreviewBanner, useConsoleAccess } from '../care/_gate'
 import { AccessNote, CanActProvider, CardHead, ChartLead, Field, Kpi, Legend, Meter, Row, ScrollTabs, StatusTag, Swatch, Writes, downloadHtml, esc, fieldCls, fmtDate, inr, pct, tabPanelProps, tick, tipLabel, tipStyle, useCanAct, useTabParam } from './_parts'
@@ -48,6 +48,9 @@ export default function Tenant() {
   const cfg = TENANT_KIND[view]
   // The tenant admin acts here; every other role sees a read-only preview (the care gate).
   const { canAct } = useConsoleAccess('/console/tenant')
+  // The gate is per tenant as well as per role: the tenant admin role belongs to Northwind, so it acts on Northwind
+  // only. Any other tenant (the Star Health insurer view) is a read-only preview for every role, writes switched off.
+  const actsOn = (k: View) => canAct && k === TENANT_HOME
 
   const addReport = (v: View) => setReports((r) => (r[v].some((x) => x.id === NEXT_REPORT[v].id) ? r : { ...r, [v]: [{ ...NEXT_REPORT[v], date: '28 Jan 2027', downloads: 0 }, ...r[v]] }))
   const countDownload = (v: View, id: string) => setReports((r) => ({ ...r, [v]: r[v].map((x) => (x.id === id ? { ...x, downloads: x.downloads + 1 } : x)) }))
@@ -88,6 +91,7 @@ export default function Tenant() {
       />
 
       <PreviewBanner path="/console/tenant" />
+      {canAct && view !== TENANT_HOME && <OtherTenantBanner view={view} onHome={() => setView(TENANT_HOME)} />}
 
       <AccessNote icon="shield" className="mb-8">
         <span className="text-ink">AIWO, not the {view === 'employer' ? 'employer' : 'insurer'}, holds the data.</span> This console shows aggregates only: groups of {cfg.group} or more, small cells suppressed and rounded, no drill-down to individuals and no free text. Ease screens, journals and any term below the aggregate never reach a tenant.
@@ -107,7 +111,7 @@ export default function Tenant() {
         ]}
       />
 
-      <CanActProvider value={canAct}>
+      <CanActProvider value={actsOn(view)}>
       {VIEWS.map((k) =>
         TABS.map((t) => {
           const id = `${k}:${t}`
@@ -117,7 +121,7 @@ export default function Tenant() {
           if (!active && t === 'outcomes') return null
           return (
             <motion.div key={id} hidden={!active} {...(active ? tabPanelProps('tenant', t) : { role: 'tabpanel', 'aria-label': `${k} ${t}` })} initial={{ opacity: 0, y: 6 }} animate={active ? { opacity: 1, y: 0 } : { opacity: 0, y: 6 }} transition={{ duration: 0.2 }}>
-              {panel(k, t)}
+              <CanActProvider value={actsOn(k)}>{panel(k, t)}</CanActProvider>
             </motion.div>
           )
         }),
@@ -127,6 +131,26 @@ export default function Tenant() {
         <ReportSheet key={view} view={view} reports={reports[view]} stepUp={stepUp[view]} onPrepared={() => addReport(view)} onDownloaded={(id) => countDownload(view, id)} />
       </Sheet>
       </CanActProvider>
+    </div>
+  )
+}
+
+/** Shown to the tenant admin on a tenant that is not theirs: they can look, never act. */
+function OtherTenantBanner({ view, onHome }: { view: View; onHome: () => void }) {
+  const home = TENANT_KIND[TENANT_HOME].short
+  const other = TENANT_KIND[view].short
+  return (
+    <div role="status" className="mb-6 flex flex-col gap-3 rounded-card border border-ink bg-paper-raised px-5 py-4 md:flex-row md:items-center md:justify-between">
+      <p className="flex items-start gap-3 text-[15px] text-ink">
+        <Eye size={18} className="mt-0.5 shrink-0" aria-hidden />
+        <span>
+          Read-only preview of {other}. Your tenant admin role belongs to {home}, so every {other} write is switched off here: eligibility and invitations, sign-in and admins, the brand line, API keys and webhooks, and report downloads.
+          <span className="mt-0.5 block text-[13px] text-ink-2">Shown as a specimen so the two kinds of tenant can be compared. In production a tenant admin signs in to their own tenant only and never opens another tenant’s aggregates.</span>
+        </span>
+      </p>
+      <div className="flex shrink-0 flex-wrap gap-2">
+        <Button size="sm" variant="secondary" onClick={onHome}>Back to {home}</Button>
+      </div>
     </div>
   )
 }
@@ -161,7 +185,7 @@ function ReportSheet({ view, reports, stepUp, onPrepared, onDownloaded }: { view
       </div>
       <div className="mt-6" aria-live="polite">
         {phase === 'idle' && <Button variant="ink" onClick={prepare} disabled={!canAct}>Prepare the report</Button>}
-        {phase === 'idle' && !canAct && <p className="mt-2 text-[13px] text-ink-3">View only. The tenant admin prepares and downloads reports.</p>}
+        {phase === 'idle' && !canAct && <p className="mt-2 text-[13px] text-ink-3">{view === TENANT_HOME ? 'View only. The tenant admin prepares and downloads reports.' : `Read-only preview. Only ${TENANT_KIND[view].short}’s own tenant admin prepares and downloads its reports.`}</p>}
         {phase === 'preparing' && (
           <div>
             <p className="text-[15px] text-ink">Preparing {NEXT_REPORT[view].id}: suppressing small cells and pinning the method…</p>
@@ -295,12 +319,8 @@ function Outcomes() {
     { label: 'Measured at Day 0', n: c.measured, note: `${pct(c.measured / c.enrolled)} of enrolled` },
     { label: 'Re-measured at Day 90', n: remeasured, note: `${pct(rate)} of measured` },
   ]
-  const terms = c.termMeans.filter((t) => term === 'all' || t.key === term)
-  const termData = terms.map((t) => ({ ...t, name: termByKey(t.key).space }))
   const focus = c.termMeans.find((t) => t.key === (term === 'all' ? 'B' : term))!
   const focusB = focus.key === 'B'
-  const showD0 = period !== 'd90'
-  const showD90 = period !== 'd0'
   const sign = (k: TermKey) => (k === 'B' ? '−' : '')
   const periodName = period === 'd0' ? 'Day 0' : period === 'd90' ? 'Day 90' : 'Day 0 and Day 90'
   const termTitle =
@@ -358,53 +378,21 @@ function Outcomes() {
         <MethodLine method="v1.0" grade="index" takenOn={period === 'd0' ? '2026-10-23' : '2027-01-21'} className="mt-6" />
       </Card>
 
-      <Card className="lg:col-span-7">
-        <CardHead eyebrow={`Term means · ${periodName}`} title={termTitle} />
-        <ChartLead>
-          Mean score {term === 'all' ? 'for each of the six terms' : `for ${termByKey(term).name}`} across the {remeasured} people re-measured in this cohort
-          {period === 'change' ? ', at Day 0 (outline) and Day 90 (filled)' : `, at ${periodName}`}. For Ease the bar is the burden, so a shorter bar is the better place to be.
-        </ChartLead>
-        <div className="-mx-1 overflow-x-auto px-1">
-        <div className={clsx('h-[240px]', term === 'all' && 'min-w-[420px]')} aria-hidden>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={termData} margin={{ top: 4, right: 4, bottom: 0, left: -24 }} barGap={3} maxBarSize={56}>
-              <defs>
-                <pattern id="hatch-b-tn" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-                  <rect width="5" height="5" fill="var(--term-b-soft)" />
-                  <rect width="2" height="5" fill="var(--term-b)" />
-                </pattern>
-              </defs>
-              <XAxis dataKey="name" tickLine={false} axisLine={{ stroke: 'var(--line)' }} tick={tick} interval={0} />
-              <YAxis tickLine={false} axisLine={false} tick={tick} domain={[0, 80]} ticks={[0, 40, 80]} />
-              <Tooltip cursor={{ fill: 'var(--paper-sunk)' }} contentStyle={tipStyle} labelStyle={tipLabel} formatter={(v, n) => [String(v), n === 'd0' ? 'Day 0' : 'Day 90']} />
-              {showD0 && (
-                <Bar dataKey="d0" radius={[3, 3, 0, 0]} isAnimationActive={false} fill={period === 'd0' ? undefined : 'var(--paper-sunk)'} stroke={period === 'd0' ? undefined : 'var(--line-strong)'}>
-                  {period === 'd0' && termData.map((d) => <Cell key={d.key} fill={d.key === 'B' ? 'url(#hatch-b-tn)' : termColor[d.key]} />)}
-                </Bar>
-              )}
-              {showD90 && (
-                <Bar dataKey="d90" radius={[3, 3, 0, 0]} isAnimationActive={false}>
-                  {termData.map((d) => <Cell key={d.key} fill={d.key === 'B' ? 'url(#hatch-b-tn)' : termColor[d.key]} />)}
-                </Bar>
-              )}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        </div>
-        <ul className="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 border-t border-line pt-4 sm:grid-cols-2" aria-label={`Term means, ${periodName}`}>
-          {terms.map((t) => {
-            const isB = t.key === 'B'
-            return (
-              <li key={t.key} className="flex items-center justify-between gap-3 text-[14px]">
-                <span className="flex items-center gap-2 text-ink-2"><TermDot term={t.key} /> {termByKey(t.key).name}</span>
-                <span className="num text-ink">
-                  {period === 'change' ? <>{sign(t.key)}{t.d0} → {sign(t.key)}{t.d90} <Delta value={t.d90 - t.d0} inverse={isB} className="ml-1.5 text-[13px]" /></> : <>{sign(t.key)}{period === 'd0' ? t.d0 : t.d90}</>}
-                </span>
-              </li>
-            )
-          })}
-        </ul>
-      </Card>
+      <TermMeansCard
+        className="lg:col-span-7"
+        means={c.termMeans}
+        term={term}
+        period={period}
+        eyebrow={`Term means · ${periodName}`}
+        title={termTitle}
+        hatchId="hatch-b-tn"
+        lead={
+          <>
+            Mean score {term === 'all' ? 'for each of the six terms' : `for ${termByKey(term).name}`} across the {remeasured} people re-measured in this cohort
+            {period === 'change' ? ', at Day 0 (outline) and Day 90 (filled)' : `, at ${periodName}`}. For Ease the bar is the burden, so a shorter bar is the better place to be.
+          </>
+        }
+      />
 
       <Card className="lg:col-span-7">
         <CardHead
@@ -472,6 +460,64 @@ function Outcomes() {
         )}
       </Card>
     </div>
+  )
+}
+
+type TermMean = { key: TermKey; d0: number; d90: number }
+
+/** Term means as bars (Day 0 outline, Day 90 filled) with a named list beneath; each Spectrum bar carries its term name. */
+function TermMeansCard({ means, term, period, eyebrow, title, lead, hatchId, aside, className }: { means: TermMean[]; term: AggTermFilter; period: AggPeriod; eyebrow: ReactNode; title: ReactNode; lead: ReactNode; hatchId: string; aside?: ReactNode; className?: string }) {
+  const terms = means.filter((t) => term === 'all' || t.key === term)
+  const termData = terms.map((t) => ({ ...t, name: termByKey(t.key).space }))
+  const showD0 = period !== 'd90'
+  const showD90 = period !== 'd0'
+  const sign = (k: TermKey) => (k === 'B' ? '−' : '')
+  const listLabel = period === 'd0' ? 'Day 0' : period === 'd90' ? 'Day 90' : 'Day 0 and Day 90'
+  return (
+    <Card className={className}>
+      <CardHead eyebrow={eyebrow} title={title} aside={aside} />
+      <ChartLead>{lead}</ChartLead>
+      <div className="-mx-1 overflow-x-auto px-1">
+      <div className={clsx('h-[240px]', term === 'all' && 'min-w-[420px]')} aria-hidden>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={termData} margin={{ top: 4, right: 4, bottom: 0, left: -24 }} barGap={3} maxBarSize={56}>
+            <defs>
+              <pattern id={hatchId} width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <rect width="5" height="5" fill="var(--term-b-soft)" />
+                <rect width="2" height="5" fill="var(--term-b)" />
+              </pattern>
+            </defs>
+            <XAxis dataKey="name" tickLine={false} axisLine={{ stroke: 'var(--line)' }} tick={tick} interval={0} />
+            <YAxis tickLine={false} axisLine={false} tick={tick} domain={[0, 80]} ticks={[0, 40, 80]} />
+            <Tooltip cursor={{ fill: 'var(--paper-sunk)' }} contentStyle={tipStyle} labelStyle={tipLabel} formatter={(v, n) => [String(v), n === 'd0' ? 'Day 0' : 'Day 90']} />
+            {showD0 && (
+              <Bar dataKey="d0" radius={[3, 3, 0, 0]} isAnimationActive={false} fill={period === 'd0' ? undefined : 'var(--paper-sunk)'} stroke={period === 'd0' ? undefined : 'var(--line-strong)'}>
+                {period === 'd0' && termData.map((d) => <Cell key={d.key} fill={d.key === 'B' ? `url(#${hatchId})` : termColor[d.key]} />)}
+              </Bar>
+            )}
+            {showD90 && (
+              <Bar dataKey="d90" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+                {termData.map((d) => <Cell key={d.key} fill={d.key === 'B' ? `url(#${hatchId})` : termColor[d.key]} />)}
+              </Bar>
+            )}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      </div>
+      <ul className="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 border-t border-line pt-4 sm:grid-cols-2" aria-label={`Term means, ${listLabel}`}>
+        {terms.map((t) => {
+          const isB = t.key === 'B'
+          return (
+            <li key={t.key} className="flex items-center justify-between gap-3 text-[14px]">
+              <span className="flex items-center gap-2 text-ink-2"><TermDot term={t.key} /> {termByKey(t.key).name}</span>
+              <span className="num text-ink">
+                {period === 'change' ? <>{sign(t.key)}{t.d0} → {sign(t.key)}{t.d90} <Delta value={t.d90 - t.d0} inverse={isB} className="ml-1.5 text-[13px]" /></> : <>{sign(t.key)}{period === 'd0' ? t.d0 : t.d90}</>}
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+    </Card>
   )
 }
 
@@ -1034,42 +1080,113 @@ function Settings({ kind, lastPublished }: { kind: View; lastPublished: string }
 
 // ─── Insurer view ────────────────────────────────────────────────────────
 
+const INSURER_COHORT_KEYS = INSURER_COHORTS.map((c) => c.value)
+
 function InsurerOutcomes() {
+  // Own URL keys, so the employer's wave cohort and the insurer's policy cohort never overwrite each other.
+  const [cohort, setCohort] = useTabParam<InsurerCohortKey>(INSURER_COHORT_KEYS, 'all', 'icohort')
+  const [term, setTerm] = useTabParam<AggTermFilter>(AGG_TERMS, 'all', 'iterm')
+  const [period, setPeriod] = useTabParam<AggPeriod>(PERIOD_KEYS, 'change', 'iperiod')
+  const c = INSURER_COHORTS.find((x) => x.value === cohort) ?? INSURER_COHORTS[0]
+  const k = TENANT_KIND.insurer.group
+  const whole = c.value === 'all'
   const fee = INSURER.enrolled * INSURER.pricePerMember
   const base = fee * (1 - INSURER.outcomeShare)
   const outcome = fee * INSURER.outcomeShare
-  const fall = INSURER.burdenD0 - INSURER.burdenD90
+  const pilotFall = INSURER.burdenD0 - INSURER.burdenD90
   const threshold = 3
-  const met = fall >= threshold
-  const bandData = INSURER.bands.map((b) => ({ ...b, value: Math.round(b.share * 100) }))
+  const met = pilotFall >= threshold
   const lakh = (n: number) => `₹${(n / 100000).toLocaleString('en-IN')} L`
+  const filters = <AggregateFilters<InsurerCohortKey> cohort={cohort} term={term} period={period} onCohort={setCohort} onTerm={setTerm} onPeriod={setPeriod} cohorts={INSURER_COHORTS} periods={INSURER_PERIODS} minGroup={k} />
+
+  const projection = (
+    <Card tone="soft" className="lg:col-span-12">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-start gap-3">
+          <Building2 size={22} className="mt-1 shrink-0 text-ink-2" aria-hidden />
+          <div>
+            <p className="text-[1.35rem] font-light leading-snug text-ink">The insurer pays for a measured fall in preventable suffering.</p>
+            <p className="mt-1 text-[15px] text-ink-2">Never individual underwriting. No person’s score, flag or term leaves AIWO, and the contract forbids using any figure here to price or decide a claim for a person.</p>
+            <p className="mt-3 flex flex-wrap items-center gap-2 text-[14px] text-ink-2"><StatusTag tone="draft">Projection · J3</StatusTag> The pilot is still in conversation (Decision 7). Every Day-90 figure below is projected from direct-member cohorts, not measured: the earliest policyholder Day 90 is {INSURER.firstDay90}.</p>
+          </div>
+        </div>
+        <TermChip term="B" withSpace size="md" className="shrink-0 self-start" />
+      </div>
+    </Card>
+  )
+
+  if (c.enrolled < k || c.measured < k) {
+    return (
+      <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
+        {projection}
+        {filters}
+        <Card className="lg:col-span-12">
+          <div className="flex items-start gap-3">
+            <Lock size={20} className="mt-1 shrink-0 text-ink-3" aria-hidden />
+            <div>
+              <p className="text-[1.35rem] font-light leading-snug text-ink">Suppressed · fewer than {k} in this cohort</p>
+              <p className="mt-2 max-w-2xl text-[15px] text-ink-2">{c.label}. {c.note} An insurer sees a group only once it holds {k} or more policyholders, so no count, mean or chart is shown, not even a rounded one.</p>
+              <Button variant="secondary" size="sm" className="mt-4" onClick={() => setCohort('all')}>Back to the whole pilot</Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    )
+  }
+
+  const burden = c.termMeans.find((t) => t.key === 'B')!
+  const fall = burden.d0 - burden.d90
+  const falling = c.bands[0] + c.bands[1]
+  const routed = Math.round(c.measured * c.remeasureRate * c.bands[3])
+  const bandData = INSURER_BAND_LABELS.map((label, i) => ({ label, value: Math.round(c.bands[i] * 100) }))
+  const focus = c.termMeans.find((t) => t.key === (term === 'all' ? 'B' : term))!
+  const focusB = focus.key === 'B'
+  const sign = (key: TermKey) => (key === 'B' ? '−' : '')
+  const periodName = period === 'd0' ? 'Day 0' : period === 'd90' ? 'Day 90, projected' : 'Day 0 and Day 90'
+  const remeasured = Math.round(c.measured * c.remeasureRate)
+  const termTitle =
+    term !== 'all'
+      ? `${termByKey(term).name}, ${period === 'change' ? 'Day 0 to Day 90' : periodName}`
+      : period === 'change'
+        ? 'Every term would rise; Preventable Suffering would fall'
+        : `Six term means at ${periodName}`
 
   return (
     <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
-      <Card tone="soft" className="lg:col-span-12">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-start gap-3">
-            <Building2 size={22} className="mt-1 shrink-0 text-ink-2" aria-hidden />
-            <div>
-              <p className="text-[1.35rem] font-light leading-snug text-ink">The insurer pays for a measured fall in preventable suffering.</p>
-              <p className="mt-1 text-[15px] text-ink-2">Never individual underwriting. No person’s score, flag or term leaves AIWO, and the contract forbids using any figure here to price or decide a claim for a person.</p>
-              <p className="mt-3 flex flex-wrap items-center gap-2 text-[14px] text-ink-2"><StatusTag tone="draft">Projection · J3</StatusTag> The pilot is still in conversation (Decision 7). Every Day-90 figure below is projected from direct-member cohorts, not measured: the earliest policyholder Day 90 is {INSURER.firstDay90}.</p>
-            </div>
-          </div>
-          <TermChip term="B" withSpace size="md" className="shrink-0 self-start" />
-        </div>
-      </Card>
+      {projection}
+      {filters}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:col-span-12 xl:grid-cols-4">
-        <Kpi label="Policyholders enrolled" value={INSURER.enrolled.toLocaleString('en-IN')} sub="Pilot cohort, opt-in" />
-        <Kpi label="Measured at Day 0" value={INSURER.measured.toLocaleString('en-IN')} sub={`${pct(INSURER.measured / INSURER.enrolled)} of enrolled`} />
-        <Kpi label="Re-measured at Day 90 · projected" value={pct(INSURER.remeasureRate)} sub="Lower than direct members; circles not yet offered" />
-        <Kpi label="Burden, cohort mean · projected" value={<span className="flex items-baseline gap-3">−{INSURER.burdenD90}<Delta value={-fall} inverse className="text-[15px]" /></span>} sub={<>From −{INSURER.burdenD0} at Day 0. {pct(INSURER.burdenFalling)} projected to see it fall.</>} />
+        <Kpi label="Policyholders enrolled" value={c.enrolled.toLocaleString('en-IN')} sub={whole ? 'Pilot cohort, opt-in' : `${pct(c.enrolled / INSURER.enrolled)} of the pilot cohort`} />
+        <Kpi label="Measured at Day 0" value={c.measured.toLocaleString('en-IN')} sub={`${pct(c.measured / c.enrolled)} of enrolled`} />
+        <Kpi label="Re-measured at Day 90 · projected" value={pct(c.remeasureRate)} sub="Lower than direct members; circles not yet offered" />
+        <Kpi
+          label={`${termByKey(focus.key).name}, cohort mean${period === 'd0' ? '' : ' · projected'}`}
+          value={period === 'd0' ? <>{sign(focus.key)}{focus.d0}</> : <span className="flex items-baseline gap-3">{sign(focus.key)}{focus.d90}<Delta value={focus.d90 - focus.d0} inverse={focusB} className="text-[15px]" /></span>}
+          sub={period === 'd0' ? <>Measured at Day 0, Dec 2026.{focusB ? ' Lower is better.' : ''}</> : focusB ? <>From −{focus.d0} at Day 0. {pct(falling)} projected to see it fall.</> : <>Up from {focus.d0} at Day 0.</>}
+        />
       </div>
 
-      <Card className="lg:col-span-7">
-        <CardHead eyebrow="Preventable Suffering · change at Day 90 · projection" title="Where the fall would come from" aside={<StatusTag tone="draft">Projection · J3</StatusTag>} />
-        <ChartLead>Projected share of re-measured policyholders by how their Burden score would change between Day 0 and Day 90, from direct-member cohorts on method v1.0. Burden is the minus in the equation; a fall is the outcome the insurer buys.</ChartLead>
+      <TermMeansCard
+        className="lg:col-span-7"
+        means={c.termMeans}
+        term={term}
+        period={period}
+        eyebrow={`Term means · ${periodName}`}
+        title={termTitle}
+        hatchId="hatch-b-in-t"
+        aside={period === 'd0' ? <StatusTag tone="ok">Measured</StatusTag> : <StatusTag tone="draft">Projection · J3</StatusTag>}
+        lead={
+          <>
+            Mean score {term === 'all' ? 'for each of the six terms' : `for ${termByKey(term).name}`} for {c.label.toLowerCase()}
+            {period === 'change' ? ': Day 0 as measured (outline) and Day 90 as projected (filled)' : period === 'd0' ? ', as measured at Day 0' : ', as projected for Day 90'}. For Ease the bar is the burden, so a shorter bar is the better place to be.
+          </>
+        }
+      />
+
+      <Card className="lg:col-span-5">
+        <CardHead eyebrow={`Preventable Suffering · ${c.label}`} title="Where the fall would come from" aside={<StatusTag tone="draft">Projection · J3</StatusTag>} />
+        <ChartLead>Projected share of the {remeasured.toLocaleString('en-IN')} policyholders re-measured in this cohort by how their Burden score would change between Day 0 and Day 90, from direct-member cohorts on method v1.0. A fall is the outcome the insurer buys.</ChartLead>
         <div className="h-[200px]" aria-hidden>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={bandData} layout="vertical" margin={{ top: 0, right: 32, bottom: 0, left: 8 }}>
@@ -1089,8 +1206,23 @@ function InsurerOutcomes() {
           </ResponsiveContainer>
         </div>
         <ul className="sr-only">{bandData.map((b) => <li key={b.label}>{b.label}: {b.value}%</li>)}</ul>
-        <p className="mt-4 text-[14px] text-ink-2">On this projection {pct(INSURER.bands[3].share)} would see their Burden rise, about <span className="num">{INSURER.routed.toLocaleString('en-IN')}</span> people. Each of them is offered a call with a named AIWO clinician; the insurer is told the count of offers, nothing more.</p>
+        <p className="mt-4 text-[14px] text-ink-2">Cohort Burden <span className="num text-ink">−{burden.d0} → −{burden.d90}</span>, a projected fall of <span className="num text-ink">{fall}</span> points. On this projection {pct(c.bands[3])} would see their Burden rise, about <span className="num">{routed.toLocaleString('en-IN')}</span> people. Each of them is offered a call with a named AIWO clinician; the insurer is told the count of offers, nothing more.</p>
         <MethodLine method="v1.0" grade="index" className="mt-5" />
+      </Card>
+
+      <Card className="lg:col-span-7">
+        <CardHead eyebrow="Clinician offers and EAP routing · monthly" title="Routed by AIWO, counted for the insurer" aside={<StatusTag tone="draft">Feb–Apr projected</StatusTag>} />
+        {whole ? (
+          <>
+            <ChartLead>Each month, how many policyholders were offered a call with an AIWO clinician (an Ease screen over threshold, or a Burden rise at Day 90) and how many were routed to Star Health’s tele-counselling line (EAP). Counts only: who, why and what was said stay with AIWO. December and January are counted; February to April are projected, lighter.</ChartLead>
+            <InsurerRoutingChart />
+          </>
+        ) : (
+          <div className="flex items-start gap-3 rounded-card bg-paper-sunk p-4 text-[14px] text-ink-2">
+            <Lock size={15} className="mt-0.5 shrink-0 text-ink-3" aria-hidden />
+            <p>Offer and routing counts are published for the whole pilot only. Split by policy type, some months would fall under ten, so no cohort figure is shown. <button className="underline decoration-line-strong underline-offset-2 hover:text-ink focus-ring" onClick={() => setCohort('all')}>See the pilot total</button></p>
+          </div>
+        )}
       </Card>
 
       <Card className="lg:col-span-5">
@@ -1099,11 +1231,12 @@ function InsurerOutcomes() {
           <Row k="Per member per year" v={<span className="num">{inr(INSURER.pricePerMember)}</span>} />
           <Row k="Fixed component" v={<span className="num">{lakh(base)}</span>} />
           <Row k={<>Released on a cohort Burden fall of ≥{threshold} points</>} v={<span className="num">{lakh(outcome)}</span>} />
-          <Row k="Projected fall at Day 90" v={<span className="num">{fall} points</span>} />
+          <Row k="Projected fall at Day 90, whole pilot" v={<span className="num">{pilotFall} points</span>} />
         </dl>
         <div className={clsx('mt-4 rounded-card p-4 text-[15px]', met ? 'bg-paper-sunk text-ink' : 'border border-line text-ink-2')}>
           {met ? <>On this projection the condition would be met. The outcome component is released only on the measured Day-90 record, after its independent check.</> : <>On this projection the condition would not be met. If the measured record agrees, the outcome component is not paid, and the result is published as it is.</>}
         </div>
+        {!whole && <p className="mt-3 text-[14px] text-ink-2">The fee is set on the whole pilot cohort, never on one policy type, so it does not change with this filter.</p>}
         <p className="mt-4 text-[13px] text-ink-3">Illustrative pilot terms for discussion with Star Health (Decision 7). Not an offer.</p>
       </Card>
 
@@ -1112,7 +1245,7 @@ function InsurerOutcomes() {
           <div>
             <Eyebrow>The insurer receives</Eyebrow>
             <ul className="mt-3 space-y-2 text-[15px] text-ink-2">
-              {['Cohort-level term means and Burden change, groups of ten or more', 'Re-measure rate and the share improving their lowest term', 'Count of clinician offers and EAP routings', 'Method version and grade on every figure'].map((l) => <li key={l} className="flex gap-2"><Check size={15} className="mt-1 shrink-0 text-ink" aria-hidden />{l}</li>)}
+              {['Cohort-level term means and Burden change, groups of ten or more', 'Re-measure rate and the share improving their lowest term', 'Count of clinician offers and EAP routings, monthly, whole pilot', 'Method version and grade on every figure'].map((l) => <li key={l} className="flex gap-2"><Check size={15} className="mt-1 shrink-0 text-ink" aria-hidden />{l}</li>)}
             </ul>
           </div>
           <div>
@@ -1124,5 +1257,49 @@ function InsurerOutcomes() {
         </div>
       </Card>
     </div>
+  )
+}
+
+/** Monthly clinician offers and EAP routings for the whole pilot. Ink only; projected months lighter; cells under ten never shown. */
+function InsurerRoutingChart() {
+  const minCell = TENANT.minCell
+  const data = INSURER_ROUTING.map((m) => ({ ...m, label: m.projected ? `${m.month} · proj.` : m.month }))
+  const shown = (n: number) => (n < minCell ? 0 : n)
+  return (
+    <>
+      <div className="h-[220px]" aria-hidden>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data.map((m) => ({ ...m, clinicianShown: shown(m.clinician), eapShown: shown(m.eap) }))} margin={{ top: 4, right: 4, bottom: 0, left: -20 }} maxBarSize={44}>
+            <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: 'var(--line)' }} tick={tick} interval={0} />
+            <YAxis tickLine={false} axisLine={false} tick={tick} />
+            <Tooltip cursor={{ fill: 'var(--paper-sunk)' }} contentStyle={tipStyle} labelStyle={tipLabel} formatter={(v, n) => [String(v), n === 'clinicianShown' ? 'Clinician offers' : 'EAP routings']} />
+            <Bar dataKey="clinicianShown" stackId="r" isAnimationActive={false}>
+              {data.map((m) => <Cell key={m.month} fill="var(--ink)" fillOpacity={m.projected ? 0.4 : 1} />)}
+            </Bar>
+            <Bar dataKey="eapShown" stackId="r" radius={[3, 3, 0, 0]} isAnimationActive={false}>
+              {data.map((m) => <Cell key={m.month} fill="var(--ink-3)" fillOpacity={m.projected ? 0.4 : 1} />)}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <Legend className="mt-4" items={[{ label: 'Offered a clinician call', swatch: <Swatch color="var(--ink)" /> }, { label: 'Routed to the EAP line', swatch: <Swatch color="var(--ink-3)" /> }, { label: 'Projected month, lighter', swatch: <span aria-hidden className="inline-block h-2.5 w-4 rounded-sm" style={{ background: 'var(--ink)', opacity: 0.4 }} /> }]} />
+      <div className="mt-4 overflow-x-auto border-t border-line pt-3">
+        <table className="w-full min-w-[420px] text-left text-[14px]">
+          <caption className="sr-only">Clinician offers and EAP routings by month, whole pilot</caption>
+          <thead><tr className="border-b border-line">{['Month', 'Clinician offers', 'EAP routings', ''].map((h, i) => <th key={h || i} scope="col" className={clsx('eyebrow py-2 pr-4 font-normal text-ink-3', i > 0 && i < 3 && 'text-right')}>{h}</th>)}</tr></thead>
+          <tbody>
+            {INSURER_ROUTING.map((m) => (
+              <tr key={m.month} className="border-b border-line/70 last:border-0">
+                <th scope="row" className="py-2 pr-4 font-normal text-ink">{m.month} {m.month === 'Dec' ? '2026' : '2027'}</th>
+                <td className="num py-2 pr-4 text-right text-ink">{m.clinician < minCell ? `fewer than ${minCell}` : m.clinician.toLocaleString('en-IN')}</td>
+                <td className="num py-2 pr-4 text-right text-ink">{m.eap < minCell ? `fewer than ${minCell}` : m.eap.toLocaleString('en-IN')}</td>
+                <td className="py-2 pr-4 text-right">{m.projected ? <StatusTag tone="draft">Projected</StatusTag> : <StatusTag tone="ok">Counted</StatusTag>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-3 text-[13px] text-ink-3">March and April include the projected Day-90 offers, <span className="num">{INSURER.routed.toLocaleString('en-IN')}</span> in all. Any month under ten would read “fewer than 10”.</p>
+    </>
   )
 }

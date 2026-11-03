@@ -3,7 +3,7 @@ import { Activity, Building2, FlaskConical, Gauge, HeartPulse, Hotel, LayoutGrid
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { JoyOsLockup } from '@/components/joy/Brand'
 import { EnglishOnly } from '@/lib/i18n'
-import { p0Sla, useClinicalState } from '@/routes/console/care/_clinicalStore'
+import { p0Sla, useClinicalState, useCrisisIntake } from '@/routes/console/care/_clinicalStore'
 import { specimenRoleOf, useConsoleRole } from '@/routes/console/care/_gate'
 import { useConsoleNow } from '@/routes/console/care/_parts'
 import { ThemeToggle } from './shared'
@@ -37,6 +37,8 @@ function P0Reach() {
 
 export default function ConsoleLayout() {
   const { chosen, setRole, roleLabel, person } = useConsoleRole()
+  // A crisis intercept in the member app opens a P0 on the clinical board, whichever console is open.
+  useCrisisIntake()
   // A visitor who has not chosen a console role yet takes the role of the console they open
   // from the nav, so the Demo switcher stays in step. A direct URL takes no role: the console
   // stays view only and offers its role (fail closed). Once a role is chosen, a nav link never

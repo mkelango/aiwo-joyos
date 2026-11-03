@@ -21,6 +21,16 @@ const ABHA_ADDR = /^[a-z0-9._]{3,}@(abdm|sbx)$/i
 const ABHA_NUM = /^\d{2}-?\d{4}-?\d{4}-?\d{4}$/
 const RELATIONS: NomineeState['relation'][] = ['Spouse', 'Child', 'Parent', 'Sibling', 'Friend', 'Other']
 
+/** Placeholders filled into translated copy, so the values can be set in Mono in their place. */
+const SLOT_A = '\u0000'
+const SLOT_B = '\u0001'
+/** The sentence with SLOT_A and SLOT_B (in that order, as in all three languages) replaced by Mono values. */
+function monoSlots(filled: string, [a, b]: [string, string]) {
+  const [before, rest = ''] = filled.split(SLOT_A)
+  const [middle, after = ''] = rest.split(SLOT_B)
+  return [before, <Mono key="a" size={14} tone="ink2">{a}</Mono>, middle, <Mono key="b" size={14} tone="ink2">{b}</Mono>, after]
+}
+
 /** How the Index is computed, every method version, and the way to the full method page. */
 export function MethodCard() {
   const { space } = useTheme()
@@ -34,7 +44,8 @@ export function MethodCard() {
       <Card tone="raised" padding={8} style={{ paddingHorizontal: 16 }}>
         <View style={{ paddingVertical: 12, gap: 4 }}>
           <Mono tone="ink">{`JI = GM(H, P, R, F, D) − ${METHODS['v1.0'].lambda} · B`}</Mono>
-          <Meta size={14}>{t('yourIndexOn', { method: latest.method, build: latest.engineBuild })}</Meta>
+          {/* The method and engine build are identifiers with numbers in them: Mono, inside the sentence. */}
+          <Meta size={14}>{monoSlots(t('yourIndexOn', { method: SLOT_A, build: SLOT_B }), [latest.method, latest.engineBuild])}</Meta>
         </View>
         {(Object.keys(METHODS) as MethodVersion[]).map((v) => (
           <View key={v}>
@@ -46,7 +57,9 @@ export function MethodCard() {
               <View style={{ flex: 1 }}>
                 <Body>{tx(METHOD_LABEL[v], METHODS[v].label)}</Body>
                 <Meta size={14}>
-                  {`λ ${METHODS[v].lambda} · `}
+                  {'λ '}
+                  <Mono size={14} tone="ink2">{String(METHODS[v].lambda)}</Mono>
+                  {' · '}
                   <Mono size={14} tone="ink2">{/^\d{4}-\d{2}-\d{2}$/.test(METHODS[v].published) ? fmtDate(METHODS[v].published) : METHODS[v].published}</Mono>
                 </Meta>
               </View>
@@ -62,7 +75,7 @@ export function MethodCard() {
   )
 }
 
-/** The DPDP nominee: shown, changed with validation, kept on the phone. */
+/** The DPDP nominee: shown, changed with validation, kept on the phone with the account signed in. */
 export function NomineeCard({ onToast }: { onToast: (msg: string) => void }) {
   const { c, space } = useTheme()
   const t = useDict(TRUST)
@@ -95,10 +108,17 @@ export function NomineeCard({ onToast }: { onToast: (msg: string) => void }) {
       <Body weight="medium">{t('nomineeTitle')}</Body>
       <Meta>{t('nomineeBody')}</Meta>
       <Card tone="sunk" padding={16} style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1 }}>
-        <View style={{ flex: 1, gap: 2 }}>
-          <Body>{nominee.name}</Body>
-          <Meta size={14}>{`${rel(nominee.relation)} · ${nominee.email}`}</Meta>
-        </View>
+        {nominee.name ? (
+          <View style={{ flex: 1, gap: 2 }}>
+            <Body>{nominee.name}</Body>
+            <Meta size={14}>{`${rel(nominee.relation)} · ${nominee.email}`}</Meta>
+          </View>
+        ) : (
+          <View style={{ flex: 1, gap: 2 }}>
+            <Body>{t('nomineeNone')}</Body>
+            <Meta size={14}>{t('nomineeNoneHint')}</Meta>
+          </View>
+        )}
         <Button
           size="sm"
           variant="secondary"
@@ -108,7 +128,7 @@ export function NomineeCard({ onToast }: { onToast: (msg: string) => void }) {
             setOpen(true)
           }}
         >
-          {t('change')}
+          {nominee.name ? t('change') : t('nomineeAdd')}
         </Button>
       </Card>
 

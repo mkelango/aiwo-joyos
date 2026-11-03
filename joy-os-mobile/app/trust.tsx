@@ -29,11 +29,13 @@ import { TENANT } from '@/shared/platform'
 import type { AccessEvent, Consent } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { CLAIMS_LOG, EXPORTS_PAST, EXTRA_ACCESS, SPECIMEN_NOW } from '@/screens/b/accountData'
-import { ARTEFACT_VERSION, EXPORT_STAGE_MS, consentHistoryStore, exportStage, recordConsent, trustStore, useStore, type ConsentAction, type ConsentEvent, type ExportDone, type ExportFormat, type InsurerDecision } from '@/screens/b/bStore'
+import { ARTEFACT_VERSION, EXPORT_STAGE_MS, accountStore, consentHistoryStore, exportStage, recordConsent, trustStore, useStore, type ConsentAction, type ConsentEvent, type ExportDone, type ExportFormat, type InsurerDecision } from '@/screens/b/bStore'
 import { ChoiceCard, Done, Field, FilterChips, KeyValue, TimelineStep, useAccount, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
 import { StepUp } from '@/screens/b/stepUp'
 import { AbhaCard, MethodCard, NomineeCard } from '@/screens/b/trustCards'
 import { useDict } from '@/lib/i18n'
+import { useLatestIndex } from '@/lib/indexRecord'
+import { useIsMinor } from '@/lib/minor'
 import { TRUST, SCOPE_TEXT, CONSENT_T, ACCESS_T, EXPORT_T, CLAIM_STATE, CLAIM_BY, CLAIM_T } from '@/screens/b/i18n/trust'
 import { ROLE, useCommon, useTx } from '@/screens/b/i18n/common'
 
@@ -79,6 +81,20 @@ function Trust() {
   // Consents, research use and a scheduled erasure are kept on the phone (they hold on return).
   const [trust, setTrust] = useStore(trustStore)
   const account = useAccount()
+  // The export carries only the signed-in account's own Index (L2): Arjun's recorded history (with
+  // any re-take on this phone first), the Index taken on this phone for an account made in
+  // onboarding, and none for Lakshmi, who has no Index on record. Under 18 nothing is scored, so
+  // a minor's export carries no Index, term score or band at all.
+  const minor = useIsMinor()
+  const [acctState] = useStore(accountStore)
+  const latestIdx = useLatestIndex()
+  const ownIndex = minor
+    ? []
+    : account.id === 'arjun'
+      ? [...(latestIdx.onPhone ? [latestIdx] : []), ...INDEX_HISTORY]
+      : account.id === 'new' && latestIdx.onPhone
+        ? [latestIdx]
+        : []
   // The insurer consent (c_star) is answered on its own card: granted, declined or undecided.
   const insurer: InsurerDecision = trust.insurer ?? 'not-granted'
   const consent: Record<string, { on: boolean; changed?: boolean }> = Object.fromEntries(
@@ -179,8 +195,10 @@ function Trust() {
     const bundle = {
       specimen: true,
       format: format === 'fhir' ? 'FHIR R4 bundle (specimen excerpt)' : 'JSON',
-      member: { aiwoId: account.aiwoId, name: account.name, city: MEMBER.city, plan: MEMBER.plan },
-      index: INDEX_HISTORY.map((x) => ({ takenOn: x.takenOn, value: x.value, grade: x.grade, method: x.method, terms: x.terms.map((t) => ({ key: t.key, value: t.value })) })),
+      member: { aiwoId: account.aiwoId, name: account.name, city: MEMBER.city, plan: acctState.plan },
+      ...(minor
+        ? { index: [], indexNote: 'Nothing is scored under 18: this copy carries no Index.' }
+        : { index: ownIndex.map((x) => ({ takenOn: x.takenOn, value: x.value, grade: x.grade, method: x.method, terms: x.terms.map((t) => ({ key: t.key, value: t.value })) })) }),
       consents: Object.entries(consent).map(([id, v]) => ({ id, granted: v.on })),
       exportedAt: new Date().toISOString(),
     }
@@ -410,7 +428,7 @@ function Trust() {
           <Eyebrow>{t('export')}</Eyebrow>
         </View>
         <Title size={24}>{t('exportTitle')}</Title>
-        <Body tone="ink2">{t('exportBody')}</Body>
+        <Body tone="ink2">{t(minor ? 'exportBodyMinor' : 'exportBody')}</Body>
         <Segmented
           value={format}
           onChange={(v) => (job ? undefined : setFormat(v))}

@@ -14,9 +14,13 @@ import { useLocal } from '@/screens/a/local'
 import type { MeasuredIndex } from '@/shared/indexScoring'
 import { INDEX_HISTORY } from '@/shared/member'
 import { SPACE_TODAY, SPACE_TODAY_INDEX, localDay } from '@/screens/a/spacesData'
+import { Verse } from '@/screens/a/parts'
+import { useIsMinor } from '@/lib/minor'
 
 // PRACTICE WEEK (Memo p.21): one week in full — audio, the practice, the science note,
-// a private reflection (crisis-intercepted) and "Mark practised", the one Daybreak.
+// a private reflection (crisis-intercepted) and "Mark practised", the one Daybreak. The Practice
+// register's verse (the Thirukkural, Tamil with the English beneath) closes the week. Under 18 the
+// Week-8 re-take is not offered: nothing is scored (minors gate).
 
 const MAX = 600
 
@@ -32,6 +36,7 @@ function WeekView({ n }: { n: string }) {
   const week = PRACTICE_WEEKS.find((w) => w.week === num)
   const content = PRACTICE_CONTENT.find((p) => p.week === num)
   const guard = useCrisisGuard()
+  const minor = useIsMinor()
   const [measured] = useLocal<MeasuredIndex>('measuredIndex', null)
   const [prac, setPrac] = useStore(practiceStore)
   const stored = prac.reflections[String(num)]
@@ -124,7 +129,12 @@ function WeekView({ n }: { n: string }) {
             <Body>{tx(v)}</Body>
           </View>
         ))}
-        {num === 8 ? (
+        {num === 8 && minor ? (
+          <Card tone="raised" padding={16} style={{ gap: space.s1 }}>
+            <Body weight="medium">{t('Not scored while under 18')}</Body>
+            <Meta>{t('At the end of the eight weeks, choose one thing for the next ninety days with Priya.')}</Meta>
+          </Card>
+        ) : num === 8 ? (
           <Card tone="raised" padding={16} style={{ gap: space.s1 }}>
             <Body weight="medium">{t('This week, you take the Index again.')}</Body>
             <Meta>{t('About twenty minutes, saved as you go. Like for like with your baseline, then a signed delta at Day 90.')}</Meta>
@@ -218,6 +228,11 @@ function WeekView({ n }: { n: string }) {
         <ArrowLink icon="users" onPress={() => router.push('/circles')}>
           {t('Your circle')}
         </ArrowLink>
+      </Card>
+
+      {/* The verse of the Practice register (Playbook p63) */}
+      <Card tone="soft">
+        <Verse />
       </Card>
 
       {/* Prev / next */}

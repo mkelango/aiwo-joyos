@@ -1,5 +1,5 @@
 import type { TermKey } from '@/domain/types'
-import { ONBOARDING_KEY, readJSON, type SavedOnboarding } from '@/routes/entry/_store'
+import { ONBOARDING_KEY, readJSON, setupName, type SavedOnboarding } from '@/routes/entry/_store'
 import { DEFAULT_NOTIF_PREFS, SPECIMEN_NOW, type NotifPrefs } from './_data'
 import { CONSENT_ARTEFACTS, CONSENT_SEED, ARTEFACT_VERSION, type ConsentEvent, type ConsentHistory } from './_consent'
 import { DEVICE_CONSENT } from './_links'
@@ -141,12 +141,13 @@ export function seedFromOnboarding() {
     write(ACCT('consent-history'), { events: [...kept, ...fresh] })
   }
 
-  // Profile: the name given in setup (the AIWO ID contact is read straight from the record).
-  const name = ob.account?.name?.trim()
-  if (name) {
-    const [first, ...rest] = name.split(/\s+/)
+  // Profile: the name given in setup, family name included (the AIWO ID step keeps it apart;
+  // setupName splits it off the first-name field for older drafts). The AIWO ID contact is
+  // read straight from the record.
+  const who = setupName()
+  if (who?.firstName) {
     const cur = read<Record<string, string>>(ACCT('profile')) ?? {}
-    write(ACCT('profile'), { ...cur, firstName: first, lastName: rest.join(' ') })
+    write(ACCT('profile'), { ...cur, firstName: who.firstName, lastName: who.lastName })
   }
 
   write(SEEDED_KEY, ob.completedAt)

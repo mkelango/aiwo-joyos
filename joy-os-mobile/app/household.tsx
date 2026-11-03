@@ -38,6 +38,7 @@ import { COUPLES_CHECK, HOUSEHOLD_MINOR, KAVYA_SHARED, SPECIMEN_NOW, type Grant,
 import { PLANS } from '@/screens/b/_data'
 import { accountStore, householdKindStore, refCode, useStore } from '@/screens/b/bStore'
 import { useApp } from '@/lib/store'
+import { useIsMinor } from '@/lib/minor'
 import { CharterCard, FjoOffice, KindCard } from '@/screens/b/charter'
 import { ChoiceCard, Done, Field, KeyValue, shareOrCopy, useAccount, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
@@ -53,6 +54,24 @@ import { BAND, LEDGER_TAG, useCommon, useTx } from '@/screens/b/i18n/common'
 // family writes and every adult agrees to: see src/screens/b/charter.tsx.
 
 const bandFor = (v: number): Band => (v >= 70 ? 'steady' : v >= 50 ? 'uneven' : 'thin')
+
+/** A placeholder filled into translated copy, so the score can be set in Mono in its place. */
+const SLOT = '\u0000'
+/** The "Index 64" tag on a member's card: a Pill's shape, the number in Mono. */
+function IndexTag({ v }: { v: number }) {
+  const { c, radius } = useTheme()
+  const t = useDict(HOUSE)
+  const [a, b = ''] = t('indexTag', { v: SLOT }).split(SLOT)
+  return (
+    <View style={{ alignSelf: 'flex-start', backgroundColor: c.paperSunk, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 3 }}>
+      <Meta size={13} tone="ink2">
+        {a}
+        <Mono size={13} tone="ink2">{String(v)}</Mono>
+        {b}
+      </Meta>
+    </View>
+  )
+}
 /** Scope words, relation and age labels in the member's language. */
 function useHouseText() {
   const t = useDict(HOUSE)
@@ -84,6 +103,8 @@ function Household() {
   // Signed in as Lakshmi (M1), this is her household: her settings are hers to change.
   const account = useAccount()
   const asLakshmi = account.id === 'lakshmi'
+  // Under 18 nothing is scored (Architecture p26): no Index tag, no per-person Index, band or term value.
+  const minor = useIsMinor()
   const { setTextSize } = useApp()
   const elder = acct.elder
   const helperSince = elder.helperSince ?? '2027-01-08'
@@ -120,13 +141,13 @@ function Household() {
   const lakshmiDetail = elder.helper ? t('detailMother', { date: fmtDate(helperSince) }) : t('detailMotherNone')
   const members = asLakshmi
     ? [
-        { person: lakshmi, role: t('lkYou'), detail: t('lkDetailYou'), tags: [] as string[] },
+        { person: lakshmi, role: t('lkYou'), detail: t('lkDetailYou'), tags: [] as string[], index: undefined as number | undefined },
         { person: arjun, role: elder.helper ? t('lkSonHelper') : t('lkSon'), detail: t('lkDetailOwn'), tags: [t('ownIndex'), t('ownConsents')] },
         { person: kavya, role: t('lkDaughterInLaw'), detail: t('lkDetailOwn'), tags: [t('ownIndex'), t('ownConsents')] },
         { person: HOUSEHOLD_MINOR, role: t('lkGranddaughter'), detail: t('lkDetailMinor'), tags: [t('notScored')] },
       ]
     : [
-        { person: arjun, role: t('roleYou'), detail: t('detailYou'), tags: [t('indexTag', { v: me.value }), PLANS.find((p) => p.key === acct.plan)?.name ?? t('plus')] },
+        { person: arjun, role: t('roleYou'), detail: t('detailYou'), tags: [...(minor ? [t('notScored')] : []), PLANS.find((p) => p.key === acct.plan)?.name ?? t('plus')], index: minor ? undefined : me.value },
         { person: kavya, role: t('rolePartner'), detail: t('detailPartner'), tags: [t('ownIndex'), t('ownConsents')] },
         { person: lakshmi, role: t('roleMother'), detail: lakshmiDetail, tags: [t('elderMode'), t('helperArjun')] },
         { person: HOUSEHOLD_MINOR, role: t('roleDaughter'), detail: t('detailDaughter'), tags: [t('notScored'), t('parentalConsent')] },
@@ -169,6 +190,7 @@ function Household() {
             </View>
             <Meta>{m.detail}</Meta>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+              {'index' in m && m.index != null ? <IndexTag v={m.index} /> : null}
               {(m.person.id === lakshmi.id ? [elder.largeType || elder.voice ? t('elderMode') : t('standardMode'), elder.helper ? t('helperArjun') : elder.asked ? t('elAskedPill') : t('noHelper')] : m.tags).map((tag) => (
                 <Pill key={tag}>{tag}</Pill>
               ))}
@@ -218,10 +240,10 @@ function Household() {
         />
       ) : null}
 
-      {asLakshmi ? (
+      {asLakshmi || minor ? (
         <Card tone="sunk" style={{ flexDirection: 'row', gap: 10 }}>
           <Icon name="lock" size={16} color={c.ink3} />
-          <Meta style={{ flex: 1 }}>{t('lkCouple')}</Meta>
+          <Meta style={{ flex: 1 }}>{asLakshmi ? t('lkCouple') : t('minorCouple')}</Meta>
         </Card>
       ) : (
       <>

@@ -1,30 +1,34 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { CalendarCheck, Check, Info, Landmark, Plus, ShieldCheck, Trash2, X } from 'lucide-react'
+import { ArrowRight, BellRing, CalendarCheck, Check, Info, Landmark, Plus, ShieldCheck, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { DaybreakButton, Eyebrow, SpecimenTag } from '@/components/joy/primitives'
 import { Button, Pill, Progress, Tabs } from '@/components/ui'
 import { NO_SUGGESTIONS, PEACE_OF_MIND, TIME_AUDIT, TIME_KINDS } from './_data'
-import { ChartTip, SpaceShell, ToolCard, axisTick, rovingRadio, useCrisisGuard, Toggle } from './_SpaceShell'
+import { ChartTip, CopyDetails, SpaceShell, ToolCard, axisTick, focusCard, rovingRadio, useCrisisGuard, Toggle } from './_SpaceShell'
 import { useSpaceText, type SpKey } from './_i18n'
-import { CAL_KEY, CAL_NAME, CAL_PROVIDERS, useSpaceState, useTrustConsent, type CalConnection, type CalProvider } from './_state'
+import { CAL_KEY, CAL_NAME, CAL_PROVIDERS, SABBATH_DAYS, SABBATH_KEY, nextSabbathOn, useSpaceState, useTrustConsent, type CalConnection, type CalProvider, type SabbathDay, type SabbathPlan } from './_state'
 
 // FREEDOM (Memo p.19): the time audit (two weeks of calendar, consented,
 // summarised then discarded: whose time is it?), the No list, the digital
 // sabbath scheduler, the peace-of-mind checklist. Never financial advice.
 // The time audit starts from a calendar opt-in (provider, read-only grant) and
-// follows the calendar consent in the Trust centre.
+// follows the calendar consent in the Trust centre. The grant is read-only, so
+// nothing here writes to a calendar; the VIVA tools cite it only while it is on.
 // The one Daybreak button: keep my No list.
 export default function Freedom() {
   const { t, r } = useSpaceText()
+  // One calendar connection for the page: the time audit changes it and the sabbath card
+  // reads it, so connecting or disconnecting shows in both straight away (no reload).
+  const [conn, setConn] = useSpaceState<CalConnection>(CAL_KEY, { provider: null })
   return (
     <SpaceShell term="F" title={<>{r('fr.title', { e: <em>{t('fr.titleE')}</em> })}</>}>
-      <TimeAudit />
+      <div id="time-audit" tabIndex={-1} className="scroll-mt-24 rounded-card focus:outline-none"><TimeAudit conn={conn} setConn={setConn} /></div>
       <div className="grid gap-6 lg:grid-cols-12">
         <div className="flex lg:col-span-7"><NoList /></div>
-        <div className="flex lg:col-span-5"><Sabbath /></div>
+        <div className="flex lg:col-span-5"><Sabbath conn={conn} /></div>
       </div>
       <div className="grid items-start gap-6 lg:grid-cols-12">
         <div className="flex lg:col-span-7"><PeaceOfMind /></div>
@@ -51,9 +55,8 @@ function useCalendarConsent() {
   return useTrustConsent('c_cal')
 }
 
-function TimeAudit() {
+function TimeAudit({ conn, setConn }: { conn: CalConnection; setConn: (c: CalConnection) => void }) {
   const consent = useCalendarConsent()
-  const [conn, setConn] = useSpaceState<CalConnection>(CAL_KEY, { provider: null })
   const [rerun, setRerun] = useSpaceState<'idle' | 'asked'>('freedom.audit.rerun.v1', 'idle')
   const [note, setNote] = useState('')
   const provider = conn.provider && CAL_PROVIDERS.includes(conn.provider) ? conn.provider : null
@@ -293,8 +296,10 @@ function NoList() {
 
 // ─── Digital sabbath ──────────────────────────────────────────────────────
 
-const SABBATH_DAYS = ['Sat', 'Sun'] as const
-type SabbathPlan = { day: (typeof SABBATH_DAYS)[number]; from: string; to: string; off: { email: boolean; social: boolean; news: boolean; calls: boolean }; withKavya: boolean }
+// The plan is kept in Joy OS (freedom.sabbath.v1, shared with the Spaces hub's reminder).
+// The calendar grant is read-only, so nothing here creates an event or invites anyone:
+// with a calendar connected and c_cal on, the member is handed the details to add it
+// themselves; otherwise the card says why it stays in Joy OS and how to change that.
 const SABBATH_START: SabbathPlan = { day: 'Sun', from: '08:00', to: '18:00', off: { email: true, social: true, news: true, calls: false }, withKavya: true }
 
 /** 'HH:MM' → hours as a number; NaN for anything else (an empty or half-typed time input). */
@@ -304,18 +309,20 @@ function parseHm(v: string) {
   return h + m / 60
 }
 
-function Sabbath() {
-  // The plan in the calendar persists and re-arms the form; editing any field un-schedules it until it is put back.
-  const [plan, setPlan] = useSpaceState<SabbathPlan | null>('freedom.sabbath.v1', null)
+function Sabbath({ conn }: { conn: CalConnection }) {
+  // The kept plan persists and re-arms the form; editing any field un-keeps it until it is kept again.
+  const [plan, setPlan] = useSpaceState<SabbathPlan | null>(SABBATH_KEY, null)
+  const consent = useCalendarConsent()
+  const provider = consent.on && conn.provider && CAL_PROVIDERS.includes(conn.provider) ? conn.provider : null
   const start = plan && SABBATH_DAYS.includes(plan.day) ? plan : SABBATH_START
-  const [day, setDay] = useState(start.day)
+  const [day, setDay] = useState<SabbathDay>(start.day)
   const [from, setFrom] = useState(start.from)
   const [to, setTo] = useState(start.to)
   const [off, setOff] = useState(start.off)
   const [withKavya, setWithKavya] = useState(start.withKavya)
-  const scheduled = !!plan && plan.day === day && plan.from === from && plan.to === to && plan.withKavya === withKavya && (Object.keys(off) as (keyof typeof off)[]).every((k) => plan.off?.[k] === off[k])
-  const setScheduled = (v: boolean) => setPlan(v ? { day, from, to, off, withKavya } : null)
-  const { t, r } = useSpaceText()
+  const kept = !!plan && plan.day === day && plan.from === from && plan.to === to && plan.withKavya === withKavya && (Object.keys(off) as (keyof typeof off)[]).every((k) => plan.off?.[k] === off[k])
+  const setKept = (v: boolean) => setPlan(v ? { day, from, to, off, withKavya } : null)
+  const { t, r, wdm } = useSpaceText()
   const dayName = (x: string) => (x === 'Sat' ? t('c.saturday') : t('c.sunday'))
   const dayRadio = rovingRadio(SABBATH_DAYS, day, (d) => setDay(d))
   // An emptied or partial time input gives ''; treat it as no time rather than as 00:00 or NaN.
@@ -325,7 +332,15 @@ function Sabbath() {
   })()
   const invalid = !Number.isFinite(hours) || hours <= 0
   const labels: Record<keyof typeof off, string> = { email: t('fr.sb.email'), social: t('fr.sb.social'), news: t('fr.sb.news'), calls: t('fr.sb.calls') }
+  const offList = (Object.keys(off) as (keyof typeof off)[]).filter((k) => off[k]).map((k) => labels[k])
+  // What the member copies into their own calendar, in their language.
+  const details = [
+    t('fr.sb.eyebrow'),
+    t('fr.sb.summary', { day: dayName(day), from, to, h: hours, with: withKavya ? t('fr.sb.withKavya') : '' }),
+    offList.length ? t('fr.sb.detOff', { list: offList.join(', ') }) : '',
+  ].filter(Boolean).join('\n')
   const timeCls = 'num h-11 w-full rounded-xl border border-line-strong bg-paper px-3 text-[16px] text-ink focus-ring'
+  const linkCls = 'inline-flex items-center gap-1 rounded text-ink underline underline-offset-4 focus-ring'
   return (
     <ToolCard className="w-full" eyebrow={t('fr.sb.eyebrow')} title={t('fr.sb.title')} sub={t('fr.sb.sub')}>
       <div role="radiogroup" aria-label={t('fr.sb.day')} className="inline-flex self-start rounded-full bg-paper-sunk p-1">
@@ -351,7 +366,23 @@ function Sabbath() {
       <div className="mt-5"><Toggle checked={withKavya} onChange={setWithKavya} label={t('fr.sb.invite')} description={t('fr.sb.inviteDesc')} /></div>
       <div className="mt-auto pt-6">
         <p className="mb-3 text-[15px] text-ink" aria-live="polite">{!invalid && r('fr.sb.summary', { day: dayName(day), from: <span className="num">{from}</span>, to: <span className="num">{to}</span>, h: <span className="num">{hours}</span>, with: withKavya ? t('fr.sb.withKavya') : '' })}</p>
-        {scheduled && !invalid ? <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px] text-ink-2" role="status"><span className="flex items-center gap-2"><Check size={15} className="shrink-0" aria-hidden /> {t('fr.sb.scheduled', { day: dayName(day), inv: withKavya ? t('fr.sb.invSent') : '' })}</span><button type="button" onClick={() => setScheduled(false)} className="rounded text-ink underline underline-offset-4 focus-ring">{t('c.remove')}</button></p> : <Button variant="ink" disabled={invalid} onClick={() => setScheduled(true)}><CalendarCheck size={15} /> {t('fr.sb.put')}</Button>}
+        {kept && !invalid
+          ? <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px] text-ink-2" role="status"><span className="flex items-center gap-2"><Check size={15} className="shrink-0" aria-hidden /> {t('fr.sb.scheduled', { date: wdm(nextSabbathOn(day)) })}</span><button type="button" onClick={() => setKept(false)} className="rounded text-ink underline underline-offset-4 focus-ring">{t('c.remove')}</button></p>
+          : <Button variant="ink" disabled={invalid} onClick={() => setKept(true)}><BellRing size={15} /> {t('fr.sb.put')}</Button>}
+        {!invalid && (
+          <div className="mt-4 rounded-2xl border border-line px-4 py-3 text-[14px] text-ink-2">
+            {provider ? (
+              <>
+                <p>{t('fr.sb.readOnly', { cal: CAL_NAME[provider] })}</p>
+                <CopyDetails text={details} className="mt-2.5" />
+              </>
+            ) : consent.on ? (
+              <p className="flex flex-wrap items-center gap-x-3 gap-y-1"><span>{t('fr.sb.noCal')}</span><button type="button" onClick={() => focusCard('time-audit')} className={linkCls}>{t('fr.sb.connect')} <ArrowRight size={13} aria-hidden /></button></p>
+            ) : (
+              <p className="flex flex-wrap items-center gap-x-3 gap-y-1"><span>{t('fr.sb.calOff')}</span><Link to="/app/trust#consents" className={linkCls}>{t('pl.pp.turnOn')} <ArrowRight size={13} aria-hidden /></Link></p>
+            )}
+          </div>
+        )}
       </div>
     </ToolCard>
   )

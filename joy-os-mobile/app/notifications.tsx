@@ -1,7 +1,7 @@
 import { router } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Pressable, View } from 'react-native'
-import { Body, Button, Card, DaybreakButton, Divider, Eyebrow, Icon, Meta, Mono, Screen, ScreenHeader, SectionTitle, Serif, Toggle, type IconName } from '@/components'
+import { Body, Button, Card, DaybreakButton, Divider, EmptyIllustration, Eyebrow, Icon, Meta, Mono, Screen, ScreenHeader, SectionTitle, Serif, Toggle, type IconName } from '@/components'
 import { useTheme } from '@/theme/ThemeProvider'
 import { NOTICES, type Notice } from '@/screens/b/_data'
 import { notifPrefsStore, notifReadStore, useStore, validatePrefs, type NotifPrefs } from '@/screens/b/bStore'
@@ -14,7 +14,8 @@ import { perDayKey, useCommon, usePrefsError, useTx } from '@/screens/b/i18n/com
 
 // NOTIFICATIONS: the few things we sent you, grouped Today / Earlier, each opening where it
 // belongs; then the rules we keep — quiet hours, at most three a day, and the channels. The
-// same preferences Settings and onboarding use. One Daybreak: Save.
+// same preferences Settings and onboarding use. One Daybreak: Save. What has been read or
+// cleared belongs to the account signed in (L2: kept with the account when another signs in).
 
 const ICON: Record<Notice['kind'], IconName> = { action: 'sun', ledger: 'feather', circle: 'users', message: 'message-circle', letter: 'mail', care: 'heart' }
 
@@ -98,7 +99,7 @@ function Notifications() {
 
       {shown.length === 0 ? (
         <Card tone="sunk" style={{ gap: space.s1, alignItems: 'flex-start' }}>
-          <Icon name="moon" size={22} color={c.ink2} />
+          <EmptyIllustration kind="generic" />
           <Body>{t('nothingNew')}</Body>
           <Button variant="link" onPress={() => setRd({ read: [], cleared: [] })}>
             {t('showAgain')}

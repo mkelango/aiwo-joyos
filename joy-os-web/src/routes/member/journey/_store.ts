@@ -62,7 +62,12 @@ export interface JourneyState {
   demoNoCation: boolean
   /** The Joyspan 2027 Declaration card, signed by the member typing their name (Playbook p61). */
   declaration: null | { name: string; signedAt: string }
+  /** What every delegate badge prints: photography consent as a word, and diet (Playbook p61). null = not given yet. */
+  badge: BadgeDetails
 }
+
+export type BadgeDiet = 'veg' | 'vegan' | 'jain' | 'egg' | 'nonveg' | 'none'
+export interface BadgeDetails { photography: null | 'yes' | 'no'; diet: null | BadgeDiet }
 
 export type OccasionGeneration = 'elders' | 'middle' | 'young'
 
@@ -125,6 +130,7 @@ const initial: JourneyState = {
   occasionRequests: [],
   demoNoCation: false,
   declaration: null,
+  badge: { photography: null, diet: null },
 }
 
 // Offline audio is kept on the device, so its record lives in localStorage and
@@ -155,12 +161,29 @@ function loadDeclaration(): JourneyState['declaration'] {
   }
 }
 
+// The badge details are the member's standing answers for every event, so they live in localStorage too.
+const BADGE_KEY = 'joyos:journey:badge'
+const DIETS: BadgeDiet[] = ['veg', 'vegan', 'jain', 'egg', 'nonveg', 'none']
+
+function loadBadge(): BadgeDetails {
+  try {
+    const raw = window.localStorage.getItem(BADGE_KEY)
+    const v = raw ? (JSON.parse(raw) as { photography?: unknown; diet?: unknown } | null) : null
+    return {
+      photography: v?.photography === 'yes' || v?.photography === 'no' ? v.photography : null,
+      diet: DIETS.includes(v?.diet as BadgeDiet) ? (v!.diet as BadgeDiet) : null,
+    }
+  } catch {
+    return initial.badge
+  }
+}
+
 function load(): JourneyState {
   try {
     const raw = window.sessionStorage.getItem(KEY)
     const base: JourneyState = raw ? { ...initial, ...(JSON.parse(raw) as Partial<JourneyState>) } : initial
     const offline = loadOffline()
-    return { ...base, ...(offline ? { offlineWeeks: offline } : {}), declaration: loadDeclaration() }
+    return { ...base, ...(offline ? { offlineWeeks: offline } : {}), declaration: loadDeclaration(), badge: loadBadge() }
   } catch {
     return initial
   }
@@ -176,6 +199,7 @@ function emit() {
     if (state.declaration) window.localStorage.setItem(DECLARATION_KEY, JSON.stringify(state.declaration))
     else window.localStorage.removeItem(DECLARATION_KEY)
   } catch { /* storage blocked */ }
+  try { window.localStorage.setItem(BADGE_KEY, JSON.stringify(state.badge)) } catch { /* storage blocked */ }
   listeners.forEach((l) => l())
 }
 
@@ -279,6 +303,10 @@ export function setDemoNoCation(on: boolean) {
 
 export function signDeclaration(name: string | null) {
   setJourney((s) => ({ ...s, declaration: name ? { name, signedAt: new Date().toISOString() } : null }))
+}
+
+export function setBadge(update: Partial<BadgeDetails>) {
+  setJourney((s) => ({ ...s, badge: { ...s.badge, ...update } }))
 }
 
 // ─── The venue's published itinerary (C11) ────────────────────────────────

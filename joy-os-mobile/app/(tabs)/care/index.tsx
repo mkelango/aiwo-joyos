@@ -30,8 +30,8 @@ import {
 import { useApp } from '@/lib/store'
 import { MEMBER, TEAM } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
-import { CARE_LADDER, CLINICIANS, ERX, PAST_CONSULTS, PEOPLE_DETAIL, RESULTS, THREADS } from '@/screens/b/accountData'
-import { accountStore, messagesStore, refCode, useStore } from '@/screens/b/bStore'
+import { CARE_LADDER, CLINICIANS, ERX, PAST_CONSULTS, PEOPLE_DETAIL, RESULTS } from '@/screens/b/accountData'
+import { accountStore, messagesStore, refCode, useAccountThreads, useStore } from '@/screens/b/bStore'
 import { ChoiceCard, Done, Field, HereMarker, KeyValue, TimelineStep, useSheetCrisisGuard } from '@/screens/b/parts'
 import { localDate, Rich, useA } from '@/screens/a/i18n'
 import { slotsFor, useCareConsults, type Clinician, type ConsultRow } from '@/screens/a/care'
@@ -75,6 +75,8 @@ export default function Care() {
   const ld = (s: string) => localDate(s, lang)
   const { setCrisisOpen } = useApp()
   const [msgs] = useStore(messagesStore)
+  // The signed-in account's own threads (L2): Lakshmi never sees Arjun's conversations here.
+  const threads = useAccountThreads()
   const [acct, setAcct] = useStore(accountStore)
   const { rows: consults, joined, book, cancel } = useCareConsults()
   const [resched, setResched] = useState<ConsultRow | null>(null)
@@ -99,12 +101,12 @@ export default function Care() {
   const [note, setNote] = useState<string | null>(null)
   const person = (id: string) => TEAM.find((p) => p.id === id)!
   const isUnread = (id: string, n: number) => n > 0 && !msgs.read.includes(id)
-  const unread = THREADS.filter((t) => isUnread(t.id, t.unread)).length
+  const unread = threads.filter((t) => isUnread(t.id, t.unread)).length
   const hereIdx = CARE_LADDER.findIndex((r) => r.status === 'here')
 
   // Messages live on their own screen, so the crisis intercept is never under a sheet.
   const openThreadFor = (personId: string) => {
-    const t = [...msgs.started, ...THREADS].find((x) => x.personId === personId)
+    const t = [...msgs.started, ...threads].find((x) => x.personId === personId)
     router.push(t ? `/messages?t=${t.id}` : `/messages?compose=1&to=${personId}`)
   }
   const requestSlot = () => {
@@ -190,7 +192,7 @@ export default function Care() {
           <Eyebrow>{t('Messages')}</Eyebrow>
           {unread > 0 ? <Pill tone="daybreak">{unread === 1 ? t('A new reply') : t('New replies')}</Pill> : null}
         </View>
-        {THREADS.slice(0, 2).map((th) => {
+        {threads.slice(0, 2).map((th) => {
           const p = person(th.personId)
           const last = th.messages[th.messages.length - 1]
           return (
@@ -216,6 +218,7 @@ export default function Care() {
             </Pressable>
           )
         })}
+        {threads.length === 0 && msgs.started.length === 0 ? <Meta size={14}>{t('No messages yet. Your care team is one message away.')}</Meta> : null}
         <DaybreakButton icon="message-circle" onPress={() => router.push('/messages')}>
           {t('Open messages')}
         </DaybreakButton>

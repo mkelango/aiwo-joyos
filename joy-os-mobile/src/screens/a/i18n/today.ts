@@ -65,4 +65,14 @@ export const TODAY = dict({
   'Notice three things.': ['மூன்று விஷயங்களைக் கவனியுங்கள்.', 'तीन चीज़ों पर ध्यान दीजिए।'],
   'Savouring interventions raise positive affect (Bryant & Veroff, 2007).': ['ரசித்து அனுபவிக்கும் பயிற்சிகள் நேர்மறை உணர்வை உயர்த்துகின்றன (Bryant & Veroff, 2007).', 'आनंद को ठहरकर महसूस करने के अभ्यास सकारात्मक भावनाएँ बढ़ाते हैं (Bryant & Veroff, 2007)।'],
   'Daily Pleasure is your lowest term. Your calendar is clear after 7 pm and Kavya is home.': ['தினசரி மகிழ்ச்சி உங்கள் மிகக் குறைந்த அம்சம். இரவு 7 மணிக்குப் பிறகு உங்கள் நாட்காட்டி காலியாக உள்ளது, Kavya வீட்டில் இருக்கிறார்.', 'रोज़ का आनंद आपका सबसे निचला पहलू है। शाम 7 बजे के बाद आपका कैलेंडर ख़ाली है और Kavya घर पर हैं।'],
+  // The one action follows the lowest term (any of the six)
+  'Done. *Thank you.*': ['முடிந்தது. *நன்றி.*', 'हो गया। *धन्यवाद।*'],
+  'Marked as done for today. You can undo it.': ['இன்றைக்கு முடிந்ததாகக் குறிக்கப்பட்டது. இதைச் செயல்தவிர்க்கலாம்.', 'आज के लिए पूरा चिह्नित किया गया। आप इसे वापस ले सकते हैं।'],
+  'Your calendar is not read: consent is off in the Trust centre. Kavya linked, sunset 18:12.': ['உங்கள் நாட்காட்டி படிக்கப்படவில்லை: நம்பிக்கை மையத்தில் அனுமதி அணைக்கப்பட்டுள்ளது. Kavya இணைக்கப்பட்டுள்ளார், சூரிய அஸ்தமனம் 18:12.', 'आपका कैलेंडर नहीं पढ़ा जाता: ट्रस्ट सेंटर में सहमति बंद है। Kavya जुड़ी हैं, सूर्यास्त 18:12।'],
+  'Fits in *{n}* minutes, {when}, with Kavya.': ['*{n}* நிமிடங்களில், {when}, Kavya உடன் பொருந்தும்.', '*{n}* मिनट में, {when}, Kavya के साथ हो जाता है।'],
+  'Fits in *{n}* minutes, {when}.': ['*{n}* நிமிடங்களில், {when} பொருந்தும்.', '*{n}* मिनट में, {when} हो जाता है।'],
+  'in the morning': ['காலையில்', 'सुबह'],
+  'in the afternoon': ['மதியத்தில்', 'दोपहर में'],
+  'in the evening': ['மாலையில்', 'शाम को'],
+  'at any time of day': ['நாளின் எந்த நேரத்திலும்', 'दिन में किसी भी समय'],
 })

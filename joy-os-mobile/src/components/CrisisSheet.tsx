@@ -1,4 +1,4 @@
-import { router } from 'expo-router'
+import { router, usePathname } from 'expo-router'
 import { useState } from 'react'
 import { Linking, View } from 'react-native'
 import { useDict } from '../lib/i18n'
@@ -23,6 +23,8 @@ import { KIT } from './_i18n'
  * emergency contact told only when the member asks (or called directly).
  * Signed out (Welcome, Sign in, the Check, Onboarding) there is no member yet: no emergency
  * contact is shown, and the on-call clinician is a phone call, since Messages needs an account.
+ * Signed in with no emergency contact on the account (onboarding never asks for one) the card
+ * says so plainly and offers Profile, where one is added; it never offers to tell no one.
  */
 // The psychologist on call tonight (specimen roster).
 const ON_CALL = TEAM.find((p) => p.id === 'p_sanjay')!
@@ -38,7 +40,10 @@ export function CrisisSheet() {
   const [session] = useStore(sessionStore)
   const member = session.signedIn
   const contact = acct.emergency
-  const first = contact.name.split(' ')[0] || contact.name
+  const name = contact.name.trim()
+  const hasContact = name.length > 0
+  const first = name.split(' ')[0] || name
+  const path = usePathname()
   // Telling the contact is the member's choice, made here; kept for this sheet only.
   const [told, setTold] = useState(false)
   const close = () => {
@@ -71,7 +76,7 @@ export function CrisisSheet() {
       </Card>
       <View style={{ gap: space.s1 }}>
         <Eyebrow>{t('yourPeople')}</Eyebrow>
-        <Body>{t(member ? 'yourPeopleBody' : 'yourPeopleBodyOut')}</Body>
+        <Body>{member ? `${t('yourPeopleOnCall')} ${hasContact ? t('yourPeopleContact', { name: first }) : t('yourPeopleNoContact')}` : t('yourPeopleBodyOut')}</Body>
         {member ? (
           <Button
             variant="ink"
@@ -103,10 +108,29 @@ export function CrisisSheet() {
             </Meta>
           </>
         )}
-        {member ? (
+        {member && !hasContact ? (
           <Card tone="sunk" style={{ gap: space.s1 }}>
-            <Eyebrow>{t('emergencyContact', { relation: tx(RELATION_TEXT[contact.relation], contact.relation) })}</Eyebrow>
-            <Body weight="medium">{contact.name}</Body>
+            <Eyebrow>{t('emergencyContactPlain')}</Eyebrow>
+            <Body>{t('noContactBody')}</Body>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s1 }}>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon="user-plus"
+                accessibilityHint={t('addContactHint')}
+                onPress={() => {
+                  close()
+                  if (path !== '/profile') router.push('/profile')
+                }}
+              >
+                {t('addContact')}
+              </Button>
+            </View>
+          </Card>
+        ) : member ? (
+          <Card tone="sunk" style={{ gap: space.s1 }}>
+            <Eyebrow>{contact.relation.trim() ? t('emergencyContact', { relation: tx(RELATION_TEXT[contact.relation], contact.relation) }) : t('emergencyContactPlain')}</Eyebrow>
+            <Body weight="medium">{name}</Body>
             {told ? (
               <View accessibilityLiveRegion="polite" style={{ flexDirection: 'row', gap: 10 }}>
                 <Icon name="check" size={18} color={c.ink} />

@@ -7,7 +7,7 @@ import { DaybreakButton, Eyebrow, SpecimenTag } from '@/components/joy/primitive
 import { Button, Card, PageHeader, Pill } from '@/components/ui'
 import { CONSOLES } from '@/layouts/ConsoleLayout'
 import { AccessRequestSheet } from './_access'
-import { DECLINE_REASONS, STRUCTURE_ONLY, AGGREGATES_ONLY, NAMED_MEMBER, access, isLive, scopeLabel, standingRequest, lastSettled, statusLabel, useAccessRequests, type AccessRequest } from './_accessStore'
+import { DECLINE_REASONS, STRUCTURE_ONLY, AGGREGATES_ONLY, ASSIGNED_MEMBERS, NAMED_MEMBER, access, assignedIds, isLive, scopeLabel, standingRequest, lastSettled, statusLabel, useAccessRequests, type AccessRequest } from './_accessStore'
 import { useMemberAccessLog } from '@/routes/member/account/_access'
 import { GATE, ROLE_OPTIONS, specimenRoleOf, useConsoleRole } from './_gate'
 import { AccessNote, fmtClock, fmtDuration, useConsoleNow } from './_parts'
@@ -367,6 +367,7 @@ function AccessRequests({ requests, now }: { requests: AccessRequest[]; now: num
                   {live && r.scope === STRUCTURE_ONLY && <p className="mt-1 text-[13px] text-ink-3">Structure only: the console opens to look, never to act on a member.</p>}
                   {live && r.scope === AGGREGATES_ONLY && <p className="mt-1 text-[13px] text-ink-3">Aggregates only: never acts on a member’s record.</p>}
                   {live && r.scope === NAMED_MEMBER && <p className="mt-1 text-[13px] text-ink-3">Acts on {r.memberName ?? r.memberId}’s record only; every other member stays view only.</p>}
+                  {live && r.scope === ASSIGNED_MEMBERS && <p className="mt-1 text-[13px] text-ink-3">Acts on the records of the <span className="num">{assignedIds(r).length}</span> members assigned to {r.person} only, one by one; every other member and anything console-wide stays view only.</p>}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 md:flex-col md:items-end">
                   {r.status === 'pending' && declining !== r.ref && (

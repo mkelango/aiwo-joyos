@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, BookOpen, Check, Clock, MapPin, ShieldCheck, Sparkles } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BookOpen, Check, Clock, Copy, MapPin, ShieldCheck, Sparkles } from 'lucide-react'
 import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -15,7 +15,7 @@ import { LE8, LE8_KEY, LE8_LOG_START, ROOM_VERDICT, VIVA_DRAFT, VIVA_MATCH, VIVA
 import { useSpaceText } from './_i18n'
 import { TermIcon } from '@/components/joy/icons'
 import { useIsMinor } from '@/lib/minor'
-import { readSpaceState, useSpaceState } from './_state'
+import { readCalendarProvider, readSpaceState, readTrustConsent, useSpaceState } from './_state'
 
 // Shared shell for the six spaces (Memo p.19): the term, its score with method,
 // its 90-day history, what moves it, three actions, the VIVA tool, the lead
@@ -150,7 +150,7 @@ export function TermRule({ term, className }: { term: TermKey; className?: strin
 
 function ScoreHero({ term }: { term: TermKey }) {
   const t = termByKey(term)
-  const { t: tx, tt, d, dm, my } = useSpaceText()
+  const { t: tx, r, tt, d, dm, my } = useSpaceText()
   const name = tt.name(term)
   const s = termScore(term)
   const isB = term === 'B'
@@ -159,10 +159,11 @@ function ScoreHero({ term }: { term: TermKey }) {
   const history = termHistory(term)
   const fulls = INDEX_HISTORY.slice().reverse().map((ix) => ({ on: ix.takenOn, v: ix.terms.find((x) => x.key === term)!.value, grade: ix.grade }))
   const diff = s.delta ?? 0
-  const sv = { n: Math.abs(diff), prev: s.prev ?? '' }
+  // Every number in the sentence is set in Mono, Burden's minus included.
+  const sv = { n: <span className="num">{Math.abs(diff)}</span>, prev: <span className="num">{sign}{s.prev ?? ''}</span> }
   const sentence = isB
-    ? tx(diff < 0 ? 'sh.bEased' : diff > 0 ? 'sh.bRose' : 'sh.bSame', sv)
-    : tx(diff > 0 ? 'sh.up' : diff < 0 ? 'sh.down' : 'sh.same', sv)
+    ? r(diff < 0 ? 'sh.bEased' : diff > 0 ? 'sh.bRose' : 'sh.bSame', sv)
+    : r(diff > 0 ? 'sh.up' : diff < 0 ? 'sh.down' : 'sh.same', sv)
   const gradId = `g-${term}`
   return (
     <Card className="relative overflow-hidden !p-0">
@@ -350,9 +351,54 @@ function ThreeActions({ term }: { term: TermKey }) {
   )
 }
 
+/** Scroll a card on this page into view and move focus to it (the card's wrapper carries the id and tabIndex -1). */
+export function focusCard(id: string) {
+  const el = document.getElementById(id)
+  if (!el) return
+  el.scrollIntoView({ behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })
+  el.focus({ preventScroll: true })
+}
+
+/**
+ * Details the member copies to add something to their own calendar. Joy OS's calendar grant
+ * is read-only, so it never creates the event itself; this hands the words over instead.
+ */
+export function CopyDetails({ text, className }: { text: string; className?: string }) {
+  const { t } = useSpaceText()
+  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const box = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => setState('idle'), [text])
+  const copy = async () => {
+    try {
+      if (!navigator.clipboard) throw new Error('no clipboard')
+      await navigator.clipboard.writeText(text)
+      setState('copied')
+    } catch {
+      box.current?.select()
+      setState('failed')
+    }
+  }
+  return (
+    <div className={className}>
+      <label className="block">
+        <span className="sr-only">{t('c.details')}</span>
+        <textarea ref={box} readOnly value={text} rows={Math.min(6, text.split('\n').length + 1)} onFocus={(e) => e.currentTarget.select()} className="w-full resize-none rounded-xl border border-line bg-paper px-3 py-2 text-[14px] leading-relaxed text-ink focus-ring" />
+      </label>
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <Button size="sm" variant="secondary" onClick={copy}>{state === 'copied' ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />} {t('c.copy')}</Button>
+        <span role="status" className="text-[13px] text-ink-2">{state === 'copied' ? t('c.copied') : state === 'failed' ? t('c.copyFail') : ''}</span>
+      </div>
+    </div>
+  )
+}
+
 type VivaDraft = { tool: string; ask: string; draft: string; reviewer: string }
+/** A way on from a draft: a link to another screen, or a jump to a card on this page (by its id). */
+type VivaLink = { label: string; to?: string; focus?: string }
 /** One turn in the space's VIVA card: what was asked (the member's own words or a canned prompt) and the draft. */
-type VivaTurn = { ask: string; text: string; by: string }
+type VivaTurn = { ask: string; text: string; by: string; link?: VivaLink }
+/** Freedom's tools that read the time audit's totals. */
+const CALENDAR_TOOLS = ['time_audit_summary', 'no_list_coach']
 
 function VivaTool({ term }: { term: TermKey }) {
   const t = termByKey(term)
@@ -381,13 +427,29 @@ function VivaTool({ term }: { term: TermKey }) {
     const [a, b] = ranked
     return tx('sh.viva.le8', { a: dx(a.name), sa: a.score, b: dx(b.name), sb: b.score })
   }
+  /**
+   * The whole answer. Freedom's calendar tools answer from the time audit only while a calendar
+   * is connected and the Trust centre's calendar consent (c_cal) is on; otherwise they say the
+   * audit is off, cite nothing from a calendar, and offer the way to turn it on.
+   */
+  const answer = (dr: VivaDraft): Omit<VivaTurn, 'ask'> => {
+    const by = tx('sh.draftedBy', { tool: dr.tool, reviewer: dx(dr.reviewer) })
+    if (!CALENDAR_TOOLS.includes(dr.tool)) return { text: draftText(dr), by }
+    const consent = readTrustConsent('c_cal')
+    if (consent.on && readCalendarProvider()) return { text: draftText(dr), by }
+    return {
+      text: dr.tool === 'no_list_coach' ? tx('fr.viva.noListOff') : tx(consent.on ? 'fr.viva.noCal' : 'fr.viva.calOff'),
+      by: tx('sh.draftedBy', { tool: dr.tool, reviewer: tx('fr.viva.offBy') }),
+      link: consent.on ? { label: tx('fr.viva.connect'), focus: 'time-audit' } : { label: tx('fr.cal.turnOn'), to: '/app/trust#consents' },
+    }
+  }
   const run = (next: VivaTurn) => {
     setTurn(next)
     setState('drafting')
     window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => setState('shown'), 700)
   }
-  const askTool = (dr: VivaDraft) => run({ ask: dx(dr.ask), text: draftText(dr), by: tx('sh.draftedBy', { tool: dr.tool, reviewer: dx(dr.reviewer) }) })
+  const askTool = (dr: VivaDraft) => run({ ask: dx(dr.ask), ...answer(dr) })
   const askOwn = () => {
     const v = q.trim()
     if (!v) return setErr(true)
@@ -395,7 +457,7 @@ function VivaTool({ term }: { term: TermKey }) {
     if (guard(v)) return
     const hit = drafts.find((dr) => VIVA_MATCH[dr.tool]?.test(v))
     run(hit
-      ? { ask: v, text: draftText(hit), by: tx('sh.draftedBy', { tool: hit.tool, reviewer: dx(hit.reviewer) }) }
+      ? { ask: v, ...answer(hit) }
       : { ask: v, text: tx('sh.viva.generic', { tools: t.viva.map(dx).join(', ') }), by: tx('sh.viva.genericBy') })
     setQ(''); setErr(false)
   }
@@ -437,6 +499,9 @@ function VivaTool({ term }: { term: TermKey }) {
                   <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24 }} className="rounded-2xl rounded-bl-md bg-paper-raised p-4">
                     <p className="text-[15px] leading-relaxed text-ink">{turn.text}</p>
                     <p className="eyebrow mt-3 break-words text-ink-3">{turn.by}</p>
+                    {turn.link && (turn.link.to
+                      ? <Link to={turn.link.to} className="mt-3 inline-flex items-center gap-1.5 rounded text-[14px] text-ink underline underline-offset-4 focus-ring">{turn.link.label} <ArrowRight size={14} aria-hidden /></Link>
+                      : <button type="button" onClick={() => focusCard(turn.link!.focus!)} className="mt-3 inline-flex items-center gap-1.5 rounded text-[14px] text-ink underline underline-offset-4 focus-ring">{turn.link.label} <ArrowRight size={14} aria-hidden /></button>)}
                   </motion.div>
                   <Button size="sm" variant="ghost" onClick={reset}>{tx('sh.viva.again')}</Button>
                 </>

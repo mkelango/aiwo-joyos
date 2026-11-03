@@ -1,7 +1,7 @@
 import { router } from 'expo-router'
 import { useState } from 'react'
 import { Platform, View } from 'react-native'
-import { ArrowLink, Avatar, Body, Divider, DaybreakButton, Eyebrow, JoyspanWheel, LoopRing, Meta, Mono, Numeral, Screen, ScreenHeader, Serif, SpecimenTag, TermDot, fmtDate } from '@/components'
+import { AiwoMark, ArrowLink, Avatar, Body, Divider, DaybreakButton, Eyebrow, JoyspanWheel, LoopRing, Meta, Mono, Numeral, Screen, ScreenHeader, Serif, SpecimenTag, TermDot, fmtDate } from '@/components'
 import { useApp } from '@/lib/store'
 import { useIsMinor } from '@/lib/minor'
 import { useDict, useTermText } from '@/lib/i18n'
@@ -9,7 +9,7 @@ import { H2 } from '@/screens/a/local'
 import { DAY40_COACH_NOTE, DAY40_DATES } from '@/screens/b/entryData'
 import { DAY40, DAY40_SIGNALS } from '@/screens/b/i18n/day40'
 import { useTx } from '@/screens/b/i18n/common'
-import { memberOnly } from '@/screens/b/parts'
+import { memberOnly, useAccount } from '@/screens/b/parts'
 import { INDEX_HISTORY, MEMBER, TEAM, TODAY_ACTION } from '@/shared/member'
 import type { TermKey } from '@/shared/types'
 import { txFor } from '@/screens/a/i18n'
@@ -33,6 +33,8 @@ function Day40() {
   const tx = useTx()
   const lang = useLang()
   const { ledger } = useApp()
+  // The page names whoever is signed in on this phone (Arjun, Lakshmi, or the account made in onboarding).
+  const me = useAccount()
   const [done, setDone] = useState<null | 'saved' | 'printed'>(null)
   const day0 = INDEX_HISTORY[0]
   const low = day0.lowestTerm
@@ -63,8 +65,14 @@ function Day40() {
       <View style={{ borderRadius: radius.card, borderWidth: 1, borderColor: c.line, backgroundColor: c.paperRaised, padding: space.s3, gap: space.s3 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: space.s2, flexWrap: 'wrap' }}>
           <View style={{ gap: 4, flex: 1, minWidth: 180 }}>
-            <Eyebrow tone="ink2">AIWO · Joy OS</Eyebrow>
-            <Body weight="semibold">{t('pageHead', { name: `${MEMBER.firstName} ${MEMBER.lastName}` })}</Body>
+            {/* The drawn mark (Playbook p20), with Joy OS as its line of type: never typed as a logo. */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <AiwoMark size={20} />
+              <Eyebrow tone="ink2" style={{ letterSpacing: 12 * 0.24 }}>
+                Joy OS
+              </Eyebrow>
+            </View>
+            <Body weight="semibold">{t('pageHead', { name: me.name })}</Body>
             <Mono size={13} tone="ink3">{fmtDate(DAY40_DATES.day40)}</Mono>
           </View>
           <View style={{ alignItems: 'center', gap: 4 }}>

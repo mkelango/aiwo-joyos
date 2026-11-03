@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Platform, View } from 'react-native'
-import { Body, Button, Card, DaybreakButton, Eyebrow, Icon, Meta, Mono, Screen, ScreenHeader, Segmented, Serif, SpecimenTag, Title, Toggle, fmtDate } from '@/components'
+import { AiwoMark, Body, Button, Card, DaybreakButton, EmptyIllustration, Eyebrow, Icon, Meta, Mono, Screen, ScreenHeader, Segmented, Serif, SpecimenTag, Title, Toggle, fmtDate } from '@/components'
 import { playSound } from '@/lib/sound'
 import { useDict, useLang } from '@/lib/i18n'
 import { H2, useLocal } from '@/screens/a/local'
@@ -12,7 +12,7 @@ import { useTheme } from '@/theme/ThemeProvider'
 
 // THE JOYSPAN LETTER (Memo p17: print artefacts; Playbook p63: "monthly, in the Mentor's voice,
 // with real numbers"). Editorial register: Newsreader for the headline, generous margins,
-// Daybreak only as the ribbon. The letter is the Mentor's own words and stays as written; the
+// Daybreak only as the ribbon (and the illustration's one fill, as on the web issue). The letter is the Mentor's own words and stays as written; the
 // chrome around it is translated. Write back: free text through the crisis intercept, kept on
 // the phone (specimen), never quoted without the member's yes. One Daybreak: send the reply.
 // Open to anyone (the Check's Letter door leads here), members and not.
@@ -78,9 +78,14 @@ export default function LetterScreen() {
         <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ width: 6, backgroundColor: c.daybreak }} />
         <View style={{ flex: 1, padding: space.s3, gap: space.s2 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <Eyebrow tone="ink2">{t('letterOn', { date: fmtDate(issue.date, lang) })}</Eyebrow>
+            <AiwoMark size={18} />
             <Eyebrow>{t('issueNo', { n: issue.n })}</Eyebrow>
           </View>
+          {/* Editorial illustration (Playbook p51): single-weight Ink line, the one Daybreak fill its seal. */}
+          <View style={{ width: 150, maxWidth: '100%' }}>
+            <EmptyIllustration kind="letter" width={150} />
+          </View>
+          <Eyebrow tone="ink2">{t('letterOn', { date: fmtDate(issue.date, lang) })}</Eyebrow>
           <Title size={30} accessibilityRole="header" aria-level={2}>
             <Serif>{issue.title}</Serif>
           </Title>

@@ -5,11 +5,13 @@ import { useDict } from '@/lib/i18n'
 import { IconButton, fmtTime } from '@/screens/b/parts'
 import { PARTS } from '@/screens/b/i18n/parts'
 import { useTheme } from '@/theme/ThemeProvider'
+import { useA } from './i18n'
 import { useLocal } from './local'
 
 // The Mentor's five-minute audio for the Practice tab — simulated playback, transcript and an
 // offline download whose state is kept on the phone per week (AsyncStorage via useLocal), so a
 // saved week stays saved after leaving the screen and a download in progress resumes on return.
+// The transcript is the Mentor's words as he spoke them, in English; in Tamil and Hindi a note says so.
 
 /** Week number → download progress (0–100). A week with no entry is not kept for offline. */
 export function useOfflineAudio() {
@@ -28,6 +30,7 @@ export function useOfflineAudio() {
 export function AudioPlayer({ week, title, seconds, transcript, startAt = 0 }: { week: number; title: string; seconds: number; transcript: string[]; startAt?: number }) {
   const { c, space, radius } = useTheme()
   const t = useDict(PARTS)
+  const { t: ta, lang } = useA()
   const [playing, setPlaying] = useState(false)
   const [pos, setPos] = useState(startAt)
   const [rate, setRate] = useState<1 | 1.25 | 0.8>(1)
@@ -113,8 +116,9 @@ export function AudioPlayer({ week, title, seconds, transcript, startAt = 0 }: {
       {showText ? (
         <View style={{ backgroundColor: c.paperSunk, borderRadius: radius.card, padding: space.s2, gap: space.s1 }}>
           <Eyebrow>{t('transcriptFollows')}</Eyebrow>
+          {lang !== 'en' ? <Meta tone="ink2">{ta('The Mentor’s audio and its transcript are in English for now. His words are kept as he spoke them.')}</Meta> : null}
           {transcript.map((line, i) => (
-            <Body key={i} tone={i === active && pos > 0 ? 'ink' : 'ink2'}>
+            <Body key={i} tone={i === active && pos > 0 ? 'ink' : 'ink2'} accessibilityLanguage="en">
               {line}
             </Body>
           ))}

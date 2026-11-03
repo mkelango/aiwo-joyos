@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { BookOpen, Check, FileText, FlaskConical, Lock, PenLine, Play, RotateCcw, ShieldCheck, X } from 'lucide-react'
+import { BookOpen, Braces, Check, Copy, Download, FileText, FlaskConical, Lock, PenLine, Play, RotateCcw, ShieldCheck, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MutableRefObject } from 'react'
 import { Bar, BarChart, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { DaybreakButton, Eyebrow, MethodLine, SpecimenTag, TermChip, TermDot } from '@/components/joy/primitives'
@@ -10,7 +10,7 @@ import { INDEX_HISTORY } from '@/data/member'
 import { TERMS, termByKey } from '@/data/terms'
 import { FIVE, METHODS, geometricMean } from '@/domain/indexEngine'
 import type { MethodVersion, TermKey } from '@/domain/types'
-import { CLAIMS_LOG, COUNCIL_REVIEW, DATA_REQUESTS, INSTRUMENT_LICENCE, GOLDEN_CASES, JOY_REPORT, METHOD_V10_META, NEEDS_CITATION, REFUSED, RESEARCH, SIGNERS, WEIGHTS_V10, WEIGHTS_V11_PROPOSAL, type WeightSet } from './_data'
+import { CLAIMS_LOG, COUNCIL_REVIEW, DATA_REQUESTS, INSTRUMENT_LICENCE, GOLDEN_CASES, JOY_REPORT, METHOD_SIGNER_ROLES, METHOD_V10_META, MIN_ITEMS, NEEDS_CITATION, REFUSED, RESEARCH, SIGNERS, TERM_VARS, WEIGHTS_V10, WEIGHTS_V11_PROPOSAL, type WeightSet } from './_data'
 import { PreviewBanner, useConsoleAccess } from '../care/_gate'
 import { AccessNote, CanActProvider, CardHead, ChartLead, Field, Kpi, ScrollTabs, StatusTag, areaCls, fieldCls, pct, tabPanelProps, tick, tipLabel, tipStyle, useCanAct, useTabParam } from './_parts'
 
@@ -151,10 +151,104 @@ function cloneWeights(w: WeightSet): WeightSet {
 }
 const sumOf = (arr: { w: number }[]) => Math.round(arr.reduce((a, c) => a + c.w, 0) * 100) / 100
 
+/** Items served for a term: every item of every instrument that scores it in the registry. */
+const itemsServed = (k: TermKey) => INSTRUMENTS.filter((i) => i.term === k).reduce((a, i) => a + i.items, 0)
+const instrumentId = (code: string) => `${code.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}@1`
+const LANG_CODE: Record<string, string> = { English: 'en', Tamil: 'ta', Hindi: 'hi' }
+const LANG_STATE: Record<string, string> = { Validated: 'validated', 'In review': 'in-review', 'Not started': 'not-started' }
+const BAND_RANGES = { steady: [70, 100], uneven: [50, 69], thin: [0, 49] }
+
+/**
+ * The method definition the engine reads by version (Architecture p.11), built from the registry's own data: weights,
+ * λ, bands, minimum items, and each instrument's items and translation state. v1.1 follows the draft as it is edited.
+ */
+function methodDefinition(v: 'v1.0' | 'v1.1', weights: WeightSet, lambda: number, signed: string[], published: boolean) {
+  const sealed = v === 'v1.0' || published
+  const terms = Object.fromEntries(
+    SIX.map((k) => {
+      const formula = weights[k].map((c) => `${c.w.toFixed(2)}*${TERM_VARS[c.label] ?? c.label}`).join(' + ')
+      const instruments = INSTRUMENTS.filter((i) => i.term === k && !(k === 'R' && i.code === 'CSI-4')).map((i) => instrumentId(i.code))
+      return [k, { formula, instruments, ...(k === 'R' ? { variants: { couple: { support: instrumentId('CSI-4').replace('@1', '') } } } : {}), ...(k === 'B' ? { direction: 'higher-is-worse' } : {}) }]
+    }),
+  )
+  return {
+    method: 'joyspan-index',
+    version: v === 'v1.0' ? '1.0.0' : '1.1.0',
+    status: v === 'v1.0' ? 'published' : published ? 'published' : 'draft',
+    published: v === 'v1.0' ? METHODS['v1.0'].published : published ? '2027-01-28' : null,
+    signedBy: v === 'v1.0' ? METHOD_SIGNER_ROLES : SIGNERS.filter((s) => signed.includes(s.id)).map((s) => METHOD_SIGNER_ROLES[SIGNERS.indexOf(s)]),
+    hash: v === 'v1.0' ? METHOD_V10_META.hash : sealed ? 'sha256:3b7f…a912' : null,
+    engine: METHOD_V10_META.engine,
+    terms,
+    index: { combine: 'geomean(H,P,R,F,D) - lambda*B', lambda: Number(lambda.toFixed(2)), bounds: [0, 100], round: 'integer', minimumPositiveTerms: 5 },
+    bands: BAND_RANGES,
+    minimumItems: MIN_ITEMS,
+    instruments: Object.fromEntries(
+      INSTRUMENTS.map((i) => [
+        instrumentId(i.code),
+        { term: i.term, items: i.items, translations: Object.fromEntries((INSTRUMENT_LICENCE[i.code]?.langs ?? []).map((l) => [LANG_CODE[l.lang] ?? l.lang, LANG_STATE[l.state] ?? l.state])) },
+      ]),
+    ),
+  }
+}
+
+function MethodJson({ v, d }: { v: 'v1.0' | 'v1.1'; d: Draft }) {
+  const def = methodDefinition(v, v === 'v1.0' ? WEIGHTS_V10 : d.weights, v === 'v1.0' ? METHODS['v1.0'].lambda : d.lambda, d.signed, d.published)
+  const text = JSON.stringify(def, null, 2)
+  const [copied, setCopied] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const name = `joyspan-index-${def.version}${def.status === 'draft' ? '-draft' : ''}.json`
+  const copy = () => {
+    // writeText rejects (not throws) without focus or permission; the JSON stays on screen to copy by hand.
+    try { navigator.clipboard?.writeText(text).catch(() => undefined) } catch { /* clipboard unavailable */ }
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1400)
+  }
+  const download = () => {
+    try {
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = name
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1500)
+    } catch { /* download unavailable; the JSON stays on screen */ }
+    setSaved(true)
+  }
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <StatusTag tone={def.status === 'published' ? 'ok' : 'draft'}>{def.status === 'published' ? 'Published · immutable' : 'Draft · follows the editor'}</StatusTag>
+        {def.hash && <span className="num text-[13px] text-ink-3">{def.hash}</span>}
+      </div>
+      <p className="text-[15px] leading-relaxed text-ink-2">
+        {def.status === 'published'
+          ? 'Stored as data and read by the engine by version. This record is never updated; a change is a new version with two new signatures.'
+          : 'Stored as data once published. Until then it changes as the weights and λ are edited, and carries no hash; publishing seals it.'}{' '}
+        Illustrative shape; item-level scoring follows each instrument’s licence.
+      </p>
+      <dl className="grid grid-cols-3 gap-3 rounded-card bg-paper-sunk p-4 text-[14px]">
+        <div><dt className="eyebrow normal-case text-ink-3">λ</dt><dd className="num mt-0.5 text-ink">{def.index.lambda.toFixed(2)}</dd></div>
+        <div><dt className="eyebrow text-ink-3">Signers</dt><dd className="num mt-0.5 text-ink">{def.signedBy.length}/2</dd></div>
+        <div><dt className="eyebrow text-ink-3">Instruments</dt><dd className="num mt-0.5 text-ink">{Object.keys(def.instruments).length}</dd></div>
+      </dl>
+      <pre className="num max-h-[52vh] overflow-auto rounded-card border border-line bg-paper-raised p-4 text-[12px] leading-relaxed text-ink" tabIndex={0} aria-label={`Method ${v} definition JSON`}>{text}</pre>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="secondary" size="sm" onClick={copy}>{copied ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />} {copied ? 'Copied' : 'Copy JSON'}</Button>
+        <Button variant="ghost" size="sm" onClick={download}><Download size={14} aria-hidden /> Download {name}</Button>
+      </div>
+      <p className="text-[13px] text-ink-3" aria-live="polite">{saved ? `Saved as ${name} in your downloads.` : ''}</p>
+    </div>
+  )
+}
+
 function Methods({ focusKey, scrollRequest, d }: { focusKey: number; scrollRequest: MutableRefObject<boolean>; d: Draft }) {
   const { weights, setWeights, lambda, setLambda, tests, runTests, touch, signed, setSigned, published, setPublished } = d
   const [term, setTerm] = useState<TermKey>('H')
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [jsonFor, setJsonFor] = useState<'v1.0' | 'v1.1' | null>(null)
   const running = tests === 'running'
   const canAct = useCanAct()
 
@@ -227,27 +321,32 @@ function Methods({ focusKey, scrollRequest, d }: { focusKey: number; scrollReque
                     {METHOD_V10_META.signed.map((s) => <p key={s} className="flex items-center gap-1.5"><PenLine size={12} aria-hidden /> {s}</p>)}
                   </div>
                 )}
-                {v === 'v2.0' && <p className="mt-3 text-[13px] text-ink-3">Adaptive item selection; fewer questions, same precision; under ₹100 per measure.</p>}
+                {v === 'v2.0' && <p className="mt-3 text-[13px] text-ink-3">Adaptive item selection; fewer questions, same precision; under ₹100 per measure. No definition JSON until it is drafted at J4.</p>}
                 {isDraft && <p className="mt-3 text-[13px] text-ink-3">From the 612-record cohort. Edited below.</p>}
+                {v !== 'v2.0' && (
+                  <Button variant="ghost" size="sm" className="-ml-3 mt-2" onClick={() => setJsonFor(v)} aria-label={`Definition JSON for method ${v}`}><Braces size={14} aria-hidden /> Definition JSON</Button>
+                )}
               </li>
             )
           })}
         </ol>
         <div className="mt-5 overflow-x-auto border-t border-line pt-4">
           <table className="w-full min-w-[640px] text-left text-[14px]">
-            <caption className="sr-only">Method v1.0 term formulas</caption>
-            <thead><tr className="border-b border-line">{['Term', 'Method v1.0 formula', 'Bands'].map((h) => <th key={h} scope="col" className="eyebrow py-2.5 pr-4 font-normal text-ink-3">{h}</th>)}</tr></thead>
+            <caption className="sr-only">Method v1.0 term formulas, minimum items and bands</caption>
+            <thead><tr className="border-b border-line">{['Term', 'Method v1.0 formula', 'Minimum items', 'Bands'].map((h, i) => <th key={h} scope="col" className={clsx('eyebrow whitespace-nowrap py-2.5 pr-4 font-normal text-ink-3', i === 2 && 'text-right')}>{h}</th>)}</tr></thead>
             <tbody>
               {TERMS.map((t) => (
                 <tr key={t.key} className="border-b border-line/70 last:border-0">
                   <th scope="row" className="whitespace-nowrap py-2.5 pr-4 font-normal"><span className="flex items-center gap-2 text-ink"><TermDot term={t.key} /> {t.name}</span></th>
                   <td className="num py-2.5 pr-4 text-[13px] text-ink-2">{t.formula}</td>
+                  <td className="num whitespace-nowrap py-2.5 pr-4 text-right text-[13px] text-ink">{MIN_ITEMS[t.key]} <span className="text-ink-3">of {itemsServed(t.key)}</span></td>
                   <td className="py-2.5 pr-4 text-[13px] text-ink-3">{t.key === 'B' ? 'Inverse: higher is heavier' : METHOD_V10_META.bands}</td>
                 </tr>
               ))}
             </tbody>
           </table>
           <p className="num mt-3 text-[13px] text-ink-2">JI = GM(H, P, R, F, D) − λ·B · 0–100 · a term not yet measured is never imputed</p>
+          <p className="mt-2 text-[13px] text-ink-3">Minimum items: a term is scored only when at least this many of the items served across its instruments are answered; fewer and it reads “not yet measured”. The Index is not issued with fewer than five positive terms.</p>
         </div>
       </Card>
 
@@ -446,6 +545,10 @@ function Methods({ focusKey, scrollRequest, d }: { focusKey: number; scrollReque
           <Button variant="ink" disabled={!canAct} onClick={() => { if (!canAct) return; setPublished(true); setConfirmOpen(false) }}><Lock size={15} aria-hidden /> Publish and seal</Button>
           <Button variant="ghost" onClick={() => setConfirmOpen(false)}>Not yet</Button>
         </div>
+      </Sheet>
+
+      <Sheet open={!!jsonFor} onClose={() => setJsonFor(null)} title={jsonFor ? `Method ${jsonFor} · definition` : ''}>
+        {jsonFor && <MethodJson key={jsonFor} v={jsonFor} d={d} />}
       </Sheet>
     </div>
   )

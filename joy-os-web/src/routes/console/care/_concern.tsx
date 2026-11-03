@@ -3,8 +3,9 @@ import { Check, ShieldAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button, Sheet } from '@/components/ui'
 import type { TermKey } from '@/domain/types'
-import { PRIYA, type SafetyAlert } from './_data'
+import type { SafetyAlert } from './_data'
 import { clinical, useClinicalState } from './_clinicalStore'
+import { actorOf, useConsoleAccess } from './_gate'
 import { coach } from './_store'
 import { areaCls, consoleNowMs, fmtClock, labelCls } from './_parts'
 
@@ -16,9 +17,11 @@ const PSYCHOLOGIST = 'Dr Sanjay Menon'
 let seq = 0
 
 export type ConcernTarget = { name: string; memberId?: string; context?: string; prefill?: string }
+/** Who raised it: the signed-in person and role, and the grant they acted under, if any. */
+export type ConcernBy = { who: string; role: string; grantRef?: string }
 
 /** Create the alert (and the clinical task the coach queue shows as held). Returns the alert. */
-export function raiseConcern(t: ConcernTarget, what: string, priority: 'P0' | 'P1', slaMinutes: number): SafetyAlert {
+export function raiseConcern(t: ConcernTarget, what: string, priority: 'P0' | 'P1', slaMinutes: number, by: ConcernBy): SafetyAlert {
   const ms = consoleNowMs()
   seq += 1
   const id = `cc-${ms.toString(36)}-${seq}`
@@ -28,14 +31,15 @@ export function raiseConcern(t: ConcernTarget, what: string, priority: 'P0' | 'P
     memberId: t.memberId ?? '',
     priority,
     kind: t.context ? `Coach concern · ${t.context}` : 'Coach concern',
-    detail: `Raised by ${PRIYA.name}: “${what}”`,
+    detail: `Raised by ${by.who}${by.role === 'Coach' ? '' : ` (${by.role.toLowerCase()})`}: “${what}”`,
     openedAt: new Date(ms).toISOString(),
     slaMinutes,
     owner: PSYCHOLOGIST,
     status: 'open',
   }
   clinical.setAlerts((xs) => [...xs, alert])
-  clinical.log({ who: PRIYA.name, role: 'Coach', what: `Raised a ${priority} coach concern${t.context ? ` · ${t.context.toLowerCase()}` : ''}`, purpose: 'Safety · coach concern', kind: 'action', memberId: t.memberId, member: t.name })
+  const purpose = by.grantRef ? `Safety · coach concern · under ${by.grantRef}` : 'Safety · coach concern'
+  clinical.log({ who: by.who, role: by.role, what: `Raised a ${priority} coach concern${t.context ? ` · ${t.context.toLowerCase()}` : ''}`, purpose, kind: 'action', memberId: t.memberId, member: t.name })
   if (t.memberId) {
     const ist = new Date(ms + 5.5 * 3600_000).toISOString()
     coach.addTask({
@@ -44,7 +48,7 @@ export function raiseConcern(t: ConcernTarget, what: string, priority: 'P0' | 'P
       memberName: t.name,
       signal: 'screen-threshold',
       label: 'Coach concern · clinical review',
-      detail: 'You raised a concern. The clinical team holds it now.',
+      detail: `${by.who} raised a concern. The clinical team holds it now.`,
       priority,
       slaHours: Math.max(1, Math.round(slaMinutes / 60)),
       openedAt: `${ist.slice(0, 10)} ${ist.slice(11, 16)}`,
@@ -52,13 +56,16 @@ export function raiseConcern(t: ConcernTarget, what: string, priority: 'P0' | 'P
       status: 'in-progress',
       term: 'B' as TermKey,
     })
-    coach.updateMember(t.memberId, (w) => ({ ...w, audit: [{ at: `28 Jan 2027 · ${fmtClock(ms)}`, who: PRIYA.name, what: `Raised a ${priority} concern to the clinical team`, purpose: 'Safety · coach concern' }, ...(w.audit ?? [])] }))
+    coach.updateMember(t.memberId, (w) => ({ ...w, audit: [{ at: `28 Jan 2027 · ${fmtClock(ms)}`, who: by.role === 'Coach' ? by.who : `${by.who} · ${by.role.toLowerCase()}`, what: `Raised a ${priority} concern to the clinical team`, purpose }, ...(w.audit ?? [])] }))
   }
   return alert
 }
 
 export function RaiseConcernSheet({ target, onClose, canAct, onRaised }: { target: ConcernTarget | null; onClose: () => void; canAct: boolean; onRaised?: (a: SafetyAlert) => void }) {
   const { md } = useClinicalState()
+  // Credited to whoever is signed in (a grant holder or another role), never to the coach by default.
+  const acc = useConsoleAccess('/console/coach', target?.memberId ?? null)
+  const actor = actorOf(acc)
   const [what, setWhat] = useState('')
   const [urgent, setUrgent] = useState(false)
   const [err, setErr] = useState('')
@@ -78,7 +85,7 @@ export function RaiseConcernSheet({ target, onClose, canAct, onRaised }: { targe
     if (what.trim().length < 15) return setErr('Say what you noticed in at least a sentence (15 characters). The clinician reads it before calling.')
     const priority = urgent ? 'P0' : 'P1'
     const sla = urgent ? md.values.p0 : md.values.p1 * 60
-    const a = raiseConcern(target, what.trim(), priority, sla)
+    const a = raiseConcern(target, what.trim(), priority, sla, { who: actor.who, role: actor.role, grantRef: acc.grant?.ref })
     setDone(a)
     onRaised?.(a)
   }

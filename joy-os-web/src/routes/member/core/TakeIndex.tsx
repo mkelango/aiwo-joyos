@@ -16,11 +16,12 @@ import type { TermKey } from '@/domain/types'
 import { SIGNAL_READINGS, SITTINGS, TERM_DETAIL, type InstrumentBlock, type SampleItem } from './_data'
 import { HumanWritten, Switch } from './_parts'
 import { ALL_SIGNAL_IDS, ITEM_TERM, ORDER, WEARABLE_SIGNAL_IDS, isWearableSignal, scaleOf, scoreAnswers, signalId, signalSources, withoutSkipped } from './_scoring'
-import { IN_REMEASURE_WINDOW, REMEASURE_OPENS, REMEASURE_TAKEN, SPECIMEN_TODAY, addDays, amendedAnswers, useMeasured, useRemeasure, useSignalsDown, type Amendment } from './_store'
+import { IN_REMEASURE_WINDOW, REMEASURE_OPENS, REMEASURE_TAKEN, SPECIMEN_TODAY, addDays, amendRemeasure, amendedAnswers, useMeasured, useRemeasure, useSignalsDown, type Amendment } from './_store'
 import { specimenNow } from './_amend'
 import { DAY90_DATES } from './_data'
 import { SIGNER } from './_remeasure'
-import { useX } from './_i18nX'
+import { ATTRIBUTION_TEXT, BLOCK_NAME_TEXT, txOf, useX } from './_i18nX'
+import { regTx } from '@/routes/entry/_i18n'
 import { BLOCK_TEXT, SIGNAL_READING_TEXT, SIGNAL_SOURCE_TEXT, SITTING_TITLE, fmtLocal, rich, useCore } from './_i18n'
 import { INSTRUMENT_NOTE, useT } from '@/lib/i18n'
 import { useApp } from '@/lib/store'
@@ -110,10 +111,12 @@ export default function TakeIndex() {
   const x = useX()
   // Decided on arrival only: submitting moves the record on, and the scoring screen must stay.
   const [gate] = useState<null | 'closed' | 'submitted'>(() => (!clinical ? null : !rec ? 'closed' : rec.status === 'awaiting' || rec.status === 'signed' ? 'submitted' : null))
-  if (gate) return <ClinicalGate submitted={gate === 'submitted'} />
-  // A term skipped at the sitting, measured later (/app/index/take?term=F).
+  // A term skipped at the sitting, measured later (/app/index/take?term=F). A term skipped in
+  // the Clinical-grade sitting is measured later from Day 90 (?grade=clinical&term=F) and joins
+  // that record, which then goes back to the physician to sign.
   const term = params.get('term') as TermKey | null
-  if (!clinical && term && ORDER.includes(term)) return <TermFlow term={term} key={term} />
+  if (term && ORDER.includes(term)) return <TermFlow term={term} clinical={clinical} key={`${clinical ? 'c' : 'i'}${term}`} />
+  if (gate) return <ClinicalGate submitted={gate === 'submitted'} />
   return <TakeFlow clinical={clinical} key={clinical ? 'clinical' : 'index'} onClinicalStart={() => setRec((r) => (r && r.status === 'invited' ? { ...r, status: 'in-progress', startedAt: new Date().toISOString() } : r))} onClinicalSubmit={(patch) => setRec((r) => (r ? { ...r, ...patch } : r))} x={x} />
 }
 
@@ -183,7 +186,7 @@ function TakeFlow({ clinical, onClinicalStart, onClinicalSubmit, x }: { clinical
   }
   useEffect(() => () => window.clearTimeout(autoTimer.current), [])
 
-  const { t: c, pick } = useCore()
+  const { t: c, pick, lang } = useCore()
   const answeredCount = Object.keys(withoutSkipped(answers, skipped)).filter((id) => answers[id] !== undefined).length
   const step = steps[cursor]
   const termOfStep = (st: Step | undefined) => (st && (st.type === 'intro' || st.type === 'item') ? SITTINGS[st.s].blocks[st.b].term : null)
@@ -326,7 +329,7 @@ function TakeFlow({ clinical, onClinicalStart, onClinicalSubmit, x }: { clinical
             {stage === 'overview' && (
               <Overview
                 resumable={resumable}
-                resumeLabel={draft ? describeCursor(c, steps[draft.cursor], draft.stage) : ''}
+                resumeLabel={draft ? describeCursor(c, steps[draft.cursor], draft.stage, lang) : ''}
                 answered={answeredCount}
                 clinical={clinical}
                 onStart={() => {
@@ -440,6 +443,7 @@ function TakeFlow({ clinical, onClinicalStart, onClinicalSubmit, x }: { clinical
                       answers: kept,
                       signalsOff: effectiveOff,
                       skipped,
+                      surveyOnly: r.surveyOnly,
                       draw: { slot: parts.slot! },
                       capacity: { sitToStand: sitSeconds(parts.sitToStand)! },
                     })
@@ -456,7 +460,7 @@ function TakeFlow({ clinical, onClinicalStart, onClinicalSubmit, x }: { clinical
                 }}
               />
             )}
-            {stage === 'saved' && <Saved where={describeCursor(c, steps[cursor], savedStage)} answered={answeredCount} onResume={() => resume(savedStage)} />}
+            {stage === 'saved' && <Saved where={describeCursor(c, steps[cursor], savedStage, lang)} answered={answeredCount} onResume={() => resume(savedStage)} />}
             {stage === 'scoring' && (
               <Scoring
                 answers={answers}
@@ -485,13 +489,13 @@ function startPosition(block: InstrumentBlock) {
   return block.sample[0]?.position ?? 1
 }
 type Tr = ReturnType<typeof useCore>['t']
-function describeCursor(c: Tr, step: Step | undefined, stage: 'step' | 'review' = 'step') {
+function describeCursor(c: Tr, step: Step | undefined, stage: 'step' | 'review' = 'step', lang: string = 'en') {
   if (stage === 'review' || !step) return c('curReview')
   const sit = SITTINGS[step.s]
   if (step.type === 'item') return c('curItem', { p: step.item.position, t: sit.total, n: sit.n })
   if (step.type === 'break') return c('curBreak')
   if (step.type === 'signals') return c('curSignals', { n: sit.n })
-  return c('curIntro', { name: sit.blocks[step.b].name, n: sit.n })
+  return c('curIntro', { name: txOf(BLOCK_NAME_TEXT, sit.blocks[step.b].name, lang), n: sit.n })
 }
 
 // ─── Overview ───────────────────────────────────────────────────────────────
@@ -535,7 +539,7 @@ function Overview({ resumable, resumeLabel, answered, clinical, onStart, onResta
               <ul className="mt-4 flex flex-wrap gap-2">
                 {s.blocks.map((b) => (
                   <li key={b.code} className="inline-flex items-center gap-2 rounded-full border border-line px-2.5 py-1 text-[13px] text-ink-2">
-                    <TermDot term={b.term} /> {b.code} <span className="num text-ink-3">{b.items}</span>
+                    <TermDot term={b.term} /> {regTx(b.code, lang)} <span className="num text-ink-3">{b.items}</span>
                   </li>
                 ))}
                 <li className="inline-flex items-center gap-2 rounded-full border border-dashed border-line px-2.5 py-1 text-[13px] text-ink-2">
@@ -572,13 +576,15 @@ function Overview({ resumable, resumeLabel, answered, clinical, onStart, onResta
 // ─── Instrument intro ───────────────────────────────────────────────────────
 function InstrumentIntro({ block, index, of, onBegin, onBack, onSkip }: { block: InstrumentBlock; index: number; of: number; onBegin: () => void; onBack: () => void; onSkip?: () => void }) {
   const term = termByKey(block.term)
-  const { t: c, name, pick } = useCore()
+  const { t: c, name, pick, lang } = useCore()
   const x = useX()
   const bt = BLOCK_TEXT[block.code]
+  const shownName = txOf(BLOCK_NAME_TEXT, block.name, lang)
   return (
     <div className="flex flex-1 flex-col">
       <p className="eyebrow text-ink-3">{rich(c('inOf'), { i: <span className="num">{index + 1}</span>, n: <span className="num">{of}</span> })}</p>
-      <h1 lang="en" className="mt-3 text-[2rem] font-light leading-tight text-ink md:text-[2.5rem]">{block.name}</h1>
+      <h1 lang={shownName === block.name ? 'en' : lang} className="mt-3 text-[2rem] font-light leading-tight text-ink md:text-[2.5rem]">{shownName}</h1>
+      {shownName !== block.name && <p className="mt-1 text-[14px] text-ink-3">{x('tmEnglishName')} · <span lang="en">{block.name}</span></p>}
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <TermChip term={block.term} withSpace={term.space !== term.name} />
         <span className="flex items-center gap-1.5 text-[14px] text-ink-2"><Clock size={14} /> {rich(c('inAbout'), { m: <span className="num">{block.minutes}</span>, n: <span className="num">{block.items}</span> })}</span>
@@ -597,7 +603,7 @@ function InstrumentIntro({ block, index, of, onBegin, onBack, onSkip }: { block:
         </div>
         <div>
           <dt className="eyebrow text-ink-3">{c('inLicence')}</dt>
-          <dd lang="en" className="mt-1 text-ink">{block.attribution}</dd>
+          <dd className="mt-1 text-ink">{txOf(ATTRIBUTION_TEXT, block.attribution, lang)}</dd>
         </div>
       </dl>
       <div className="mt-auto flex flex-col gap-2 pt-10">
@@ -642,7 +648,7 @@ function ItemScreen({ block, item, value, fromReview, onAnswer, onNext, onAutoAd
     <div className="flex flex-1 flex-col">
       <div className="flex items-center gap-2">
         <TermDot term={block.term} />
-        <span lang="en" className="eyebrow text-ink-3">{block.code} · {block.timeframe}</span>
+        <span className="eyebrow text-ink-3">{regTx(block.code, lang)} · <span lang="en">{block.timeframe}</span></span>
       </div>
       {lang !== 'en' && <p lang={lang} className="mt-3 rounded-card bg-paper-sunk px-3 py-2 text-[13px] text-ink-2">{INSTRUMENT_NOTE[lang]}</p>}
       {item.stem && <p lang="en" className="mt-4 text-[17px] text-ink-2">{item.stem}</p>}
@@ -757,7 +763,7 @@ function SignalsStep({ sitting, off, down, fromReview, onToggle, onConfirm, onBa
 
 // ─── Between sittings ───────────────────────────────────────────────────────
 function SittingBreak({ onContinue, onLater }: { onContinue: () => void; onLater: () => void }) {
-  const { t: c, pick } = useCore()
+  const { t: c, pick, lang } = useCore()
   return (
     <div className="flex flex-1 flex-col">
       <Eyebrow tone="daybreak">{c('brEyebrow')}</Eyebrow>
@@ -770,7 +776,7 @@ function SittingBreak({ onContinue, onLater }: { onContinue: () => void; onLater
         <ul className="mt-3 flex flex-wrap gap-2">
           {SITTINGS[1].blocks.map((b) => (
             <li key={b.code} className="inline-flex items-center gap-2 rounded-full border border-line bg-paper-raised px-2.5 py-1 text-[13px] text-ink-2">
-              <TermDot term={b.term} /> {b.code} <span className="num text-ink-3">{b.items}</span>
+              <TermDot term={b.term} /> {regTx(b.code, lang)} <span className="num text-ink-3">{b.items}</span>
             </li>
           ))}
         </ul>
@@ -902,7 +908,7 @@ function Review({ answers, answered, signalsOff, confirmed, skipped, clinical, o
                         <div className="min-w-0 flex-1">
                           <p lang="en" className="text-[15px] text-ink">{item.stem && item.stem.endsWith('…') ? `${item.stem.replace('…', '')} ${item.text.replace('…', '')}` : item.text}</p>
                           <p className="mt-0.5 text-[13px] text-ink-3">
-                            <span className="num">{b.code} · {item.position}</span> · {off ? <span className="text-ink-3">{x('skSkipped')}</span> : label ? <span lang="en" className="text-ink-2">{label}</span> : <span className="text-error">{c('rvNotAnswered')}</span>}
+                            <span className="num">{regTx(b.code, lang)} · {item.position}</span> · {off ? <span className="text-ink-3">{x('skSkipped')}</span> : label ? <span lang="en" className="text-ink-2">{label}</span> : <span className="text-error">{c('rvNotAnswered')}</span>}
                           </p>
                         </div>
                         <Button variant="ghost" size="sm" onClick={() => onEdit(item.id)} aria-label={c('rvEditAria', { text: item.text })}>
@@ -1116,14 +1122,17 @@ function Scoring({ answers, signalsOff, skipped, offline, clinical, x, onSee }: 
 // ─── A term skipped for now, measured later (?term=F) ───────────────────────
 // Only the skipped term's instruments, one item per screen; the answers join the sitting's
 // record as append-only amendments ("answered later"), the Index is scored again, and the
-// first score stays in the history.
+// first score stays in the history. With ?grade=clinical the term joins the Clinical-grade
+// re-measure instead: the record returns to 'awaiting' (a signature already given is kept in
+// its history) so the physician signs the completed sitting.
 type TermStep = { type: 'intro'; block: InstrumentBlock; b: number; of: number } | { type: 'item'; block: InstrumentBlock; item: SampleItem }
 
-function TermFlow({ term }: { term: TermKey }) {
+function TermFlow({ term, clinical }: { term: TermKey; clinical: boolean }) {
   const [m, setMeasured] = useMeasured()
+  const [rec, setRec] = useRemeasure()
   const navigate = useNavigate()
   const x = useX()
-  const { t: c, name } = useCore()
+  const { t: c, name, lang } = useCore()
   const fmtDate = useFmtDate()
   const blocks = useMemo(() => SITTINGS.flatMap((sit) => sit.blocks).filter((b) => b.term === term), [term])
   const steps = useMemo<TermStep[]>(() => blocks.flatMap((block, b) => [{ type: 'intro' as const, block, b, of: blocks.length }, ...block.sample.map((item) => ({ type: 'item' as const, block, item }))]), [blocks])
@@ -1134,7 +1143,17 @@ function TermFlow({ term }: { term: TermKey }) {
   const [fromReview, setFromReview] = useState(false)
   const timer = useRef<number | undefined>(undefined)
   useEffect(() => () => window.clearTimeout(timer.current), [])
-  const open = !!m && !!m.answers && (m.skipped ?? []).includes(term)
+  // The record the term joins: the sitting on My Index, or the Clinical-grade re-measure.
+  const src = clinical
+    ? rec && (rec.status === 'awaiting' || rec.status === 'signed') && rec.answers
+      ? { answers: rec.answers, amendments: rec.amendments, skipped: rec.skipped ?? [], signalsOff: rec.signalsOff ?? [], value: rec.value ?? null, takenOn: rec.takenOn ?? REMEASURE_TAKEN }
+      : null
+    : m && m.answers
+      ? { answers: m.answers, amendments: m.amendments, skipped: m.skipped ?? [], signalsOff: m.signalsOff ?? [], value: m.value, takenOn: m.takenOn }
+      : null
+  const open = !!src && src.skipped.includes(term)
+  const home = clinical ? '/app/index/day-90' : '/app/index'
+  const homeLabel = clinical ? x('tmBackDay90') : x('tmBack')
   const answered = items.filter((i) => answers[i.id] !== undefined).length
 
   const go = (n: number) => {
@@ -1153,21 +1172,27 @@ function TermFlow({ term }: { term: TermKey }) {
   const back = () => (cursor === 0 ? setStage('overview') : go(cursor - 1))
 
   const add = () => {
-    if (!m || !m.answers || answered < items.length) return
+    if (!src || answered < items.length) return
     // Each answer is its own append-only amendment, scored in order, so the history reads true.
-    const skipLeft = (m.skipped ?? []).filter((k) => k !== term)
-    let current = amendedAnswers(m.answers, m.amendments)
-    let before = m.value
+    const skipLeft = src.skipped.filter((k) => k !== term)
+    let current = amendedAnswers(src.answers, src.amendments)
+    let before = src.value
     const added: Amendment[] = []
     const base = Date.now()
-    let r = scoreAnswers(current, m.signalsOff ?? [], m.skipped ?? [])
+    let r = scoreAnswers(current, src.signalsOff, src.skipped)
     items.forEach((item, i) => {
       current = { ...current, [item.id]: answers[item.id] }
-      r = scoreAnswers(current, m.signalsOff ?? [], i === items.length - 1 ? skipLeft : m.skipped ?? [])
+      r = scoreAnswers(current, src.signalsOff, i === items.length - 1 ? skipLeft : src.skipped)
       const after = i === items.length - 1 ? r.value : before
       added.push({ id: `am_${(base + i).toString(36)}`, itemId: item.id, from: null, to: answers[item.id], reason: '', at: specimenNow(), before, after })
       before = after
     })
+    if (clinical) {
+      setRec((prev) => (prev ? amendRemeasure(prev, added, r, skipLeft) : prev))
+      playSound('complete')
+      navigate(home)
+      return
+    }
     setMeasured((prev) =>
       prev
         ? {
@@ -1185,7 +1210,7 @@ function TermFlow({ term }: { term: TermKey }) {
         : prev,
     )
     playSound('complete')
-    navigate('/app/index')
+    navigate(home)
   }
 
   const step = steps[cursor]
@@ -1196,30 +1221,31 @@ function TermFlow({ term }: { term: TermKey }) {
           <AiwoMark size={20} />
           <span className="eyebrow text-ink-3">{c('tkBrand')}</span>
         </div>
-        <Link to="/app/index" className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[14px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring" aria-label={c('tkCloseAria')}>
+        <Link to={home} className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[14px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring" aria-label={c('tkCloseAria')}>
           <X size={16} /> {c('close')}
         </Link>
       </div>
       {!open ? (
         <div className="flex flex-1 flex-col">
           <p className="text-[17px] text-ink-2">{x('tmNone')}</p>
-          <Link to="/app/index" className="mt-6 inline-flex items-center gap-1.5 self-start text-[15px] text-ink underline-offset-4 hover:underline focus-ring">{x('tmBack')} <ArrowRight size={14} /></Link>
+          <Link to={home} className="mt-6 inline-flex items-center gap-1.5 self-start text-[15px] text-ink underline-offset-4 hover:underline focus-ring">{homeLabel} <ArrowRight size={14} /></Link>
         </div>
       ) : stage === 'overview' ? (
         <div className="flex flex-1 flex-col">
-          <Eyebrow tone="daybreak">{x('tmEyebrow', { term: name(term), date: fmtDate(m!.takenOn) })}</Eyebrow>
+          {clinical && <Eyebrow>{c('gradeFullClinical')}</Eyebrow>}
+          <Eyebrow tone="daybreak">{x('tmEyebrow', { term: name(term), date: fmtDate(src!.takenOn) })}</Eyebrow>
           <h1 className="mt-3 text-[2.2rem] font-light leading-tight text-ink">{rich(x('tmTitle'))}</h1>
-          <p className="mt-4 text-[17px] leading-relaxed text-ink-2">{x('tmBody')}</p>
+          <p className="mt-4 text-[17px] leading-relaxed text-ink-2">{clinical ? x('tmBodyClinical', { who: SIGNER.name }) : x('tmBody')}</p>
           <ul className="mt-6 flex flex-wrap gap-2">
             {blocks.map((b) => (
               <li key={b.code} className="inline-flex items-center gap-2 rounded-full border border-line px-2.5 py-1 text-[13px] text-ink-2">
-                <TermDot term={b.term} /> {b.code} <span className="num text-ink-3">{b.sample.length}</span>
+                <TermDot term={b.term} /> {regTx(b.code, lang)} <span className="num text-ink-3">{b.sample.length}</span>
               </li>
             ))}
           </ul>
           <div className="mt-auto flex flex-col gap-2 pt-10">
             <DaybreakButton onClick={() => go(0)} className="w-full">{x('tmBegin')}</DaybreakButton>
-            <Link to="/app/index" className="self-center py-2 text-[15px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring">{x('tmBack')}</Link>
+            <Link to={home} className="self-center py-2 text-[15px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring">{homeLabel}</Link>
           </div>
         </div>
       ) : stage === 'step' && step?.type === 'intro' ? (
@@ -1242,7 +1268,7 @@ function TermFlow({ term }: { term: TermKey }) {
         />
       ) : (
         <div className="flex flex-1 flex-col">
-          <Eyebrow tone="daybreak">{x('tmEyebrow', { term: name(term), date: fmtDate(m!.takenOn) })}</Eyebrow>
+          <Eyebrow tone="daybreak">{x('tmEyebrow', { term: name(term), date: fmtDate(src!.takenOn) })}</Eyebrow>
           <h1 className="mt-3 text-[2.2rem] font-light leading-tight text-ink">{rich(x('tmReviewTitle'))}</h1>
           <p className="mt-3 text-[17px] text-ink-2">{rich(x('tmCount'), { a: <span className="num text-ink">{answered}</span>, n: <span className="num text-ink">{items.length}</span> })}</p>
           <ul className="mt-6 divide-y divide-line rounded-card border border-line bg-paper-raised">
@@ -1254,7 +1280,7 @@ function TermFlow({ term }: { term: TermKey }) {
                     <span className="mt-1.5"><TermDot term={b.term} /></span>
                     <div className="min-w-0 flex-1">
                       <p lang="en" className="text-[15px] text-ink">{item.text}</p>
-                      <p className="mt-0.5 text-[13px] text-ink-3"><span className="num">{b.code} · {item.position}</span> · {label ? <span lang="en" className="text-ink-2">{label}</span> : <span className="text-error">{c('rvNotAnswered')}</span>}</p>
+                      <p className="mt-0.5 text-[13px] text-ink-3"><span className="num">{regTx(b.code, lang)} · {item.position}</span> · {label ? <span lang="en" className="text-ink-2">{label}</span> : <span className="text-error">{c('rvNotAnswered')}</span>}</p>
                     </div>
                     <Button variant="ghost" size="sm" onClick={() => { setFromReview(true); go(steps.findIndex((s) => s.type === 'item' && s.item.id === item.id)) }} aria-label={c('rvEditAria', { text: item.text })}>
                       <Pencil size={14} /> {c('rvEdit')}
@@ -1265,7 +1291,7 @@ function TermFlow({ term }: { term: TermKey }) {
             )}
           </ul>
           <div className="mt-auto flex flex-col gap-2 pt-10">
-            <DaybreakButton onClick={add} disabled={answered < items.length} className="w-full">{x('tmAdd')}</DaybreakButton>
+            <DaybreakButton onClick={add} disabled={answered < items.length} className="w-full">{clinical ? x('tmAddClinical') : x('tmAdd')}</DaybreakButton>
           </div>
         </div>
       )}

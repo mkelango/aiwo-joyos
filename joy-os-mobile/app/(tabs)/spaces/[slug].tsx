@@ -23,15 +23,16 @@ import {
   TermChip,
   Title,
 } from '@/components'
+import { useT } from '@/lib/i18n'
+import { useLatestIndex } from '@/lib/indexRecord'
 import { useIsMinor } from '@/lib/minor'
 import { Rich, useA } from '@/screens/a/i18n'
 import { formulaIn } from '@/screens/a/i18n/formula'
 import { H2, usePlanned } from '@/screens/a/local'
 import { HumanWritten, NotScored, Sparkline } from '@/screens/a/parts'
-import { ROOM_VERDICT, VIVA_DRAFT, actionsFor, termHistory } from '@/screens/a/spacesData'
+import { VIVA_DRAFT, actionsFor, roomVerdict, termHistory, todayActionFor } from '@/screens/a/spacesData'
 import { SPACE_TITLE, SpaceTools } from '@/screens/a/tools'
 import { RoomViva } from '@/screens/a/viva'
-import { INDEX_HISTORY } from '@/shared/member'
 import { TERMS } from '@/shared/terms'
 import { useTheme } from '@/theme/ThemeProvider'
 
@@ -39,7 +40,9 @@ import { useTheme } from '@/theme/ThemeProvider'
 // the 90-day pulse; three actions (one planned with the Daybreak); the room's signature tools;
 // the room's VIVA tool, run here with provenance (never on Ease). Driven by slug: body · purpose ·
 // people · freedom · pleasure · ease. Under 18 the score, band, delta and pulse give way to a calm
-// "not scored" note; the framework, actions and tools stay.
+// "not scored" note; the framework, actions and tools stay. The score is the latest Index's (shared
+// contract L1), so a room opened from Today shows the number Today showed. Every room ends with
+// the privacy line, one tap from the Trust centre (Playbook p62).
 
 export default function SpaceDetail() {
   const { slug } = useLocalSearchParams<{ slug: string }>()
@@ -50,6 +53,8 @@ export default function SpaceDetail() {
   const [chosen, setChosen] = useState(0)
   const { planned: plannedBySpace, plan } = usePlanned()
   const minor = useIsMinor()
+  const tt = useT()
+  const latest = useLatestIndex()
 
   if (!term) {
     return (
@@ -62,13 +67,14 @@ export default function SpaceDetail() {
 
   const k = term.key
   const inverse = k === 'B'
-  const latest = INDEX_HISTORY[0]
   const score = latest.terms.find((s) => s.key === k)!
   const shown = inverse ? `−${score.value}` : String(score.value)
-  const history = termHistory(k)
+  const verdict = roomVerdict(k, latest)
+  // The pulse ends on this score and starts from the measure before it, so it agrees with the delta.
+  const history = termHistory(k, score.value == null ? undefined : { cur: score.value, prev: score.value - (score.delta ?? 0) })
   const first = history[0]
   const last = history[history.length - 1]
-  const actions = actionsFor(k)
+  const actions = actionsFor(k, todayActionFor(minor ? null : latest.lowestTerm).id)
   const draft = VIVA_DRAFT[k]
   const col = th.term(k)
   const plannedAction = actions.find((a) => a.id === plannedBySpace[k])
@@ -105,7 +111,7 @@ export default function SpaceDetail() {
               <BandLabel band={score.band} />
             </View>
           </View>
-          <Body tone="ink2">{tx(ROOM_VERDICT[k])}</Body>
+          <Body tone="ink2">{tx(verdict.text, verdict.vars)}</Body>
           {inverse ? <Meta>{t('Burden is the one term where lower is better. It is subtracted from the Index at a quarter of its weight.')}</Meta> : null}
           <View style={{ gap: space.s1, marginTop: space.half }}>
             <Meta>
@@ -246,6 +252,20 @@ export default function SpaceDetail() {
           <HumanWritten by="Dr Sanjay Menon" />
         </Card>
       )}
+
+      {/* Privacy, one tap away in every room */}
+      <Pressable
+        onPress={() => router.push('/trust')}
+        accessibilityRole="link"
+        accessibilityHint={t('Opens the Trust centre')}
+        hitSlop={6}
+        style={({ pressed }) => ({ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', opacity: pressed ? 0.6 : 1 })}
+      >
+        <Icon name="shield" size={14} color={c.ink2} />
+        <Eyebrow tone="ink2" style={{ textDecorationLine: 'underline' }}>
+          {tt('trust')}
+        </Eyebrow>
+      </Pressable>
     </Screen>
   )
 }

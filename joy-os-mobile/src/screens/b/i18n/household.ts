@@ -21,6 +21,7 @@ export const HOUSE = {
   noHelper: { en: 'No helper', ta: 'உதவியாளர் இல்லை', hi: 'कोई सहायक नहीं' },
   roleDaughter: { en: 'Daughter · 15 · minor', ta: 'மகள் · 15 · சிறார்', hi: 'बेटी · 15 · नाबालिग' },
   detailDaughter: { en: 'Never scored. Joins household rituals only. Parental consent given by Kavya on 12 Jan 2027 (DPDP Act); no tracking, no profiling, no advertising.', ta: 'ஒருபோதும் மதிப்பிடப்படாது. குடும்பச் சடங்குகளில் மட்டும் சேர்கிறார். 12 ஜனவரி 2027 அன்று Kavya பெற்றோர் ஒப்புதல் அளித்தார் (DPDP சட்டம்); கண்காணிப்பு இல்லை, விவரக்குறிப்பு இல்லை, விளம்பரம் இல்லை.', hi: 'कभी स्कोर नहीं होता। सिर्फ़ परिवार की रस्मों में शामिल। 12 जनवरी 2027 को Kavya ने अभिभावक सहमति दी (DPDP क़ानून); न ट्रैकिंग, न प्रोफ़ाइलिंग, न विज्ञापन।' },
+  minorCouple: { en: 'Under 18, nothing here is scored: the household page, share grants and the Couples Check are for the adults. Your answers stay yours.', ta: '18 வயதுக்குக் கீழ், இங்கே எதற்கும் மதிப்பெண் இல்லை: குடும்பப் பக்கம், பகிர்வு அனுமதிகள், தம்பதியர் சோதனை ஆகியவை பெரியவர்களுக்கானவை. உங்கள் பதில்கள் உங்களுடையவையே.', hi: '18 से कम उम्र में यहाँ कुछ भी स्कोर नहीं होता: परिवार पेज, साझा करने की अनुमतियाँ और कपल्स चेक बड़ों के लिए हैं। आपके जवाब आपके ही रहते हैं।' },
   notScored: { en: 'Not scored', ta: 'மதிப்பிடப்படாது', hi: 'स्कोर नहीं' },
   parentalConsent: { en: 'Parental consent', ta: 'பெற்றோர் ஒப்புதல்', hi: 'अभिभावक सहमति' },
   titleA: { en: 'Made for two, ', ta: 'இருவருக்காக உருவானது, ஒருவரையும் ', hi: 'दो के लिए बना, एक का भी ' },

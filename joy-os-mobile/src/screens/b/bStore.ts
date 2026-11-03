@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useCallback, useSyncExternalStore } from 'react'
 import { CONSENTS, MEMBER } from '@/shared/member'
 import type { TermKey } from '@/shared/types'
-import { DEVICES, GRANTS, SPECIMEN_NOW, type DeviceState, type Grant, type Msg, type Thread } from './accountData'
+import { DEVICES, GRANTS, SPECIMEN_NOW, specimenThreads, type DeviceState, type Grant, type Msg, type Thread } from './accountData'
 
 // Lane B persisted state: small module-level stores kept on the device with AsyncStorage
 // (offline-first, like the app store). Each store hydrates once, notifies subscribers and
@@ -92,14 +92,26 @@ export interface Session {
   elderTypeRaised?: boolean
 }
 /**
- * A fresh install starts signed out, so Welcome is the first screen (M1). A phone that already
- * used Joy OS before the session was kept (any other Joy OS key on it) carries on signed in as
- * the specimen member; a kept session is read as it is. Sign out clears signedIn.
+ * Keys only a signed-in member can have written: each belongs to a member-only screen (Trust,
+ * Messages, Notifications, Household, Circles, Settings, Devices, Practice) or to sign-in itself.
+ * Anything a signed-out person can touch (onboarding and its draft, the Letter, the Check, the
+ * language and theme, the device-security demo, Lane A's own keys) is left out on purpose.
+ */
+const SESSION_PROOF = [
+  'trust', 'consentHistory', 'accountSnapshots', 'messages', 'notifRead', 'practice', 'nominee', 'abha',
+  'a11y', 'lock', 'devices', 'householdKind', 'charter', 'occasions', 'circleReports',
+].map((k) => PREFIX + k)
+/**
+ * A fresh install starts signed out, so Welcome is the first screen (M1). A phone that used
+ * Joy OS as a member before the session was kept (a key only a signed-in member writes) carries
+ * on signed in as the specimen member; a kept session is read as it is. A signed-out first run
+ * that only went through onboarding, the Letter or the Check stays signed out on relaunch.
+ * Sign out clears signedIn.
  */
 export const sessionStore = createStore<Session>(
   'session',
   { signedIn: false, onboarded: false, account: 'arjun' },
-  { whenMissing: () => keysAtLaunch.then((keys) => (keys.some((k) => k.startsWith('joyos:')) ? { signedIn: true, onboarded: true, account: 'arjun' } : null)) },
+  { whenMissing: () => keysAtLaunch.then((keys) => (keys.some((k) => SESSION_PROOF.includes(k)) ? { signedIn: true, onboarded: true, account: 'arjun' } : null)) },
 )
 
 // ─── Notification preferences (onboarding, Settings and Notifications share these) ───
@@ -180,7 +192,8 @@ export const weekdayIndex = (d = new Date()) => (d.getDay() + 6) % 7
 
 // ─── Notifications inbox ──────────────────────────────────────────────────
 
-export const notifReadStore = createStore<{ read: string[]; cleared: string[] }>('notifRead', { read: [], cleared: [] })
+export interface NotifRead { read: string[]; cleared: string[] }
+export const notifReadStore = createStore<NotifRead>('notifRead', { read: [], cleared: [] })
 
 // ─── Account: membership, profile, events, care, circles, household ───────
 
@@ -207,7 +220,7 @@ export interface AccountState {
   /** Pass codes added to the phone's wallet (specimen). */
   wallet?: string[]
   /** A request for a place at the next flagship edition; withdrawn sets it back to null. */
-  flagshipRequest?: { ref: string; guests: 1 | 2; note: string; at: string } | null
+  flagshipRequest?: { ref: string; guests: 1 | 2; note: string; at: string; photo?: boolean; diet?: BadgeDiet } | null
   /** Invoices paid on this phone (the February renewal paid during grace). */
   paidInvoices?: { id: string; date: string; item: string; total: number; method: string; status: string; ref: string }[]
   /** A membership pause: billing and the circle stop; the record, Ledger and Index carry on. */
@@ -220,7 +233,17 @@ export interface AccountState {
   schedule?: Record<number, boolean> | null
   /** The Joyspan 2027 Declaration card, signed by typing a name (Playbook p61). */
   declaration?: { name: string; signedAt: string } | null
+  /** Who bills the plan: Razorpay (web, Patron, or set up before) or the phone's store for Joy OS Plus. */
+  billing?: Billing
+  /** The Joy Passport card added to the phone's wallet (specimen). */
+  passportWallet?: 'apple' | 'google' | null
+  /** The member chose to keep the Index off the Passport screen (shown again with one tap). */
+  passportHideIndex?: boolean
 }
+export type Billing = 'razorpay' | 'app-store' | 'google-play'
+
+/** What the next edition's delegate badge carries (Playbook p61: consent as a word, and diet). */
+export type BadgeDiet = 'Vegetarian' | 'Non-vegetarian' | 'Vegan' | 'Jain'
 
 /** A pass for something booked here. Its name, date and place come from the Session or salon by id. */
 export interface BookedPass {
@@ -329,16 +352,25 @@ export interface NomineeState {
   email: string
   savedAt?: string
 }
+export interface AbhaState { linked: boolean; address: string; since: string }
+/** No nominee yet: a name of '' (the account made in onboarding starts here). */
+export const NO_NOMINEE: NomineeState = { name: '', relation: 'Spouse', email: '' }
 export const nomineeStore = createStore<NomineeState>('nominee', { name: 'Kavya Rao', relation: 'Spouse', email: 'kavya.rao@example.in' })
-export const abhaStore = createStore<{ linked: boolean; address: string; since: string }>('abha', { linked: true, address: 'arjun.rao@abdm', since: '2026-10-04' })
+export const abhaStore = createStore<AbhaState>('abha', { linked: true, address: 'arjun.rao@abdm', since: '2026-10-04' })
 
 // ─── Accessibility and security (Settings) ─────────────────────────────────
 
 export interface A11yState {
   /** Captions on by default in circle calls; each call can still turn them off. */
   captions: boolean
+  /**
+   * Voice-first: prompts read aloud and answers spoken. Simulated in this build (no speech module
+   * is installed): the words show as a caption while they would be read. Lakshmi's own setting
+   * is her elder mode's voice (accountStore.elder.voice), so Settings writes that one for her.
+   */
+  voice?: boolean
 }
-export const a11yStore = createStore<A11yState>('a11y', { captions: false })
+export const a11yStore = createStore<A11yState>('a11y', { captions: false, voice: false })
 
 export interface LockState {
   /** Ask for Face ID, Touch ID or the device PIN when Joy OS opens (specimen: nothing is checked). */
@@ -423,8 +455,10 @@ export function useSignalsDown() {
 
 // ─── Accounts (M1): the specimen member, Lakshmi in elder mode, or the one made in onboarding ───
 // Each account keeps its own profile, membership, bookings and passes, wallet, schedule, circle
-// requests, Declaration, invitations, consents (with their history) and device links. Switching
-// puts the current account's away and brings the next one's back (or its starting point).
+// requests, Declaration, invitations, consents (with their history), the rest of the Trust centre
+// (research use, insurer decision, scheduled erasure, exports), DPDP nominee, ABHA link, messages,
+// notification read state, circle concerns and device links. Switching puts the current
+// account's away and brings the next one's back (or its starting point).
 // Lakshmi's elder mode and the share grants belong to the household, so every account sees them.
 
 /** What each account keeps for itself: everything on the account but the household's own. */
@@ -436,6 +470,26 @@ interface AccountSnapshot {
   consents: Record<string, boolean>
   events: ConsentEvent[]
   devices: DevicesState['states']
+  /** The Trust centre beyond consents. Older snapshots lack these: the account's start is used. */
+  trust?: Omit<TrustState, 'consents'>
+  nominee?: NomineeState
+  abha?: AbhaState
+  messages?: MessagesState
+  notifRead?: NotifRead
+  circleReports?: CircleReport[]
+}
+/** The per-account stores beyond the account record, at each account's starting point. */
+function sideStart(id: AccountId): Required<Pick<AccountSnapshot, 'trust' | 'nominee' | 'abha' | 'messages' | 'notifRead' | 'circleReports'>> {
+  const empty = { messages: { sent: {}, started: [], read: [] }, notifRead: { read: [], cleared: [] }, circleReports: [] }
+  if (id === 'arjun') {
+    return { ...empty, trust: { research: true, eraseScheduled: false, insurer: 'not-granted' }, nominee: { name: 'Kavya Rao', relation: 'Spouse', email: 'kavya.rao@example.in' }, abha: { linked: true, address: 'arjun.rao@abdm', since: '2026-10-04' } }
+  }
+  if (id === 'lakshmi') {
+    // Her son is her nominee; her ABHA is not linked yet.
+    return { ...empty, trust: { research: true, eraseScheduled: false, insurer: 'not-granted' }, nominee: { name: ACCOUNT_PROFILES.arjun.profile.name, relation: 'Child', email: ACCOUNT_PROFILES.arjun.profile.email }, abha: { linked: false, address: '', since: '' } }
+  }
+  // A new member was never asked about research use in setup, so it starts off (no event says otherwise).
+  return { ...empty, trust: { research: false, eraseScheduled: false, insurer: 'not-granted' }, nominee: NO_NOMINEE, abha: { linked: false, address: '', since: '' } }
 }
 export const accountSnapshotsStore = createStore<Partial<Record<AccountId, AccountSnapshot>>>('accountSnapshots', {})
 
@@ -459,25 +513,41 @@ function ownStart(id: AccountId, profile: AccountState['profile']): OwnAccount {
   }
   if (id === 'arjun') return { ...blank, emergency: { name: 'Kavya Rao', relation: 'Partner', phone: '9840055317' } }
   if (id === 'lakshmi') return { ...blank, emergency: { name: ACCOUNT_PROFILES.arjun.profile.name, relation: 'Child', phone: ACCOUNT_PROFILES.arjun.profile.phone } }
-  return blank
+  // A new member has paid for nothing yet: Joy OS (free) until they choose Plus in Membership.
+  return { ...blank, plan: 'Free' }
 }
 
-const takeSnapshot = (): AccountSnapshot => ({
-  own: ownOf(accountStore.get()),
-  consents: trustStore.get().consents,
-  events: consentHistoryStore.get().events,
-  devices: devicesStore.get().states,
-})
+const takeSnapshot = (): AccountSnapshot => {
+  const { consents, ...trust } = trustStore.get()
+  return {
+    own: ownOf(accountStore.get()),
+    consents,
+    events: consentHistoryStore.get().events,
+    devices: devicesStore.get().states,
+    trust,
+    nominee: nomineeStore.get(),
+    abha: abhaStore.get(),
+    messages: messagesStore.get(),
+    notifRead: notifReadStore.get(),
+    circleReports: circleReportsStore.get().reports,
+  }
+}
 function putSnapshot(id: AccountId, s: AccountSnapshot, profile: AccountState['profile']) {
   // The household's elder mode and grants stay as they are; the rest is the account's own.
   const own: OwnAccount = s.own ?? ownStart(id, s.profile ?? profile)
+  const start = sideStart(id)
   accountStore.set((a) => ({ ...own, elder: a.elder, grants: a.grants }))
-  trustStore.set((t) => ({ ...t, consents: s.consents }))
+  trustStore.set({ ...(s.trust ?? start.trust), consents: s.consents })
   consentHistoryStore.set({ events: s.events })
   devicesStore.set((d) => ({ ...d, states: s.devices }))
+  nomineeStore.set(s.nominee ?? start.nominee)
+  abhaStore.set(s.abha ?? start.abha)
+  messagesStore.set(s.messages ?? start.messages)
+  notifReadStore.set(s.notifRead ?? start.notifRead)
+  circleReportsStore.set({ reports: s.circleReports ?? start.circleReports })
 }
 /** The specimen accounts start from the specimen record. */
-const specimenStart = (id: 'arjun' | 'lakshmi'): AccountSnapshot => ({ own: ownStart(id, ACCOUNT_PROFILES[id].profile), consents: {}, events: CONSENT_SEED, devices: {} })
+const specimenStart = (id: 'arjun' | 'lakshmi'): AccountSnapshot => ({ own: ownStart(id, ACCOUNT_PROFILES[id].profile), consents: {}, events: CONSENT_SEED, devices: {}, ...sideStart(id) })
 
 /** The account made in onboarding: its name and contact come from the AIWO ID step. */
 function newAccountProfile(): AccountState['profile'] {
@@ -497,7 +567,7 @@ export function applyDemoAccount(id: AccountId) {
   const profileFor = () => (id === 'new' ? newAccountProfile() : ACCOUNT_PROFILES[id].profile)
   if (prev !== id) {
     const snaps = accountSnapshotsStore.get()
-    const next = snaps[id] ?? (id === 'new' ? { consents: {}, events: CONSENT_SEED, devices: {} } : specimenStart(id))
+    const next = snaps[id] ?? (id === 'new' ? { consents: {}, events: CONSENT_SEED, devices: {}, ...sideStart('new') } : specimenStart(id))
     accountSnapshotsStore.set({ ...snaps, [prev]: takeSnapshot() })
     putSnapshot(id, next, next.own?.profile ?? next.profile ?? profileFor())
   } else if (id === 'new' && !accountSnapshotsStore.get().new?.own && !accountSnapshotsStore.get().new?.profile) {
@@ -549,9 +619,22 @@ export function seedFromOnboarding({ consents, device }: { consents: { care: boo
   const invited = new Set(storeByKey<{ invited: string[] }>('onbAccount')?.get().invited ?? [])
   const current = accountStore.get()
   const own: OwnAccount = { ...ownStart('new', newAccountProfile()), invites: current.invites.filter((iv) => invited.has(iv.id)) }
-  const snap: AccountSnapshot = { own, consents: choice, events, devices: states }
+  const snap: AccountSnapshot = { own, consents: choice, events, devices: states, ...sideStart('new') }
   if ((sessionStore.get().account ?? 'arjun') === 'new') putSnapshot('new', snap, own.profile)
   else accountStore.set((a) => ({ ...a, invites: a.invites.filter((iv) => !invited.has(iv.id)) }))
   // Kept as the new account's starting point; applyDemoAccount('new') brings it in.
   accountSnapshotsStore.set((s) => ({ ...s, new: snap }))
+}
+
+// ─── Account-scoped reads (L2): what the signed-in person sees as their own ───
+
+/** The specimen threads for the account signed in (Arjun's coach, physician and concierge; Lakshmi's own; none for a new member). */
+export function useAccountThreads(): Thread[] {
+  const [session] = useStore(sessionStore)
+  return specimenThreads(session.account ?? 'arjun')
+}
+/** The signed-in account's id, for screens that only need to know whose data they show. */
+export function useAccountId(): AccountId {
+  const [session] = useStore(sessionStore)
+  return session.account ?? 'arjun'
 }

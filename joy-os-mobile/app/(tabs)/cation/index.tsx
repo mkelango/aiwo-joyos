@@ -31,7 +31,7 @@ import {
   Button,
   fmtDate,
 } from '@/components'
-import { INDEX_HISTORY, MEMBER, TEAM } from '@/shared/member'
+import { MEMBER, TEAM, TODAY_ACTION } from '@/shared/member'
 import { CATIONS, CATION_PHASES, CIRCLE } from '@/shared/platform'
 import { TERMS, termByKey } from '@/shared/terms'
 import type { TermKey } from '@/shared/types'
@@ -41,13 +41,25 @@ import { FilterChips, HereMarker, PrimaryChip, TimelineStep } from '@/screens/b/
 import { useCationRequests, useLocal } from '@/screens/a/local'
 import { Rich, useA } from '@/screens/a/i18n'
 import { useT } from '@/lib/i18n'
+import { useLatestIndex } from '@/lib/indexRecord'
+import { useIsMinor } from '@/lib/minor'
+import type { Cation } from '@/shared/types'
 
 // ’CATION (Memo p.20): the member's current journey — before, during, after; the hand-off,
 // readings from Signal Points, the named outcome and the ninety days; then the ’cation for
 // the lowest term, Joyspan Occasions and the ten. One Daybreak: see the suggested ’cation.
 // A specimen switch shows the empty state of a member with no ’cation yet (Memo p.17).
+// The lowest term is the latest Index's (shared contract L1). Under 18 nothing is scored (minors
+// gate): no lowest-term score, no reading deltas, no Day-90 measure or method line; the ’cation
+// for Pleasure is offered as the gentlest place to begin, as Today does.
 
 type Filter = 'all' | 'ALL' | TermKey
+
+/** The ’cation suggested for a term: Savourcation for Pleasure (the specimen's), else the first open one leading with it. */
+function cationFor(term: TermKey): Cation | undefined {
+  const forTerm = CATIONS.filter((x) => x.primary === term)
+  return forTerm.find((x) => x.slug === 'savourcation') ?? forTerm.find((x) => x.status !== 'FY28') ?? forTerm[0]
+}
 
 const phaseState = (key: string): 'done' | 'now' | 'next' => {
   const day = MEMBER.dayOfLoop
@@ -68,11 +80,12 @@ function WithCation({ demo }: { demo: ReactNode }) {
   const { c, space } = useTheme()
   const { t, tx, lang, name, space: spaceName } = useA()
   const tt = useT()
-  const latest = INDEX_HISTORY[0]
-  const lowest = termByKey(latest.lowestTerm)
+  const minor = useIsMinor()
+  const latest = useLatestIndex()
+  const lowest = termByKey(minor ? TODAY_ACTION.term : latest.lowestTerm)
   const lowestScore = latest.terms.find((t) => t.key === latest.lowestTerm)?.value
   const mine = CATIONS.find((x) => x.slug === MY_CATION.slug)!
-  const suggested = CATIONS.find((x) => x.slug === 'savourcation')!
+  const suggested = cationFor(lowest.key) ?? CATIONS.find((x) => x.slug === 'savourcation')!
   const coach = TEAM.find((p) => p.role === 'Coach')!
   const concierge = TEAM.find((p) => p.role === 'Concierge')!
 
@@ -138,7 +151,7 @@ function WithCation({ demo }: { demo: ReactNode }) {
           <Pill tone="ink">{t('Protocol live')}</Pill>
         </View>
         <Body>
-          <Rich text={t('Your protocol went live for *{name}*, your lowest term at checkout.', { name: name(MY_CATION.protocolTerm) })} wrap={(w) => <Body weight="semibold">{w}</Body>} />
+          <Rich text={t(minor ? 'Your protocol went live for *{name}* at checkout.' : 'Your protocol went live for *{name}*, your lowest term at checkout.', { name: name(MY_CATION.protocolTerm) })} wrap={(w) => <Body weight="semibold">{w}</Body>} />
         </Body>
         <Meta>{tx(MY_CATION.protocol)}</Meta>
         {[
@@ -209,7 +222,7 @@ function WithCation({ demo }: { demo: ReactNode }) {
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Meta size={13}>{t('from')}</Meta>
                     <Mono size={13} tone="ink2">{r.baseline}</Mono>
-                    {better !== null ? <Delta value={Math.round(better * 10) / 10} size={13} /> : null}
+                    {better !== null && !minor ? <Delta value={Math.round(better * 10) / 10} size={13} /> : null}
                   </View>
                 ) : (
                   <Meta size={13} tone="ink3">{r.note ? tx(r.note) : t('First reading')}</Meta>
@@ -218,30 +231,38 @@ function WithCation({ demo }: { demo: ReactNode }) {
             )
           })}
         </View>
-        <Meta tone="ink3" size={14}>{t('For sit-to-stand a lower time is better; the arrow shows improvement. Blood pressure reviewed by Dr Meera Iyer, present on the floor throughout.')}</Meta>
+        <Meta tone="ink3" size={14}>{minor ? t('Blood pressure reviewed by Dr Meera Iyer, present on the floor throughout.') : t('For sit-to-stand a lower time is better; the arrow shows improvement. Blood pressure reviewed by Dr Meera Iyer, present on the floor throughout.')}</Meta>
       </View>
 
       {/* The ninety days */}
       <Card tone="outline" style={{ gap: space.s2 }}>
         <Eyebrow>{t('The ninety days · from checkout')}</Eyebrow>
         <Body>
-          {t('Day {n}. Your Day-45 review with Priya is on {date}. The Day-90 measure for {name}, a {measure}, opens on Day 76.', { n: MEMBER.dayOfLoop, date: fmtDate('2027-02-19', lang), name: mine.name, measure: tx(mine.day90Measure) })}
+          {minor
+            ? t('Day {n}. Your Day-45 review with Priya is on {date}. Nothing is re-measured: under 18 there is no score.', { n: MEMBER.dayOfLoop, date: fmtDate('2027-02-19', lang) })
+            : t('Day {n}. Your Day-45 review with Priya is on {date}. The Day-90 measure for {name}, a {measure}, opens on Day 76.', { n: MEMBER.dayOfLoop, date: fmtDate('2027-02-19', lang), name: mine.name, measure: tx(mine.day90Measure) })}
         </Body>
-        <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />
+        {minor ? null : <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />}
       </Card>
 
       {/* Suggested for the lowest term */}
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>{t('For your lowest term')}</SectionTitle>
+        <SectionTitle>{minor ? t('A ’cation to look at') : t('For your lowest term')}</SectionTitle>
         <Card tone="sunk" style={{ gap: space.s2 }}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.s1 }}>
-            <TermChip term={latest.lowestTerm} withSpace />
-            <Eyebrow>
-              <Rich text={t('Lowest term · *{n}*', { n: String(lowestScore) })} wrap={(w) => <Mono size={12} tone="ink2">{w}</Mono>} />
-            </Eyebrow>
+            <TermChip term={lowest.key} withSpace />
+            {minor ? null : (
+              <Eyebrow>
+                <Rich text={t('Lowest term · *{n}*', { n: String(lowestScore) })} wrap={(w) => <Mono size={12} tone="ink2">{w}</Mono>} />
+              </Eyebrow>
+            )}
           </View>
           <Title size={30}>{suggested.name}</Title>
-          <Body tone="ink2">{t('{promise} {name} is still your lowest term on Day {n}. Priya will open this conversation at Day 60; you can look now.', { promise: tx(suggested.promise), name: name(lowest.key), n: MEMBER.dayOfLoop })}</Body>
+          <Body tone="ink2">
+            {minor
+              ? t('{promise} It is built around {name}, the gentlest place to begin. Priya will talk it through with you and your guardian at Day 60; you can look now.', { promise: tx(suggested.promise), name: name(lowest.key) })
+              : t('{promise} {name} is still your lowest term on Day {n}. Priya will open this conversation at Day 60; you can look now.', { promise: tx(suggested.promise), name: name(lowest.key), n: MEMBER.dayOfLoop })}
+          </Body>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s2, rowGap: 4 }}>
             <Meta>{tx(suggested.nights)}</Meta>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 }}>
@@ -276,7 +297,8 @@ function Catalogue({ noCation = false }: { noCation?: boolean }) {
     const r = requests[slug]
     return r ? `${r.interestOnly ? t('Interest registered') : t('Requested')} · ${r.ref}` : null
   }
-  const latest = INDEX_HISTORY[0]
+  const latest = useLatestIndex()
+  const minor = useIsMinor()
   const groups: (TermKey | 'ALL')[] = ['ALL', 'H', 'P', 'R', 'F', 'D', 'B']
   const shown = groups.flatMap((g) => CATIONS.filter((x) => x.primary === g)).filter((x) => filter === 'all' || x.primary === filter)
   return (
@@ -316,7 +338,7 @@ function Catalogue({ noCation = false }: { noCation?: boolean }) {
               </View>
               <Meta>{tx(x.promise)}</Meta>
               {!noCation && x.slug === MY_CATION.slug ? <Meta size={14} tone="daybreak">{t('You took this · {venue}', { venue: MY_CATION.venue })}</Meta> : null}
-              {x.primary === latest.lowestTerm ? <Meta size={14} tone="daybreak">{t('For your lowest term')}</Meta> : null}
+              {!minor && x.primary === latest.lowestTerm ? <Meta size={14} tone="daybreak">{t('For your lowest term')}</Meta> : null}
               {requestLine(x.slug) ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Icon name="check" size={14} color={c.ink} />
@@ -330,7 +352,11 @@ function Catalogue({ noCation = false }: { noCation?: boolean }) {
                   <Icon name="map-pin" size={13} color={c.ink3} />
                   <Meta size={14} numberOfLines={1} style={{ flexShrink: 1 }}>
                     {tx(x.venues[0])}
-                    {x.venues.length > 1 ? ` +${x.venues.length - 1}` : ''}
+                    {x.venues.length > 1 ? (
+                      <Mono size={13} tone="ink2">
+                        {` +${x.venues.length - 1}`}
+                      </Mono>
+                    ) : null}
                   </Meta>
                 </View>
                 <Meta size={14} tone="ink">
@@ -392,30 +418,38 @@ function NoCation({ demo }: { demo: ReactNode }) {
   const { t, tx, name } = useA()
   const tt = useT()
   const { requests } = useCationRequests()
-  const latest = INDEX_HISTORY[0]
-  const lowest = latest.lowestTerm
+  const minor = useIsMinor()
+  const latest = useLatestIndex()
+  // Under 18 there is no lowest term: the invitation is for Pleasure, the gentlest place to begin.
+  const lowest = minor ? TODAY_ACTION.term : latest.lowestTerm
   const score = latest.terms.find((x) => x.key === lowest)?.value ?? ''
   const forLowest = CATIONS.filter((x) => x.primary === lowest)
   // The invitation leads with the ’cation already suggested for this term, else the first open one for it.
-  const invite = forLowest.find((x) => x.slug === 'savourcation') ?? forLowest.find((x) => x.status !== 'FY28') ?? forLowest[0]
+  const invite = cationFor(lowest)
   const others = forLowest.filter((x) => x.slug !== invite?.slug)
   const req = invite ? requests[invite.slug] : undefined
   return (
     <Screen inTabs top={<AppBar />}>
-      <ScreenHeader eyebrow={`${tt('cation')} · ${t('none taken yet')}`} title={<Rich text={t('Go somewhere. Come back *different*.')} wrap={(w) => <Serif>{w}</Serif>} />} lead={t('You have not taken a ’cation yet. Your Index already says where one would help most.')} />
+      <ScreenHeader eyebrow={`${tt('cation')} · ${t('none taken yet')}`} title={<Rich text={t('Go somewhere. Come back *different*.')} wrap={(w) => <Serif>{w}</Serif>} />} lead={minor ? t('You have not taken a ’cation yet. Each one is built around one part of a life; here is a gentle place to begin.') : t('You have not taken a ’cation yet. Your Index already says where one would help most.')} />
       {demo}
       <EmptyIllustration kind="cation" />
       {invite ? (
         <Card tone="sunk" style={{ gap: space.s2 }}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.s1 }}>
             <TermChip term={lowest} withSpace />
-            <Eyebrow>
-              <Rich text={t('Lowest term · *{n}*', { n: String(score) })} wrap={(w) => <Mono size={12} tone="ink2">{w}</Mono>} />
-            </Eyebrow>
+            {minor ? null : (
+              <Eyebrow>
+                <Rich text={t('Lowest term · *{n}*', { n: String(score) })} wrap={(w) => <Mono size={12} tone="ink2">{w}</Mono>} />
+              </Eyebrow>
+            )}
           </View>
-          <Title size={28}>{t('Your first ’cation, for your lowest term: {name}', { name: invite.name })}</Title>
+          <Title size={28}>{minor ? t('Your first ’cation: {name}', { name: invite.name }) : t('Your first ’cation, for your lowest term: {name}', { name: invite.name })}</Title>
           <Body tone="ink2">
-            <Rich text={t('{lowest} is your lowest term at *{v}*. {cation} is made for it: {promise} It ends with a measured delta on Day 90, not a souvenir.', { lowest: name(lowest), v: String(score), cation: invite.name, promise: tx(invite.promise) })} wrap={(w) => <Mono tone="ink2">{w}</Mono>} />
+            {minor ? (
+              t('{cation} is made for {lowest}: {promise} It ends with a Day-90 conversation, not a souvenir.', { lowest: name(lowest), cation: invite.name, promise: tx(invite.promise) })
+            ) : (
+              <Rich text={t('{lowest} is your lowest term at *{v}*. {cation} is made for it: {promise} It ends with a measured delta on Day 90, not a souvenir.', { lowest: name(lowest), v: String(score), cation: invite.name, promise: tx(invite.promise) })} wrap={(w) => <Mono tone="ink2">{w}</Mono>} />
+            )}
           </Body>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s2, rowGap: 4 }}>
             <Meta>{tx(invite.nights)}</Meta>
@@ -423,7 +457,7 @@ function NoCation({ demo }: { demo: ReactNode }) {
               <Rich text={t('From *{p}*', { p: invite.priceFrom })} wrap={(w) => <Mono tone="ink">{w}</Mono>} />
             </Meta>
           </View>
-          <Meta size={14} tone="ink3">{t('Day-90 measure: {m}', { m: tx(invite.day90Measure) })}</Meta>
+          {minor ? null : <Meta size={14} tone="ink3">{t('Day-90 measure: {m}', { m: tx(invite.day90Measure) })}</Meta>}
           {others.length ? <Meta size={14} tone="ink3">{t('Also for {lowest}: {list}', { lowest: name(lowest), list: others.map((x) => x.name).join(t(' and ')) })}</Meta> : null}
           {req ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -438,13 +472,13 @@ function NoCation({ demo }: { demo: ReactNode }) {
       ) : null}
       <Card tone="outline" style={{ gap: space.s2 }}>
         <Eyebrow>{t('What every ’cation promises')}</Eyebrow>
-        {[t('A named outcome on the booking, in your own words'), t('A measured change in the primary term, kept in Joy OS'), t('A named clinician present, not on call'), t('Ninety days of continuation from checkout')].map((x) => (
+        {[t('A named outcome on the booking, in your own words'), minor ? t('No score under 18: the change is talked through with you, not measured') : t('A measured change in the primary term, kept in Joy OS'), t('A named clinician present, not on call'), t('Ninety days of continuation from checkout')].map((x) => (
           <View key={x} style={{ flexDirection: 'row', gap: 10 }}>
             <Icon name="check" size={15} color={c.ink3} />
             <Body style={{ flex: 1 }}>{x}</Body>
           </View>
         ))}
-        <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />
+        {minor ? null : <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />}
       </Card>
       <OccasionsLink />
       <Catalogue noCation />

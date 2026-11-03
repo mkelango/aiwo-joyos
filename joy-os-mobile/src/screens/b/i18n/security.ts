@@ -27,6 +27,8 @@ export const SECURITY = {
   acked: { en: 'You have read this. The banner is off until the next signal.', ta: 'இதைப் படித்துவிட்டீர்கள். அடுத்த சமிக்ஞை வரும் வரை அறிவிப்புப் பட்டை காட்டப்படாது.', hi: 'आपने यह पढ़ लिया है। अगले संकेत तक बैनर नहीं दिखेगा।' },
   showAgain: { en: 'Show the banner again', ta: 'அறிவிப்புப் பட்டையை மீண்டும் காட்டு', hi: 'बैनर फिर दिखाएँ' },
   lockLink: { en: 'Biometric lock is in Settings', ta: 'பயோமெட்ரிக் பூட்டு அமைப்புகளில் உள்ளது', hi: 'बायोमेट्रिक लॉक सेटिंग्स में है' },
+  lockSignedOut: { en: 'The app lock is part of your account, so it is set in Settings once you are signed in.', ta: 'செயலிப் பூட்டு உங்கள் கணக்கின் ஒரு பகுதி; நீங்கள் உள்நுழைந்த பிறகு அமைப்புகளில் அதை இயக்கலாம்.', hi: 'ऐप लॉक आपके खाते का हिस्सा है, इसलिए साइन इन करने के बाद इसे सेटिंग्स में चालू करें।' },
+  lockSignIn: { en: 'Sign in to turn it on', ta: 'அதை இயக்க உள்நுழையுங்கள்', hi: 'इसे चालू करने के लिए साइन इन करें' },
   demo: { en: 'Specimen demo', ta: 'மாதிரி செயல்விளக்கம்', hi: 'नमूना डेमो' },
   demoToggle: { en: 'Show this phone as jailbroken or rooted', ta: 'இந்தத் தொலைபேசியை jailbreak அல்லது root செய்யப்பட்டதாகக் காட்டு', hi: 'इस फ़ोन को jailbreak या root किया हुआ दिखाएँ' },
   demoToggleD: { en: 'Nothing on the phone changes. Joy OS behaves as it would if the check found signals.', ta: 'தொலைபேசியில் எதுவும் மாறாது. சரிபார்ப்பில் சமிக்ஞைகள் கிடைத்தால் Joy OS எப்படி நடக்குமோ அப்படியே நடக்கும்.', hi: 'फ़ोन पर कुछ नहीं बदलता। जाँच में संकेत मिलने पर Joy OS जैसा बर्ताव करता, वैसा ही करेगा।' },

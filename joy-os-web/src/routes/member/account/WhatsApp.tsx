@@ -12,6 +12,7 @@ import { readNotifPrefs, rich, syncWhatsAppChannel, useMemberProfile, usePersist
 import { INSTRUMENT_NOTE, fill, useDict, useLang, useTermText } from '@/lib/i18n'
 import { WA, useLookup } from './_i18n'
 import { WatchComplication } from './_watch'
+import { useScoresHidden } from '@/lib/minor'
 import { recordConsentEvent } from './_consent'
 
 // WHATSAPP (Memo p.17, p.22, J5): a simulated WhatsApp Business chat for the Check,
@@ -27,6 +28,12 @@ interface Node { bot: string[]; replies?: Reply[] }
 
 const latest = INDEX_HISTORY[0]
 const bandsLine = latest.terms.map((t) => `${termByKey(t.key).space} ${t.band.toUpperCase()}`).join(' · ')
+// Under 18 the Check gives no bands (Architecture p26): these lines stand in for the ones that would.
+const MINOR_LINES: Record<string, string> = {
+  'The Joyspan Check: 18 statements, about five minutes. You’ll get bands for each part of life — never a number. Ready?': 'The Joyspan Check: 18 statements, about five minutes. Under 18 it gives no bands and no number. Ready?',
+  'Thank you. Your bands: {bands}.': 'Thank you. Nothing is scored while you are under 18 — no bands, no number.',
+  'Done. Your bands are saved to your AIWO ID. If you never sign in, they are deleted after 30 days.': 'Done. No bands were made, so there is nothing to keep.',
+}
 const LIKERT = ['Rarely', 'Sometimes', 'Often', 'Almost always']
 
 const SCRIPTS: Record<Scenario, { start: string; time: string; nodes: Record<string, Node> }> = {
@@ -80,6 +87,13 @@ function addMinutes(t: string, m: number) {
 }
 
 const CLINICAL = /\b(result|results|doctor|medicine|tablet|dose|blood|lab|prescription|symptom|pain|diagnos\w*)\b/i
+/** The same clinical words in Tamil and Hindi. Matched as stems inside a word (no \b: it only
+ *  knows ASCII letters, and Tamil adds its case endings to the word itself), each stem fenced off
+ *  from the everyday words that share its letters: ரத்து (cancel) is not ரத்த (blood), and the
+ *  bare முடிவு also means a decision or an end (முடிவு செய்தேன், நாள் முடிவில்), so only the plural
+ *  முடிவுகள் (முடிவுகளை, முடிவுகளில்) and the loanword ரிசல்ட் stand for "results"; வலிமை (strength) and வலியுறுத்து (urge) are not வலி (pain). */
+const CLINICAL_LOCAL = /(முடிவுகள|ரிசல்ட|ரிப்போர்ட|ரத்த(?!ு)|மருத்துவர்|டாக்டர்|மருந்து|மாத்திரை|பரிசோதனை|ஆய்வக|அறிகுறி|வலி(?!மை|யுறுத்)|நோயறி|नतीज|रिपोर्ट|ख़ून|खून|ब्लड|डॉक्टर|डाक्टर|दवा|दवाई|गोली|ख़ुराक|खुराक|लैब|जाँच|जांच|पर्ची|लक्षण|दर्द|निदान)/
+const isClinical = (t: string) => CLINICAL.test(t) || CLINICAL_LOCAL.test(t)
 /** Said instead of "Saved to your Joy Ledger" while the chat is only a preview. */
 const PREVIEW_NOT_SAVED = 'Preview only: with prompts on, this moment would be saved to your Joy Ledger.'
 /** The Ledger prompt for a chat clock time (12:40, 16:15, 21:30), as the Ledger schedule has it. */
@@ -92,6 +106,7 @@ export default function WhatsApp() {
   const lk = useLookup(WA)
   const tt = useTermText()
   const bandText = useBandText()
+  const hidden = useScoresHidden()
   const reduce = useReducedMotion()
   const [toast, showToast] = useToast()
   const [scenario, setScenario] = useState<Scenario>('ledger')
@@ -169,7 +184,7 @@ export default function WhatsApp() {
       botSay(['You don’t have to hold this alone. A person is being told now and will reach you within 15 minutes.', 'Tele-MANAS is free, any hour: 14416. In an emergency, call 112.'])
       return
     }
-    if (CLINICAL.test(t)) {
+    if (isClinical(t)) {
       botSay(['Clinical matters never come over WhatsApp. Dr Meera’s messages and your results are in the app, under Care.'])
       return
     }
@@ -215,6 +230,7 @@ export default function WhatsApp() {
   const word = (w: string) => (lang === 'en' ? w.toLowerCase() : lk(w))
   const lineText = (m: ChatMsg) => {
     if (m.from === 'me') return m.vars?.reply ? lk(m.text) : m.text
+    if (hidden && MINOR_LINES[m.text]) return lk(MINOR_LINES[m.text])
     const bands = lang === 'en' ? bandsLine : latest.terms.map((x) => `${tt.space(x.key)} ${bandText(x.band)}`).join(' · ')
     return fill(lk(m.text), { name: profile.firstName, bands, w1: word(LEDGER_WEEK[0].tag), w2: word(LEDGER_WEEK[1].tag), ...m.vars, tag: word(m.vars?.tag ?? tag) })
   }
@@ -301,7 +317,8 @@ export default function WhatsApp() {
             <span className="eyebrow text-ink-3">{tw('simulation')}</span>
           </div>
           <div className="mt-2 flex flex-wrap justify-center gap-1.5" role="group" aria-label={tw('tryTyping')}>
-            {['STOP', 'my blood results?', 'Lunch with Kavya'].map((x) => (
+            {/* STOP is the keyword itself, so it stays as typed; the other two read in the member's language. */}
+            {['STOP', tw('tryResults'), tw('tryLunch')].map((x) => (
               <button key={x} type="button" onClick={() => setText(x)} className="rounded-full border border-line px-2.5 py-1 text-[12px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring">{tw('tryX', { x })}</button>
             ))}
           </div>

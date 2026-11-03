@@ -39,11 +39,15 @@ function readEmergencyContact(): EmergencyContact | null {
 
 /** P0 crisis pathway — a person and Tele-MANAS before any model runs (Memo p.24, p.27). */
 export function CrisisSheet() {
-  const { crisisOpen, setCrisisOpen } = useApp()
+  const { crisisOpen, setCrisisOpen, crisisEventId } = useApp()
   const t = useDict(SHARED)
   const sanjay = TEAM.find((p) => p.role === 'Psychologist')!
   // A voluntary tap is a choice, not an intercept: no "what you wrote", no one "has been told".
   const manual = crisisOpen === 'manual'
+  // "Has been told" and "P0 · logged" only once the P0 record exists ('joyos:crisis:events', read
+  // by the clinical console's P0 board). If this browser could not keep it, the sheet says only
+  // what is true: the clinician is on call and can be written to.
+  const logged = !manual && !!crisisEventId
   const dx = useData()
   const [contact, setContact] = useState<EmergencyContact | null>(null)
   const [told, setTold] = useState(false)
@@ -66,11 +70,11 @@ export function CrisisSheet() {
           </span>
           <Phone size={20} className="shrink-0" />
         </a>
-        {/* The on-call clinician, in both modes. After an intercept they have already been told;
+        {/* The on-call clinician, in both modes. After a logged intercept they have already been told;
             either way the member can write to them straight away in Care messages. */}
         <div className="rounded-card border border-line px-5 py-4">
-          <p className="text-[16px] text-ink">{manual ? t('clinicianOnCall', { name: sanjay.name }) : t('hasBeenTold', { name: sanjay.name })}</p>
-          <p className="text-[14px] text-ink-2">{manual ? t('onCallManual') : t('onCall')}</p>
+          <p className="text-[16px] text-ink">{logged ? t('hasBeenTold', { name: sanjay.name }) : t('clinicianOnCall', { name: sanjay.name })}</p>
+          <p className="text-[14px] text-ink-2">{logged ? t('onCall') : t('onCallManual')}</p>
           <Link
             to={`/app/care/messages?p=${sanjay.id}`}
             onClick={() => setCrisisOpen(false)}
@@ -126,7 +130,7 @@ export function CrisisSheet() {
           <Phone size={18} className="shrink-0" />
         </a>
       </div>
-      {!manual && <p className="eyebrow mt-6 text-ink-3">{t('p0Logged')}</p>}
+      {logged && <p className="eyebrow mt-6 text-ink-3">{t('p0Logged')}</p>}
     </Sheet>
   )
 }

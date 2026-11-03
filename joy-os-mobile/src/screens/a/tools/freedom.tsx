@@ -44,10 +44,21 @@ const CAL_NAME: Record<CalProvider, string> = { google: 'Google Calendar', micro
 type CalConnection = { provider: CalProvider | null; rerun: boolean }
 
 /** The Trust centre's calendar consent, live: the member's own choice over the specimen default. */
-function useCalendarConsent() {
+export function useCalendarConsent() {
   const [trust] = useStore(trustStore)
   const fallback = CONSENTS.find((x) => x.id === 'c_cal')?.granted ?? false
   return 'c_cal' in trust.consents ? trust.consents.c_cal : fallback
+}
+
+/**
+ * Whether a time-audit summary exists to talk about: calendar consent stands (c_cal) and a calendar
+ * is connected. The room's VIVA card reads this, so it never summarises a calendar it may not read.
+ */
+export function useTimeAuditAccess(): 'open' | 'no-consent' | 'not-connected' {
+  const on = useCalendarConsent()
+  const [conn] = useLocal<CalConnection>('calendarConnection', { provider: null, rerun: false })
+  if (!on) return 'no-consent'
+  return conn.provider && CAL_PROVIDERS.includes(conn.provider) ? 'open' : 'not-connected'
 }
 
 function TimeAudit() {

@@ -7,6 +7,7 @@ import { Delta, Eyebrow, MethodLine, SpecimenTag, TermChip, TermDot, useFmtDate 
 import { Avatar, Button, Card, LoopRing, PageHeader, Pill, SectionTitle, Tabs, Toggle } from '@/components/ui'
 import { CATIONS, CATION_PHASES, CIRCLE } from '@/data/platform'
 import { INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
+import { useScoresHidden } from '@/lib/minor'
 import { TERMS } from '@/data/terms'
 import type { TermKey } from '@/domain/types'
 import { MY_CATION, SIGNAL_READINGS } from './_data'
@@ -32,6 +33,8 @@ const phaseState = (key: string): 'done' | 'now' | 'next' => {
 
 export default function CationHome() {
   const { t, r, tx, term } = useJ()
+  // A member under 18 is never scored (Architecture p26): no term values.
+  const minor = useScoresHidden()
   const fmtDate = useFmtDate()
   const latest = INDEX_HISTORY[0]
   const lowestName = term.name(latest.lowestTerm)
@@ -220,7 +223,7 @@ export default function CationHome() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <TermChip term={latest.lowestTerm} withSpace size="md" />
-              <span className="eyebrow text-ink-3">{r('lowestTermScore', { v: { n: latest.terms.find((x) => x.key === latest.lowestTerm)?.value ?? '' } })}</span>
+              <span className="eyebrow text-ink-3">{minor ? t('forLowest') : r('lowestTermScore', { v: { n: latest.terms.find((x) => x.key === latest.lowestTerm)?.value ?? '' } })}</span>
             </div>
             <h2 className="mt-4 text-[2rem] font-light leading-tight text-ink">{suggested.name}</h2>
             <p className="mt-2 text-[17px] text-ink-2">{r('suggestedBody', { promise: tx(suggested.promise), lowest: lowestName, day: MEMBER.dayOfLoop, d60: 60, coach: coachFirst })}</p>
@@ -309,7 +312,7 @@ function Catalogue({ suggestedSlug, noCation = false }: { suggestedSlug: string;
                 {journey.cationRequests.some((x) => x.slug === c.slug) && <p className="mt-2"><Pill tone="daybreak">{t(c.status === 'FY28' ? 'interestNoted' : 'requested')}</Pill></p>}
                 <p className="mt-4 text-[13px] text-ink-3"><span className="eyebrow">{t('day90Dot')}</span>{tx(c.day90Measure)}</p>
                 <div className="mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1 pt-5 text-[14px]">
-                  <span className="flex items-center gap-1 text-ink-2"><MapPin size={13} /> {tx(c.venues[0])}{c.venues.length > 1 && ` +${c.venues.length - 1}`}</span>
+                  <span className="flex items-center gap-1 text-ink-2"><MapPin size={13} /> {tx(c.venues[0])}{c.venues.length > 1 && <> <span className="num">+{c.venues.length - 1}</span></>}</span>
                   <span className="text-ink">{r('fromLower', { p: { n: c.priceFrom } })}</span>
                 </div>
               </Link>
@@ -338,6 +341,7 @@ function DemoSwitch() {
 /** The ’Cation tab for a member with no ’cation yet: the empty state invites the ’cation for the lowest term. */
 function NoCation() {
   const { t, r, tx, term } = useJ()
+  const minor = useScoresHidden()
   const journey = useJourney()
   const latest = INDEX_HISTORY[0]
   const lowest = latest.lowestTerm
@@ -365,7 +369,7 @@ function NoCation() {
           <JourneyEmpty
             kind="cation"
             title={<span id="none-invite" className="flex flex-col items-center gap-3"><TermChip term={lowest} withSpace size="md" /><span className="text-[1.6rem] font-light leading-tight">{t('noneTitle', { name: invite.name })}</span></span>}
-            body={<>{r('noneBody', { lowest: lowestName, v: { n: score }, cation: invite.name, promise: tx(invite.promise) })}<span className="mt-3 block text-[14px] text-ink-3">{t('day90Colon', { m: tx(invite.day90Measure) })} · {r('nightsN', { n: parseInt(invite.nights, 10) })} · {r('fromLower', { p: { n: invite.priceFrom } })}</span>{others.length > 0 && <span className="mt-1 block text-[14px] text-ink-3">{t('noneMore', { lowest: lowestName, list: others.map((c) => c.name).join(t('andJoin')) })}</span>}</>}
+            body={<>{minor ? r('noneBodyMinor', { lowest: lowestName, cation: invite.name, promise: tx(invite.promise) }) : r('noneBody', { lowest: lowestName, v: { n: score }, cation: invite.name, promise: tx(invite.promise) })}<span className="mt-3 block text-[14px] text-ink-3">{t('day90Colon', { m: tx(invite.day90Measure) })} · {r('nightsN', { n: parseInt(invite.nights, 10) })} · {r('fromLower', { p: { n: invite.priceFrom } })}</span>{others.length > 0 && <span className="mt-1 block text-[14px] text-ink-3">{t('noneMore', { lowest: lowestName, list: others.map((c) => c.name).join(t('andJoin')) })}</span>}</>}
             action={
               <div className="flex flex-col items-center gap-2">
                 {req && <Pill tone="daybreak">{r('requestedRef', { ref: { n: req.ref } })}</Pill>}

@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowRight, Lock, Watch } from 'lucide-react'
+import { ArrowRight, BellRing, Lock, Watch } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
@@ -13,6 +13,7 @@ import { ROOM_PLAIN, ROOM_VERDICT, actionsFor } from './_data'
 import { Reveal, TermRule, softColor } from './_SpaceShell'
 import { useSpaceText } from './_i18n'
 import { useIsMinor } from '@/lib/minor'
+import { SABBATH_DAYS, SABBATH_KEY, nextSabbathOn, readSpaceState, type SabbathPlan } from './_state'
 
 // SPACES HUB (Memo p.19): six rooms, named in plain words. Each with its Spectrum
 // colour and name, score, band, delta and framework. The Wheel selects a petal.
@@ -31,8 +32,11 @@ export default function SpacesHub() {
   const selScore = latest.terms.find((t) => t.key === selected)!
   const lowTerm = termByKey(lowest)
   const firstAction = actionsFor(selected)[0]
-  const { t, tt, d, r } = useSpaceText()
+  const { t, tt, d, r, wdm } = useSpaceText()
   const tx = t
+  // The digital sabbath kept in Freedom: the in-app reminder of the next one (no calendar holds it).
+  const sabbath = readSpaceState<SabbathPlan | null>(SABBATH_KEY, null)
+  const nextSabbath = sabbath && SABBATH_DAYS.includes(sabbath.day) && /^\d{2}:\d{2}$/.test(sabbath.from) && /^\d{2}:\d{2}$/.test(sabbath.to) ? sabbath : null
 
   return (
     <div>
@@ -42,6 +46,15 @@ export default function SpacesHub() {
         lead={minor ? t('mn.hubLead') : t('hub.lead')}
         actions={<Link to={`/app/spaces/${lowTerm.slug}`} className="btn-daybreak focus-ring">{minor ? t('hub.open', { space: tt.space(lowest) }) : t('hub.startHereSpace', { space: tt.space(lowest) })} <ArrowRight size={18} /></Link>}
       />
+
+      {nextSabbath && (
+        <p role="note" className="-mt-2 mb-6 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-line bg-paper-raised px-4 py-3 text-[14px] text-ink-2">
+          <BellRing size={15} className="shrink-0 text-ink-3" aria-hidden />
+          <span className="text-ink">{r('fr.sb.next', { date: wdm(nextSabbathOn(nextSabbath.day)), from: <span className="num">{nextSabbath.from}</span>, to: <span className="num">{nextSabbath.to}</span> })}</span>
+          <span>{t('fr.sb.nextB')}</span>
+          <Link to="/app/spaces/freedom" className="inline-flex items-center gap-1 rounded text-ink underline underline-offset-4 focus-ring">{t('fr.sb.open')} <ArrowRight size={13} aria-hidden /></Link>
+        </p>
+      )}
 
       {/* The Wheel and the selected room */}
       <Reveal>

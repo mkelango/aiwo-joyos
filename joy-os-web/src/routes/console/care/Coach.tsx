@@ -67,7 +67,9 @@ function Coach({ deskSwitch }: { deskSwitch: ReactNode }) {
   const navigate = useNavigate()
   const now = useConsoleNow()
   const { tasks, circles } = useCoachState()
-  const { canAct } = useConsoleAccess('/console/coach')
+  // canAct is the console as a whole; canActOn answers for one member, so a grant scoped to one
+  // member or to the holder's assigned members acts on those rows and nowhere else.
+  const { canAct, canActOn } = useConsoleAccess('/console/coach')
   const [circleOpen, setCircleOpen] = useState<string | null>(null)
   const [filter, setFilter] = useState<'all' | 'P0' | 'P1' | 'P2'>('all')
   const [mineOnly, setMineOnly] = useState(false)
@@ -105,13 +107,13 @@ function Coach({ deskSwitch }: { deskSwitch: ReactNode }) {
   const setStatus = (id: string, status: DriftTask['status'], extra?: Partial<CoachTask>) => coach.setStatus(id, status, extra)
 
   const takeNext = () => {
-    if (!nextForMe || !canAct) return
+    if (!nextForMe || !canActOn(nextForMe.memberId)) return
     setStatus(nextForMe.id, 'in-progress')
     navigate(`/console/coach/member/${nextForMe.memberId}?task=${nextForMe.id}`)
   }
 
   const confirmClose = () => {
-    if (!closing) return
+    if (!closing || !canActOn(closing.memberId)) return
     if (!outcome) return setOutcomeErr('Choose an outcome. A task closes with what happened, not just a tick.')
     setStatus(closing.id, 'done', { outcome: outcomeNote ? `${outcome} — ${outcomeNote}` : outcome, closedAt: fmtClock(now) })
     const next = tasks.filter((t) => t.id !== closing.id && isMine(t) && t.status === 'open').sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority] || deadlineOf(a) - deadlineOf(b))[0]
@@ -175,7 +177,7 @@ function Coach({ deskSwitch }: { deskSwitch: ReactNode }) {
           <CardHead
             eyebrow="Drift tasks · rules v1.0"
             title="The queue"
-            aside={<DaybreakButton onClick={takeNext} disabled={!nextForMe || !canAct} className="!h-12 !px-5 !text-[17px]">{nextForMe ? 'Take the next task' : 'Nothing waiting for you'}</DaybreakButton>}
+            aside={<DaybreakButton onClick={takeNext} disabled={!nextForMe || !canActOn(nextForMe.memberId)} className="!h-12 !px-5 !text-[17px]">{nextForMe ? 'Take the next task' : 'Nothing waiting for you'}</DaybreakButton>}
           />
           <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
             <ScrollTabs
@@ -248,7 +250,7 @@ function Coach({ deskSwitch }: { deskSwitch: ReactNode }) {
                         {(['open', 'in-progress', 'done'] as const).map((s) => (
                           <button
                             key={s}
-                            disabled={!canAct}
+                            disabled={!canActOn(task.memberId)}
                             aria-pressed={task.status === s}
                             onClick={() => (s === 'done' ? (setClosing(task), setOutcomeErr('')) : setStatus(task.id, s, { outcome: undefined }))}
                             className={clsx('rounded-full px-2.5 py-1 text-[12px] focus-ring disabled:cursor-not-allowed disabled:opacity-60', task.status === s ? 'bg-paper-raised text-ink shadow-card' : 'text-ink-2 hover:text-ink')}
@@ -428,7 +430,7 @@ function Coach({ deskSwitch }: { deskSwitch: ReactNode }) {
         </div>
       </section>
 
-      <Moderation canAct={canAct} now={now} onConcern={setConcern} />
+      <Moderation canActOn={canActOn} now={now} onConcern={setConcern} />
 
       {tonight && (
         <div className="mt-8 flex justify-end">
@@ -438,11 +440,11 @@ function Coach({ deskSwitch }: { deskSwitch: ReactNode }) {
         </div>
       )}
 
-      <CircleSheet id={circleOpen} onClose={() => setCircleOpen(null)} canAct={canAct} now={now} onConcern={(t) => { setCircleOpen(null); setConcern(t) }} />
+      <CircleSheet id={circleOpen} onClose={() => setCircleOpen(null)} canAct={canAct} canActOn={canActOn} now={now} onConcern={(t) => { setCircleOpen(null); setConcern(t) }} />
       <RaiseConcernSheet
         target={concern}
         onClose={() => setConcern(null)}
-        canAct={canAct}
+        canAct={!!concern && canActOn(concern.memberId)}
         onRaised={(a) => { if (concern?.reportId) coach.moderate(concern.reportId, { status: 'concern', at: fmtClock(now), alertId: a.id }) }}
       />
 
@@ -481,7 +483,7 @@ function Coach({ deskSwitch }: { deskSwitch: ReactNode }) {
 
 // ─── Circle sheet: roster, this week, call room, attendance ────────────────
 
-function CircleSheet({ id, onClose, canAct, now, onConcern }: { id: string | null; onClose: () => void; canAct: boolean; now: number; onConcern: (t: ConcernTarget) => void }) {
+function CircleSheet({ id, onClose, canAct, canActOn, now, onConcern }: { id: string | null; onClose: () => void; canAct: boolean; canActOn: (memberId?: string | null) => boolean; now: number; onConcern: (t: ConcernTarget) => void }) {
   const { circles } = useCoachState()
   const c = CIRCLES_LED.find((x) => x.id === id)
   const roster = id ? CIRCLE_ROSTER[id] ?? [] : []
@@ -555,7 +557,7 @@ function CircleSheet({ id, onClose, canAct, now, onConcern }: { id: string | nul
                       ) : (
                         <span className="text-[12px] text-ink-3">Coach · {m.coach}</span>
                       )}
-                      <button type="button" disabled={!canAct} onClick={() => onConcern({ name: m.name, memberId: m.id, context: `circle · ${c.name}` })} className="text-[13px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring disabled:opacity-50" aria-label={`Raise a concern about ${m.name}`}>Concern</button>
+                      <button type="button" disabled={!canActOn(m.id)} onClick={() => onConcern({ name: m.name, memberId: m.id, context: `circle · ${c.name}` })} className="text-[13px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring disabled:opacity-50" aria-label={`Raise a concern about ${m.name}`}>Concern</button>
                     </span>
                   </li>
                 )
@@ -667,7 +669,7 @@ function fmtReportAt(ms: number | null) {
   return fmtOpened(new Date(ms + 5.5 * 3600_000).toISOString().slice(0, 16).replace('T', ' '))
 }
 
-function Moderation({ canAct, now, onConcern }: { canAct: boolean; now: number; onConcern: (t: ConcernTarget & { reportId?: string }) => void }) {
+function Moderation({ canActOn, now, onConcern }: { canActOn: (memberId?: string | null) => boolean; now: number; onConcern: (t: ConcernTarget & { reportId?: string }) => void }) {
   const reports = useCircleReports()
   const { moderation } = useCoachState()
   const { alerts } = useClinicalState()
@@ -677,7 +679,7 @@ function Moderation({ canAct, now, onConcern }: { canAct: boolean; now: number; 
   const open = reports.filter((r) => !moderation[r.id])
 
   const spoke = (r: CircleReport) => {
-    if (!canAct) return
+    if (!canActOn(r.memberId)) return
     if (note.trim().length < 10) return setErr('Write a sentence about what you said and agreed (10 characters or more).')
     coach.moderate(r.id, { status: 'spoken', at: fmtClock(now), note: note.trim() })
     setNoting(null); setNote(''); setErr('')
@@ -694,6 +696,7 @@ function Moderation({ canAct, now, onConcern }: { canAct: boolean; now: number; 
         {reports.map((r) => {
           const m = moderation[r.id]
           const alert = m?.alertId ? alerts.find((a) => a.id === m.alertId) : undefined
+          const canAct = canActOn(r.memberId)
           return (
             <li key={r.id} className={clsx('rounded-lg border border-line bg-paper-raised p-4', m && 'opacity-80')}>
               <div className="flex flex-wrap items-center justify-between gap-2">

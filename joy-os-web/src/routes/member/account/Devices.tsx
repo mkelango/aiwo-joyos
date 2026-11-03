@@ -132,6 +132,7 @@ export default function Devices() {
       <Section id="connected" eyebrow={t('connected')} title={t('readingNow')} lead={connected.length > 0 ? rich(t(connected.length === 1 ? 'sourcesOne' : 'sourcesMany'), { n: <span className="num">{connected.length}</span> }) : undefined} aside={<SpecimenTag />}>
         {connected.length === 0 && (
           <EmptyState
+            illustration="generic"
             title={t('nothing')}
             body={t('nothingBody', { body: tt.space('H'), ease: tt.space('B') })}
             action={<Button variant="secondary" onClick={toMore}><Link2 size={15} /> {t('connectDevice')}</Button>}

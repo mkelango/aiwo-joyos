@@ -85,7 +85,15 @@ export const CLINICIANS = [
 
 // ─── Messages ─────────────────────────────────────────────────────────────
 
-export interface Msg { id: string; from: 'me' | 'them' | 'system'; at: string; body: string; drafted?: boolean; signed?: string; clinical?: boolean }
+export interface Msg {
+  id: string; from: 'me' | 'them' | 'system'; at: string; body: string; drafted?: boolean; signed?: string; clinical?: boolean
+  /** A member message VIVA passed on for them (account/_careInbox). */
+  via?: 'viva'
+  /** What a handed-on message is about (a supplement, a review), for the care team. */
+  ref?: string
+  /** A system line drawn from a translated key instead of `body` (the "replies within" line of a hand-off). */
+  sys?: { k: 'replyClinical' | 'replySame' | 'replyDay'; name: string }
+}
 export interface Thread { id: string; personId: string; subject: string; clinical?: boolean; unread: number; messages: Msg[] }
 
 /** Specimen replies used after a member writes (non-clinical people only — clinicians reply themselves, later). */

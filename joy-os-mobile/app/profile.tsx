@@ -29,7 +29,8 @@ function Profile() {
   const { lang, setLang } = useApp()
   const guard = useSheetCrisisGuard()
   const [acct, setAcct] = useStore(accountStore)
-  // The DPDP nominee and ABHA are set in the Trust centre; Profile shows them.
+  // The DPDP nominee and ABHA are set in the Trust centre; Profile shows them. Both are the
+  // signed-in account's own (L2), kept with it when another account signs in.
   const [nominee] = useStore(nomineeStore)
   const [abha] = useStore(abhaStore)
   const planName = `${PLANS.find((p) => p.key === acct.plan)?.name ?? MEMBER.plan} + ${MEMBER.membership}`
@@ -189,8 +190,14 @@ function Profile() {
       <View style={{ gap: space.s1 }}>
         <SectionTitle aside={<Button variant="link" onPress={() => router.push('/trust')}>{tc('edit')}</Button>}>{t('nomineeEyebrow')}</SectionTitle>
         <Card tone="raised" style={{ gap: 4 }}>
-          <Body weight="medium">{nominee.name}</Body>
-          <Meta>{`${tx(NOMINEE_REL[nominee.relation], nominee.relation)} · ${nominee.email}`}</Meta>
+          {nominee.name ? (
+            <>
+              <Body weight="medium">{nominee.name}</Body>
+              <Meta>{`${tx(NOMINEE_REL[nominee.relation], nominee.relation)} · ${nominee.email}`}</Meta>
+            </>
+          ) : (
+            <Body>{t('nomineeNone')}</Body>
+          )}
           <Meta size={14} tone="ink3">{t('nomineeNote')}</Meta>
           <Meta size={14} tone="ink3">{abha.linked ? t('abhaLine', { address: abha.address }) : t('abhaNone')}</Meta>
         </Card>

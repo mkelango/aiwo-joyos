@@ -79,6 +79,42 @@ export function Quote({ children, by, role, className }: { children: ReactNode; 
   )
 }
 
+/**
+ * The Thirukkural, kural 39 (Arattuppal · Aran Valiyuruttal), public domain. Set in
+ * Tamil with the English beneath, in every language (Playbook p63). The Tamil stays
+ * upright in the serif stack (Newsreader has no Tamil, and a slanted Tamil would be a
+ * fake oblique); the English beneath is the quotation register, Newsreader italic.
+ */
+const KURAL = {
+  n: 39,
+  ta: ['அறத்தான் வருவதே இன்பம்மற் றெல்லாம்', 'புறத்த புகழும் இல.'],
+  en: ['Only the joy that comes of living rightly is joy;', 'all else is outward show, and brings no praise.'],
+}
+
+export function Verse({ className }: { className?: string }) {
+  const { t, r } = useJ()
+  return (
+    <figure className={clsx('relative', className)}>
+      <p className="eyebrow text-ink-3">{r('verseEyebrow', { n: KURAL.n })}</p>
+      <blockquote className="mt-4">
+        {/* Inline family: the [lang|='ta'] rule would otherwise set the Tamil in the sans stack; here it
+            resolves to that rule's serif stack (Noto Serif Tamil). */}
+        <p lang="ta" className="text-[1.3rem] font-light leading-[1.7] text-ink md:text-[1.45rem]" style={{ fontFamily: 'var(--font-serif)' }}>
+          {KURAL.ta.map((l, i) => <span key={i} className="block">{l}</span>)}
+        </p>
+        <p lang="en" className="mt-3 font-serif text-[1.15rem] font-light italic leading-snug text-ink-2 md:text-[1.25rem]">
+          {KURAL.en.map((l, i) => <span key={i} className="block">{l}</span>)}
+        </p>
+      </blockquote>
+      <figcaption className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="h-px w-8 bg-line-strong" aria-hidden />
+        <span className="text-[15px] text-ink">{t('verseBy')}</span>
+        <span className="eyebrow text-ink-3">{t('verseBook')}</span>
+      </figcaption>
+    </figure>
+  )
+}
+
 export const kindIcon: Record<ItemKind, typeof Bed> = {
   Room: Bed, Treatment: Sparkles, Measure: Ruler, Circle: Users, Meal: Utensils, Talk: MessageCircle, Movement: Footprints,
 }

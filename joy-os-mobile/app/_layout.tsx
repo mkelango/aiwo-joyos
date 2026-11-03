@@ -28,12 +28,15 @@ import { StatusBar } from 'expo-status-bar'
 import { useEffect, useMemo, useState } from 'react'
 import { Linking, Platform, Pressable, ScrollView, Text, View, useColorScheme } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import Svg, { Path } from 'react-native-svg'
 import { CrisisSheet } from '../src/components/CrisisSheet'
-import { DaybreakMark } from '../src/components'
+import { DaybreakMark, WORDMARK_PATH, WORDMARK_VIEWBOX } from '../src/components'
 import { LockScreen } from '../src/components/LockScreen'
 import { sessionStore, useStore } from '../src/screens/b/bStore'
 import { kit } from '../src/components/_i18n'
 import { AppProvider, useApp, type Lang } from '../src/lib/store'
+// Loaded first: settles a signed-out first run's session (and the onboarding draft's layout).
+import '../src/lib/onboardingAccount'
 import { ThemeProvider, useTheme } from '../src/theme/ThemeProvider'
 import { fonts as latinFonts, indicFonts, palettes, radius, space } from '../src/theme/tokens'
 
@@ -181,7 +184,16 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
     <View style={{ flex: 1, backgroundColor: c.paper }}>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <ScrollView contentContainerStyle={{ paddingHorizontal: space.gutter, paddingTop: 72, paddingBottom: space.s5, gap: space.s3, width: '100%', maxWidth: 640, alignSelf: 'center' }}>
-        <Text style={{ fontFamily: fonts.mono, fontSize: 12, letterSpacing: 1.7, color: c.ink2 }}>AIWO · JOY OS</Text>
+        {/* The drawn wordmark (Playbook p20: never set in a font), then Joy OS as its line of type.
+            Drawn here directly: the Wordmark component reads the theme provider, which is gone. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View accessible accessibilityRole="image" accessibilityLabel="AIWO">
+            <Svg width={72} height={(72 * WORDMARK_VIEWBOX.h) / WORDMARK_VIEWBOX.w} viewBox={`0 0 ${WORDMARK_VIEWBOX.w} ${WORDMARK_VIEWBOX.h}`}>
+              <Path d={WORDMARK_PATH} fill={c.ink} fillRule="evenodd" />
+            </Svg>
+          </View>
+          <Text style={{ fontFamily: latinFonts.mono, fontSize: 12, letterSpacing: 12 * 0.24, color: c.ink2 }}>JOY OS</Text>
+        </View>
         <View style={{ gap: space.s1 }}>
           <Text style={{ fontFamily: script ? fonts.sansSemi : fonts.mono, fontSize: 12, letterSpacing: script ? 0 : 1.7, textTransform: 'uppercase', color: c.daybreakInk }}>{t('errEyebrow')}</Text>
           <Text accessibilityRole="header" style={{ fontFamily: fonts.sansLight, fontSize: 32, lineHeight: 40, color: c.ink }}>

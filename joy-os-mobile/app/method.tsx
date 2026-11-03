@@ -200,7 +200,7 @@ export default function Method() {
               <View style={{ paddingVertical: 10, gap: 2 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <TermDot term={ins.term} />
-                  <Body style={{ flexShrink: 1 }}>{ins.code}</Body>
+                  <Body style={{ flexShrink: 1 }}>{instr(ins.code)}</Body>
                   <Meta size={13}>{tt.space(ins.term)}</Meta>
                   <Pill tone={ins.status === 'live' ? 'ink' : 'neutral'}>{ins.status === 'live' ? t('inUse') : ins.status === 'gated' ? t('gated') : t('inReview')}</Pill>
                 </View>
@@ -227,7 +227,8 @@ export default function Method() {
                 <View style={{ flex: 1 }}>
                   <Body>{tx(METHOD_LABEL[v], METHODS[v].label)}</Body>
                   <Meta size={14}>
-                    {`λ ${METHODS[v].lambda} · `}
+                    <Mono size={14} tone="ink2">{`λ ${METHODS[v].lambda}`}</Mono>
+                    {' · '}
                     <Mono size={14} tone="ink2">{METHODS[v].published}</Mono>
                   </Meta>
                 </View>

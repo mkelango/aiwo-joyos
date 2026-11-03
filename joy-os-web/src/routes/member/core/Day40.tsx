@@ -16,6 +16,7 @@ import { ACTION_TEXT, rich, useCore } from './_i18n'
 import { useX } from './_i18nX'
 import { dotDate } from './_card'
 import { useMemberName } from '@/lib/memberName'
+import { useIsMinor } from '@/lib/minor'
 
 // THE DAY-40 PAGE (Memo p17: "print: the Index card, the Day-40 page, the Joyspan Letter").
 // One printed page at the middle of the ninety days: where the member started, what they
@@ -37,6 +38,8 @@ export default function Day40() {
   const { name, pick, tag, lang } = useCore()
   const fmtDate = useFmtDate()
   const who = useMemberName()
+  // A member under 18 is never scored: the page keeps where they started, with no number.
+  const minor = useIsMinor()
   const { ledger } = useApp()
   const [removed] = useLedgerRemoved()
   const day0 = INDEX_HISTORY[0]
@@ -100,13 +103,22 @@ export default function Day40() {
           </div>
           <div className="min-w-0">
             <Eyebrow>{x('d4Start')}</Eyebrow>
-            <p className="mt-2 text-[17px] text-ink">
-              {rich(x('d4StartBody'), { date: <span className="num">{fmtDate(day0.takenOn)}</span>, v: <span className="num">{day0.value}</span>, who: day0.signedBy ?? '' })}
-            </p>
-            <p className="mt-1 flex items-center gap-2 text-[15px] text-ink-2">
-              <TermDot term={lowest} /> {rich(x('d4Lowest'), { term: name(lowest), v: <span className="num">{lowV}</span> })}
-            </p>
-            <MethodLine className="mt-2" method={day0.method} grade={day0.grade} takenOn={day0.takenOn} signedBy={day0.signedBy} />
+            {minor ? (
+              <>
+                <p className="mt-2 text-[17px] text-ink">{rich(x('d4StartMinor'), { date: <span className="num">{fmtDate(day0.takenOn)}</span> })}</p>
+                <p className="mt-1 flex items-center gap-2 text-[15px] text-ink-2"><TermDot term={lowest} /> {x('d4PlanMinor', { term: name(lowest) })}</p>
+              </>
+            ) : (
+              <>
+                <p className="mt-2 text-[17px] text-ink">
+                  {rich(x('d4StartBody'), { date: <span className="num">{fmtDate(day0.takenOn)}</span>, v: <span className="num">{day0.value}</span>, who: day0.signedBy ?? '' })}
+                </p>
+                <p className="mt-1 flex items-center gap-2 text-[15px] text-ink-2">
+                  <TermDot term={lowest} /> {rich(x('d4Lowest'), { term: name(lowest), v: <span className="num">{lowV}</span> })}
+                </p>
+                <MethodLine className="mt-2" method={day0.method} grade={day0.grade} takenOn={day0.takenOn} signedBy={day0.signedBy} />
+              </>
+            )}
           </div>
         </section>
 

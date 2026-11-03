@@ -169,3 +169,29 @@ export const LAB_TEXT: Record<string, { ta: string; hi: string }> = {
   'LDL cholesterol': { ta: 'LDL கொழுப்பு', hi: 'LDL कोलेस्ट्रॉल' },
   'Vitamin D (25-OH)': { ta: 'வைட்டமின் D (25-OH)', hi: 'विटामिन D (25-OH)' },
 }
+
+/** Instrument names in the sitting overview and intros. Scale names that are brands or codes
+ *  (Life’s Essential 8, Ikigai-9, UCLA, Lubben) stay as written; the plain words translate.
+ *  The items themselves stay English (INSTRUMENT_NOTE). */
+export const BLOCK_NAME_TEXT: Record<string, { ta: string; hi: string }> = {
+  'Life’s Essential 8 · self-report': { ta: 'Life’s Essential 8 · சுய அறிக்கை', hi: 'Life’s Essential 8 · स्व-रिपोर्ट' },
+  'Meaning in Life · Presence': { ta: 'வாழ்வின் அர்த்தம் · இருப்பு', hi: 'जीवन का अर्थ · उपस्थिति' },
+  'UCLA Loneliness · three items': { ta: 'UCLA தனிமை · மூன்று கேள்விகள்', hi: 'UCLA अकेलापन · तीन सवाल' },
+  'Lubben Social Network Scale · six items': { ta: 'Lubben சமூக வலைப்பின்னல் அளவுகோல் · ஆறு கேள்விகள்', hi: 'Lubben सामाजिक नेटवर्क पैमाना · छह सवाल' },
+  'Basic Psychological Needs · autonomy': { ta: 'அடிப்படை உளவியல் தேவைகள் · சுயாட்சி', hi: 'बुनियादी मनोवैज्ञानिक ज़रूरतें · स्वायत्तता' },
+  'Time affluence': { ta: 'நேர வளம்', hi: 'समय की भरपूरता' },
+  'Financial Well-Being · five items': { ta: 'நிதி நலம் · ஐந்து கேள்விகள்', hi: 'वित्तीय कल्याण · पाँच सवाल' },
+  'Scale of Positive and Negative Experience': { ta: 'நேர்மறை, எதிர்மறை அனுபவ அளவுகோல்', hi: 'सकारात्मक और नकारात्मक अनुभव का पैमाना' },
+  'Patient Health Questionnaire · four items': { ta: 'நோயாளர் உடல்நலக் கேள்வித்தாள் · நான்கு கேள்விகள்', hi: 'रोगी स्वास्थ्य प्रश्नावली · चार सवाल' },
+  'Perceived Stress Scale · four items': { ta: 'உணரப்படும் மன அழுத்த அளவுகோல் · நான்கு கேள்விகள்', hi: 'महसूस किए गए तनाव का पैमाना · चार सवाल' },
+}
+
+/** The licence half of an instrument's attribution ("Author · licence"); the authors stay as written. */
+export const ATTRIB_TEXT: Record<string, { ta: string; hi: string }> = {
+  'free to use': { ta: 'இலவசமாகப் பயன்படுத்தலாம்', hi: 'मुफ़्त उपयोग' },
+  'author permission (pending, specimen)': { ta: 'ஆசிரியர் அனுமதி (நிலுவையில், மாதிரி)', hi: 'लेखक की अनुमति (बाकी, नमूना)' },
+  'free for research, commercial use confirmed': { ta: 'ஆய்வுக்கு இலவசம், வணிகப் பயன்பாடு உறுதி', hi: 'रिसर्च के लिए मुफ़्त, व्यावसायिक उपयोग पक्का' },
+  'public domain': { ta: 'பொதுக் களம்', hi: 'सार्वजनिक' },
+  'terms to confirm (specimen)': { ta: 'நிபந்தனைகள் உறுதிசெய்யப்பட வேண்டும் (மாதிரி)', hi: 'शर्तें पक्की होनी बाकी (नमूना)' },
+  'free with attribution': { ta: 'மூலம் குறிப்பிட்டால் இலவசம்', hi: 'श्रेय देकर मुफ़्त' },
+}

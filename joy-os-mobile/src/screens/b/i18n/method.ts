@@ -128,6 +128,7 @@ export const INSTR_TEXT: Record<string, { ta: string; hi: string }> = {
   'Pain': { ta: 'வலி', hi: 'दर्द' },
   'Avoidance': { ta: 'தவிர்த்தல்', hi: 'टालना' },
   'LE8 self-report': { ta: 'LE8 சுய அறிக்கை', hi: 'LE8 स्व-रिपोर्ट' },
+  Savouring: { ta: 'ரசித்தல்', hi: 'रस लेना' },
 }
 
 /** Weight-table row labels parsed from the term formulas. Instrument codes (LE8, Ikigai-9, MLQ-P,

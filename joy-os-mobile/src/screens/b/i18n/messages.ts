@@ -51,6 +51,8 @@ export const MSG = {
   message: { en: 'Message', ta: 'செய்தி', hi: 'संदेश' },
   messagePh: { en: 'Write as you would speak', ta: 'பேசுவது போலவே எழுதுங்கள்', hi: 'जैसे बोलते हैं, वैसे लिखें' },
   sendMessage: { en: 'Send message', ta: 'செய்தியை அனுப்பு', hi: 'संदेश भेजें' },
+  emptyTitle: { en: 'No messages yet.', ta: 'இன்னும் செய்திகள் இல்லை.', hi: 'अभी कोई संदेश नहीं।' },
+  emptyBody: { en: 'Your coach, physician and concierge will write here. You can write to any of them first.', ta: 'உங்கள் பயிற்சியாளர், மருத்துவர், கான்சியர்ஜ் இங்கே எழுதுவார்கள். நீங்களே முதலில் அவர்களில் யாருக்கும் எழுதலாம்.', hi: 'आपके कोच, डॉक्टर और कंसीयर्ज यहाँ लिखेंगे। आप पहले उनमें से किसी को भी लिख सकते हैं।' },
   personReads: { en: 'A person reads it. Nothing is answered by a machine alone.', ta: 'ஒரு மனிதர் படிப்பார். எதற்கும் இயந்திரம் மட்டும் தனியாகப் பதிலளிக்காது.', hi: 'एक इंसान इसे पढ़ता है। किसी बात का जवाब अकेले मशीन नहीं देती।' },
 } satisfies Dict
 
@@ -66,4 +68,5 @@ export const SUBJECT_T: Record<string, L3 & { date?: string }> = {
   t_priya: { en: 'Day 15 review and this week', ta: 'நாள் 15 மதிப்பாய்வும் இந்த வாரமும்', hi: 'दिन 15 की समीक्षा और यह हफ़्ता' },
   t_meera: { en: 'January panel · signed', ta: 'ஜனவரி பரிசோதனை · கையொப்பமிடப்பட்டது', hi: 'जनवरी की जाँच · हस्ताक्षरित' },
   t_ravi: { en: 'Joyspan Session · Chennai, {d}', ta: 'ஜாய்ஸ்பான் Session · சென்னை, {d}', hi: 'जॉयस्पैन Session · चेन्नई, {d}', date: '2027-02-20' },
+  t_ravi_lk: { en: 'Joyspan Session · Chennai, {d}', ta: 'ஜாய்ஸ்பான் Session · சென்னை, {d}', hi: 'जॉयस्पैन Session · चेन्नई, {d}', date: '2027-02-20' },
 }

@@ -9,15 +9,17 @@ import { SPECIMEN_TODAY, addDays, liveLedger, specimenWeek, useLedgerRemoved, we
 import { useA11yPrefs } from '@/routes/member/account/_prefs'
 import { useApp } from '@/lib/store'
 import { FILMS, PLANNED_START, SAVOURING_PROMPTS } from './_data'
-import { SpaceShell, ToolCard, rovingRadio, useCrisisGuard, Toggle } from './_SpaceShell'
+import { CopyDetails, SpaceShell, ToolCard, rovingRadio, useCrisisGuard, Toggle } from './_SpaceShell'
 import { useSpaceText, type SpKey } from './_i18n'
 import { CAL_NAME, KEPT_KEY, readCalendarProvider, useSpaceState, useTrustConsent, type KeptPrompt } from './_state'
 
 // PLEASURE · Daily Pleasure (Memo p.19): the Joy Ledger's weekly view of where joy
 // came from; one planned pleasure a day, scheduled like a meeting; savouring
 // prompts; Moments of Joy films; #MyMomentOfJoy (opt-in).
-// Planned pleasures go to the calendar Freedom connected, only while the Trust centre's
-// calendar consent (c_cal) is on; otherwise they stay in the app. Kept savouring prompts are
+// Planned pleasures are kept in the app (the Ledger asks how each one was). The calendar
+// Freedom connected is read-only, so Joy OS never adds one there: while c_cal is on it hands
+// the member the details to add it themselves, unless they chose to keep it in the app only.
+// Kept savouring prompts are
 // saved for the Ledger's evening "How was it?". Sharing a moment needs the Publishing
 // consent (c_pub); turning #MyMomentOfJoy off, or withdrawing c_pub, takes every share back.
 // The one Daybreak button: schedule today's pleasure.
@@ -106,18 +108,19 @@ function LedgerInsights() {
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const LENGTHS = [10, 30] as const
-/** A planned pleasure; `cal` names the calendar it was sent to ('' = kept in the app only). */
+/** A planned pleasure, kept in the app. (`cal` is only on records saved by an older build; it is ignored.) */
 type Planned = (typeof PLANNED_START)[number] & { cal?: string }
 
 function PlannedPleasure() {
   const guard = useCrisisGuard()
   const [items, setItems] = useSpaceState<Planned[]>('pleasure.planned.v1', PLANNED_START)
-  // Where a pleasure goes: the calendar Freedom connected, and only while c_cal is on.
+  // The calendar Freedom connected, while c_cal is on: read-only, so it is only ever named
+  // as the place the member may add a pleasure themselves.
   const calConsent = useTrustConsent('c_cal')
   const provider = readCalendarProvider()
-  const calName = calConsent.on && provider ? CAL_NAME[provider] : ''
-  // The member may choose to keep planned pleasures in the app rather than connect a calendar.
+  // The member may keep planned pleasures in the app only: then no calendar details are offered.
   const [appOnly, setAppOnly] = useSpaceState('pleasure.appOnly.v1', false)
+  const calName = calConsent.on && provider && !appOnly ? CAL_NAME[provider] : ''
   const [what, setWhat] = useState('')
   const [day, setDay] = useState('Thu')
   const [time, setTime] = useState('19:00')
@@ -135,7 +138,7 @@ function PlannedPleasure() {
     if (taken) return setErr('pl.pp.errTaken')
     if (guard(what, withWho)) return
     const id = `pp${Date.now()}`
-    setItems((x) => [...x, { id, day, time, what: what.trim(), minutes: mins, with: withWho.trim(), cal: calName }].sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day)))
+    setItems((x) => [...x, { id, day, time, what: what.trim(), minutes: mins, with: withWho.trim() }].sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day)))
     setJustAdded(id); setWhat(''); setWithWho(''); setErr(''); setRemoved(null)
     const next = DAYS.find((d) => !items.some((i) => i.day === d) && d !== day)
     if (next) setDay(next)
@@ -173,27 +176,39 @@ function PlannedPleasure() {
           </div>
         </div>
         {err && <p id="pp-err" role="alert" className="text-[13px] text-error">{t(err, { day: dayT(day) })}</p>}
-        {!calName && (
-          // Not allowed to reach a calendar: offer the way to connect, or keep it in the app.
-          <div className="rounded-2xl border border-line bg-paper-raised px-4 py-3 text-[14px] text-ink-2">
-            <p>{t(calConsent.on ? 'pl.pp.noCal' : 'pl.pp.calOff')}</p>
-            <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-              {calConsent.on
-                ? <Link to="/app/spaces/freedom" className="inline-flex items-center gap-1 rounded text-ink underline-offset-4 hover:underline focus-ring">{t('pl.pp.connect')} <ArrowRight size={14} /></Link>
-                : <Link to="/app/trust#consents" className="inline-flex items-center gap-1 rounded text-ink underline-offset-4 hover:underline focus-ring">{t('pl.pp.turnOn')} <ArrowRight size={14} /></Link>}
-              {appOnly
-                ? <span className="inline-flex items-center gap-1.5 text-ink-3"><Check size={14} aria-hidden /> {t('pl.pp.appOnlyOn')}</span>
-                : <button type="button" onClick={() => setAppOnly(true)} className="rounded text-ink underline underline-offset-4 focus-ring">{t('pl.pp.appOnly')}</button>}
+        {/* Where it goes: always the app. Say what the calendar can and cannot do, and respect "app only". */}
+        <div className="rounded-2xl border border-line bg-paper-raised px-4 py-3 text-[14px] text-ink-2">
+          {appOnly ? (
+            <p className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              <span className="inline-flex items-center gap-1.5 text-ink"><Check size={14} aria-hidden /> {t('pl.pp.appOnlyOn')}</span>
+              <span>{t('pl.pp.appOnlyB')}</span>
+              <button type="button" onClick={() => setAppOnly(false)} className="rounded text-ink underline underline-offset-4 focus-ring">{calConsent.on && provider ? t('pl.pp.appOnlyUndo') : t('c.change')}</button>
             </p>
-          </div>
-        )}
+          ) : (
+            <>
+              <p>{calName ? t('pl.pp.readOnly', { cal: calName }) : t(calConsent.on ? 'pl.pp.noCal' : 'pl.pp.calOff')}</p>
+              <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                {!calName && (calConsent.on
+                  ? <Link to="/app/spaces/freedom" className="inline-flex items-center gap-1 rounded text-ink underline-offset-4 hover:underline focus-ring">{t('pl.pp.connect')} <ArrowRight size={14} /></Link>
+                  : <Link to="/app/trust#consents" className="inline-flex items-center gap-1 rounded text-ink underline-offset-4 hover:underline focus-ring">{t('pl.pp.turnOn')} <ArrowRight size={14} /></Link>)}
+                <button type="button" onClick={() => setAppOnly(true)} className="rounded text-ink underline underline-offset-4 focus-ring">{t('pl.pp.appOnly')}</button>
+              </p>
+            </>
+          )}
+        </div>
         <DaybreakButton type="submit" className="w-full"><CalendarClock size={18} /> {t('pl.pp.schedule')}</DaybreakButton>
         {added && (
-          <p role="status" className="flex items-start gap-2 text-[14px] text-ink"><Check size={15} className="mt-0.5 shrink-0" aria-hidden /><span>{r(added.cal ? 'pl.pp.added' : 'pl.pp.addedApp', { dt: <>{dayT(added.day)} <span className="num">{added.time}</span></>, cal: added.cal ?? '', m: <span className="num">{added.minutes}</span>, with: added.with ? t('pl.pp.withX', { who: added.with }) : '', slot: t(Number(added.time.slice(0, 2)) < 14 ? 'pl.slot.midday' : Number(added.time.slice(0, 2)) < 18 ? 'pl.slot.afternoon' : 'pl.slot.evening') })}</span></p>
+          <p role="status" className="flex items-start gap-2 text-[14px] text-ink"><Check size={15} className="mt-0.5 shrink-0" aria-hidden /><span>{r('pl.pp.addedApp', { dt: <>{dayT(added.day)} <span className="num">{added.time}</span></>, m: <span className="num">{added.minutes}</span>, with: added.with ? t('pl.pp.withX', { who: added.with }) : '', slot: t(Number(added.time.slice(0, 2)) < 14 ? 'pl.slot.midday' : Number(added.time.slice(0, 2)) < 18 ? 'pl.slot.afternoon' : 'pl.slot.evening') })}</span></p>
+        )}
+        {added && calName && (
+          <div className="rounded-2xl border border-line bg-paper-raised px-4 py-3 text-[14px] text-ink-2">
+            <p>{t('pl.pp.addYourself', { cal: calName })}</p>
+            <CopyDetails className="mt-2.5" text={`${dayT(added.day)} ${added.time} · ${added.minutes} ${t('c.min')}\n${added.what}${added.with ? t('pl.pp.dotWith', { who: added.with }) : ''}`} />
+          </div>
         )}
         {removed && (
           <p role="status" className="flex items-center gap-3 text-[14px] text-ink-2">
-            {(removed.cal ?? calName) ? t('pl.pp.removed', { day: dayT(removed.day), cal: removed.cal ?? calName }) : t('pl.pp.removedApp', { day: dayT(removed.day) })}
+            {calName ? t('pl.pp.removed', { day: dayT(removed.day), cal: calName }) : t('pl.pp.removedApp', { day: dayT(removed.day) })}
             <button type="button" className="rounded text-ink underline underline-offset-4 focus-ring" onClick={() => { setItems((x) => [...x, removed].sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day))); setRemoved(null) }}>{t('c.undo')}</button>
           </p>
         )}

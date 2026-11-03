@@ -14,6 +14,8 @@ export type MemberWork = {
   override?: { title: string; term: TermKey; reason: string; until: number } | null
   reviewed?: boolean
   reviewedAt?: string | null
+  /** Who marked the VIVA summary reviewed: the signed-in person, whoever that is. */
+  reviewedBy?: string | null
   summary?: string | null
   audit?: AuditEvent[]
 }

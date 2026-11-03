@@ -14,6 +14,7 @@ import type { IndexScore, TermKey } from '@/domain/types'
 import { HISTORY_METHOD, METHOD_V10_PUBLISHED, NOT_YET_EXAMPLE, TERM_DETAIL } from './_data'
 import { KV, PrintOnly, TICK, TOOLTIP_STYLE } from './_parts'
 import { useMeasured, useSignalsDown, type Amendment, type MeasuredIndex } from './_store'
+import { OWN_DAY90_ID, useIndexHistory } from './_latest'
 import type { SittingResult } from './_scoring'
 import { AmendPanel } from './_amend'
 import { formulaText } from './_extra'
@@ -34,12 +35,13 @@ import type { Lang } from '@/lib/store'
 const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 const gradeShort = (g: IndexScore['grade']) => (g === 'clinical' ? 'gradeShortClinical' : g === 'index' ? 'gradeShortIndex' : 'gradeShortCheck')
 const gradeFull = (g: IndexScore['grade']) => (g === 'clinical' ? 'gradeFullClinical' : g === 'index' ? 'gradeFullIndex' : 'gradeFullCheck')
+const fmtSigned = (v: number | null | undefined, isB: boolean) => (v == null ? '—' : isB ? `−${v}` : String(v))
 const shortDate = (iso: string, lang: Lang) => fmtLocal(new Date(iso), lang, { month: 'short', year: '2-digit' })
 
 export default function IndexHome() {
   const navigate = useNavigate()
-  const latest = INDEX_HISTORY[0]
-  const previous = INDEX_HISTORY[1]
+  // The member's own signed Day-90 re-measure leads when there is one; else the specimen record.
+  const { latest, previous, own, surveyOnly } = useIndexHistory()
   const lowest = termByKey(latest.lowestTerm)
   const [selected, setSelected] = useState<TermKey>(latest.lowestTerm)
   const [measured, setMeasured] = useMeasured()
@@ -49,6 +51,7 @@ export default function IndexHome() {
   const lowName = name(lowest.key)
   const at = ACTION_TEXT[TODAY_ACTION.id]
   const signalsDown = useSignalsDown()
+  const x = useX()
 
   return (
     <div>
@@ -92,7 +95,7 @@ export default function IndexHome() {
       <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr] lg:gap-8">
         <Card tone="raised" className="flex flex-col">
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-            <Eyebrow>{c('ixJiEyebrow', { day: tr('dayOf', { n: MEMBER.dayOfLoop }) })}</Eyebrow>
+            <Eyebrow>{c('ixJiEyebrow', { day: tr('dayOf', { n: own ? 90 : MEMBER.dayOfLoop }) })}</Eyebrow>
             <SpecimenTag className="shrink-0 text-[10px] sm:text-[11px]" />
           </div>
           <div className="mt-4 flex flex-col items-center gap-2 xl:flex-row xl:items-center xl:justify-between">
@@ -141,7 +144,10 @@ export default function IndexHome() {
             })}
           </ul>
           <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-5">
-            <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />
+            <span className="flex flex-wrap items-center gap-2">
+              <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} signedBy={own ? latest.signedBy : undefined} />
+              {surveyOnly && <Pill tone="neutral">{c('soPill')}</Pill>}
+            </span>
             <Link to="/app/trust" className="eyebrow inline-flex items-center gap-1.5 text-ink-3 underline-offset-4 hover:text-ink hover:underline focus-ring">
               <ShieldCheck size={13} /> {tr('trust')}
             </Link>
@@ -158,6 +164,13 @@ export default function IndexHome() {
           <p className="mt-4 text-[1.5rem] font-light leading-snug text-ink">
             {rich(c('ixLowestIs'), { term: lowName, v: <span className="num">{latest.terms.find((t) => t.key === lowest.key)!.value}</span> })}
           </p>
+          {own && lowest.key !== TODAY_ACTION.term ? (
+            // The member's own re-measure moved the lowest term: its one next step, not today's specimen action.
+            <div className="mt-5 rounded-card border border-line bg-paper-raised p-4">
+              <TermChip term={lowest.key} withSpace />
+              <p className="mt-3 text-[17px] text-ink">{x(`ns${lowest.key}`)}</p>
+            </div>
+          ) : (
           <div className="mt-5 rounded-card border border-line bg-paper-raised p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <TermChip term={TODAY_ACTION.term} withSpace />
@@ -166,6 +179,7 @@ export default function IndexHome() {
             <p className="mt-3 text-[17px] text-ink">{pick(at?.title, TODAY_ACTION.title)} {pick(at?.detail, TODAY_ACTION.detail)}</p>
             <p className="mt-2 text-[14px] text-ink-2">{pick(at?.why, TODAY_ACTION.why)}</p>
           </div>
+          )}
           <p className="mt-4 text-[15px] text-ink-2">
             {c('ixWhyLowest')}
           </p>
@@ -204,12 +218,13 @@ export default function IndexHome() {
 
 // ─── Term detail (petal → instruments, signals vs survey, formula, what moved) ──
 function TermDetailPanel({ termKey }: { termKey: TermKey }) {
-  const latest = INDEX_HISTORY[0]
+  const { latest, previous, own } = useIndexHistory()
   const term = termByKey(termKey)
   const score = latest.terms.find((t) => t.key === termKey)!
   const detail = TERM_DETAIL[termKey]
   const isB = termKey === 'B'
   const { t: c, name, space, pick, method, lang } = useCore()
+  const x = useX()
   const fmtDate = useFmtDate()
   const dt = TERM_DETAIL_TEXT[termKey]
   const instruments = term.instruments.map((name) => {
@@ -269,8 +284,17 @@ function TermDetailPanel({ termKey }: { termKey: TermKey }) {
             ))}
           </dl>
 
+          {own ? (
+            // The member's own re-measure: what moved is read from the two sittings, not the specimen notes.
+            <div className="mt-5">
+              <p className="eyebrow mb-2 text-ink-3">{x('ixOwnMovedH')}</p>
+              <p className="text-[15px] text-ink">
+                {rich(x('ixOwnMoved'), { a: <span className="num">{fmtSigned(previous.terms.find((t) => t.key === termKey)?.value, isB)}</span>, b: <span className="num">{fmtSigned(score.value, isB)}</span> })}
+              </p>
+            </div>
+          ) : (
           <div className="mt-5">
-            <p className="eyebrow mb-2 text-ink-3">{c('ixMovedSince', { date: fmtDate(INDEX_HISTORY[1].takenOn) })}</p>
+            <p className="eyebrow mb-2 text-ink-3">{c('ixMovedSince', { date: fmtDate(previous.takenOn) })}</p>
             <ul className="space-y-1.5">
               {detail.moved.map((m, i) => (
                 <li key={m} className="flex gap-2.5 text-[15px] text-ink">
@@ -280,6 +304,7 @@ function TermDetailPanel({ termKey }: { termKey: TermKey }) {
               ))}
             </ul>
           </div>
+          )}
         </motion.div>
       </AnimatePresence>
     </Card>
@@ -288,7 +313,7 @@ function TermDetailPanel({ termKey }: { termKey: TermKey }) {
 
 // ─── The formula, worked through live with the engine, and a sandbox ─────────
 function FormulaCard() {
-  const latest = INDEX_HISTORY[0]
+  const { latest } = useIndexHistory()
   const base = useMemo(() => Object.fromEntries(latest.terms.map((t) => [t.key, t.value ?? 0])) as Record<TermKey, number>, [latest])
   const [vals, setVals] = useState<Record<TermKey, number>>(base)
   const real = joyspanIndex(latest.terms, latest.method)!
@@ -428,7 +453,9 @@ function HistoryCard() {
   const [view, setView] = useState<'index' | 'terms'>('index')
   const narrow = useNarrow()
   const v10 = Date.parse(METHOD_V10_PUBLISHED)
-  const rows = [...INDEX_HISTORY].reverse()
+  const { history, own, signedAt } = useIndexHistory()
+  const x = useX()
+  const rows = [...history].reverse()
   const v11 = Date.parse(METHODS['v1.1'].published)
   const data = rows.map((r) => ({
     t: Date.parse(r.takenOn),
@@ -442,7 +469,9 @@ function HistoryCard() {
   const { t: c, lang, name } = useCore()
   const tr = useT()
   const fmtDate = useFmtDate()
-  const lowRow = INDEX_HISTORY.every((r) => r.lowestTerm === INDEX_HISTORY[0].lowestTerm) ? 'hsLowEach' : 'hsLowNow'
+  const lowRow = history.every((r) => r.lowestTerm === history[0].lowestTerm) ? 'hsLowEach' : 'hsLowNow'
+  const values = data.map((d) => d.JI)
+  const indexDomain: [number, number] = [Math.min(40, Math.floor((Math.min(...values) - 5) / 10) * 10), Math.max(80, Math.ceil((Math.max(...values) + 5) / 10) * 10)]
 
   type DotProps = { cx?: number; cy?: number; payload?: { grade: string } }
   const GradeDot = (p: DotProps) => {
@@ -460,8 +489,11 @@ function HistoryCard() {
         <div>
           <Eyebrow>{c('hsEyebrow', { n: rows.length })}</Eyebrow>
           <p className="mt-2 max-w-2xl text-[17px] text-ink">
-            {rich(c(rows[rows.length - 1].value >= rows[0].value ? 'hsRisen' : 'hsMoved'), { a: <span className="num">{rows[0].value}</span>, b: <span className="num">{rows[rows.length - 1].value}</span>, n: <span className="num">{rows.length}</span>, low: c(lowRow, { term: name(INDEX_HISTORY[0].lowestTerm) }) })}
+            {rich(c(rows[rows.length - 1].value >= rows[0].value ? 'hsRisen' : 'hsMoved'), { a: <span className="num">{rows[0].value}</span>, b: <span className="num">{rows[rows.length - 1].value}</span>, n: <span className="num">{rows.length}</span>, low: c(lowRow, { term: name(history[0].lowestTerm) }) })}
           </p>
+          {own && (
+            <p className="mt-2 max-w-2xl text-[14px] text-ink-2">{rich(x('hsOwnLine'), { who: history[0].signedBy ?? '', date: <span className="num">{fmtDate((signedAt ?? history[0].takenOn).slice(0, 10))}</span> })}</p>
+          )}
         </div>
         <Tabs value={view} onChange={setView} items={[{ value: 'index', label: c('index') }, { value: 'terms', label: c('hsSixTerms') }]} />
       </div>
@@ -470,8 +502,8 @@ function HistoryCard() {
         <ResponsiveContainer width="100%" height="100%">
           <LineChart accessibilityLayer={false} data={data} margin={{ top: 16, right: 16, bottom: 4, left: -16 }}>
             <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="2 6" />
-            <XAxis dataKey="t" type="number" scale="time" domain={[first - pad, v11 + pad]} ticks={[...data.map((d) => d.t), v11]} tickFormatter={(t: number) => shortDate(new Date(t).toISOString(), lang)} tick={TICK} axisLine={{ stroke: 'var(--line)' }} tickLine={false} />
-            <YAxis domain={view === 'index' ? [40, 80] : [0, 100]} tick={TICK} axisLine={false} tickLine={false} width={44} />
+            <XAxis dataKey="t" type="number" scale="time" domain={[first - pad, Math.max(v11, data[data.length - 1].t) + pad]} ticks={[...data.map((d) => d.t), v11]} tickFormatter={(t: number) => shortDate(new Date(t).toISOString(), lang)} tick={TICK} axisLine={{ stroke: 'var(--line)' }} tickLine={false} />
+            <YAxis domain={view === 'index' ? indexDomain : [0, 100]} tick={TICK} axisLine={false} tickLine={false} width={44} />
             <Tooltip
               {...TOOLTIP_STYLE}
               labelFormatter={(t) => fmtDate(new Date(Number(t)).toISOString())}
@@ -479,7 +511,7 @@ function HistoryCard() {
             />
             <ReferenceLine x={v10} stroke="var(--ink-3)" strokeDasharray="4 4" label={{ value: 'v1.0', position: 'insideBottomRight', fill: 'var(--ink-3)', fontSize: 11, fontFamily: 'var(--font-mono)' }} />
             <ReferenceLine x={v11} stroke="var(--ink-3)" strokeDasharray="4 4" label={{ value: narrow ? 'v1.1' : c('hsPlanned'), position: 'insideTopRight', fill: 'var(--ink-3)', fontSize: 11, fontFamily: 'var(--font-mono)' }} />
-            <ReferenceLine x={Date.parse(INDEX_HISTORY[0].nextMeasure)} stroke="var(--line-strong)" label={narrow ? undefined : { value: c('hsNext'), position: 'insideBottomLeft', fill: 'var(--ink-3)', fontSize: 11, fontFamily: 'var(--font-mono)' }} />
+            <ReferenceLine x={Date.parse(history[0].nextMeasure)} stroke="var(--line-strong)" label={narrow ? undefined : { value: c('hsNext'), position: 'insideBottomLeft', fill: 'var(--ink-3)', fontSize: 11, fontFamily: 'var(--font-mono)' }} />
             {view === 'index' ? (
               <Line type="monotone" dataKey="JI" stroke="var(--ink)" strokeWidth={2} dot={<GradeDot />} activeDot={{ r: 7, fill: 'var(--ink)' }} isAnimationActive={false} />
             ) : (
@@ -510,17 +542,17 @@ function HistoryCard() {
         className="mt-6"
         caption={c('hsCaption')}
         rowKey={(r) => r.id}
-        rows={INDEX_HISTORY}
+        rows={history}
         columns={[
-          { key: 'd', header: c('hsMeasured'), render: (r) => <span className="num">{fmtDate(r.takenOn)}</span> },
+          { key: 'd', header: c('hsMeasured'), render: (r) => <span className="num">{fmtDate(r.takenOn)}{r.id === OWN_DAY90_ID && <span className="ml-2 font-sans text-[13px] text-ink-3">{tr('dayOf', { n: 90 })}</span>}</span> },
           { key: 'v', header: c('index'), align: 'right', render: (r) => <span className="num text-[16px]">{r.value}</span> },
           {
             key: 'delta',
             header: c('change'),
             align: 'right',
             render: (r) => {
-              const i = INDEX_HISTORY.indexOf(r)
-              const prev = INDEX_HISTORY[i + 1]
+              const i = history.indexOf(r)
+              const prev = history[i + 1]
               return prev ? <Delta value={r.value - prev.value} /> : <span className="text-ink-3">{c('hsBaseline')}</span>
             },
           },
@@ -539,7 +571,7 @@ function HistoryCard() {
 
 // ─── A sitting just measured (from Take the Index) ──────────────────────────
 function MeasuredBanner({ m, onClear }: { m: MeasuredIndex; onClear: () => void }) {
-  const latest = INDEX_HISTORY[0]
+  const { latest } = useIndexHistory()
   const [confirming, setConfirming] = useState(false)
   const [amending, setAmending] = useState(false)
   const [, setMeasured] = useMeasured()
@@ -670,10 +702,12 @@ function MeasuredBanner({ m, onClear }: { m: MeasuredIndex; onClear: () => void 
 
 // ─── The printable Index card (Playbook p59) ────────────────────────────────
 function IndexCard() {
-  const latest = INDEX_HISTORY[0]
+  const { latest, own, signedAt, surveyOnly } = useIndexHistory()
   const { pick } = useCore()
+  const x = useX()
   const at = ACTION_TEXT[TODAY_ACTION.id]
-  const step = `${pick(at?.title, TODAY_ACTION.title)} ${pick(at?.detail, TODAY_ACTION.detail)}`
+  // The member's own Day-90 card carries the one next step for its own lowest term.
+  const step = own ? x(`ns${latest.lowestTerm}`) : `${pick(at?.title, TODAY_ACTION.title)} ${pick(at?.detail, TODAY_ACTION.detail)}`
   return (
     <Card tone="outline" className="bg-paper-raised">
       <IndexCardView
@@ -688,7 +722,9 @@ function IndexCard() {
         lowest={latest.lowestTerm}
         step={step}
         signedBy={latest.signedBy}
-        signedOn={latest.takenOn}
+        signedOn={own && signedAt ? signedAt.slice(0, 10) : latest.takenOn}
+        baseline={own ? INDEX_HISTORY[0].terms : null}
+        surveyOnly={surveyOnly}
       />
     </Card>
   )

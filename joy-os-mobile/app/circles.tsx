@@ -10,7 +10,7 @@ import { palettes } from '@/theme/tokens'
 import { useApp, useReduceMotion } from '@/lib/store'
 import { CAPTIONS, CIRCLE_NEXT, CIRCLE_SESSIONS, OTHER_CIRCLES, PRACTICE_CONTENT, SALONS } from '@/screens/b/journeyData'
 import { a11yStore, accountStore, circleReportsStore, refCode, useStore, type BookedPass } from '@/screens/b/bStore'
-import { CheckLine, ChoiceCard, Done, Field, FilterChips, TimelineStep, fmtWhen, memberOnly, useSheetCrisisGuard } from '@/screens/b/parts'
+import { CheckLine, ChoiceCard, Done, Field, FilterChips, TimelineStep, fmtWhen, memberOnly, useAccount, useSheetCrisisGuard } from '@/screens/b/parts'
 import { useDict } from '@/lib/i18n'
 import { CIRCLES, OTHER_CIRCLE_TEXT, CIRCLE_STATUS, SALON_TITLE, CIRCLE_PROMPT } from '@/screens/b/i18n/journey'
 import { PRACTICE_TITLE, useCommon, useTx } from '@/screens/b/i18n/common'
@@ -20,6 +20,16 @@ import { PRACTICE_TITLE, useCommon, useTx } from '@/screens/b/i18n/common'
 // ranked. Other circles and salons by invitation. One Daybreak: join Monday's call.
 // Moderation (Arch 8b-16): a member can raise a concern about someone in the circle. Only the
 // coach and AIWO's safety team see it; the person is never told who raised it. Kept on the phone.
+// The circle's own seat is the account signed in (L2): its first name is shown as You, and its
+// concerns are its own (kept with the account when another signs in).
+
+/**
+ * The circle as the signed-in account sees it: its own seat carries its own first name. The own
+ * seat is marked by position, not by name, so a new member who shares a first name with someone
+ * else in the circle (two Kavyas) is still one seat marked You.
+ */
+type Seat = { key: string; name: string; me: boolean }
+const seatsOf = (me: string): Seat[] => CIRCLE.members.map((m, i) => ({ key: `seat-${i}`, name: m === MEMBER.firstName ? me : m, me: m === MEMBER.firstName }))
 
 export default memberOnly(Circles)
 
@@ -56,6 +66,8 @@ function Circles() {
   const coachFirst = CIRCLE.coach.split(' ')[0]
   const [reportOpen, setReportOpen] = useState(false)
   const [reports, setReports] = useStore(circleReportsStore)
+  const me = useAccount().firstName
+  const seats = seatsOf(me)
   // Avatars are neutral: the Spectrum is reserved for the six terms, never for people.
 
   return (
@@ -83,18 +95,18 @@ function Circles() {
             <Mono tone="ink2">{CIRCLE_NEXT.time}</Mono> · <Mono tone="ink2">{String(CIRCLE.callMinutes)}</Mono>{t('minutesA', { coach: CIRCLE.coach })}
           </Meta>
         </View>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: space.s1 }} accessible accessibilityLabel={t('inCircle', { list: CIRCLE.members.join(', '), coach: CIRCLE.coach })}>
-          {CIRCLE.members.map((m) => (
-            <View key={m} style={{ width: '25%', alignItems: 'center', gap: 4 }}>
-              {m === 'Arjun' ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: space.s1 }} accessible accessibilityLabel={t('inCircle', { list: seats.map((m) => m.name).join(', '), coach: CIRCLE.coach })}>
+          {seats.map((m) => (
+            <View key={m.key} style={{ width: '25%', alignItems: 'center', gap: 4 }}>
+              {m.me ? (
                 <View style={{ borderRadius: 24, borderWidth: 2, borderColor: c.ink }}>
-                  <Avatar person={{ name: m, initials: m[0], tone: '' }} size={44} />
+                  <Avatar person={{ name: m.name, initials: m.name[0], tone: '' }} size={44} />
                 </View>
               ) : (
-                <Avatar person={{ name: m, initials: m[0], tone: '' }} size={44} />
+                <Avatar person={{ name: m.name, initials: m.name[0], tone: '' }} size={44} />
               )}
-              <Meta size={13} tone={m === 'Arjun' ? 'ink' : 'ink2'}>
-                {m === 'Arjun' ? tc('you') : m}
+              <Meta size={13} tone={m.me ? 'ink' : 'ink2'}>
+                {m.me ? tc('you') : m.name}
               </Meta>
             </View>
           ))}
@@ -499,7 +511,7 @@ function CallRoom({ mode, audioOnly, onMode, onLeave }: { mode: RoomMode; audioO
   const others = CIRCLE.members.filter((m) => m !== MEMBER.firstName)
   // Thomas sends his apologies this week; Deepa is on audio from a train.
   const present = others.filter((m) => m !== 'Thomas')
-  const you = { name: MEMBER.firstName, coach: false, you: true }
+  const you = { name: useAccount().firstName, coach: false, you: true }
   const tiles = live ? [{ name: coach, coach: true, you: false }, ...present.map((m) => ({ name: m, coach: false, you: false })), you] : [you]
 
   // Whoever is speaking moves round the circle (everyone but you).

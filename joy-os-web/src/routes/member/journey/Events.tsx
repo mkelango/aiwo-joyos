@@ -1,30 +1,33 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowRight, CalendarHeart, Check, Clock, MapPin, Plus, Printer, QrCode, Star, Ticket } from 'lucide-react'
+import { ArrowRight, BadgeCheck, CalendarHeart, Check, Clock, MapPin, Plus, Printer, QrCode, Star, Ticket } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
 import { AiwoMark } from '@/components/joy/Brand'
-import { BandLabel, DaybreakButton, Eyebrow, MethodLine, SpecimenTag, TermChip, TermDot, useFmtDate } from '@/components/joy/primitives'
+import { BandLabel, DaybreakButton, Eyebrow, MethodLine, NotScoredNote, SpecimenTag, TermChip, TermDot, useFmtDate } from '@/components/joy/primitives'
 import { Button, Card, LoopRing, PageHeader, Pill, SectionTitle, Sheet, Tabs } from '@/components/ui'
 import { CIRCLE, COHORTS, EVENTS } from '@/data/platform'
 import { HOUSEHOLD, INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
 import { useMemberName } from '@/lib/memberName'
+import { useScoresHidden } from '@/lib/minor'
 import { FLAGSHIP_NEXT, FLAGSHIP_RECAP, NYE_PROGRAMME, PASSES, SALONS, SESSIONS_ALLOWANCE, SESSIONS_OPEN, SESSION_SCHEDULE, ZONES } from './_data'
 import { JourneyEmpty, OccasionsCard, PrintOnly, QRCode, SheetFocus, fade, printOnly } from './_parts'
 // One shared emergency intercept for every member free-text field (Memo p.24).
 import { useCrisisGuard } from '@/routes/member/spaces/_SpaceShell'
-import { addPass, cancelPass, isoDate, passCode, setFlagshipRequest, setSalon, setSchedule, signDeclaration, useJourney } from './_store'
+import { addPass, cancelPass, isoDate, passCode, setBadge, setFlagshipRequest, setSalon, setSchedule, signDeclaration, useJourney, type BadgeDiet } from './_store'
 import { useJ, type JourneyKey } from './_i18n'
 
 // EVENTS (Memo p.21): the Joyspan Event Platform — AIWO Joyspan at New Year,
 // Joyspan Sessions, Connections salons, passes, personal schedules and
 // Experience Zones by term colour. Every guest leaves with an Index and a
 // Day-90 date. New Year's Eve ends with the Declaration at 23:50 and the
-// Declaration card the member signs (Playbook p61). One Daybreak: book a Session.
+// Declaration card the member signs (Playbook p61), the household's invitation, and
+// a delegate badge on every pass. One Daybreak: book a Session.
 
 const CONCIERGE = TEAM.find((p) => p.role === 'Concierge')!.name.split(' ')[0]
 const PARTNER = HOUSEHOLD.find((p) => p.role === 'Partner')!.name.split(' ')[0]
+const FLAGSHIP_ID = 'ev1'
 
 interface PassView { id: string; name: string; when: string; where: string; kind: string; code: string; gate: string; seat: string; holder: string; status: 'Valid' | 'Used'; mine: boolean }
 
@@ -34,6 +37,10 @@ export default function Events() {
   const me = useMemberName()
   const [passTab, setPassTab] = useState<'upcoming' | 'past'>('upcoming')
   const [openPass, setOpenPass] = useState<string | null>(null)
+  const [passView, setPassView] = useState<'pass' | 'badge'>('pass')
+  const showPass = (id: string, v: 'pass' | 'badge' = 'pass') => { setPassView(v); setOpenPass(id) }
+  // A member under 18 is never scored (Architecture p26): the recap shows no Index.
+  const minor = useScoresHidden()
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null)
   const mine: Record<number, boolean> = journey.schedule ?? Object.fromEntries(SESSION_SCHEDULE.map((s, i) => [i, s.mine]))
   const [swapNote, setSwapNote] = useState<null | { k: 'swapOff' | 'swapOn' | 'swapClash'; i: number; o?: number }>(null)
@@ -139,7 +146,8 @@ export default function Events() {
                     <span aria-hidden className="absolute -left-3 -top-3 h-6 w-6 rounded-full border border-line bg-paper" />
                     <span aria-hidden className="absolute -bottom-3 -left-3 h-6 w-6 rounded-full border border-line bg-paper" />
                     <span className={clsx(used && 'opacity-40')}><QRCode value={p.code} size={104} /></span>
-                    <Button variant="ghost" size="sm" onClick={() => setOpenPass(p.id)} aria-label={t('showPassFor', { name: tx(p.name) })}><QrCode size={14} /> {t('show')}</Button>
+                    <Button variant="ghost" size="sm" onClick={() => showPass(p.id)} aria-label={t('showPassFor', { name: tx(p.name) })}><QrCode size={14} /> {t('show')}</Button>
+                    <Button variant="ghost" size="sm" onClick={() => showPass(p.id, 'badge')} aria-label={t('badgeShow', { name: tx(p.name) })}><BadgeCheck size={14} /> {t('badgeView')}</Button>
                   </div>
                 </motion.div>
               )
@@ -221,18 +229,20 @@ export default function Events() {
         <SectionTitle aside={<SpecimenTag />}><span id="recap">{t('recapTitle', { name: flagship.name })}</span></SectionTitle>
         <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
           <Card>
-            <Eyebrow>{t('indexIssued', { where: tx(flagship.where) })}</Eyebrow>
+            <Eyebrow>{minor ? t('joyspanIndex') : t('indexIssued', { where: tx(flagship.where) })}</Eyebrow>
             <div className="mt-4 flex flex-col items-center gap-6 sm:flex-row">
               <JoyspanWheel terms={latest.terms} size={150} />
-              <div>
-                <div className="flex items-end gap-3">
-                  <span className="num text-[4.5rem] font-light leading-none text-ink">{latest.value}</span>
-                  <BandLabel band={latest.band} className="mb-2" />
+              {minor ? <NotScoredNote /> : (
+                <div>
+                  <div className="flex items-end gap-3">
+                    <span className="num text-[4.5rem] font-light leading-none text-ink">{latest.value}</span>
+                    <BandLabel band={latest.band} className="mb-2" />
+                  </div>
+                  <p className="mt-2 text-[16px] text-ink-2">{r('measuredBody', { d: fmtDate(latest.takenOn), c: fmtDate(FLAGSHIP_RECAP.cardHanded), term: <span className="text-ink">{term.name(latest.lowestTerm)}</span> })}</p>
                 </div>
-                <p className="mt-2 text-[16px] text-ink-2">{r('measuredBody', { d: fmtDate(latest.takenOn), c: fmtDate(FLAGSHIP_RECAP.cardHanded), term: <span className="text-ink">{term.name(latest.lowestTerm)}</span> })}</p>
-              </div>
+              )}
             </div>
-            <MethodLine className="mt-5" method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />
+            {!minor && <MethodLine className="mt-5" method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />}
           </Card>
           <Card tone="sunk" className="flex flex-col">
             <div className="flex items-center gap-4">
@@ -262,18 +272,25 @@ export default function Events() {
       <OccasionsCard />
 
       {/* Sessions booking */}
-      <SessionBooking onShowPass={setOpenPass} />
+      <SessionBooking onShowPass={(id) => showPass(id)} />
 
       <Sheet open={!!openPass} onClose={() => setOpenPass(null)} title={t('yourPass')} side="center">
         <SheetFocus />
         {active && (
           <div className="flex flex-col items-center text-center">
-            <QRCode value={`${active.code}:live`} size={232} />
-            <p className="mt-4 text-[1.2rem] text-ink">{tx(active.name)}</p>
-            <p className="num text-[14px] text-ink-2">{tx(active.when)}</p>
-            <p className="mt-1 text-[14px] text-ink-2">{active.holder} · {tx(active.gate)}</p>
-            <p className="num mt-2 text-[12px] text-ink-3">{active.code}</p>
-            <p className="mt-4 rounded-card bg-paper-sunk px-4 py-3 text-[14px] text-ink-2">{t(active.status === 'Used' ? 'passUsed' : 'passScan')}</p>
+            <Tabs value={passView} onChange={setPassView} items={[{ value: 'pass', label: t('passView') }, { value: 'badge', label: t('badgeView') }]} className="mb-5" />
+            {passView === 'pass' ? (
+              <>
+                <QRCode value={`${active.code}:live`} size={232} />
+                <p className="mt-4 text-[1.2rem] text-ink">{tx(active.name)}</p>
+                <p className="num text-[14px] text-ink-2">{tx(active.when)}</p>
+                <p className="mt-1 text-[14px] text-ink-2">{active.holder} · {tx(active.gate)}</p>
+                <p className="num mt-2 text-[12px] text-ink-3">{active.code}</p>
+                <p className="mt-4 rounded-card bg-paper-sunk px-4 py-3 text-[14px] text-ink-2">{t(active.status === 'Used' ? 'passUsed' : 'passScan')}</p>
+              </>
+            ) : (
+              <DelegateBadge pass={active} />
+            )}
           </div>
         )}
       </Sheet>
@@ -281,10 +298,125 @@ export default function Events() {
   )
 }
 
+const BADGE_ID = 'delegate-badge'
+const DIETS: BadgeDiet[] = ['veg', 'vegan', 'jain', 'egg', 'nonveg', 'none']
+
+/**
+ * The delegate badge for a pass (Playbook p61): the name large (22 pt), then
+ * PROGRAMME, TABLE, PHOTOGRAPHY written as a word, and DIET. The member's answers
+ * are kept on this device and print on every badge. Printable on its own.
+ */
+function DelegateBadge({ pass }: { pass: PassView }) {
+  const id = useId()
+  const { t, tx } = useJ()
+  const { badge } = useJourney()
+  const table = /^table\b/i.test(pass.seat)
+  const photo = badge.photography === 'yes' ? t('photoYes') : badge.photography === 'no' ? t('photoNo') : t('notGiven')
+  const diet = badge.diet ? t(`diet_${badge.diet}` as JourneyKey) : t('notGiven')
+  const rows: [string, ReactNode, boolean][] = [
+    [t('bProgramme'), <>{tx(pass.kind)} · <span className="num">{tx(pass.when)}</span></>, true],
+    [t(table ? 'bTable' : 'bSeat'), monoDigits(tx(pass.seat)), true],
+    [t('bPhoto'), photo, !!badge.photography],
+    [t('bDiet'), diet, !!badge.diet],
+  ]
+  return (
+    <div className="w-full text-left">
+      <PrintOnly id={BADGE_ID} />
+      <article id={BADGE_ID} aria-label={t('badgeFor', { name: pass.holder })} className="mx-auto w-full max-w-[22rem] overflow-hidden rounded-[14px] border border-line-strong bg-paper-raised shadow-card" style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}>
+        <div className={`bg-ink-ground px-5 py-4 ${FG_STONE}`}>
+          <AiwoMark size={16} className="!text-[color:var(--aiwo-stone)]" />
+          <p className="eyebrow mt-3 opacity-80">{tx(pass.name)}</p>
+        </div>
+        <div className="h-1 bg-daybreak" aria-hidden />
+        <div className="px-5 pb-5 pt-6">
+          <p className="break-words text-[1.85rem] font-light leading-tight text-ink">{pass.holder}</p>
+          <p className="mt-1 text-[14px] text-ink-2">{t('badgeWho', { city: tx(MEMBER.city) })}</p>
+          <dl className="mt-6 divide-y divide-line border-y border-line">
+            {rows.map(([k, v, set]) => (
+              <div key={k} className="grid grid-cols-[6.5rem_1fr] gap-3 py-2.5">
+                <dt className="eyebrow min-w-0 break-words pt-0.5 text-ink-3">{k}</dt>
+                <dd className={clsx('min-w-0 break-words text-[15px]', set ? 'text-ink' : 'text-ink-3')}>{v}</dd>
+              </div>
+            ))}
+          </dl>
+          <div className="mt-5 flex items-end justify-between gap-3">
+            <QRCode value={pass.code} size={64} />
+            <p className="num text-[12px] text-ink-3">{pass.code}</p>
+          </div>
+        </div>
+      </article>
+
+      <div data-noprint className="mx-auto mt-5 w-full max-w-[22rem] space-y-4">
+        <fieldset>
+          <legend className="text-[15px] text-ink">{t('photoLegend')}</legend>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {(['yes', 'no'] as const).map((v) => (
+              <label key={v} className={clsx('inline-flex cursor-pointer items-center gap-2 rounded-full border px-3.5 py-2 text-[14px] transition-colors', badge.photography === v ? 'border-ink bg-paper-sunk text-ink' : 'border-line text-ink-2 hover:border-line-strong')}>
+                <input type="radio" name={`${id}-photo`} value={v} checked={badge.photography === v} onChange={() => setBadge({ photography: v })} className="accent-[color:var(--ink)]" />
+                {t(v === 'yes' ? 'photoYes' : 'photoNo')}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <div>
+          <label htmlFor={`${id}-diet`} className="text-[15px] text-ink">{t('badgeDietLabel')}</label>
+          <select id={`${id}-diet`} value={badge.diet ?? ''} onChange={(e) => setBadge({ diet: (e.target.value || null) as BadgeDiet | null })} className="mt-2 h-11 w-full rounded-full border border-line-strong bg-paper-raised px-4 text-[15px] text-ink focus-ring">
+            <option value="">{t('dietChoose')}</option>
+            {DIETS.map((d) => <option key={d} value={d}>{t(`diet_${d}` as JourneyKey)}</option>)}
+          </select>
+        </div>
+        <p className="text-[13px] text-ink-3">{t('badgeHint')}</p>
+        <Button variant="secondary" onClick={() => printOnly(BADGE_ID)}><Printer size={15} /> {t('badgePrint')}</Button>
+      </div>
+    </div>
+  )
+}
+
+// The badge and invitation headers are dark objects in both themes: fixed brand Stone, not --paper.
+const FG_STONE = 'text-[color:var(--aiwo-stone)]'
+
 /** Digits in running text set in Mono, the rest left as it is. */
 const monoDigits = (s: string): ReactNode => s.split(/(\d+)/).map((p, i) => (/^\d+$/.test(p) ? <span key={i} className="num">{p}</span> : p))
 
 const DECL_ID = 'declaration-card'
+const INV_ID = 'joyspan-invitation'
+
+/**
+ * The household's invitation to AIWO Joyspan 2027 (Playbook p61, letterpress on
+ * cotton): "… are invited to begin the year with joy", addressed with the member's
+ * own name and their partner's. Printable on its own.
+ */
+function Invitation() {
+  const { t, r, tx } = useJ()
+  const me = useMemberName()
+  const fmtDate = useFmtDate()
+  const flagship = EVENTS.find((e) => e.id === FLAGSHIP_ID)!
+  // The other adult on the invitation: the partner, or the household's own member if the partner is signed in.
+  const other = HOUSEHOLD.find((p) => p.role === 'Partner' && p.name.split(' ')[0] !== me.firstName) ?? HOUSEHOLD.find((p) => p.role === 'You')!
+  const [oFirst, ...oRest] = other.name.split(' ')
+  const oLast = oRest.join(' ')
+  const names = oLast && oLast === me.lastName ? `${me.firstName}${t('andJoin')}${oFirst} ${oLast}` : `${me.fullName}${t('andJoin')}${other.name}`
+  return (
+    <div className="grid gap-6 lg:grid-cols-[1fr_1.05fr] lg:items-center">
+      <PrintOnly id={INV_ID} />
+      <article id={INV_ID} aria-label={t('invAria', { name: flagship.name })} className="relative flex min-h-[17rem] flex-col rounded-[6px] border border-line bg-[color:var(--aiwo-paper)] p-7 text-[color:var(--aiwo-ink)] shadow-card md:p-9" style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}>
+        <div className="flex items-start justify-between gap-3">
+          <p className="eyebrow opacity-70">{t('invEyebrow')}</p>
+          <AiwoMark size={15} className="!text-[color:var(--aiwo-ink)] opacity-80" />
+        </div>
+        <p className="mt-6 max-w-[22rem] font-serif text-[1.6rem] font-light italic leading-snug md:text-[1.85rem]">{r('invText', { names })}</p>
+        <span aria-hidden className="mt-6 block h-8 w-[3px] origin-bottom-left rotate-[20deg] rounded-full" style={{ background: 'var(--aiwo-daybreak)' }} />
+        <p className="mt-auto pt-6 text-[14px] opacity-80">{flagship.name} · {tx(flagship.where)}</p>
+        <p className="num text-[13px] opacity-70">{fmtDate('2026-12-31')} – {fmtDate('2027-01-05')}</p>
+      </article>
+      <div className="min-w-0">
+        <Eyebrow>{t('invTitle')}</Eyebrow>
+        <p className="mt-2 text-[16px] text-ink-2">{t('invBody', { name: flagship.name })}</p>
+        <Button variant="secondary" className="mt-4" onClick={() => printOnly(INV_ID)}><Printer size={15} /> {t('invPrint')}</Button>
+      </div>
+    </div>
+  )
+}
 
 function NewYearsEve() {
   const id = useId()
@@ -401,6 +533,9 @@ function NewYearsEve() {
           )}
           <p className="mt-4 text-[13px] text-ink-3">{r('declFoot', { name: flagship.name, d: 90 })}</p>
         </div>
+      </div>
+      <div className="mt-8 border-t border-line pt-8">
+        <Invitation />
       </div>
     </section>
   )

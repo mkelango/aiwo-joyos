@@ -1,5 +1,5 @@
 import { router } from 'expo-router'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Pressable, View } from 'react-native'
 import {
   AppBar,
@@ -21,12 +21,12 @@ import {
   SpecimenTag,
   TermDot,
 } from '@/components'
+import { useLatestIndex } from '@/lib/indexRecord'
 import { useIsMinor } from '@/lib/minor'
 import { Rich, useA } from '@/screens/a/i18n'
 import { H2 } from '@/screens/a/local'
 import { NotScored } from '@/screens/a/parts'
-import { ROOM_PLAIN, ROOM_VERDICT } from '@/screens/a/spacesData'
-import { INDEX_HISTORY } from '@/shared/member'
+import { ROOM_PLAIN, roomVerdict } from '@/screens/a/spacesData'
 import { termByKey } from '@/shared/terms'
 import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
@@ -34,14 +34,19 @@ import { useTheme } from '@/theme/ThemeProvider'
 // SPACES HUB (Memo p.19; Plan §4A): six rooms, one per term, in Wheel order.
 // The lowest term is marked "Start here"; tap a petal or a card to enter a room.
 // Under 18 nothing is scored: no Wheel values, numbers, bands, deltas or "lowest", only the rooms.
+// The Wheel and the six cards read the latest Index (shared contract L1): one re-taken on this phone
+// replaces the specimen, so the hub agrees with Today.
 
 const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 
 export default function SpacesHome() {
   const { c, space } = useTheme()
   const { t, tx, name, space: spaceName } = useA()
-  const latest = INDEX_HISTORY[0]
+  const latest = useLatestIndex()
   const [focus, setFocus] = useState<TermKey>(latest.lowestTerm)
+  // A re-take (or the stored Index arriving) moves the focus to the new lowest term.
+  useEffect(() => setFocus(latest.lowestTerm), [latest.lowestTerm])
+  const verdict = roomVerdict(focus, latest)
   const focusTerm = termByKey(focus)
   const focusScore = latest.terms.find((s) => s.key === focus)!
   const minor = useIsMinor()
@@ -83,7 +88,7 @@ export default function SpacesHome() {
                 <BandLabel band={focusScore.band} />
               </View>
             </View>
-            <Body tone="ink2">{tx(ROOM_VERDICT[focus])}</Body>
+            <Body tone="ink2">{tx(verdict.text, verdict.vars)}</Body>
           </View>
           <DaybreakButton onPress={() => router.push(`/spaces/${focusTerm.slug}`)} accessibilityHint={t('Opens the {space} space', { space: spaceName(focus) })}>
             {t('Open {space}', { space: spaceName(focus) })}

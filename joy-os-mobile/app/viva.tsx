@@ -20,6 +20,7 @@ import {
   type IconName,
 } from '@/components'
 import { interceptsCrisis, useApp } from '@/lib/store'
+import { useIsMinor } from '@/lib/minor'
 import { VIVA_MEMORY } from '@/screens/a/coreData'
 import { H2, useLocal } from '@/screens/a/local'
 import { HumanWritten, IconButton, Provenance, TextField } from '@/screens/a/parts'
@@ -40,7 +41,8 @@ import { txFor } from '@/screens/a/i18n'
 // VIVA COMPANION (Memo p.27; Plan §4B). Typed tools, scripted replies (no live model in
 // this front end), provenance on every draft. Guardrails in order of precedence:
 // emergency intercept first, no AI text on a Suffering result, no diagnosis, no financial
-// advice. The member can see and edit what VIVA remembers.
+// advice. The member can see and edit what VIVA remembers. Under 18 nothing is scored: VIVA
+// quotes no Index, term score or band, and the Index tool explains the method instead.
 
 type Kind = 'reply' | 'refusal' | 'suffering' | 'crisis' | 'unavailable'
 interface Msg {
@@ -109,6 +111,7 @@ function Viva() {
   const [memory, setMemory] = useLocal('vivaMemory', VIVA_MEMORY)
   const [notice, setNotice] = useState('')
   const me = useAccount()
+  const minor = useIsMinor()
   // A space's "Ask VIVA about {space}" opens /viva?space=<slug>: VIVA starts on that space, with
   // a question about it ready in the box for the member to send or change.
   const { space: spaceSlug } = useLocalSearchParams<{ space?: string }>()
@@ -119,7 +122,7 @@ function Viva() {
       from: 'viva',
       kind: 'reply',
       tool: 'index_explainer',
-      text: fill(VIVA.hello[lang], { name: me.firstName }),
+      text: fill(VIVA[minor ? 'helloMinor' : 'hello'][lang], { name: me.firstName }),
     },
     ...(fromTerm ? [{ id: 'from-space', from: 'viva' as const, kind: 'reply' as const, tool: 'space_context', text: tr(lang, 'fromSpace', { space: tt.space(fromTerm) }) }] : []),
   ])
@@ -158,7 +161,7 @@ function Viva() {
     }
     setMsgs((m) => [...m, mine])
     setTyping(true)
-    const reply = route(routeText, memoryOn, phq4Retakes, lang)
+    const reply = route(routeText, memoryOn, phq4Retakes, lang, minor)
     const id = setTimeout(() => {
       timers.current = timers.current.filter((x) => x !== id)
       if (timers.current.length === 0) setTyping(false)
@@ -222,12 +225,14 @@ function Viva() {
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {TOOLS.map((tool) => {
-                const title = TOOL_TEXT[tool.id]?.title[lang] ?? tool.title
-                const ask = TOOL_TEXT[tool.id]?.ask[lang] ?? tool.ask
+                // Under 18 the Index tool asks how the Index works, never why "my Index" is a number.
+                const minorIndex = minor && tool.id === 'index_explainer'
+                const title = minorIndex ? t('toolIndexMinor') : TOOL_TEXT[tool.id]?.title[lang] ?? tool.title
+                const ask = minorIndex ? t('askIndexMinor') : TOOL_TEXT[tool.id]?.ask[lang] ?? tool.ask
                 return (
                 <Pressable
                   key={tool.id}
-                  onPress={() => respond(ask, tool.ask)}
+                  onPress={() => respond(ask, minorIndex ? VIVA.askIndexMinor.en : tool.ask)}
                   disabled={unavailable}
                   accessibilityRole="button"
                   accessibilityLabel={t('asks', { title, ask })}
@@ -271,7 +276,7 @@ function Viva() {
           {/* Conversation */}
           <View style={{ gap: space.s2 }}>
             {msgs.map((m) => (
-              <Bubble key={m.id} m={m.id === 'hello' ? { ...m, text: t('hello', { name: me.firstName }) } : m.id === 'from-space' && fromTerm ? { ...m, text: t('fromSpace', { space: tt.space(fromTerm) }) } : m} onWriteDown={writeDown} />
+              <Bubble key={m.id} m={m.id === 'hello' ? { ...m, text: t(minor ? 'helloMinor' : 'hello', { name: me.firstName }) } : m.id === 'from-space' && fromTerm ? { ...m, text: t('fromSpace', { space: tt.space(fromTerm) }) } : m} onWriteDown={writeDown} />
             ))}
             {typing ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} accessible accessibilityLabel={t('drafting')}>
@@ -422,7 +427,7 @@ function Bubble({ m, onWriteDown }: { m: Msg; onWriteDown: () => void }) {
         <Body>{m.text}</Body>
         {m.extra ? <Extra kind={m.extra} onWriteDown={onWriteDown} /> : null}
       </View>
-      <Provenance tool={m.tool ?? 'router'} />
+      <Provenance tool={m.tool && m.tool in GUARD_TOOL ? t(GUARD_TOOL[m.tool]) : m.tool ?? 'router'} />
     </View>
   )
 }
@@ -432,7 +437,10 @@ function Extra({ kind, onWriteDown }: { kind: NonNullable<Msg['extra']>; onWrite
   const { c } = useTheme()
   const t = useDict(VIVA)
   const tt = useTermText()
+  const minor = useIsMinor()
   if (kind === 'index') {
+    // Never a term score under 18 (the router does not attach this for a minor either).
+    if (minor) return null
     const latest = INDEX_HISTORY[0]
     return (
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
@@ -498,6 +506,9 @@ function Extra({ kind, onWriteDown }: { kind: NonNullable<Msg['extra']>; onWrite
 // ─── Scripted router (no live model in this front end) ──────────────────────
 const MEMORY_ON_DEFAULT: Record<TermKey, boolean> = { H: true, P: true, R: true, F: true, D: true, B: false }
 
+/** Guardrail refusals carry a tool id; the label shown in the provenance is translated. */
+const GUARD_TOOL: Record<string, 'toolDx' | 'toolMoney'> = { guardrail_no_diagnosis: 'toolDx', guardrail_no_financial_advice: 'toolMoney' }
+
 // The guardrails must hold in the member's own language, not only for English words or the
 // tapped chips (which pass English route text). Matched as substrings of the lowercased text.
 const DX_WORDS_INDIC = [
@@ -514,7 +525,7 @@ const MONEY_WORDS_INDIC = [
 ]
 const hasAny = (t: string, words: string[]) => words.some((w) => t.includes(w))
 
-function route(text: string, memoryOn: Record<TermKey, boolean>, retakes: { date: string; score: number }[] = [], lang: Lang = 'en'): Msg {
+function route(text: string, memoryOn: Record<TermKey, boolean>, retakes: { date: string; score: number }[] = [], lang: Lang = 'en', minor = false): Msg {
   const t = text.toLowerCase()
   const latest = INDEX_HISTORY[0]
   const viva = (tool: string, body: string, extra?: Msg['extra'], kind: Kind = 'reply'): Msg => ({ id: mid(), from: 'viva', kind, tool, text: body, extra })
@@ -526,13 +537,14 @@ function route(text: string, memoryOn: Record<TermKey, boolean>, retakes: { date
       kind: 'suffering',
       text: phq4Passage(retakes, lang),
     }
-  if (hasAny(t, DX_WORDS_INDIC)) return viva('guardrail · no diagnosis', tr(lang, 'rDx'), 'route-meera', 'refusal')
-  if (hasAny(t, MONEY_WORDS_INDIC)) return viva('guardrail · no financial advice', tr(lang, 'rMoney'), 'route-adviser', 'refusal')
+  if (hasAny(t, DX_WORDS_INDIC)) return viva('guardrail_no_diagnosis', tr(lang, 'rDx'), 'route-meera', 'refusal')
+  if (hasAny(t, MONEY_WORDS_INDIC)) return viva('guardrail_no_financial_advice', tr(lang, 'rMoney'), 'route-adviser', 'refusal')
   if (/\b(diagnos|insomnia|disorder|depress|melatonin|medicine|medication|dose|tablet|prescri|apnoea|apnea)/.test(t))
-    return viva('guardrail · no diagnosis', tr(lang, 'rDx'), 'route-meera', 'refusal')
+    return viva('guardrail_no_diagnosis', tr(lang, 'rDx'), 'route-meera', 'refusal')
   if (/\b(savings|invest|equity|mutual fund|stocks?|shares|loan|money|portfolio|sip)\b/.test(t))
-    return viva('guardrail · no financial advice', tr(lang, 'rMoney'), 'route-adviser', 'refusal')
+    return viva('guardrail_no_financial_advice', tr(lang, 'rMoney'), 'route-adviser', 'refusal')
   if (/\b(index|score|64|lowest|wheel|band)\b/.test(t)) {
+    if (minor) return viva('index_explainer', tr(lang, 'rIndexMinor'))
     const e = joyspanIndex(latest.terms)!
     const lifted = joyspanIndex(latest.terms.map((s) => (s.key === latest.lowestTerm ? { ...s, value: (s.value ?? 0) + 10 } : s)))!
     return viva(
@@ -542,7 +554,9 @@ function route(text: string, memoryOn: Record<TermKey, boolean>, retakes: { date
     )
   }
   if (/\b(why|today|action|verandah|tea)\b/.test(t) && !/savour/.test(t))
-    return viva('next_best_action', lang === 'en' ? `${TODAY_ACTION.why} So the one action is: ${TODAY_ACTION.title.toLowerCase()} ${TODAY_ACTION.detail} The evidence: ${TODAY_ACTION.evidence} “Not today” is always allowed.` : tr(lang, 'rAction'))
+    return minor
+      ? viva('next_best_action', tr(lang, 'rActionMinor'))
+      : viva('next_best_action', lang === 'en' ? `${TODAY_ACTION.why} So the one action is: ${TODAY_ACTION.title.toLowerCase()} ${TODAY_ACTION.detail} The evidence: ${TODAY_ACTION.evidence} “Not today” is always allowed.` : tr(lang, 'rAction'))
   if (/\b(purpose|ikigai|tomorrow|meaning)\b/.test(t))
     return viva(
       'ikigai_coach',
@@ -556,5 +570,5 @@ function route(text: string, memoryOn: Record<TermKey, boolean>, retakes: { date
     const w = PRACTICE_WEEKS.find((p) => p.week === CIRCLE.week)!
     return viva('practice_companion', lang === 'en' ? `Week ${w.week} is “${w.title}”. The idea is simple: the pleasures we postpone for a better time rarely get one. This week’s practice is to schedule one small pleasure each day, like a meeting, and keep it. Your circle talks about it on ${CIRCLE.when}.` : tr(lang, 'rPractice', { week: w.week, title: PRACTICE_TITLE[w.week]?.[lang] ?? w.title, when: tr(lang, 'circleWhen') }))
   }
-  return viva('router', tr(lang, 'rRouter'))
+  return viva('router', tr(lang, minor ? 'rRouterMinor' : 'rRouter'))
 }

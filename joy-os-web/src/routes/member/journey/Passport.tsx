@@ -5,10 +5,11 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
 import { AiwoMark } from '@/components/joy/Brand'
-import { BandLabel, DaybreakButton, Eyebrow, MethodLine, SpecimenTag, TermDot, useFmtDate } from '@/components/joy/primitives'
+import { BandLabel, DaybreakButton, Eyebrow, MethodLine, NotScoredNote, SpecimenTag, TermDot, useFmtDate } from '@/components/joy/primitives'
 import { Button, Card, LoopRing, PageHeader, Pill, SectionTitle, Sheet } from '@/components/ui'
 import { INDEX_HISTORY, MEMBER } from '@/data/member'
 import { useMemberName } from '@/lib/memberName'
+import { useScoresHidden } from '@/lib/minor'
 import { FLAGSHIP_NEXT, PASSES, PASSPORT, SESSIONS_ALLOWANCE } from './_data'
 import { QRCode, SheetFocus } from './_parts'
 import { setWallet, useJourney } from './_store'
@@ -39,6 +40,8 @@ export default function Passport() {
   const [showPass, setShowPass] = useState(false)
   const [flipped, setFlipped] = useState(false)
   const [hideIndex, setHideIndex] = useState(false)
+  // A member under 18 is never scored (Architecture p26): the card carries no Index at all.
+  const minor = useScoresHidden()
   const journey = useJourney()
   const me = useMemberName()
   const wallet = journey.wallet
@@ -87,10 +90,17 @@ export default function Passport() {
                     <p className="mt-1 truncate text-[1.6rem] font-light leading-tight md:text-[2rem]">{me.fullName}</p>
                     <p className="mt-1 font-mono text-[12px] tracking-wider opacity-70">{MEMBER.aiwoId} · {MEMBER.membership}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="eyebrow opacity-60">{t('joyspanIndex')}</p>
-                    <p className="num text-[3.6rem] font-light leading-none md:text-[4.5rem]">{hideIndex ? '••' : latest.value}</p>
-                  </div>
+                  {minor ? (
+                    <div className="max-w-[9rem] text-right">
+                      <p className="eyebrow opacity-60">{t('joyspanIndex')}</p>
+                      <p className="mt-1 text-[15px] leading-snug opacity-90">{t('minorCard')}</p>
+                    </div>
+                  ) : (
+                    <div className="text-right">
+                      <p className="eyebrow opacity-60">{t('joyspanIndex')}</p>
+                      <p className="num text-[3.6rem] font-light leading-none md:text-[4.5rem]">{hideIndex ? '••' : latest.value}</p>
+                    </div>
+                  )}
                 </div>
                 <div className="relative mt-7 grid grid-cols-3 gap-4 border-t border-[color:color-mix(in_srgb,var(--aiwo-stone)_18%,transparent)] pt-5">
                   <div className="min-w-0"><p className="eyebrow opacity-60">{t('loop')}</p><p className="num mt-1 text-[17px]">{t('loopDay', { d: MEMBER.dayOfLoop })}</p></div>
@@ -114,7 +124,7 @@ export default function Passport() {
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <Button variant="secondary" size="sm" onClick={() => setFlipped((f) => !f)} aria-pressed={flipped}>{t(flipped ? 'showFront' : 'turnCard')}</Button>
-            <Button variant="ghost" size="sm" onClick={() => setHideIndex((h) => !h)} aria-pressed={hideIndex}>{hideIndex ? <><Eye size={15} /> {t('showIdx')}</> : <><EyeOff size={15} /> {t('hideIdx')}</>}</Button>
+            {!minor && <Button variant="ghost" size="sm" onClick={() => setHideIndex((h) => !h)} aria-pressed={hideIndex}>{hideIndex ? <><Eye size={15} /> {t('showIdx')}</> : <><EyeOff size={15} /> {t('hideIdx')}</>}</Button>}
             <SpecimenTag className="ml-auto" />
           </div>
 
@@ -144,17 +154,26 @@ export default function Passport() {
         <div className="space-y-6">
           <Card>
             <Eyebrow>{t('sameIndex')}</Eyebrow>
-            <div className="mt-4 flex items-center gap-5">
-              <JoyspanWheel terms={latest.terms} size={120} />
-              <div>
-                <div className="flex items-end gap-3">
-                  <span className="num text-[3.4rem] font-light leading-none text-ink">{latest.value}</span>
-                  <BandLabel band={latest.band} className="mb-1.5" />
-                </div>
-                <p className="mt-2 text-[15px] text-ink-2">{r('lowestTermColon', { t: <span className="inline-flex items-center gap-1.5 text-ink"><TermDot term={latest.lowestTerm} /> {term.name(latest.lowestTerm)}</span> })}</p>
+            {minor ? (
+              <div className="mt-4 flex items-center gap-5">
+                <JoyspanWheel terms={latest.terms} size={120} />
+                <NotScoredNote />
               </div>
-            </div>
-            <MethodLine className="mt-5" method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />
+            ) : (
+              <>
+                <div className="mt-4 flex items-center gap-5">
+                  <JoyspanWheel terms={latest.terms} size={120} />
+                  <div>
+                    <div className="flex items-end gap-3">
+                      <span className="num text-[3.4rem] font-light leading-none text-ink">{latest.value}</span>
+                      <BandLabel band={latest.band} className="mb-1.5" />
+                    </div>
+                    <p className="mt-2 text-[15px] text-ink-2">{r('lowestTermColon', { t: <span className="inline-flex items-center gap-1.5 text-ink"><TermDot term={latest.lowestTerm} /> {term.name(latest.lowestTerm)}</span> })}</p>
+                  </div>
+                </div>
+                <MethodLine className="mt-5" method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />
+              </>
+            )}
           </Card>
           <Card tone="sunk" className="flex items-center gap-5">
             <LoopRing day={MEMBER.dayOfLoop} size={72} />

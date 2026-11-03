@@ -41,7 +41,8 @@ import { termByKey } from '@/shared/terms'
 import { useTheme } from '@/theme/ThemeProvider'
 import { memberOnly } from '@/screens/b/parts'
 import { INSTRUMENT_NOTE, useDict, useLang, useTermText } from '@/lib/i18n'
-import { LAB_TEXT, TAKE } from '@/screens/b/i18n/indexTake'
+import { ATTRIB_TEXT, BLOCK_NAME_TEXT, LAB_TEXT, TAKE } from '@/screens/b/i18n/indexTake'
+import { INSTR_TEXT } from '@/screens/b/i18n/method'
 import { useCommon } from '@/screens/b/i18n/common'
 import { txFor } from '@/screens/a/i18n'
 
@@ -129,6 +130,17 @@ function TakeIndex() {
   // Survey-only: signals down, or the member chose answers only for this sitting.
   const surveyOnly = signalsDown || !!saved.signalsOff
   const labName = (n: string) => (lang === 'en' ? n : LAB_TEXT[n]?.[lang] ?? n)
+  // Instrument codes and names in the member's language (brand codes stay), and the licence half
+  // of each attribution; the authors' names stay as written.
+  const instr = (code: string) => (lang === 'en' ? code : INSTR_TEXT[code]?.[lang] ?? code)
+  const blockName = (n: string) => (lang === 'en' ? n : BLOCK_NAME_TEXT[n]?.[lang] ?? n)
+  const attrib = (a: string) => {
+    if (lang === 'en') return a
+    const at = a.indexOf(' · ')
+    if (at < 0) return ATTRIB_TEXT[a]?.[lang] ?? a
+    const lic = a.slice(at + 3)
+    return `${a.slice(0, at)} · ${ATTRIB_TEXT[lic]?.[lang] ?? lic}`
+  }
   // Care threshold on the PHQ-4 answers so far.
   const phqHigh = phqOver(answers)
 
@@ -267,7 +279,7 @@ function TakeIndex() {
           <View style={{ gap: space.s2 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1, flexWrap: 'wrap' }}>
               <TermChip term={f.block.term} withSpace={termByKey(f.block.term).name !== termByKey(f.block.term).space} />
-              <Eyebrow>{f.block.code}</Eyebrow>
+              <Eyebrow>{instr(f.block.code)}</Eyebrow>
             </View>
             {note}
             <Meta>{f.item.stem ?? f.block.timeframe}</Meta>
@@ -327,7 +339,7 @@ function TakeIndex() {
               return (
                 <View key={a.id} style={{ gap: 2, paddingVertical: 4 }}>
                   <Meta size={14} tone="ink3">
-                    {`${f.block.code} · ${localStamp(a.at)}`}
+                    {`${instr(f.block.code)} · ${localStamp(a.at)}`}
                   </Meta>
                   <Body>{itemText(f)}</Body>
                   <Meta tone="ink">{t('amLogRow', { from: labelFor(f, a.from), to: labelFor(f, a.to) })}</Meta>
@@ -362,7 +374,7 @@ function TakeIndex() {
                       style={({ pressed }) => ({ paddingVertical: 12, gap: 4, opacity: pressed ? 0.7 : 1 })}
                     >
                       <Meta size={14} tone="ink3">
-                        {corrected.has(f.item.id) ? `${f.block.code} · ${t('amCorrected')}` : f.block.code}
+                        {corrected.has(f.item.id) ? `${instr(f.block.code)} · ${t('amCorrected')}` : instr(f.block.code)}
                       </Meta>
                       <Body>{itemText(f)}</Body>
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -516,7 +528,7 @@ function TakeIndex() {
               {s.blocks.map((b) => (
                 <View key={b.code} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <TermChip term={b.term} />
-                  <Meta style={{ flex: 1 }}>{b.code}</Meta>
+                  <Meta style={{ flex: 1 }}>{instr(b.code)}</Meta>
                   <Mono size={13} tone="ink3">
                     {String(b.items)}
                   </Mono>
@@ -592,8 +604,8 @@ function TakeIndex() {
           eyebrow={t('nextInstrument', { n: items[i].sitting })}
           title={
             <>
-              {b.name.split(' · ')[0]}
-              {b.name.includes(' · ') ? <Serif>{` · ${b.name.split(' · ').slice(1).join(' · ')}`}</Serif> : null}
+              {blockName(b.name).split(' · ')[0]}
+              {blockName(b.name).includes(' · ') ? <Serif>{` · ${blockName(b.name).split(' · ').slice(1).join(' · ')}`}</Serif> : null}
             </>
           }
           lead={ax(b.about)}
@@ -601,14 +613,14 @@ function TakeIndex() {
         <Card tone="raised" style={{ gap: space.s1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1, flexWrap: 'wrap' }}>
             <TermChip term={b.term} withSpace={tm.name !== tm.space} />
-            <Eyebrow>{b.code}</Eyebrow>
+            <Eyebrow>{instr(b.code)}</Eyebrow>
           </View>
           <Divider />
           {[
             [t('kTimeframe'), b.timeframe],
             [t('kItems'), here === b.items ? t('itemsFull', { items: b.items }) : t('itemsVal', { items: b.items, here })],
             [t('kTime'), t('timeVal', { min: b.minutes })],
-            [t('kSource'), b.attribution],
+            [t('kSource'), attrib(b.attribution)],
           ].map(([k, v]) => (
             <View key={k} style={{ flexDirection: 'row', gap: 12, minHeight: 28 }} accessible accessibilityLabel={`${k}: ${v}`}>
               <Eyebrow style={{ width: 96, paddingTop: 3 }}>{k}</Eyebrow>
@@ -630,7 +642,7 @@ function TakeIndex() {
             setStep({ kind: 'item', i })
           }}
         >
-          {t('beginCode', { code: b.code })}
+          {t('beginCode', { code: instr(b.code) })}
         </DaybreakButton>
       </Screen>
     )
@@ -669,7 +681,7 @@ function TakeIndex() {
         <View style={{ gap: space.s2 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1, flexWrap: 'wrap' }}>
             <TermChip term={f.block.term} withSpace={termByKey(f.block.term).name !== termByKey(f.block.term).space} />
-            <Eyebrow>{f.block.code}</Eyebrow>
+            <Eyebrow>{instr(f.block.code)}</Eyebrow>
           </View>
           {note}
           <Meta>{f.item.stem ?? f.block.timeframe}</Meta>
@@ -698,7 +710,7 @@ function TakeIndex() {
             {fromReview ? t('backReview') : i + 1 === items.length ? t('reviewAnswers') : tc('next')}
           </DaybreakButton>
           <Meta size={14} tone="ink3" align="center">
-            {f.block.name} · {f.block.attribution}
+            {blockName(f.block.name)} · {attrib(f.block.attribution)}
           </Meta>
         </View>
       </Screen>
@@ -895,7 +907,7 @@ function TakeIndex() {
                       style={({ pressed }) => ({ paddingVertical: 12, gap: 4, opacity: pressed ? 0.7 : 1 })}
                     >
                       <Meta size={14} tone="ink3">
-                        {f.block.code}
+                        {instr(f.block.code)}
                       </Meta>
                       <Body>{f.item.stem ? `${f.item.stem.replace('…', '')} ${f.item.text.replace('…', '')}` : f.item.text}</Body>
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>

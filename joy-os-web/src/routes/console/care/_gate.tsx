@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui'
 import type { Role } from '@/domain/types'
 import { useApp } from '@/lib/store'
-import { AGGREGATES_ONLY, NAMED_MEMBER, STRUCTURE_ONLY, grantActs, isLive, lastSettled, scopeLabel, standingRequest, useAccessRequests } from './_accessStore'
+import { AGGREGATES_ONLY, ASSIGNED_MEMBERS, NAMED_MEMBER, STRUCTURE_ONLY, assignedIds, grantActs, isLive, lastSettled, scopeLabel, standingRequest, useAccessRequests } from './_accessStore'
 import { fmtClock, fmtDuration, useConsoleNow } from './_parts'
 
 // Role gating for the care consoles. A role opens a console; it does not open a member.
@@ -183,8 +183,10 @@ const quietLink = 'inline-flex h-9 items-center rounded-full px-3 text-[14px] te
 export function PreviewBanner({ path, memberId }: { path: string; memberId?: string | null }) {
   const { canAct, chosen, roleLabel, opensHere, grant, deskGrant, pending, settled, now, switchTo, nativeLabel, nativePerson } = useConsoleAccess(path, memberId)
   const consolePath = path.split('#')[0]
-  // A one-named-member grant acts on that member's record only; elsewhere in the console it looks.
-  const namedElsewhere = !canAct && !!grant && grant.scope === NAMED_MEMBER
+  // A one-named-member or assigned-members grant acts on those members' records only; elsewhere
+  // in the console (another member, or anything console-wide) it looks.
+  const namedElsewhere = !canAct && !!grant && (grant.scope === NAMED_MEMBER || grant.scope === ASSIGNED_MEMBERS)
+  const covered = grant?.scope === ASSIGNED_MEMBERS ? assignedIds(grant).length : 0
 
   if ((canAct && grant) || namedElsewhere) {
     return (
@@ -192,7 +194,11 @@ export function PreviewBanner({ path, memberId }: { path: string; memberId?: str
         <KeyRound size={15} className="shrink-0 text-ink-3" aria-hidden />
         <span className="text-ink">{canAct ? 'Acting under grant' : 'Grant'} <span className="num">{grant!.ref}</span></span>
         · {scopeLabel(grant!)} · <span className="num">{fmtDuration((grant!.expiresAt ?? now) - now)}</span> left
-        {canAct ? ' · every action audited' : <> · you can act on {grant!.memberName ?? grant!.memberId}’s record only, so every other write here is switched off</>}
+        {canAct
+          ? ' · every action audited'
+          : grant!.scope === ASSIGNED_MEMBERS
+            ? <> · you can act on the records of your <span className="num">{covered}</span> assigned members only{memberId ? ', and this member is not one of them' : ', one by one'}, so every other write here is switched off</>
+            : <> · you can act on {grant!.memberName ?? grant!.memberId}’s record only, so every other write here is switched off</>}
       </p>
     )
   }

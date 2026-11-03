@@ -630,6 +630,52 @@ export const JOURNEY = {
   declResign: { en: 'Sign again', ta: 'மீண்டும் கையொப்பமிடு', hi: 'फिर से हस्ताक्षर करें' },
   declFoot: { en: 'Your lowest term comes from the Index taken at {name}. Your Day-{d} measure says whether it rose.', ta: 'உங்கள் மிகக் குறைந்த கூறு {name} இல் எடுத்த குறியீட்டிலிருந்து வருகிறது. அது உயர்ந்ததா என்பதை உங்கள் நாள்-{d} அளவீடு சொல்லும்.', hi: 'आपका सबसे कम पहलू {name} में लिए गए इंडेक्स से है। यह बढ़ा या नहीं, आपका दिन-{d} माप बताएगा।' },
 
+  // Joyspan 2027 · the invitation, letterpress on cotton (Playbook p61)
+  invTitle: { en: 'Your invitation', ta: 'உங்கள் அழைப்பிதழ்', hi: 'आपका निमंत्रण' },
+  invEyebrow: { en: 'An invitation', ta: 'ஓர் அழைப்பு', hi: 'एक निमंत्रण' },
+  invText: { en: '{names} are invited to begin the year with joy.', ta: '{names} புத்தாண்டை மகிழ்ச்சியுடன் தொடங்க அழைக்கப்படுகிறார்கள்.', hi: '{names} को नए साल की शुरुआत खुशी के साथ करने के लिए आमंत्रित किया जाता है।' },
+  invAria: { en: 'Invitation to {name}', ta: '{name} க்கான அழைப்பிதழ்', hi: '{name} का निमंत्रण' },
+  invBody: { en: 'The card your household was invited with to {name}, addressed to the two of you. Print it to keep.', ta: '{name} க்கு உங்கள் குடும்பம் அழைக்கப்பட்ட அட்டை, உங்கள் இருவருக்கும் முகவரியிடப்பட்டது. வைத்துக்கொள்ள அச்சிடுங்கள்.', hi: 'वह कार्ड जिससे आपके परिवार को {name} में बुलाया गया था, आप दोनों के नाम। रखने के लिए प्रिंट करें।' },
+  invPrint: { en: 'Print the invitation', ta: 'அழைப்பிதழை அச்சிடு', hi: 'निमंत्रण प्रिंट करें' },
+
+  // Delegate badge on an event pass (Playbook p61): name large, consent as a word
+  passView: { en: 'Pass', ta: 'பாஸ்', hi: 'पास' },
+  badgeView: { en: 'Badge', ta: 'பேட்ஜ்', hi: 'बैज' },
+  badgeFor: { en: 'Delegate badge for {name}', ta: '{name} க்கான பிரதிநிதி பேட்ஜ்', hi: '{name} के लिए प्रतिनिधि बैज' },
+  badgeShow: { en: 'Show the badge for {name}', ta: '{name} க்கான பேட்ஜைக் காட்டு', hi: '{name} का बैज दिखाएँ' },
+  badgeWho: { en: 'Member · {city}', ta: 'உறுப்பினர் · {city}', hi: 'सदस्य · {city}' },
+  bProgramme: { en: 'Programme', ta: 'நிகழ்ச்சி', hi: 'कार्यक्रम' },
+  bTable: { en: 'Table', ta: 'மேசை', hi: 'टेबल' },
+  bSeat: { en: 'Seat', ta: 'இருக்கை', hi: 'सीट' },
+  bPhoto: { en: 'Photography', ta: 'புகைப்படம்', hi: 'फ़ोटोग्राफ़ी' },
+  bDiet: { en: 'Diet', ta: 'உணவு', hi: 'खान-पान' },
+  photoYes: { en: 'Yes, with consent', ta: 'ஆம், ஒப்புதலுடன்', hi: 'हाँ, सहमति से' },
+  photoNo: { en: 'No, please', ta: 'வேண்டாம்', hi: 'नहीं, कृपया' },
+  notGiven: { en: 'Not given yet', ta: 'இன்னும் தரப்படவில்லை', hi: 'अभी नहीं बताया' },
+  diet_veg: { en: 'Vegetarian', ta: 'சைவம்', hi: 'शाकाहारी' },
+  diet_vegan: { en: 'Vegan', ta: 'வீகன்', hi: 'वीगन' },
+  diet_jain: { en: 'Jain', ta: 'ஜைன உணவு', hi: 'जैन' },
+  diet_egg: { en: 'Vegetarian with egg', ta: 'முட்டையுடன் சைவம்', hi: 'अंडे के साथ शाकाहारी' },
+  diet_nonveg: { en: 'Non-vegetarian', ta: 'அசைவம்', hi: 'मांसाहारी' },
+  diet_none: { en: 'No restrictions', ta: 'கட்டுப்பாடு இல்லை', hi: 'कोई परहेज़ नहीं' },
+  badgeHint: { en: 'Your answers print on every event badge and stay on this device. Photography is written as a word, so the team can read it at a glance.', ta: 'உங்கள் பதில்கள் ஒவ்வொரு நிகழ்வுப் பேட்ஜிலும் அச்சாகும்; இந்தச் சாதனத்திலேயே இருக்கும். குழு ஒரு பார்வையில் படிக்க, புகைப்பட ஒப்புதல் ஒரு சொல்லாக எழுதப்படுகிறது.', hi: 'आपके जवाब हर इवेंट बैज पर छपते हैं और इसी डिवाइस पर रहते हैं। फ़ोटोग्राफ़ी एक शब्द में लिखी जाती है, ताकि टीम एक नज़र में पढ़ ले।' },
+  photoLegend: { en: 'May the event team photograph you?', ta: 'நிகழ்வுக் குழு உங்களைப் புகைப்படம் எடுக்கலாமா?', hi: 'क्या इवेंट टीम आपकी फ़ोटो ले सकती है?' },
+  badgeDietLabel: { en: 'Your diet', ta: 'உங்கள் உணவு முறை', hi: 'आपका खान-पान' },
+  dietChoose: { en: 'Choose…', ta: 'தேர்ந்தெடுங்கள்…', hi: 'चुनें…' },
+  badgePrint: { en: 'Print the badge', ta: 'பேட்ஜை அச்சிடு', hi: 'बैज प्रिंट करें' },
+
+  // The Practice register: a verse of the Thirukkural, in Tamil with the English beneath (Playbook p63)
+  verseEyebrow: { en: 'Thirukkural · kural {n}', ta: 'திருக்குறள் · குறள் {n}', hi: 'तिरुक्कुरल · कुरल {n}' },
+  verseBy: { en: 'Thiruvalluvar', ta: 'திருவள்ளுவர்', hi: 'तिरुवल्लुवर' },
+  verseBook: { en: 'The Book of Virtue · On the strength of virtue', ta: 'அறத்துப்பால் · அறன் வலியுறுத்தல்', hi: 'धर्म का खंड · धर्म की महिमा' },
+
+  // Minors are never scored (Architecture p26): in place of the Index on journey screens
+  minorPractice: { en: 'The Practice is yours in full. Your Index is not taken while you are under 18, so there is no before and after to show here.', ta: 'பயிற்சி முழுவதும் உங்களுடையது. 18 வயது ஆகும் வரை உங்கள் குறியீடு எடுக்கப்படுவதில்லை; அதனால் இங்கே காட்ட முன்னும் பின்னும் இல்லை.', hi: 'अभ्यास पूरी तरह आपका है। 18 साल का होने तक आपका इंडेक्स नहीं लिया जाता, इसलिए यहाँ दिखाने को पहले और बाद नहीं है।' },
+  minorWeek8Eyebrow: { en: 'After the eight weeks · the next ninety days', ta: 'எட்டு வாரங்களுக்குப் பிறகு · அடுத்த தொண்ணூறு நாட்கள்', hi: 'आठ हफ़्तों के बाद · अगले नब्बे दिन' },
+  minorWeek8: { en: 'At the end of the eight weeks, choose one thing for the next ninety days with {c}.', ta: 'எட்டு வாரங்களின் முடிவில், {c} உடன் அடுத்த தொண்ணூறு நாட்களுக்கு ஒன்றைத் தேர்ந்தெடுங்கள்.', hi: 'आठ हफ़्तों के अंत में {c} के साथ अगले नब्बे दिनों के लिए एक चीज़ चुनें।' },
+  minorCard: { en: 'Not scored while under 18', ta: '18 வயது ஆகும் வரை மதிப்பெண் இல்லை', hi: '18 साल का होने तक कोई स्कोर नहीं' },
+  noneBodyMinor: { en: '{cation} is made for {lowest}: {promise} It ends with a Day-90 conversation, not a souvenir.', ta: '{cation} {lowest} க்காகவே உருவானது: {promise} அது நினைவுப் பொருளோடு அல்ல, நாள் 90 உரையாடலோடு முடிகிறது.', hi: '{cation} {lowest} के लिए बना है: {promise} यह किसी यादगार चीज़ पर नहीं, दिन 90 की बातचीत पर खत्म होता है।' },
+
   // ’Cation detail · the venue's published itinerary (C11)
   itinFromVenue: { en: 'From {venue}', ta: '{venue} இடமிருந்து', hi: '{venue} से' },
   itinTemplate: { en: 'The template', ta: 'மாதிரித் திட்டம்', hi: 'मूल ढाँचा' },
