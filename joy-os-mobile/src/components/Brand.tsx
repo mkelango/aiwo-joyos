@@ -1,24 +1,23 @@
 import { router } from 'expo-router'
 import type { ReactNode } from 'react'
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, View } from 'react-native'
 import { NOTICES } from '../screens/b/_data'
 import { notifReadStore, useStore } from '../screens/b/bStore'
 import { useDict } from '../lib/i18n'
 import { useTheme } from '../theme/ThemeProvider'
 import { KIT } from './_i18n'
 import { Icon } from './Icon'
-import { Eyebrow } from './Text'
+import { Eyebrow, Meta } from './Text'
+import { TENANT } from './tenant'
+import { Wordmark } from './Wordmark'
 
 // AIWO is a branded house: Joy OS never has its own logo. It is a line of type beside the
 // mark, mono caps, +240 tracking (Playbook p20–27). App bar: wordmark left, "JOY OS" right (p62).
+// The wordmark is the drawn vector artwork (Wordmark.tsx), never set in a font (p20).
 
+/** The AIWO wordmark. `size` is the old type size it replaces: the drawn cap height is 0.72 of it. */
 export function AiwoMark({ size = 20, color }: { size?: number; color?: string }) {
-  const { c, fonts } = useTheme()
-  return (
-    <Text accessibilityLabel="AIWO" maxFontSizeMultiplier={1.3} style={{ fontFamily: fonts.sansLight, fontSize: size, letterSpacing: size * 0.18, color: color ?? c.ink }}>
-      A\WO
-    </Text>
-  )
+  return <Wordmark height={size * 0.72} color={color} />
 }
 
 /** The app bar used on Today and other tab roots. */
@@ -27,9 +26,17 @@ export function AppBar({ right, label = 'Joy OS' }: { right?: ReactNode; label?:
   const t = useDict(KIT)
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.gutter, minHeight: 52, width: '100%', maxWidth: 640, alignSelf: 'center' }}>
-      <Pressable onPress={() => router.navigate('/')} accessibilityRole="link" accessibilityLabel={t('appBarHome', { label })} hitSlop={8}>
-        <AiwoMark />
-      </Pressable>
+      <View style={{ flexShrink: 1, gap: 2, paddingVertical: 6 }}>
+        <Pressable onPress={() => router.navigate('/')} accessibilityRole="link" accessibilityLabel={t('appBarHome', { label })} hitSlop={8} style={{ alignSelf: 'flex-start' }}>
+          <AiwoMark />
+        </Pressable>
+        {/* The tenant's line of type under the mark (Architecture p24); none when empty. */}
+        {TENANT.tagline ? (
+          <Meta size={12} tone="ink3" numberOfLines={1} style={{ maxWidth: 200 }}>
+            {TENANT.tagline}
+          </Meta>
+        ) : null}
+      </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1, flexShrink: 1, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
         {right}
         <NotificationsBell />

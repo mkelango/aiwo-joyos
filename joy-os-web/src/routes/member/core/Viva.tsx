@@ -5,7 +5,8 @@ import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } fr
 import { Link, useSearchParams } from 'react-router-dom'
 import { DaybreakButton, Eyebrow, TermDot } from '@/components/joy/primitives'
 import { Avatar, Button, Card, PageHeader, Pill, SectionTitle } from '@/components/ui'
-import { INDEX_HISTORY, MEMBER, TEAM, TODAY_ACTION } from '@/data/member'
+import { INDEX_HISTORY, TEAM, TODAY_ACTION } from '@/data/member'
+import { useMemberName } from '@/lib/memberName'
 import { CIRCLE, PRACTICE_WEEKS } from '@/data/platform'
 import { joyspanIndex } from '@/domain/indexEngine'
 import type { TermKey } from '@/domain/types'
@@ -63,6 +64,7 @@ export default function Viva() {
   const { setCrisisOpen } = useApp()
   const core = useCore()
   const { t: c, space, pick } = core
+  const who = useMemberName()
   const band = useBandText()
   const inputId = useId()
   const [params, setParams] = useSearchParams()
@@ -232,7 +234,7 @@ export default function Viva() {
               </div>
             )}
             <div ref={scroller} className="flex-1 space-y-4 overflow-y-auto px-4 py-5 md:px-6" aria-live="polite">
-              {msgs.map((m) => <Bubble key={m.id} m={m.id === 'hello' ? { ...m, text: c('vvGreeting', { greet: c(greeting()), name: MEMBER.firstName }) } : m} onAdd={addMsg} />)}
+              {msgs.map((m) => <Bubble key={m.id} m={m.id === 'hello' ? { ...m, text: c('vvGreeting', { greet: c(greeting()), name: who.firstName }) } : m} onAdd={addMsg} />)}
               <AnimatePresence>
                 {typing && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2 text-[13px] text-ink-3">

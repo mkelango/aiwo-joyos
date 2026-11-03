@@ -1,24 +1,27 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowRight, CalendarHeart, Check, Clock, MapPin, Plus, QrCode, Star, Ticket } from 'lucide-react'
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { ArrowRight, CalendarHeart, Check, Clock, MapPin, Plus, Printer, QrCode, Star, Ticket } from 'lucide-react'
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
+import { AiwoMark } from '@/components/joy/Brand'
 import { BandLabel, DaybreakButton, Eyebrow, MethodLine, SpecimenTag, TermChip, TermDot, useFmtDate } from '@/components/joy/primitives'
-import { Button, Card, EmptyState, LoopRing, PageHeader, Pill, SectionTitle, Sheet, Tabs } from '@/components/ui'
+import { Button, Card, LoopRing, PageHeader, Pill, SectionTitle, Sheet, Tabs } from '@/components/ui'
 import { CIRCLE, COHORTS, EVENTS } from '@/data/platform'
 import { HOUSEHOLD, INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
-import { FLAGSHIP_NEXT, FLAGSHIP_RECAP, PASSES, SALONS, SESSIONS_ALLOWANCE, SESSIONS_OPEN, SESSION_SCHEDULE, ZONES } from './_data'
-import { OccasionsCard, QRCode, SheetFocus, fade } from './_parts'
+import { useMemberName } from '@/lib/memberName'
+import { FLAGSHIP_NEXT, FLAGSHIP_RECAP, NYE_PROGRAMME, PASSES, SALONS, SESSIONS_ALLOWANCE, SESSIONS_OPEN, SESSION_SCHEDULE, ZONES } from './_data'
+import { JourneyEmpty, OccasionsCard, PrintOnly, QRCode, SheetFocus, fade, printOnly } from './_parts'
 // One shared emergency intercept for every member free-text field (Memo p.24).
 import { useCrisisGuard } from '@/routes/member/spaces/_SpaceShell'
-import { addPass, cancelPass, holderName, passCode, setFlagshipRequest, setSalon, setSchedule, useJourney } from './_store'
+import { addPass, cancelPass, isoDate, passCode, setFlagshipRequest, setSalon, setSchedule, signDeclaration, useJourney } from './_store'
 import { useJ, type JourneyKey } from './_i18n'
 
 // EVENTS (Memo p.21): the Joyspan Event Platform — AIWO Joyspan at New Year,
 // Joyspan Sessions, Connections salons, passes, personal schedules and
 // Experience Zones by term colour. Every guest leaves with an Index and a
-// Day-90 date. One Daybreak: book a Session.
+// Day-90 date. New Year's Eve ends with the Declaration at 23:50 and the
+// Declaration card the member signs (Playbook p61). One Daybreak: book a Session.
 
 const CONCIERGE = TEAM.find((p) => p.role === 'Concierge')!.name.split(' ')[0]
 const PARTNER = HOUSEHOLD.find((p) => p.role === 'Partner')!.name.split(' ')[0]
@@ -28,6 +31,7 @@ interface PassView { id: string; name: string; when: string; where: string; kind
 export default function Events() {
   const latest = INDEX_HISTORY[0]
   const journey = useJourney()
+  const me = useMemberName()
   const [passTab, setPassTab] = useState<'upcoming' | 'past'>('upcoming')
   const [openPass, setOpenPass] = useState<string | null>(null)
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null)
@@ -51,7 +55,7 @@ export default function Events() {
   const allPasses: PassView[] = [
     ...PASSES.map((p) => {
       const ev = EVENTS.find((e) => e.id === p.id)!
-      return { ...p, name: ev.name, when: ev.when, where: ev.where, kind: ev.kind, mine: false }
+      return { ...p, holder: me.fullName, name: ev.name, when: ev.when, where: ev.where, kind: ev.kind, mine: false }
     }),
     ...journey.passes.map((p) => ({ ...p, status: 'Valid' as const, mine: true })),
   ]
@@ -161,7 +165,7 @@ export default function Events() {
           <Tabs value={view} onChange={setView} items={[{ value: 'mine', label: t('tabMine') }, { value: 'all', label: t('tabFull') }]} />
         </div>
         {schedule.length === 0 ? (
-          <EmptyState title={t('emptySchedTitle')} body={t('emptySchedBody')} action={<Button variant="secondary" onClick={() => setView('all')}>{t('seeFull')}</Button>} />
+          <JourneyEmpty kind="generic" title={t('emptySchedTitle')} body={t('emptySchedBody')} action={<Button variant="secondary" onClick={() => setView('all')}>{t('seeFull')}</Button>} />
         ) : (
           <Card tone="outline" className="p-0 md:p-0">
             <ol ref={schedRef} className="divide-y divide-line">
@@ -248,6 +252,9 @@ export default function Events() {
         </div>
       </section>
 
+      {/* New Year's Eve: the Declaration at 23:50 and the card */}
+      <NewYearsEve />
+
       {/* Upcoming at AIWO */}
       <UpcomingAtAiwo />
 
@@ -274,6 +281,131 @@ export default function Events() {
   )
 }
 
+/** Digits in running text set in Mono, the rest left as it is. */
+const monoDigits = (s: string): ReactNode => s.split(/(\d+)/).map((p, i) => (/^\d+$/.test(p) ? <span key={i} className="num">{p}</span> : p))
+
+const DECL_ID = 'declaration-card'
+
+function NewYearsEve() {
+  const id = useId()
+  const journey = useJourney()
+  const me = useMemberName()
+  const { t, r, tx, term } = useJ()
+  const fmtDate = useFmtDate()
+  const flagship = EVENTS.find((e) => e.kind === 'Flagship')!
+  const lowest = INDEX_HISTORY[0].lowestTerm
+  const declTime = NYE_PROGRAMME.find((p) => p.declaration)!.time
+  const signed = journey.declaration
+  const [name, setName] = useState('')
+  const [err, setErr] = useState(false)
+  const [justSigned, setJustSigned] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const statusRef = useRef<HTMLParagraphElement>(null)
+
+  const sign = (e: FormEvent) => {
+    e.preventDefault()
+    const v = name.trim().replace(/\s+/g, ' ')
+    if (!v) { setErr(true); inputRef.current?.focus(); return }
+    setErr(false)
+    signDeclaration(v)
+    setJustSigned(true)
+    setName('')
+    window.setTimeout(() => statusRef.current?.focus(), 0)
+  }
+  const signAgain = () => {
+    signDeclaration(null)
+    setJustSigned(false)
+    window.setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
+  return (
+    <section id="declaration" className="mt-12 scroll-mt-24" aria-labelledby={`${id}-h`}>
+      <PrintOnly id={DECL_ID} />
+      <SectionTitle aside={<span className="text-[13px] text-ink-3"><span className="num">{fmtDate('2026-12-31')}</span> · {tx(flagship.where)}</span>}><span id={`${id}-h`}>{t('nyeTitle')}</span></SectionTitle>
+      <div className="grid gap-6 lg:grid-cols-[1fr_1.05fr]">
+        {/* The programme */}
+        <Card tone="outline">
+          <p className="text-[16px] text-ink-2">{r('nyeLead', { y: 2026 })}</p>
+          <ol className="mt-4 divide-y divide-line">
+            {NYE_PROGRAMME.map((p) => (
+              <li key={p.time} className={clsx('grid grid-cols-[3.75rem_1fr] gap-3 py-3', p.declaration && '-mx-3 rounded-card bg-daybreak-soft px-3')}>
+                <span className={clsx('num pt-0.5 text-[15px]', p.declaration ? 'text-daybreak-ink' : 'text-ink-2')}>{p.time}</span>
+                <div className="min-w-0">
+                  <p className="text-[16px] text-ink">{monoDigits(tx(p.title))}</p>
+                  <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[13px] text-ink-3">
+                    <span>{tx(p.where)}</span>
+                    {p.term && <span className="inline-flex items-center gap-1.5 text-ink-2"><TermDot term={p.term} /> {term.name(p.term)}</span>}
+                    {p.declaration && <a href={`#${DECL_ID}`} className="inline-flex items-center gap-1 text-daybreak-ink underline-offset-4 hover:underline focus-ring">{t('nyeYourCard')} <ArrowRight size={13} /></a>}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </Card>
+
+        {/* The Declaration card: on screen, and printable on its own */}
+        <div className="min-w-0">
+          <article id={DECL_ID} aria-label={t('declCardAria')} className="scroll-mt-24">
+            <div
+              className="relative flex min-h-[19rem] flex-col overflow-hidden rounded-[18px] p-6 text-[color:var(--aiwo-stone)] shadow-card md:p-8"
+              style={{ background: 'var(--aiwo-daybreak-deep)', printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <p className="eyebrow opacity-80">{r('declEyebrow', { time: { n: declTime } })}</p>
+                <AiwoMark size={15} className="!text-[color:var(--aiwo-stone)] opacity-80" />
+              </div>
+              <p className="mt-5 font-serif text-[1.65rem] font-light italic leading-snug md:text-[1.9rem]">{r('declText', { y: 2027 })}</p>
+              <p className="mt-4 text-[15px] opacity-90">{r('declLowest', { term: <span className="font-medium">{term.name(lowest)}</span> })}</p>
+              <div className="mt-auto pt-8">
+                <div className="flex items-end gap-3">
+                  <span className="eyebrow shrink-0 pb-1.5 opacity-80">{t('declSigned')}</span>
+                  <span className="min-h-[2.4rem] min-w-0 flex-1 break-words border-b border-[color:color-mix(in_srgb,var(--aiwo-stone)_60%,transparent)] pb-1 font-serif text-[1.5rem] italic leading-tight">{signed?.name ?? ''}</span>
+                </div>
+                {signed && <p className="mt-2 text-[12px] opacity-80">{r('declSignedOn', { d: { n: fmtDate(isoDate(new Date(signed.signedAt))) } })}</p>}
+              </div>
+            </div>
+          </article>
+
+          {signed ? (
+            <div className="mt-4 space-y-3">
+              <p ref={statusRef} tabIndex={-1} role="status" className="flex items-start gap-2 text-[15px] text-ink outline-none"><Check size={16} className="mt-0.5 shrink-0" /> {justSigned ? t('declDone') : r('declSignedOn', { d: { n: fmtDate(isoDate(new Date(signed.signedAt))) } })}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="secondary" onClick={() => printOnly(DECL_ID)}><Printer size={15} /> {t('declPrint')}</Button>
+                <Button variant="link" className="text-[14px]" onClick={signAgain}>{t('declResign')}</Button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={sign} noValidate className="mt-4 space-y-3">
+              <div>
+                <label htmlFor={`${id}-sig`} className="text-[15px] text-ink">{t('declSignLabel')}</label>
+                <input
+                  ref={inputRef}
+                  id={`${id}-sig`}
+                  value={name}
+                  onChange={(e) => { setName(e.target.value); setErr(false) }}
+                  maxLength={60}
+                  autoComplete="name"
+                  placeholder={me.fullName}
+                  aria-invalid={err || undefined}
+                  aria-describedby={`${id}-sig-hint${err ? ` ${id}-sig-err` : ''}`}
+                  className="mt-2 h-11 w-full rounded-full border border-line-strong bg-paper-raised px-4 font-serif text-[17px] italic text-ink placeholder:text-ink-3 focus-ring"
+                />
+                <p id={`${id}-sig-hint`} className="mt-1.5 text-[13px] text-ink-3">{t('declSignHint')}</p>
+                {err && <p id={`${id}-sig-err`} className="mt-1 text-[13px] text-error" role="alert">{t('declErr')}</p>}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="ink" type="submit">{t('declSignBtn')}</Button>
+                <Button variant="ghost" onClick={() => printOnly(DECL_ID)}><Printer size={15} /> {t('declPrint')}</Button>
+              </div>
+            </form>
+          )}
+          <p className="mt-4 text-[13px] text-ink-3">{r('declFoot', { name: flagship.name, d: 90 })}</p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function UpcomingAtAiwo() {
   const id = useId()
   const journey = useJourney()
@@ -284,6 +416,7 @@ function UpcomingAtAiwo() {
   const guard = useCrisisGuard()
   const req = journey.flagshipRequest
   const { t, r, tx, term } = useJ()
+  const me = useMemberName()
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -363,7 +496,7 @@ function UpcomingAtAiwo() {
                   {seats ? (
                     <span className="flex items-center gap-1.5 text-[14px] text-ink" role="status"><Check size={14} /> {r('bookedFor', { n: seats })}</span>
                   ) : (
-                    <Button variant="secondary" size="sm" onClick={() => setSalon(s.id, 1, { id: s.id, name: `Connections salon · ${s.title}`, when: s.when, where: s.where, kind: 'Salon', code: `CS-${s.id.toUpperCase()}-${MEMBER.id.slice(-4)}`, gate: 'Host at the door', seat: 'One place', holder: holderName, guests: 1 })}>{t('bookForOne')}</Button>
+                    <Button variant="secondary" size="sm" onClick={() => setSalon(s.id, 1, { id: s.id, name: `Connections salon · ${s.title}`, when: s.when, where: s.where, kind: 'Salon', code: `CS-${s.id.toUpperCase()}-${MEMBER.id.slice(-4)}`, gate: 'Host at the door', seat: 'One place', holder: me.fullName, guests: 1 })}>{t('bookForOne')}</Button>
                   )}
                 </li>
               )
@@ -384,6 +517,7 @@ function SessionBooking({ onShowPass }: { onShowPass: (id: string) => void }) {
   const [check, setCheck] = useState(true)
   const [err, setErr] = useState<'' | JourneyKey>('')
   const { t, r, tx } = useJ()
+  const me = useMemberName()
   const [done, setDone] = useState<string | null>(null)
   const chosen = SESSIONS_OPEN.find((s) => s.id === (done ?? pick))
   const bookedIds = new Set(journey.passes.map((p) => p.id))
@@ -398,7 +532,7 @@ function SessionBooking({ onShowPass }: { onShowPass: (id: string) => void }) {
     if (left <= 0) { setErr('errAllBooked'); return }
     const s = SESSIONS_OPEN.find((x) => x.id === pick)!
     setErr('')
-    addPass({ id: s.id, name: `Joyspan Session · ${s.city}`, when: s.when, where: s.where, kind: 'Session', code: passCode('JS', s.city), gate: 'Main entrance', seat: guests === '2' ? 'Open seating · two' : 'Open seating', holder: holderName, guests: Number(guests) })
+    addPass({ id: s.id, name: `Joyspan Session · ${s.city}`, when: s.when, where: s.where, kind: 'Session', code: passCode('JS', s.city), gate: 'Main entrance', seat: guests === '2' ? 'Open seating · two' : 'Open seating', holder: me.fullName, guests: Number(guests) })
     setDone(s.id)
   }
 

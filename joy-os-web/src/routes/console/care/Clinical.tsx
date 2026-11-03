@@ -12,8 +12,9 @@ import {
   CLINICAL_RECORDS, CLOSE_OUTCOMES, EXTRA_FORMULARY, EXTRA_INTERACTIONS, FORMULARY, MD_CONFIG, MEERA, MEMBER_IDS, RETURN_REASONS, SCREEN_ROUTES, SCREEN_ROUTE_OWNER,
   type SafetyAlert,
 } from './_data'
-import { clinical, recordOf, stampOf, useClinicalState, type ClinicalAudit, type Draft, type MdActive, type MdHistory, type Order, type Screen, type RemeasureWork, type Sent, type SignItem, type SoapNote } from './_clinicalStore'
+import { REDRAW, clinical, recordOf, stampOf, useClinicalState, type ClinicalAudit, type Draft, type MdActive, type MdHistory, type Order, type Screen, type RemeasureWork, type Sent, type SignItem, type SoapNote } from './_clinicalStore'
 import { PreviewBanner, useConsoleAccess } from './_gate'
+import { recordSessionRead } from './_memberShare'
 import { CLINICAL_PURPOSES, ReasonGate } from './_purpose'
 import { remeasure, useRemeasure, type Remeasure } from './_remeasure'
 import { AccessNote, CardHead, Kpi, PriorityTag, ScrollTabs, SlaChip, areaCls, fieldCls, fmtClock, fmtDuration, fmtOpened, labelCls, parseIst, useConsoleNow, useTabParam } from './_parts'
@@ -59,6 +60,9 @@ function remeasureItem(rm: Remeasure, work: RemeasureWork): SignItem | null {
 
 const NAME_OF: Record<string, string> = Object.fromEntries(Object.entries(MEMBER_IDS).map(([n, id]) => [id, n]))
 
+/** Whether the signed-in role may act on one member's record (a grant may cover one member only). */
+type CanActOn = (memberId?: string | null) => boolean
+
 /** Writes one line to the clinical audit. */
 type Log = (e: { what: string; purpose: string; kind?: ClinicalAudit['kind']; memberId?: string; member?: string }) => void
 
@@ -70,17 +74,29 @@ function makeLog(acc: ReturnType<typeof useConsoleAccess>): Log {
   return (e) => {
     const memberId = e.memberId ?? (e.member ? MEMBER_IDS[e.member] : undefined)
     const member = e.member ?? (memberId ? CLINICAL_RECORDS[memberId]?.name ?? NAME_OF[memberId] : undefined)
-    clinical.log({
-      who: acc.chosen ? acc.person : 'No console role · preview',
-      role: acc.chosen ? acc.roleLabel : 'Preview',
-      what: e.what,
-      purpose: acc.grant ? `${e.purpose} · under ${acc.grant.ref}` : e.purpose,
-      kind: e.kind ?? 'action',
-      memberId,
-      member,
-    })
+    const who = acc.chosen ? acc.person : 'No console role · preview'
+    const role = acc.chosen ? acc.roleLabel : 'Preview'
+    const purpose = acc.grant ? `${e.purpose} · under ${acc.grant.ref}` : e.purpose
+    clinical.log({ who, role, what: e.what, purpose, kind: e.kind ?? 'action', memberId, member })
+    // A read of a member's record reaches their "Who has seen my data", with the reason.
+    if (e.kind === 'read' && memberId) {
+      recordSessionRead({ who, role, console: 'clinical', reason: purpose, memberId })
+    }
   }
 }
+
+/**
+ * Who signs, annotates or reviews here: the signed-in demo person, so a stamp names whoever
+ * acted under their grant (as the audit line does). The portal's own physician stands in only
+ * for the view-only preview, which cannot act.
+ */
+function useSigner() {
+  const acc = useConsoleAccess('/console/clinical')
+  return acc.chosen ? acc.person : MEERA.name
+}
+
+/** "Signed · Dr Meera Iyer · 21:04" → "Dr Meera Iyer". */
+const signerOf = (signed: string) => signed.split(' · ')[1] ?? signed
 
 /** A member's name as a link into their record (raw values live here only). */
 function MemberLink({ name, onOpen }: { name: string; onOpen: (id: string) => void }) {
@@ -96,7 +112,9 @@ function MemberLink({ name, onOpen }: { name: string; onOpen: (id: string) => vo
 export default function Clinical() {
   const now = useConsoleNow()
   const acc = useConsoleAccess('/console/clinical')
-  const { canAct } = acc
+  // canAct is the portal as a whole (the Medical Director config, a reset); canActOn answers for
+  // one member's record, so a one-named-member grant acts on that member and nobody else.
+  const { canAct, canActOn } = acc
   const log = makeLog(acc)
   const [tab, setTab] = useTabParam(TABS, 'safety')
   const [params, setParams] = useSearchParams()
@@ -134,7 +152,7 @@ export default function Clinical() {
     const r = rmItem ? next.find((x) => x.id === RM_ID) : undefined
     if (rmItem && r) {
       // Signing writes the signed state back to the member's own record.
-      if (r.signed && !rmItem.signed) remeasure.sign(MEERA.name, now, joyspanIndex(rm.terms, rm.method)?.value ?? null)
+      if (r.signed && !rmItem.signed) remeasure.sign(signerOf(r.signed), now, joyspanIndex(rm.terms, rm.method)?.value ?? null)
       if (r.notes !== rmItem.notes || r.returned !== rmItem.returned) clinical.setRemeasure({ notes: r.notes, returned: r.returned })
     }
     clinical.setSignoffs(() => next.filter((x) => x.id !== RM_ID))
@@ -155,7 +173,7 @@ export default function Clinical() {
 
   const ack = (id: string) => {
     const a = alerts.find((x) => x.id === id)
-    if (!canAct || !a || a.status !== 'open') return
+    if (!a || !canActOn(a.memberId) || a.status !== 'open') return
     setAlerts((xs) => xs.map((x) => (x.id === id ? { ...x, status: 'acknowledged', ackAt: new Date(now).toISOString() } : x)))
     const ms = now - +new Date(a.openedAt)
     log({ what: `Acknowledged ${a.priority} · ${a.kind} · reached in ${fmtDuration(ms)}${ms > a.slaMinutes * 60000 ? ' (after SLA)' : ''}`, purpose: 'Safety · first contact', memberId: a.memberId })
@@ -178,7 +196,7 @@ export default function Clinical() {
         }
       />
 
-      <PreviewBanner path="/console/clinical" />
+      <PreviewBanner path="/console/clinical" memberId={tab === 'member' ? memberId : null} />
 
       <AccessNote className="mb-6">
         <span className="text-ink">Raw clinical values are visible in this portal only.</span> Every read and every action is written to the audit with your role and purpose; see it under Audit. Coaches see term scores and bands; venues and tenants see none of this.
@@ -202,7 +220,7 @@ export default function Clinical() {
                 </div>
               </div>
               <div className="flex shrink-0 flex-col items-start gap-2 lg:items-end">
-                <DaybreakButton onClick={() => ack(openP0.id)} disabled={!canAct}><Phone size={18} aria-hidden /> Acknowledge · calling now</DaybreakButton>
+                <DaybreakButton onClick={() => ack(openP0.id)} disabled={!canActOn(openP0.memberId)}><Phone size={18} aria-hidden /> Acknowledge · calling now</DaybreakButton>
                 <span className="text-[12px] text-ink-3">Stops the reach clock; the task stays open until closed with an outcome.</span>
               </div>
             </div>
@@ -239,17 +257,17 @@ export default function Clinical() {
       </div>
 
       <div className="mt-6">
-        {tab === 'safety' && <SafetyBoard alerts={alerts} setAlerts={setAlerts} now={now} onAck={ack} onOpen={openMember} canAct={canAct} p0Minutes={md.values.p0} log={log} />}
-        {tab === 'screens' && <ScreenQueue screens={screens} setScreens={setScreens} setAlerts={setAlerts} alerts={alerts} now={now} onOpen={openMember} canAct={canAct} md={md} log={log} />}
+        {tab === 'safety' && <SafetyBoard alerts={alerts} setAlerts={setAlerts} now={now} onAck={ack} onOpen={openMember} canActOn={canActOn} p0Minutes={md.values.p0} log={log} />}
+        {tab === 'screens' && <ScreenQueue screens={screens} setScreens={setScreens} setAlerts={setAlerts} alerts={alerts} now={now} onOpen={openMember} canActOn={canActOn} md={md} log={log} />}
         {tab === 'signoff' && <RemeasureNote rm={rm} />}
-        {tab === 'signoff' && <SignOff key={rmItem ? 'with-rm' : 'queue'} items={signoffs} setItems={setSignoffs} now={now} onOpen={openMember} canAct={canAct} log={log} />}
+        {tab === 'signoff' && <SignOff key={rmItem ? 'with-rm' : 'queue'} items={signoffs} setItems={setSignoffs} now={now} onOpen={openMember} canActOn={canActOn} log={log} />}
         {tab === 'member' && (
           <MemberRecord
             key={memberId}
             memberId={memberId}
             setMember={setMember}
             now={now}
-            canAct={canAct}
+            canAct={canActOn(memberId)}
             alerts={alerts}
             log={log}
             audit={audit}
@@ -260,7 +278,7 @@ export default function Clinical() {
             suggestedPurpose={alerts.some((a) => a.memberId === memberId && a.status !== 'closed') ? 'Safety alert follow-up' : signoffs.some((x) => x.memberId === memberId && !x.signed && !x.returned) ? 'Clinical-grade sign-off' : 'Results review'}
           />
         )}
-        {tab === 'ai' && <AiReview drafts={drafts} setDrafts={setDrafts} onOpen={openMember} canAct={canAct} log={log} />}
+        {tab === 'ai' && <AiReview drafts={drafts} setDrafts={setDrafts} onOpen={openMember} canActOn={canActOn} log={log} />}
         {/* Kept mounted so a pending proposal or a new version survives a tab switch. */}
         <div hidden={tab !== 'config'}><MedicalDirector canAct={canAct} active={md} history={mdHistory} log={log} /></div>
         {tab === 'audit' && <AuditTrail key={params.get('amember') ?? 'all'} audit={audit} initialMember={params.get('amember') ?? 'all'} onOpen={openMember} />}
@@ -276,20 +294,21 @@ export default function Clinical() {
 
 // ─── Safety board ──────────────────────────────────────────────────────────
 
-function SafetyBoard({ alerts, setAlerts, now, onAck, onOpen, canAct, p0Minutes, log }: { alerts: SafetyAlert[]; setAlerts: (f: (a: SafetyAlert[]) => SafetyAlert[]) => void; now: number; onAck: (id: string) => void; onOpen: (id: string) => void; canAct: boolean; p0Minutes: number; log: Log }) {
+function SafetyBoard({ alerts, setAlerts, now, onAck, onOpen, canActOn, p0Minutes, log }: { alerts: SafetyAlert[]; setAlerts: (f: (a: SafetyAlert[]) => SafetyAlert[]) => void; now: number; onAck: (id: string) => void; onOpen: (id: string) => void; canActOn: CanActOn; p0Minutes: number; log: Log }) {
   const [closing, setClosing] = useState<SafetyAlert | null>(null)
   const [outcome, setOutcome] = useState('')
   const [note, setNote] = useState('')
   const [err, setErr] = useState('')
   const [closedNote, setClosedNote] = useState<string | null>(null)
+  const signer = useSigner()
   // Closed last; then by priority; open before acknowledged; oldest first.
   const sorted = [...alerts].sort((a, b) => (a.status === 'closed' ? 1 : 0) - (b.status === 'closed' ? 1 : 0) || PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || STATUS_RANK[a.status] - STATUS_RANK[b.status] || +new Date(a.openedAt) - +new Date(b.openedAt))
 
   const close = () => {
-    if (!closing || !canAct) return
+    if (!closing || !canActOn(closing.memberId)) return
     if (!outcome) return setErr('Choose the outcome.')
     if (note.trim().length < 10) return setErr('Add a clinical note of at least a sentence.')
-    setAlerts((xs) => xs.map((a) => (a.id === closing.id ? { ...a, status: 'closed', ackAt: a.ackAt ?? new Date(now).toISOString(), outcome: `${outcome}. ${note.trim()} — ${MEERA.name}, ${fmtClock(now)}` } : a)))
+    setAlerts((xs) => xs.map((a) => (a.id === closing.id ? { ...a, status: 'closed', ackAt: a.ackAt ?? new Date(now).toISOString(), outcome: `${outcome}. ${note.trim()} — ${signer}, ${fmtClock(now)}` } : a)))
     log({ what: `Closed ${closing.priority} · ${closing.kind} · outcome: ${outcome.toLowerCase()}${closing.ackAt ? '' : ' (closed at first contact)'}`, purpose: 'Safety · close with outcome', memberId: closing.memberId })
     setClosedNote(`${closing.priority} for ${closing.member} closed and signed at ${fmtClock(now)}. The coach sees that it is closed, not why.`)
     setClosing(null)
@@ -330,8 +349,8 @@ function SafetyBoard({ alerts, setAlerts, now, onAck, onOpen, canAct, p0Minutes,
                   ) : (
                     <SlaChip deadline={deadline} windowMs={a.slaMinutes * 60000} now={now} done={a.status === 'closed'} />
                   )}
-                  {a.status === 'open' && <Button size="sm" variant="secondary" disabled={!canAct} onClick={() => onAck(a.id)}>Acknowledge</Button>}
-                  {a.status !== 'closed' && <Button size="sm" variant="ink" disabled={!canAct} onClick={() => { setClosing(a); setErr('') }}>Close with outcome</Button>}
+                  {a.status === 'open' && <Button size="sm" variant="secondary" disabled={!canActOn(a.memberId)} onClick={() => onAck(a.id)}>Acknowledge</Button>}
+                  {a.status !== 'closed' && <Button size="sm" variant="ink" disabled={!canActOn(a.memberId)} onClick={() => { setClosing(a); setErr('') }}>Close with outcome</Button>}
                   {a.status === 'closed' && reach && <span className="text-[12px] text-ink-3">Reached in <span className="num">{fmtDuration(reach.ms)}</span> · {reach.within ? 'within SLA' : 'after SLA'}</span>}
                 </div>
               </li>
@@ -392,14 +411,14 @@ function SafetyBoard({ alerts, setAlerts, now, onAck, onOpen, canAct, p0Minutes,
 
 // ─── Screen queue ──────────────────────────────────────────────────────────
 
-function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canAct, md, log }: {
+function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canActOn, md, log }: {
   screens: Screen[]
   setScreens: (f: (s: Screen[]) => Screen[]) => void
   alerts: SafetyAlert[]
   setAlerts: (f: (a: SafetyAlert[]) => SafetyAlert[]) => void
   now: number
   onOpen: (id: string) => void
-  canAct: boolean
+  canActOn: CanActOn
   md: MdActive
   log: Log
 }) {
@@ -408,7 +427,7 @@ function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canA
 
   const route = (q: Screen) => {
     const r = choice[q.id]
-    if (!r || !canAct) return
+    if (!r || !canActOn(MEMBER_IDS[q.member])) return
     const owner = SCREEN_ROUTE_OWNER[r] ?? MEERA.name
     const memberId = MEMBER_IDS[q.member] ?? ''
     const existing = alerts.find((a) => a.memberId === memberId && a.status !== 'closed')
@@ -426,7 +445,7 @@ function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canA
     setNotice(`${q.member} routed to ${owner} · ${r}. ${existing ? 'An alert is already open on the safety board.' : `A P1 is now on the safety board with a ${md.values.p1} h clock (config ${md.version}).`}`)
   }
   const undo = (q: Screen) => {
-    if (!canAct) return
+    if (!canActOn(MEMBER_IDS[q.member])) return
     log({ what: `Undid routing of ${q.instrument} ${q.score}/${q.max} (${q.route})${q.alertId ? ' · its P1 withdrawn' : ''}`, purpose: 'Screen-threshold routing', member: q.member })
     setScreens((s) => s.map((x) => (x.id === q.id ? { ...x, route: 'Unassigned', routedAt: undefined, alertId: undefined } : x)))
     if (q.alertId) setAlerts((xs) => xs.filter((a) => a.id !== q.alertId))
@@ -474,16 +493,16 @@ function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canA
                       <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
                         <span className="text-[14px] text-ink">{q.routedAt ? 'Routed · ' : ''}{q.route}</span>
                         {q.routedAt && <span className="num text-[12px] text-ink-3">{q.routedAt}</span>}
-                        {q.routedAt && canAct && <button onClick={() => undo(q)} className="inline-flex items-center gap-1 text-[13px] text-ink underline underline-offset-4 focus-ring"><Undo2 size={12} aria-hidden /> Undo</button>}
+                        {q.routedAt && canActOn(MEMBER_IDS[q.member]) && <button onClick={() => undo(q)} className="inline-flex items-center gap-1 text-[13px] text-ink underline underline-offset-4 focus-ring"><Undo2 size={12} aria-hidden /> Undo</button>}
                       </span>
                     ) : (
                       <div className="flex flex-wrap items-center gap-2">
                         <label htmlFor={`route-${q.id}`} className="sr-only">Route for {q.member}</label>
-                        <select id={`route-${q.id}`} disabled={!canAct} value={choice[q.id] ?? ''} onChange={(e) => setChoice((c) => ({ ...c, [q.id]: e.target.value }))} className="h-9 max-w-[220px] rounded-full border border-line-strong bg-paper-raised px-3 text-[13px] text-ink focus-ring">
+                        <select id={`route-${q.id}`} disabled={!canActOn(MEMBER_IDS[q.member])} value={choice[q.id] ?? ''} onChange={(e) => setChoice((c) => ({ ...c, [q.id]: e.target.value }))} className="h-9 max-w-[220px] rounded-full border border-line-strong bg-paper-raised px-3 text-[13px] text-ink focus-ring">
                           <option value="">Choose a route…</option>
                           {SCREEN_ROUTES.map((r) => <option key={r}>{r}</option>)}
                         </select>
-                        <Button size="sm" variant="ink" disabled={!choice[q.id] || !canAct} onClick={() => route(q)}>Route</Button>
+                        <Button size="sm" variant="ink" disabled={!choice[q.id] || !canActOn(MEMBER_IDS[q.member])} onClick={() => route(q)}>Route</Button>
                         {owner && <span className="w-full text-[12px] text-ink-3">Goes to {owner}</span>}
                       </div>
                     )}
@@ -527,7 +546,10 @@ function RemeasureNote({ rm }: { rm: Remeasure }) {
   )
 }
 
-function SignOff({ items, setItems, now, onOpen, canAct, log }: { items: SignItem[]; setItems: (f: (s: SignItem[]) => SignItem[]) => void; now: number; onOpen: (id: string) => void; canAct: boolean; log: Log }) {
+/** A returned draft becomes a home redraw on the concierge desk (_concierge.tsx reads REDRAW). */
+const redrawTest = (item: SignItem) => `Redraw for sign-off · ${item.occasion}`
+
+function SignOff({ items, setItems, now, onOpen, canActOn, log }: { items: SignItem[]; setItems: (f: (s: SignItem[]) => SignItem[]) => void; now: number; onOpen: (id: string) => void; canActOn: CanActOn; log: Log }) {
   const [sel, setSel] = useState(items[0]?.id)
   const [note, setNote] = useState('')
   const [attest, setAttest] = useState(false)
@@ -535,7 +557,9 @@ function SignOff({ items, setItems, now, onOpen, canAct, log }: { items: SignIte
   const [retReason, setRetReason] = useState('')
   const [retNote, setRetNote] = useState('')
   const [retErr, setRetErr] = useState('')
+  const signer = useSigner()
   const item = items.find((i) => i.id === sel) ?? items[0]
+  const canAct = canActOn(item.memberId)
   const prevJI = joyspanIndex(item.prev, item.method)
   const nowJI = joyspanIndex(item.now, item.method)
   // Opening a draft shows raw lab values: that is a read, and it is written down.
@@ -545,28 +569,36 @@ function SignOff({ items, setItems, now, onOpen, canAct, log }: { items: SignIte
 
   const sign = () => {
     if (!canAct) return
-    setItems((xs) => xs.map((x) => (x.id === item.id ? { ...x, signed: `Signed · ${MEERA.name} · ${fmtClock(now)}` } : x)))
+    setItems((xs) => xs.map((x) => (x.id === item.id ? { ...x, signed: `Signed · ${signer} · ${fmtClock(now)}` } : x)))
     log({ what: `Signed Clinical grade · ${item.occasion} · Index ${nowJI?.value ?? '—'} under method ${item.method}`, purpose: 'Clinical-grade sign-off', memberId: item.memberId })
     setAttest(false)
   }
   const nextUnsigned = items.find((x) => !x.signed && !x.returned && x.id !== item.id)
+  const redraw = recordOf(useClinicalState(), item.memberId).orders.find((o) => o.test === redrawTest(item))
   const select = (id: string) => { setSel(id); setAttest(false); setReturning(false); setRetErr('') }
   const doReturn = () => {
     if (!retReason) return setRetErr('Choose why it is going back.')
     if (retNote.trim().length < 10) return setRetErr('Add a note of at least 10 characters for the lab and the concierge.')
     if (!canAct) return
     log({ what: `Returned the draft to the lab · ${retReason.toLowerCase()}`, purpose: 'Clinical-grade sign-off', memberId: item.memberId })
-    setItems((xs) => xs.map((x) => (x.id === item.id ? { ...x, returned: { reason: retReason, note: retNote.trim(), at: fmtClock(now) }, notes: [...x.notes, `${MEERA.name}: returned · ${retReason.toLowerCase()} — ${retNote.trim()}`] } : x)))
+    setItems((xs) => xs.map((x) => (x.id === item.id ? { ...x, returned: { reason: retReason, note: retNote.trim(), at: fmtClock(now) }, notes: [...x.notes, `${signer}: returned · ${retReason.toLowerCase()} — ${retNote.trim()}`] } : x)))
+    // The lab and the concierge get it as a redraw: a home-draw order on the member's record,
+    // which the concierge desk dispatches like any other (a time and an address, not the test).
+    const fasting = /fast/i.test(retNote)
+    clinical.updateRecord(item.memberId, (w) => ({ ...w, orders: [{ test: redrawTest(item), when: `Ordered ${fmtClock(now)} · ${REDRAW}${fasting ? ' · fasting' : ''}`, status: 'Concierge Ravi alerted · home draw to dispatch' }, ...w.orders.filter((o) => o.test !== redrawTest(item))] }))
+    log({ what: `Requested a home redraw for the returned draft${fasting ? ' · fasting' : ''} · concierge desk alerted`, purpose: 'Clinical-grade sign-off · redraw', memberId: item.memberId })
     setReturning(false); setRetReason(''); setRetNote(''); setRetErr(''); setAttest(false)
   }
   const undoReturn = () => {
     if (!canAct) return
     setItems((xs) => xs.map((x) => (x.id === item.id ? { ...x, returned: null, notes: x.notes.slice(0, -1) } : x)))
+    // The redraw goes with the return, unless the phlebotomist is already on the way.
+    clinical.updateRecord(item.memberId, (w) => ({ ...w, orders: w.orders.filter((o) => o.test !== redrawTest(item) || !o.status.startsWith('Concierge Ravi alerted')) }))
     log({ what: 'Undid the return; the draft is back in the sign-off queue', purpose: 'Clinical-grade sign-off', memberId: item.memberId })
   }
   const annotate = () => {
     if (!note.trim() || !canAct) return
-    setItems((xs) => xs.map((x) => (x.id === item.id ? { ...x, notes: [...x.notes, `${MEERA.name}: ${note.trim()}`] } : x)))
+    setItems((xs) => xs.map((x) => (x.id === item.id ? { ...x, notes: [...x.notes, `${signer}: ${note.trim()}`] } : x)))
     log({ what: 'Annotated the Clinical-grade draft', purpose: 'Clinical-grade sign-off', memberId: item.memberId })
     setNote('')
   }
@@ -610,7 +642,7 @@ function SignOff({ items, setItems, now, onOpen, canAct, log }: { items: SignIte
             <p className="mt-0.5">λ = <span className="num">{nowJI?.lambda}</span> · {item.engine}</p>
           </div>
         </div>
-        <MethodLine className="mt-3" method={item.method} grade="clinical" signedBy={item.signed ? MEERA.name : undefined} />
+        <MethodLine className="mt-3" method={item.method} grade="clinical" signedBy={item.signed ? signerOf(item.signed) : undefined} />
 
         <div className="mt-6 grid gap-6 xl:grid-cols-2">
           <div>
@@ -673,6 +705,7 @@ function SignOff({ items, setItems, now, onOpen, canAct, log }: { items: SignIte
             <div>
               <p className="text-[15px] text-ink">Returned to the lab and concierge · {item.returned.reason.toLowerCase()}.</p>
               <p className="mt-0.5 text-[14px] text-ink-2">“{item.returned.note}” Nothing is shown to {item.member.split(' ')[0]} until a new draft is signed.</p>
+              {redraw && <p className="mt-1 text-[13px] text-ink-3">Home redraw on the concierge desk · {redraw.status}</p>}
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
               <Button variant="ghost" size="sm" onClick={undoReturn} disabled={!canAct}><Undo2 size={14} aria-hidden /> Undo</Button>
@@ -752,6 +785,7 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts, log, audit, on
   suggestedPurpose: string
 }) {
   const rec = CLINICAL_RECORDS[memberId]
+  const signer = useSigner()
   // A record the relationship check refuses is written down at once. A record that can open
   // asks for the reason first; the read is written with that reason (ReasonGate below).
   useEffect(() => {
@@ -826,7 +860,7 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts, log, audit, on
     )
   }
 
-  const meds = [...rec.meds.map((m) => ({ ...m, dose: adjusted[m.drug] ?? m.dose, isNew: false as const, rx: undefined as string | undefined, adjustedNow: !!adjusted[m.drug] })), ...sent.map((s) => ({ drug: s.drug, dose: s.dose, freq: s.freq, since: 'Today', by: MEERA.name, isNew: true as const, rx: s.rx, adjustedNow: false }))]
+  const meds = [...rec.meds.map((m) => ({ ...m, dose: adjusted[m.drug] ?? m.dose, isNew: false as const, rx: undefined as string | undefined, adjustedNow: !!adjusted[m.drug] })), ...sent.map((s) => ({ drug: s.drug, dose: s.dose, freq: s.freq, since: 'Today', by: s.by ?? MEERA.name, isNew: true as const, rx: s.rx, adjustedNow: false }))]
   const f = ALL_FORMULARY.find((x) => x.drug === drug)
   const hits = drug ? interactionsFor(drug).filter((i) => meds.some((m) => m.drug === i.with)) : []
   const duplicate = drug ? meds.find((m) => m.drug === drug) : undefined
@@ -843,7 +877,7 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts, log, audit, on
     if (!checked) return setErrs('Run the interaction check first.')
     if (duplicate) return setErrs(`Duplicate therapy: ${first} already takes ${duplicate.drug} ${duplicate.dose}. Adjust the existing order instead.`)
     if (major && override.trim().length < 10) return setErrs('A major interaction needs a written clinical reason to proceed.')
-    const rx: Sent = { rx: clinical.nextRx(), drug, dose: strength, freq: `${freq} × ${days} days`, sentAt: now, reason: major ? override.trim() : undefined }
+    const rx: Sent = { rx: clinical.nextRx(), drug, dose: strength, freq: `${freq} × ${days} days`, sentAt: now, reason: major ? override.trim() : undefined, by: signer }
     setSent((s) => [...s, rx])
     log({ what: `Signed and sent e-Rx ${rx.rx} · ${drug} ${strength} · ${rx.freq}${hits.length ? ` · interactions checked: ${hits.map((h) => `${h.severity} with ${h.with}`).join(', ')}` : ' · no interactions'}${rx.reason ? ' · major interaction overridden with a written reason' : ''}`, purpose: 'Prescribing', memberId })
     setCancelled(null)
@@ -862,7 +896,7 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts, log, audit, on
     if (duplicate.isNew) setSent((s) => s.map((x) => (x.rx === duplicate.rx ? { ...x, dose: adjustTo } : x)))
     else setAdjusted((a) => ({ ...a, [duplicate.drug]: adjustTo }))
     log({ what: `Amended ${duplicate.drug} ${duplicate.dose} → ${adjustTo}${duplicate.rx ? ` (e-Rx ${duplicate.rx})` : ''}`, purpose: 'Prescribing', memberId })
-    setAdjustDone(`${duplicate.drug} changed from ${duplicate.dose} to ${adjustTo}. Signed by ${MEERA.name} · amended e-Rx sent to ABDM · ${first} notified.`)
+    setAdjustDone(`${duplicate.drug} changed from ${duplicate.dose} to ${adjustTo}. Signed by ${signer} · amended e-Rx sent to ABDM · ${first} notified.`)
     reset()
   }
   const placeOrder = (test: string, urgency: string) => {
@@ -1001,7 +1035,7 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts, log, audit, on
           <CardHead eyebrow="New e-Rx" title="Prescribe, checked against RxNav" />
           {lastSent && windowLeft > 0 && (
             <div role="status" className="mb-4 rounded-lg bg-ink p-4 text-paper">
-              <p className="flex items-start gap-2 text-[15px]"><Check size={16} className="mt-0.5 shrink-0" aria-hidden /> <span>e-Rx <span className="num">{lastSent.rx}</span> signed by {MEERA.name} · sent to ABDM · {first} notified.</span></p>
+              <p className="flex items-start gap-2 text-[15px]"><Check size={16} className="mt-0.5 shrink-0" aria-hidden /> <span>e-Rx <span className="num">{lastSent.rx}</span> signed by {lastSent.by ?? MEERA.name} · sent to ABDM · {first} notified.</span></p>
               <p className="mt-1 text-[13px] opacity-80">{lastSent.drug} {lastSent.dose} · {lastSent.freq}{lastSent.reason ? ` · override: ${lastSent.reason}` : ''}</p>
               <button onClick={() => cancelRx(lastSent.rx)} className="mt-2 text-[13px] underline underline-offset-4 focus-ring">Cancel within <span className="num">{Math.ceil(windowLeft / 60000)}</span> min</button>
             </div>
@@ -1134,6 +1168,7 @@ const SOAP_SEED: Record<string, SoapNote[]> = {
 
 function SoapNotes({ memberId, first, canAct, log, now, labs }: { memberId: string; first: string; canAct: boolean; log: Log; now: number; labs: { name: string; unit: string; series: (number | string)[]; flag?: 'H' | 'L' }[] }) {
   const work = recordOf(useClinicalState(), memberId)
+  const signer = useSigner()
   const notes = work.soap ?? SOAP_SEED[memberId] ?? []
   const setNotes = (f: (n: SoapNote[]) => SoapNote[]) => clinical.updateRecord(memberId, (w) => ({ ...w, soap: f(w.soap ?? SOAP_SEED[memberId] ?? []) }))
   const draft = notes.find((n) => n.status === 'draft')
@@ -1153,7 +1188,7 @@ function SoapNotes({ memberId, first, canAct, log, now, labs }: { memberId: stri
   const startNew = () => { setForm(EMPTY_SOAP); setEditing(true); setAttest(false); setErr(''); setNotice(null) }
   const upsert = (status: SoapNote['status']) => {
     const id = draft?.id ?? `soap-${now.toString(36)}`
-    const note: SoapNote = { id, status, ...form, author: MEERA.name, createdMs: draft?.createdMs ?? now, savedMs: now, amendments: [], ...(status === 'signed' ? { signedMs: now } : {}) }
+    const note: SoapNote = { id, status, ...form, author: signer, createdMs: draft?.createdMs ?? now, savedMs: now, amendments: [], ...(status === 'signed' ? { signedMs: now } : {}) }
     setNotes((ns) => (ns.some((n) => n.id === id) ? ns.map((n) => (n.id === id ? note : n)) : [note, ...ns]))
   }
   const saveDraft = () => {
@@ -1172,7 +1207,7 @@ function SoapNotes({ memberId, first, canAct, log, now, labs }: { memberId: stri
     upsert('signed')
     log({ what: 'Signed a SOAP note', purpose: 'Clinical documentation · SOAP', memberId })
     setEditing(false); setForm(EMPTY_SOAP); setAttest(false); setErr('')
-    setNotice(`SOAP note signed by ${MEERA.name} at ${fmtClock(now)}. It is now part of ${first}’s clinical record; it can be amended, never edited.`)
+    setNotice(`SOAP note signed by ${signer} at ${fmtClock(now)}. It is now part of ${first}’s clinical record; it can be amended, never edited.`)
   }
   const discard = () => {
     if (!canAct) return
@@ -1190,10 +1225,10 @@ function SoapNotes({ memberId, first, canAct, log, now, labs }: { memberId: stri
     if (!canAct) return
     if (!amReason) return setAmErr('Choose why you are amending.')
     if (amText.trim().length < 10) return setAmErr('Write the amendment in at least 10 characters.')
-    setNotes((ns) => ns.map((x) => (x.id === n.id ? { ...x, amendments: [...x.amendments, { id: `am-${now.toString(36)}`, ms: now, by: MEERA.name, reason: amReason, text: amText.trim() }] } : x)))
+    setNotes((ns) => ns.map((x) => (x.id === n.id ? { ...x, amendments: [...x.amendments, { id: `am-${now.toString(36)}`, ms: now, by: signer, reason: amReason, text: amText.trim() }] } : x)))
     log({ what: `Amended the SOAP note signed ${at(n.signedMs ?? n.savedMs)} · ${amReason.toLowerCase()}`, purpose: 'Clinical documentation · SOAP', memberId })
     setAmending(null); setAmReason(''); setAmText(''); setAmErr('')
-    setNotice(`Amendment signed by ${MEERA.name} at ${fmtClock(now)}. The original note stays as it was, with the amendment beside it.`)
+    setNotice(`Amendment signed by ${signer} at ${fmtClock(now)}. The original note stays as it was, with the amendment beside it.`)
   }
 
   return (
@@ -1295,14 +1330,15 @@ function SoapNotes({ memberId, first, canAct, log, now, labs }: { memberId: stri
 
 // ─── AI review (HITL) ──────────────────────────────────────────────────────
 
-function AiReview({ drafts, setDrafts, onOpen, canAct, log }: { drafts: Draft[]; setDrafts: (f: (d: Draft[]) => Draft[]) => void; onOpen: (id: string) => void; canAct: boolean; log: Log }) {
+function AiReview({ drafts, setDrafts, onOpen, canActOn, log }: { drafts: Draft[]; setDrafts: (f: (d: Draft[]) => Draft[]) => void; onOpen: (id: string) => void; canActOn: CanActOn; log: Log }) {
   const [editing, setEditing] = useState<string | null>(null)
   const [text, setText] = useState('')
+  const signer = useSigner()
   const WHAT: Record<string, string> = { approved: 'Approved and released the AI draft', rejected: 'Rejected the AI draft · not shown to the member', pending: 'Returned the AI draft to review', edited: 'Edited the AI draft before release' }
   const update = (id: string, patch: Partial<Draft>) => {
     const d = drafts.find((x) => x.id === id)
-    if (!canAct || !d) return
-    setDrafts((ds) => ds.map((x) => (x.id === id ? { ...x, ...patch } : x)))
+    if (!d || !canActOn(MEMBER_IDS[d.member])) return
+    setDrafts((ds) => ds.map((x) => (x.id === id ? { ...x, ...patch, ...(patch.state && patch.state !== 'pending' ? { reviewer: signer } : {}) } : x)))
     const what = patch.edited ? WHAT.edited : patch.state ? WHAT[patch.state] : 'Changed the AI draft'
     log({ what: `${what} · ${d.tool} · ${d.lang}`, purpose: 'AI review · human in the loop', member: d.member })
   }
@@ -1313,6 +1349,7 @@ function AiReview({ drafts, setDrafts, onOpen, canAct, log }: { drafts: Draft[];
         <span className="text-ink">AI drafts, a person signs.</span> Anything that explains a clinical result, and every non-English reply, waits here. Every output carries its attribution record: model, prompt version, tool, inputs hash and reviewer.
       </AccessNote>
       {drafts.map((d) => {
+        const canAct = canActOn(MEMBER_IDS[d.member])
         const needsEdit = d.guard.claims === 'flag' && !d.edited
         return (
           <Card key={d.id} className={clsx('min-w-0', d.state !== 'pending' && 'opacity-70')}>
@@ -1346,7 +1383,7 @@ function AiReview({ drafts, setDrafts, onOpen, canAct, log }: { drafts: Draft[];
                   </div>
                 ) : (
                   <div className="mt-4 flex flex-wrap items-center gap-3">
-                    <p className="flex items-center gap-2 text-[14px] text-ink"><Check size={14} aria-hidden /> {d.state === 'approved' ? `Released to ${d.member.split(' ')[0]} · reviewer ${MEERA.name}${d.edited ? ' · edited' : ''}` : 'Rejected · not shown to the member · logged for the evaluation plane'}</p>
+                    <p className="flex items-center gap-2 text-[14px] text-ink"><Check size={14} aria-hidden /> {d.state === 'approved' ? `Released to ${d.member.split(' ')[0]} · reviewer ${d.reviewer ?? MEERA.name}${d.edited ? ' · edited' : ''}` : 'Rejected · not shown to the member · logged for the evaluation plane'}</p>
                     {canAct && <button onClick={() => update(d.id, { state: 'pending' })} className="inline-flex items-center gap-1 text-[13px] text-ink-2 underline underline-offset-4 focus-ring"><Undo2 size={12} aria-hidden /> Undo</button>}
                   </div>
                 )}
@@ -1354,7 +1391,7 @@ function AiReview({ drafts, setDrafts, onOpen, canAct, log }: { drafts: Draft[];
               <div className="rounded-lg bg-paper-sunk p-4">
                 <p className="eyebrow text-ink-3">Attribution record</p>
                 <dl className="mt-3 space-y-2 text-[13px]">
-                  {[['Model', d.attribution.model], ['Prompt', d.attribution.prompt], ['Tool', d.attribution.tool], ['Inputs hash', d.attribution.inputs], ['Retrieval', d.attribution.rag], ['Reviewer', d.state === 'pending' ? '— awaiting' : MEERA.name]].map(([k, v]) => (
+                  {[['Model', d.attribution.model], ['Prompt', d.attribution.prompt], ['Tool', d.attribution.tool], ['Inputs hash', d.attribution.inputs], ['Retrieval', d.attribution.rag], ['Reviewer', d.state === 'pending' ? '— awaiting' : d.reviewer ?? MEERA.name]].map(([k, v]) => (
                     <div key={k} className="grid grid-cols-[96px_1fr] gap-2">
                       <dt className="text-ink-3">{k}</dt>
                       <dd className="num break-all text-ink">{v}</dd>

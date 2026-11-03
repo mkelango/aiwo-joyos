@@ -66,14 +66,23 @@ export function CrisisSheet() {
           </span>
           <Phone size={20} className="shrink-0" />
         </a>
-        {!manual && (
-          <div className="flex items-center justify-between rounded-card border border-line px-5 py-4">
-            <span>
-              <span className="block text-[16px] text-ink">{t('hasBeenTold', { name: sanjay.name })}</span>
-              <span className="block text-[14px] text-ink-2">{t('onCall')}</span>
+        {/* The on-call clinician, in both modes. After an intercept they have already been told;
+            either way the member can write to them straight away in Care messages. */}
+        <div className="rounded-card border border-line px-5 py-4">
+          <p className="text-[16px] text-ink">{manual ? t('clinicianOnCall', { name: sanjay.name }) : t('hasBeenTold', { name: sanjay.name })}</p>
+          <p className="text-[14px] text-ink-2">{manual ? t('onCallManual') : t('onCall')}</p>
+          <Link
+            to={`/app/care/messages?p=${sanjay.id}`}
+            onClick={() => setCrisisOpen(false)}
+            className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3 text-ink focus-ring"
+          >
+            <span className="min-w-0">
+              <span className="block text-[16px]">{t('clinicianMessage', { name: sanjay.name })}</span>
+              <span className="block text-[14px] text-ink-2">{t('clinicianMessageSub')}</span>
             </span>
-          </div>
-        )}
+            <MessageCircle size={18} className="shrink-0" aria-hidden />
+          </Link>
+        </div>
         <div className="rounded-card border border-line px-5 py-4">
           <p className="eyebrow text-ink-3">{t('ecEyebrow')}</p>
           {contact ? (

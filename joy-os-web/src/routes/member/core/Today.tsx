@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowRight, Check, Clock, CloudOff, CreditCard, FileText, Info, Sparkles, Sunrise, Users, Volume2, VolumeX, Watch } from 'lucide-react'
+import { ArrowRight, Check, CircleDashed, Clock, CloudOff, CreditCard, FileText, Info, Sparkles, Sunrise, UserCheck, Users, Volume2, VolumeX, Watch } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
@@ -12,7 +12,11 @@ import { termByKey } from '@/data/terms'
 import { useApp } from '@/lib/store'
 import { useT } from '@/lib/i18n'
 import { ACTION_TEXT, fmtLocal, rich, useCore } from './_i18n'
-import { SPECIMEN_TODAY, addDays, liveLedger, specimenWeek, useLedgerRemoved, useLocal, useSignalsDown, weekCounts } from './_store'
+import { SPECIMEN_TODAY, addDays, liveLedger, specimenWeek, useCoachOverride, useLedgerRemoved, useLocal, useMeasured, useSignalsDown, weekCounts } from './_store'
+import { COACH_ACTION_TEXT, COACH_REASON_TEXT } from './_extra'
+import { CountUp } from '@/components/joy/CountUp'
+import { useIsMinor } from '@/lib/minor'
+import { CURATED_ACTIONS } from '@/routes/console/care/_data'
 import { DAY90_DATES } from './_data'
 import { RemeasureCard } from './_remeasure'
 import { useX } from './_i18nX'
@@ -54,6 +58,7 @@ const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eig
 // the circle's next call, Day N of 90 and the next measure date. One Daybreak button.
 export default function Today() {
   const t = useT()
+  const x = useX()
   const { t: c, lang, name, space, pick, tag, when } = useCore()
   const { actionDone, setActionDone, ledger, offline, syncQueue, queueSync, unqueueSync, paymentsGrace } = useApp()
   const { d: spaceData } = useSpaceText()
@@ -76,7 +81,16 @@ export default function Today() {
   const previous = INDEX_HISTORY[1]
   const lowest = termByKey(latest.lowestTerm)
   const lowestValue = latest.terms.find((s) => s.key === latest.lowestTerm)!.value
-  const action = TODAY_ACTION
+  // Minors are never scored (Architecture p26): no Index, band, delta or Wheel value here.
+  const minor = useIsMinor()
+  const [measured] = useMeasured()
+  const notYet = measured ? measured.terms.filter((s) => s.value === null).map((s) => s.key) : []
+  // The coach's override of the next-best action (console), shown as today's action.
+  const override = useCoachOverride()
+  const curated = override ? CURATED_ACTIONS.find((a) => a.id === override.action || a.title === override.action) : undefined
+  const action: Omit<Action, 'minutes'> & { minutes: number } = override
+    ? { ...TODAY_ACTION, detail: '', id: `coach:${curated?.id ?? override.action}`, term: curated?.term ?? override.term ?? TODAY_ACTION.term, title: curated?.title ?? override.action, minutes: curated?.minutes ?? TODAY_ACTION.minutes, shared: false, why: override.reason, evidence: curated?.evidence ?? TODAY_ACTION.evidence }
+    : TODAY_ACTION
   const coach = CIRCLE.coach.split(' ')[0]
   const others = CIRCLE.members.length - 1
   const { weekDays, kept, top } = useMemo(() => {
@@ -85,12 +99,12 @@ export default function Today() {
     return { weekDays: days, kept: days.filter((x) => x.has).length, top: weekCounts(ledger, removed) }
   }, [ledger, removed])
   const weekLetter = (iso: string) => fmtLocal(new Date(`${iso}T12:00`), lang, { weekday: 'narrow' })
-  const at = ACTION_TEXT[action.id]
-  const actionTitle = pick(at?.title, action.title)
+  const at = override ? undefined : ACTION_TEXT[action.id]
+  const actionTitle = override ? pick(COACH_ACTION_TEXT[action.title], action.title) : pick(at?.title, action.title)
+  const overrideReason = override ? pick(COACH_REASON_TEXT[override.reason], override.reason) : ''
   const lowName = name(lowest.key)
   const tagWord = (s: string) => (lang === 'en' ? s.toLowerCase() : tag(s))
   // Offline, the action's state waits in the sync queue; Undo takes it back out.
-  const x = useX()
   // The morning check-in: one tap, kept for the specimen day, with the motif's two notes.
   const [morning, setMorning] = useLocal<Morning | null>(`morning:${SPECIMEN_TODAY}`, null)
   const checkIn = (m: Morning) => {
@@ -119,7 +133,7 @@ export default function Today() {
       return
     }
     const parts = [
-      c('tdSpeakIndex', { v: latest.value, term: lowName }),
+      minor ? x('mnSpeak') : c('tdSpeakIndex', { v: latest.value, term: lowName }),
       !actionDone && !skipped ? c('tdSpeakAction', { title: actionTitle }) : '',
       pool.length > 0 ? c('tdSpeakPool', { list: pool.map((a) => spaceData(a.title).replace(/[.।]$/, '')).join(', ') }) : '',
       c('tdSpeakDay', { n: MEMBER.dayOfLoop }),
@@ -153,10 +167,27 @@ export default function Today() {
             <SpecimenTag className="shrink-0 text-[10px] sm:text-[11px]" />
           </span>
         </div>
+        {minor ? (
+          <div className="mt-5" role="note">
+            <p className="text-[1.6rem] font-light leading-snug text-ink">{x('mnTitle')}</p>
+            <p className="mt-3 max-w-[48ch] text-[16px] text-ink-2">{x('mnBody')}</p>
+            <ul className="mt-5 flex flex-wrap gap-2 border-t border-line pt-5">
+              {TERMS.map((k) => (
+                <li key={k}>
+                  <Link to={`/app/spaces/${termByKey(k).slug}`} className="inline-flex items-center gap-2 rounded-full border border-line px-3 py-1.5 text-[14px] text-ink-2 hover:text-ink focus-ring">
+                    <TermDot term={k} /> {space(k)}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <Link to="/app/index" className="mt-5 inline-flex items-center gap-1.5 text-[15px] text-ink underline-offset-4 hover:underline focus-ring">{x('mnLink')} <ArrowRight size={14} /></Link>
+          </div>
+        ) : (
+          <>
         <div className="mt-4 flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="order-2 sm:order-1">
             <div className="flex items-end gap-3">
-              <span className="num text-[6.5rem] font-light leading-[0.85] tracking-tight text-ink md:text-[8rem]">{latest.value}</span>
+              <span className="num text-[6.5rem] font-light leading-[0.85] tracking-tight text-ink md:text-[8rem]" aria-label={c('jiAria', { v: latest.value })}><CountUp value={latest.value} /></span>
               <span className="mb-2 flex flex-col">
                 <Delta value={latest.value - previous.value} />
                 <BandLabel band={latest.band} className="mt-1" />
@@ -189,25 +220,39 @@ export default function Today() {
           <MethodLine method={latest.method} grade={latest.grade} next={latest.nextMeasure} />
           <Link to="/app/trust" className="eyebrow text-ink-3 underline-offset-4 hover:text-ink hover:underline">{t('trust')}</Link>
         </div>
+        {notYet.length > 0 && measured && (
+          <Link to="/app/index" className="mt-4 flex items-center gap-2 rounded-card border border-dashed border-line-strong px-4 py-2.5 text-[14px] text-ink-2 hover:text-ink focus-ring">
+            <CircleDashed size={15} className="shrink-0 text-ink-3" aria-hidden />
+            <span className="min-w-0">{x('nyToday', { date: fmtDate(measured.takenOn, lang), terms: notYet.map((k) => name(k)).join(x('skJoin')) })} <span className="text-ink underline underline-offset-4">{x('nyTodayLink')}</span></span>
+          </Link>
+        )}
         {signalsDown && (
           <Link to="/app/index" className="mt-4 flex items-center gap-2 rounded-card bg-paper-sunk px-4 py-2.5 text-[14px] text-ink-2 hover:text-ink focus-ring">
             <Watch size={15} className="shrink-0 text-ink-3" aria-hidden /> {c('tdSignalsDown')} <ArrowRight size={14} className="ml-auto shrink-0" />
           </Link>
+        )}
+          </>
         )}
       </Card>
 
       {/* The one action */}
       <Card tone="sunk" className="flex flex-col">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          <Eyebrow tone="daybreak">{t('today')} · {lowName}</Eyebrow>
+          <Eyebrow tone="daybreak">{t('today')}{minor ? '' : ` · ${override ? name(action.term) : lowName}`}</Eyebrow>
           <span className="flex items-center gap-1.5 text-[13px] text-ink-3"><Clock size={14} /> {c('min', { n: action.minutes })} · {action.shared ? c('tdWithKavya') : c('tdSolo')}</span>
         </div>
         <AnimatePresence mode="wait">
           {!actionDone && !skipped ? (
             <motion.div key="todo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-1 flex-col">
               <p className="mt-4 text-[1.6rem] font-light leading-snug text-ink">
-                {rich(c('tdHeadline'), { title: actionTitle.replace(/[.।]$/, '') })}
+                {override ? actionTitle : rich(c('tdHeadline'), { title: actionTitle.replace(/[.।]$/, '') })}
               </p>
+              {override && (
+                <div className="mt-3 rounded-card border border-line bg-paper-raised px-4 py-3 text-[14px] text-ink-2">
+                  <p className="flex items-center gap-2 text-ink"><UserCheck size={15} aria-hidden className="shrink-0" /> {override.by && override.at ? x('coChoseBy', { who: override.by, date: fmtDate(override.at.slice(0, 10), lang) }) : x('coChose')}</p>
+                  {overrideReason && <p className="mt-1">{x('coWhy', { reason: overrideReason })}</p>}
+                </div>
+              )}
               <button onClick={() => setWhyOpen(true)} className="mt-3 flex min-h-[24px] items-center gap-1.5 self-start py-1 text-[14px] text-ink-2 underline-offset-4 hover:underline focus-ring">
                 <Info size={15} /> {c('tdWhyQ')}
               </button>
@@ -250,7 +295,8 @@ export default function Today() {
         </Card>
         <Card>
           <div className="flex items-start justify-between">
-            <Eyebrow>{c('tdThisWeek')}</Eyebrow>
+            {/* The dots wear the Daily Pleasure colour, so the term is named beside them. */}
+            <Eyebrow>{c('tdThisWeek')} · {name('D')}</Eyebrow>
             <LoopRing day={MEMBER.dayOfLoop} size={40} />
           </div>
           <div className="mt-3 flex justify-between" role="img" aria-label={c('tdWeekAria', { n: kept })}>
@@ -377,16 +423,17 @@ export default function Today() {
       </Card>
 
       {/* The re-measure chain starts here: the Day-76 invite. */}
-      <RemeasureCard className="lg:col-span-2" />
+      {!minor && <RemeasureCard className="lg:col-span-2" />}
 
       <Sheet open={whyOpen} onClose={() => setWhyOpen(false)} title={c('tdWhyTitle')} side="center">
         <div className="flex flex-wrap items-center gap-2">
           <TermChip term={action.term} withSpace />
-          <span className="eyebrow text-ink-3">next_best_action · rules v1.0</span>
+          <span className="eyebrow text-ink-3">{override ? x('coChose') : 'next_best_action · rules v1.0'}</span>
         </div>
-        <p className="mt-4 text-[17px] leading-relaxed text-ink">{pick(at?.why, action.why)}</p>
+        <p className="mt-4 text-[17px] leading-relaxed text-ink">{override ? x('coWhy', { reason: overrideReason }) : pick(at?.why, action.why)}</p>
+        {override && <p className="mt-2 text-[14px] text-ink-2">{x('coNote')}</p>}
         <ol className="mt-5 space-y-3 text-[15px] text-ink-2">
-          <li><span className="num mr-2 text-ink-3">1</span><b className="font-medium text-ink">{c('tdStep1h')}</b> {rich(c('tdStep1'), { term: lowName, v: <span className="num">{lowestValue}</span> })}</li>
+          <li><span className="num mr-2 text-ink-3">1</span><b className="font-medium text-ink">{c('tdStep1h')}</b> {minor ? x('mnStep1') : rich(c('tdStep1'), { term: lowName, v: <span className="num">{lowestValue}</span> })}</li>
           <li><span className="num mr-2 text-ink-3">2</span><b className="font-medium text-ink">{c('tdStep2h')}</b> {c('tdStep2', { space: space('D') })}</li>
           <li><span className="num mr-2 text-ink-3">3</span><b className="font-medium text-ink">{c('tdStep3h')}</b> {c('tdStep3')}</li>
           <li><span className="num mr-2 text-ink-3">4</span><b className="font-medium text-ink">{c('tdStep4h')}</b> {c('tdStep4')}</li>

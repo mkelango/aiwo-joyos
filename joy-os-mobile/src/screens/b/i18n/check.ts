@@ -66,6 +66,10 @@ export const CHECK = {
   setUp: { en: 'Set up Joy OS', ta: 'Joy OS-ஐ அமையுங்கள்', hi: 'Joy OS सेट करें' },
   again: { en: 'Take the Check again', ta: 'செக்கை மீண்டும் எடுங்கள்', hi: 'चेक दोबारा करें' },
   readLetter: { en: 'Read a recent Letter', ta: 'சமீபத்திய கடிதத்தைப் படியுங்கள்', hi: 'हाल का लेटर पढ़ें' },
+  // Where Joyspan is defined in public (Playbook p17, p44): the word equation and its credit.
+  joyspanIs: { en: 'What Joyspan means', ta: 'ஜாய்ஸ்பான் என்றால் என்ன', hi: 'जॉयस्पैन का मतलब' },
+  equationNote: { en: 'Set verbatim, in English, everywhere it appears.', ta: 'எங்கு வந்தாலும் ஆங்கிலத்தில், எழுதியபடியே அமைக்கப்படுகிறது.', hi: 'जहाँ भी आए, अंग्रेज़ी में, हूबहू लिखा जाता है।' },
+  credit: { en: 'The word Joyspan is credited to Dr Kerry Burnight.', ta: 'Joyspan என்ற சொல்லுக்கான பெருமை Dr Kerry Burnight அவர்களுக்கு உரியது.', hi: 'Joyspan शब्द का श्रेय Dr Kerry Burnight को जाता है।' },
 } satisfies Dict
 
 export const NEXT_STEP_TEXT: Record<TermKey, { step: L3; why: L3 }> = {

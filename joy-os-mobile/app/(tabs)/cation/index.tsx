@@ -10,6 +10,7 @@ import {
   DaybreakButton,
   Delta,
   Divider,
+  EmptyIllustration,
   Eyebrow,
   Icon,
   LoopRing,
@@ -291,7 +292,8 @@ function Catalogue({ noCation = false }: { noCation?: boolean }) {
           items={[{ value: 'all', label: t('All') }, { value: 'ALL', label: t('Master') }, ...TERMS.map((x) => ({ value: x.key as Filter, label: spaceName(x.key), term: x.key }))]}
         />
         {shown.length === 0 ? (
-          <Card tone="outline">
+          <Card tone="outline" style={{ gap: space.s1 }}>
+            <EmptyIllustration kind="cation" width={128} />
             <Body tone="ink2">{t('No ’cation leads with this term yet. The master Joycation raises all six.')}</Body>
           </Card>
         ) : null}
@@ -402,6 +404,7 @@ function NoCation({ demo }: { demo: ReactNode }) {
     <Screen inTabs top={<AppBar />}>
       <ScreenHeader eyebrow={`${tt('cation')} · ${t('none taken yet')}`} title={<Rich text={t('Go somewhere. Come back *different*.')} wrap={(w) => <Serif>{w}</Serif>} />} lead={t('You have not taken a ’cation yet. Your Index already says where one would help most.')} />
       {demo}
+      <EmptyIllustration kind="cation" />
       {invite ? (
         <Card tone="sunk" style={{ gap: space.s2 }}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.s1 }}>

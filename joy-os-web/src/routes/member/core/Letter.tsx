@@ -3,6 +3,7 @@ import { ArrowRight, Check, Printer } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AiwoMark } from '@/components/joy/Brand'
+import { EmptyIllustration } from '@/components/joy/EmptyIllustration'
 import { DaybreakButton, Eyebrow, SpecimenTag, useFmtDate } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill } from '@/components/ui'
 import { interceptsCrisis, useApp } from '@/lib/store'
@@ -162,6 +163,8 @@ export default function Letter() {
               <AiwoMark size={18} />
               <span className="eyebrow text-ink-3">{x('ltNo', { n: issue.n })}</span>
             </div>
+            {/* Editorial illustration: single-weight Ink line, one Daybreak fill (Playbook p51). */}
+            <EmptyIllustration kind="letter" width={150} className="!mx-0 mt-6" />
             <p className="eyebrow mt-6 text-daybreak-ink">{x('ltEyebrow')} · <span className="num">{monthText(issue.month, lang)}</span></p>
             <div lang="en">
               <h2 className="mt-3 text-[2rem] font-light leading-tight text-ink md:text-[2.4rem]">{titleParts(issue.title)}</h2>

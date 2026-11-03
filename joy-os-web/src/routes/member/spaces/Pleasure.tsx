@@ -5,17 +5,21 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { DaybreakButton, Eyebrow, SpecimenTag } from '@/components/joy/primitives'
 import { Button, Sheet } from '@/components/ui'
-import { liveLedger, specimenWeek, useLedgerRemoved, weekCounts, weekEntryCount } from '@/routes/member/core/_store'
+import { SPECIMEN_TODAY, addDays, liveLedger, specimenWeek, useLedgerRemoved, weekCounts, weekEntryCount } from '@/routes/member/core/_store'
 import { useA11yPrefs } from '@/routes/member/account/_prefs'
 import { useApp } from '@/lib/store'
 import { FILMS, PLANNED_START, SAVOURING_PROMPTS } from './_data'
 import { SpaceShell, ToolCard, rovingRadio, useCrisisGuard, Toggle } from './_SpaceShell'
 import { useSpaceText, type SpKey } from './_i18n'
-import { useSpaceState } from './_state'
+import { CAL_NAME, KEPT_KEY, readCalendarProvider, useSpaceState, useTrustConsent, type KeptPrompt } from './_state'
 
 // PLEASURE · Daily Pleasure (Memo p.19): the Joy Ledger's weekly view of where joy
 // came from; one planned pleasure a day, scheduled like a meeting; savouring
 // prompts; Moments of Joy films; #MyMomentOfJoy (opt-in).
+// Planned pleasures go to the calendar Freedom connected, only while the Trust centre's
+// calendar consent (c_cal) is on; otherwise they stay in the app. Kept savouring prompts are
+// saved for the Ledger's evening "How was it?". Sharing a moment needs the Publishing
+// consent (c_pub); turning #MyMomentOfJoy off, or withdrawing c_pub, takes every share back.
 // The one Daybreak button: schedule today's pleasure.
 export default function Pleasure() {
   const { t, r } = useSpaceText()
@@ -102,10 +106,18 @@ function LedgerInsights() {
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const LENGTHS = [10, 30] as const
+/** A planned pleasure; `cal` names the calendar it was sent to ('' = kept in the app only). */
+type Planned = (typeof PLANNED_START)[number] & { cal?: string }
 
 function PlannedPleasure() {
   const guard = useCrisisGuard()
-  const [items, setItems] = useSpaceState('pleasure.planned.v1', PLANNED_START)
+  const [items, setItems] = useSpaceState<Planned[]>('pleasure.planned.v1', PLANNED_START)
+  // Where a pleasure goes: the calendar Freedom connected, and only while c_cal is on.
+  const calConsent = useTrustConsent('c_cal')
+  const provider = readCalendarProvider()
+  const calName = calConsent.on && provider ? CAL_NAME[provider] : ''
+  // The member may choose to keep planned pleasures in the app rather than connect a calendar.
+  const [appOnly, setAppOnly] = useSpaceState('pleasure.appOnly.v1', false)
   const [what, setWhat] = useState('')
   const [day, setDay] = useState('Thu')
   const [time, setTime] = useState('19:00')
@@ -114,7 +126,7 @@ function PlannedPleasure() {
   const [err, setErr] = useState<SpKey | ''>('')
   const { t, r, day: dayT, lang } = useSpaceText()
   const [justAdded, setJustAdded] = useState<string | null>(null)
-  const [removed, setRemoved] = useState<(typeof PLANNED_START)[number] | null>(null)
+  const [removed, setRemoved] = useState<Planned | null>(null)
   const added = items.find((i) => i.id === justAdded)
   const taken = items.some((i) => i.day === day)
   const schedule = () => {
@@ -123,7 +135,7 @@ function PlannedPleasure() {
     if (taken) return setErr('pl.pp.errTaken')
     if (guard(what, withWho)) return
     const id = `pp${Date.now()}`
-    setItems((x) => [...x, { id, day, time, what: what.trim(), minutes: mins, with: withWho.trim() }].sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day)))
+    setItems((x) => [...x, { id, day, time, what: what.trim(), minutes: mins, with: withWho.trim(), cal: calName }].sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day)))
     setJustAdded(id); setWhat(''); setWithWho(''); setErr(''); setRemoved(null)
     const next = DAYS.find((d) => !items.some((i) => i.day === d) && d !== day)
     if (next) setDay(next)
@@ -161,13 +173,27 @@ function PlannedPleasure() {
           </div>
         </div>
         {err && <p id="pp-err" role="alert" className="text-[13px] text-error">{t(err, { day: dayT(day) })}</p>}
+        {!calName && (
+          // Not allowed to reach a calendar: offer the way to connect, or keep it in the app.
+          <div className="rounded-2xl border border-line bg-paper-raised px-4 py-3 text-[14px] text-ink-2">
+            <p>{t(calConsent.on ? 'pl.pp.noCal' : 'pl.pp.calOff')}</p>
+            <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              {calConsent.on
+                ? <Link to="/app/spaces/freedom" className="inline-flex items-center gap-1 rounded text-ink underline-offset-4 hover:underline focus-ring">{t('pl.pp.connect')} <ArrowRight size={14} /></Link>
+                : <Link to="/app/trust#consents" className="inline-flex items-center gap-1 rounded text-ink underline-offset-4 hover:underline focus-ring">{t('pl.pp.turnOn')} <ArrowRight size={14} /></Link>}
+              {appOnly
+                ? <span className="inline-flex items-center gap-1.5 text-ink-3"><Check size={14} aria-hidden /> {t('pl.pp.appOnlyOn')}</span>
+                : <button type="button" onClick={() => setAppOnly(true)} className="rounded text-ink underline underline-offset-4 focus-ring">{t('pl.pp.appOnly')}</button>}
+            </p>
+          </div>
+        )}
         <DaybreakButton type="submit" className="w-full"><CalendarClock size={18} /> {t('pl.pp.schedule')}</DaybreakButton>
         {added && (
-          <p role="status" className="flex items-start gap-2 text-[14px] text-ink"><Check size={15} className="mt-0.5 shrink-0" aria-hidden /><span>{r('pl.pp.added', { dt: <span className="num">{dayT(added.day)} {added.time}</span>, m: <span className="num">{added.minutes}</span>, with: added.with ? t('pl.pp.withX', { who: added.with }) : '', slot: t(Number(added.time.slice(0, 2)) < 14 ? 'pl.slot.midday' : Number(added.time.slice(0, 2)) < 18 ? 'pl.slot.afternoon' : 'pl.slot.evening') })}</span></p>
+          <p role="status" className="flex items-start gap-2 text-[14px] text-ink"><Check size={15} className="mt-0.5 shrink-0" aria-hidden /><span>{r(added.cal ? 'pl.pp.added' : 'pl.pp.addedApp', { dt: <>{dayT(added.day)} <span className="num">{added.time}</span></>, cal: added.cal ?? '', m: <span className="num">{added.minutes}</span>, with: added.with ? t('pl.pp.withX', { who: added.with }) : '', slot: t(Number(added.time.slice(0, 2)) < 14 ? 'pl.slot.midday' : Number(added.time.slice(0, 2)) < 18 ? 'pl.slot.afternoon' : 'pl.slot.evening') })}</span></p>
         )}
         {removed && (
           <p role="status" className="flex items-center gap-3 text-[14px] text-ink-2">
-            {t('pl.pp.removed', { day: dayT(removed.day) })}
+            {(removed.cal ?? calName) ? t('pl.pp.removed', { day: dayT(removed.day), cal: removed.cal ?? calName }) : t('pl.pp.removedApp', { day: dayT(removed.day) })}
             <button type="button" className="rounded text-ink underline underline-offset-4 focus-ring" onClick={() => { setItems((x) => [...x, removed].sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day))); setRemoved(null) }}>{t('c.undo')}</button>
           </p>
         )}
@@ -190,7 +216,7 @@ function PlannedPleasure() {
             )
           })}
         </ol>
-        <p className="mt-3 text-[13px] text-ink-3">{t('pl.pp.calNote')}</p>
+        <p className="mt-3 text-[13px] text-ink-3">{calName ? t('pl.pp.calNote', { cal: calName }) : t('pl.pp.calNoteApp')}</p>
       </div>
     </ToolCard>
   )
@@ -198,39 +224,54 @@ function PlannedPleasure() {
 
 // ─── Savouring prompts ────────────────────────────────────────────────────
 
+/** Weekday ('Mon') of a calendar day, for the day label. */
+const weekdayOf = (iso: string) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(`${iso}T12:00:00`).getDay()]
+
 function Savouring() {
   const [i, setI] = useState(0)
-  const [kept, setKept] = useState<number[]>([])
+  // Kept prompts persist (pleasure.kept.v1) so the Ledger can ask about today's in the evening.
+  const [kept, setKept] = useSpaceState<KeptPrompt[]>(KEPT_KEY, SAVOURED_START)
   const { t, d, day } = useSpaceText()
   const p = SAVOURING_PROMPTS[i]
+  const today = kept.filter((k) => k.date === SPECIMEN_TODAY)
+  const isKept = today.some((k) => k.id === p.id)
+  const toggle = () => setKept((x) => (isKept ? x.filter((k) => !(k.date === SPECIMEN_TODAY && k.id === p.id)) : [...x, { date: SPECIMEN_TODAY, id: p.id, text: p.text }]))
+  // Earlier this week: what was kept on the six days before today, newest first.
+  const weekStart = addDays(SPECIMEN_TODAY, -6)
+  const earlier = kept.filter((k) => k.date < SPECIMEN_TODAY && k.date >= weekStart).sort((a, b) => b.date.localeCompare(a.date))
+  const kindOf = (id: string) => SAVOURING_PROMPTS.find((x) => x.id === id)?.kind ?? ''
   return (
     <ToolCard className="w-full" eyebrow={t('pl.sv.eyebrow')} title={t('pl.sv.title')} sub={t('pl.sv.sub')}>
       <div className="relative flex min-h-[200px] flex-col justify-between overflow-hidden rounded-2xl bg-[color:var(--term-d-soft)] p-5">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.22 }} aria-live="polite">
-            <p className="eyebrow text-[color:var(--term-d-ink)]">{d(p.kind)} · <span className="num">{i + 1}</span>/{SAVOURING_PROMPTS.length}</p>
+            <p className="eyebrow text-[color:var(--term-d-ink)]">{d(p.kind)} · <span className="num">{i + 1}</span>/<span className="num">{SAVOURING_PROMPTS.length}</span></p>
             <p className="mt-3 text-[1.3rem] font-light leading-snug text-ink">{d(p.text)}</p>
           </motion.div>
         </AnimatePresence>
         <div className="mt-5 flex flex-wrap gap-2">
           <Button size="sm" onClick={() => setI((i + 1) % SAVOURING_PROMPTS.length)}><RefreshCw size={14} /> {t('pl.sv.another')}</Button>
-          <Button size="sm" variant={kept.includes(i) ? 'ink' : 'ghost'} aria-pressed={kept.includes(i)} onClick={() => setKept((k) => (k.includes(i) ? k.filter((x) => x !== i) : [...k, i]))}>
-            {kept.includes(i) ? <><Check size={14} /> {t('pl.sv.keptToday')}</> : t('pl.sv.keepToday')}
+          <Button size="sm" variant={isKept ? 'ink' : 'ghost'} aria-pressed={isKept} onClick={toggle}>
+            {isKept ? <><Check size={14} /> {t('pl.sv.keptToday')}</> : t('pl.sv.keepToday')}
           </Button>
         </div>
       </div>
       <div className="mt-auto pt-5">
-        <p className="text-[14px] text-ink-2">{kept.length ? <>{t('pl.sv.kept', { list: kept.map((k) => d(SAVOURING_PROMPTS[k].kind).toLowerCase()).join(', ') })}</> : t('pl.sv.keepOne')}</p>
+        <p className="text-[14px] text-ink-2" role="status">{today.length ? <>{t('pl.sv.kept', { list: today.map((k) => d(kindOf(k.id)).toLowerCase()).join(', ') })}</> : t('pl.sv.keepOne')}</p>
         <div className="mt-5 border-t border-line pt-4">
           <Eyebrow>{t('pl.sv.earlier')}</Eyebrow>
-          <ul className="mt-2 space-y-1.5">
-            {SAVOURED_EARLIER.map((h) => (
-              <li key={h.day} className="grid grid-cols-[minmax(2.75rem,auto)_1fr] gap-2 text-[14px]">
-                <span className="eyebrow pt-0.5 text-ink-3">{day(h.day)}</span>
-                <span className="min-w-0 text-ink-2"><span className="text-ink">{d(h.kind)}</span> · {h.note}</span>
-              </li>
-            ))}
-          </ul>
+          {earlier.length === 0 ? (
+            <p className="mt-2 text-[14px] text-ink-3">{t('c.nothingYet')}</p>
+          ) : (
+            <ul className="mt-2 space-y-1.5">
+              {earlier.map((h) => (
+                <li key={`${h.date}-${h.id}`} className="grid grid-cols-[minmax(2.75rem,auto)_1fr] gap-2 text-[14px]">
+                  <span className="eyebrow pt-0.5 text-ink-3">{day(weekdayOf(h.date))}</span>
+                  <span className="min-w-0 text-ink-2"><span className="text-ink">{d(kindOf(h.id))}</span>{h.note ? <> · {h.note}</> : null}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </ToolCard>
@@ -248,6 +289,20 @@ function Films() {
   const { ledger } = useApp()
   const [removed] = useLedgerRemoved()
   const { t, d, dm, clock } = useSpaceText()
+  // Sharing runs under the Trust centre's Publishing consent (c_pub), read-only here.
+  const pub = useTrustConsent('c_pub')
+  // How many shares were just taken back, and why (switch off, or Publishing consent withdrawn).
+  const [takenBack, setTakenBack] = useState<{ n: number; why: 'off' | 'pub' } | null>(null)
+  const setOpt = (v: boolean) => {
+    setOptIn(v)
+    // Turning #MyMomentOfJoy off takes back every moment shared under it.
+    if (!v && shared.length) { setTakenBack({ n: shared.length, why: 'off' }); setShared([]) }
+    if (v) setTakenBack(null)
+  }
+  // A withdrawn Publishing consent takes every share back as well.
+  useEffect(() => {
+    if (!pub.on && shared.length) { setTakenBack({ n: shared.length, why: 'pub' }); setShared([]) }
+  }, [pub.on, shared, setShared])
   // Captions follow the Settings choice (joyos:acct:prefs); the film sheet can still switch them.
   const prefs = useA11yPrefs()
   const [cc, setCc] = useState(prefs.captions)
@@ -290,11 +345,19 @@ function Films() {
         ))}
       </ul>
       <div className="mt-6 rounded-2xl border border-line p-4">
-        <Toggle checked={optIn} onChange={setOptIn} label={<span className="inline-flex items-center gap-2"><Share2 size={15} aria-hidden /> #MyMomentOfJoy</span>} description={t('pl.fm.optDesc')} />
+        <Toggle checked={optIn} onChange={setOpt} label={<span className="inline-flex items-center gap-2"><Share2 size={15} aria-hidden /> #MyMomentOfJoy</span>} description={t('pl.fm.optDesc')} />
+        {takenBack && <p role="status" className="mt-3 flex items-start gap-2 text-[14px] text-ink-2"><Check size={14} className="mt-0.5 shrink-0" aria-hidden /> {t(takenBack.why === 'off' ? (takenBack.n === 1 ? 'pl.fm.takenBackOff1' : 'pl.fm.takenBackOff') : takenBack.n === 1 ? 'pl.fm.takenBackPub1' : 'pl.fm.takenBackPub', { n: takenBack.n })}</p>}
         <AnimatePresence initial={false}>
           {optIn && (
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-              <p className="pt-3 text-[14px] text-ink-2">{t('pl.fm.consent')}</p>
+              {pub.on ? (
+                <p className="pt-3 text-[14px] text-ink-2">{t('pl.fm.consent')}</p>
+              ) : (
+                <div className="mt-3 rounded-xl border border-line px-3.5 py-3 text-[14px] text-ink-2">
+                  <p>{t('pl.fm.pubOff')}</p>
+                  <Link to="/app/trust#consents" className="mt-1.5 inline-flex items-center gap-1 rounded text-ink underline-offset-4 hover:underline focus-ring">{t('pl.fm.pubTurnOn')} <ArrowRight size={14} /></Link>
+                </div>
+              )}
               {recent.length === 0 && <p className="mt-3 text-[14px] text-ink-2">{t('pl.fm.none')}</p>}
               <ul className="mt-3 space-y-2" aria-label={t('pl.fm.latest')}>
                 {recent.map((e) => {
@@ -311,7 +374,7 @@ function Films() {
                           <button type="button" className="rounded text-ink underline underline-offset-4 focus-ring" onClick={() => setShared((x) => x.filter((y) => y !== e.id))}>{t('pl.fm.takeBack')}</button>
                         </span>
                       ) : (
-                        <Button size="sm" onClick={() => setShared((x) => [...x, e.id])}><Share2 size={13} /> {t('pl.fm.share')}</Button>
+                        <Button size="sm" disabled={!pub.on} onClick={() => { setShared((x) => [...x, e.id]); setTakenBack(null) }}><Share2 size={13} /> {t('pl.fm.share')}</Button>
                       )}
                     </li>
                   )
@@ -381,8 +444,9 @@ function fmtSecs(n: number) {
   return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`
 }
 
-const SAVOURED_EARLIER = [
-  { day: 'Tue', kind: 'Absorption', note: 'Kurai Ondrum Illai, start to finish' },
-  { day: 'Mon', kind: 'Sharing with others', note: 'told Kavya about the Hosur apprentice' },
-  { day: 'Sun', kind: 'Temporal awareness', note: 'the light on the beach at 06:40' },
-]
+/** The specimen savouring history: prompts kept on the days before today, with what the member noted then. */
+const SAVOURED_START: KeptPrompt[] = [
+  { id: 'sv-absorption', note: 'Kurai Ondrum Illai, start to finish', back: 2 },
+  { id: 'sv-sharing', note: 'told Kavya about the Hosur apprentice', back: 3 },
+  { id: 'sv-temporal', note: 'the light on the beach at 06:40', back: 4 },
+].map(({ id, note, back }) => ({ date: addDays(SPECIMEN_TODAY, -back), id, text: SAVOURING_PROMPTS.find((x) => x.id === id)!.text, note }))

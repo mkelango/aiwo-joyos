@@ -7,6 +7,10 @@ export const METHOD = {
   titleSerif: { en: 'made', ta: 'உருவாகிறது', hi: 'बनता' },
   titleB: { en: '.', ta: '.', hi: ' है।' },
   lead: { en: 'Every score in Joy OS says “method v1.0”. This is that method, in full: the formula, the instruments, and what we never do.', ta: 'Joy OS-இல் ஒவ்வொரு மதிப்பெண்ணும் “method v1.0” என்று சொல்கிறது. அந்த முறை இதோ, முழுமையாக: சூத்திரம், அளவுகருவிகள், நாங்கள் ஒருபோதும் செய்யாதவை.', hi: 'Joy OS का हर स्कोर “method v1.0” कहता है। यह रहा वह तरीका, पूरा: फ़ॉर्मूला, प्रश्नावलियाँ, और जो हम कभी नहीं करते।' },
+  // The word equation (Playbook p44: set once, set verbatim) and the credit for the word.
+  equation: { en: 'Joyspan, in words', ta: 'ஜாய்ஸ்பான், சொற்களில்', hi: 'जॉयस्पैन, शब्दों में' },
+  equationNote: { en: 'Set verbatim, in English, everywhere it appears.', ta: 'எங்கு வந்தாலும் ஆங்கிலத்தில், எழுதியபடியே அமைக்கப்படுகிறது.', hi: 'जहाँ भी आए, अंग्रेज़ी में, हूबहू लिखा जाता है।' },
+  credit: { en: 'The word Joyspan is credited to Dr Kerry Burnight.', ta: 'Joyspan என்ற சொல்லுக்கான பெருமை Dr Kerry Burnight அவர்களுக்கு உரியது.', hi: 'Joyspan शब्द का श्रेय Dr Kerry Burnight को जाता है।' },
   formula: { en: 'The formula', ta: 'சூத்திரம்', hi: 'फ़ॉर्मूला' },
   formulaBody: { en: 'The geometric mean of five terms rewards balance: one low term pulls the Index down more than an average would. Burden (B) is subtracted with λ = {lambda}. Bounded 0–100.', ta: 'ஐந்து அம்சங்களின் பெருக்கல் சராசரி (geometric mean) சமநிலைக்கு மதிப்பளிக்கிறது: ஒரு குறைந்த அம்சம், சாதாரண சராசரியை விட குறியீட்டை அதிகம் கீழே இழுக்கும். சுமை (B) λ = {lambda} கொண்டு கழிக்கப்படுகிறது. வரம்பு 0–100.', hi: 'पाँच पहलुओं का ज्यामितीय माध्य (geometric mean) संतुलन को महत्व देता है: एक कमज़ोर पहलू इंडेक्स को साधारण औसत से ज़्यादा नीचे खींचता है। बोझ (B) को λ = {lambda} से घटाया जाता है। सीमा 0–100।' },
   worked: { en: 'A worked example', ta: 'ஒரு செய்முறை எடுத்துக்காட்டு', hi: 'एक उदाहरण, हल करके' },

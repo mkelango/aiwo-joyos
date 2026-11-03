@@ -37,12 +37,13 @@ import { useTheme } from '@/theme/ThemeProvider'
 import { COUPLES_CHECK, HOUSEHOLD_MINOR, KAVYA_SHARED, SPECIMEN_NOW, type Grant, type GrantScope } from '@/screens/b/accountData'
 import { PLANS } from '@/screens/b/_data'
 import { accountStore, householdKindStore, refCode, useStore } from '@/screens/b/bStore'
+import { useApp } from '@/lib/store'
 import { CharterCard, FjoOffice, KindCard } from '@/screens/b/charter'
-import { ChoiceCard, Done, Field, KeyValue, shareOrCopy, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
+import { ChoiceCard, Done, Field, KeyValue, shareOrCopy, useAccount, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
 import { HOUSE, THEME_TEXT } from '@/screens/b/i18n/household'
 import { RELATION_TEXT } from '@/screens/b/i18n/account'
-import { BAND, useCommon, useTx } from '@/screens/b/i18n/common'
+import { BAND, LEDGER_TAG, useCommon, useTx } from '@/screens/b/i18n/common'
 
 // HOUSEHOLD (Memo p.19, "made for two, welcoming to one"): partners scored separately,
 // elder mode with a helper by the elder's consent, minors never scored, share grants both
@@ -77,7 +78,16 @@ function Household() {
   const [toast, setToast] = useState<string | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [helperOpen, setHelperOpen] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [lkWithdrawOpen, setLkWithdrawOpen] = useState(false)
   const [acct, setAcct] = useStore(accountStore)
+  // Signed in as Lakshmi (M1), this is her household: her settings are hers to change.
+  const account = useAccount()
+  const asLakshmi = account.id === 'lakshmi'
+  const { setTextSize } = useApp()
+  const elder = acct.elder
+  const helperSince = elder.helperSince ?? '2027-01-08'
+  const setElder = (p: Partial<typeof elder>) => setAcct((a) => ({ ...a, elder: { ...a.elder, ...p } }))
   // Share grants are kept with the account, so a proposal or revoke holds on return.
   const grants = acct.grants
   const setGrants = (fn: (gs: Grant[]) => Grant[]) => setAcct((a) => ({ ...a, grants: fn(a.grants) }))
@@ -107,12 +117,25 @@ function Household() {
   const indexShared = mutual('index')
   const live = grants.filter((g) => g.state !== 'revoked')
 
-  const members = [
-    { person: arjun, role: t('roleYou'), detail: t('detailYou'), tags: [t('indexTag', { v: me.value }), PLANS.find((p) => p.key === acct.plan)?.name ?? t('plus')] },
-    { person: kavya, role: t('rolePartner'), detail: t('detailPartner'), tags: [t('ownIndex'), t('ownConsents')] },
-    { person: lakshmi, role: t('roleMother'), detail: t('detailMother'), tags: [t('elderMode'), t('helperArjun')] },
-    { person: HOUSEHOLD_MINOR, role: t('roleDaughter'), detail: t('detailDaughter'), tags: [t('notScored'), t('parentalConsent')] },
-  ]
+  const lakshmiDetail = elder.helper ? t('detailMother', { date: fmtDate(helperSince) }) : t('detailMotherNone')
+  const members = asLakshmi
+    ? [
+        { person: lakshmi, role: t('lkYou'), detail: t('lkDetailYou'), tags: [] as string[] },
+        { person: arjun, role: elder.helper ? t('lkSonHelper') : t('lkSon'), detail: t('lkDetailOwn'), tags: [t('ownIndex'), t('ownConsents')] },
+        { person: kavya, role: t('lkDaughterInLaw'), detail: t('lkDetailOwn'), tags: [t('ownIndex'), t('ownConsents')] },
+        { person: HOUSEHOLD_MINOR, role: t('lkGranddaughter'), detail: t('lkDetailMinor'), tags: [t('notScored')] },
+      ]
+    : [
+        { person: arjun, role: t('roleYou'), detail: t('detailYou'), tags: [t('indexTag', { v: me.value }), PLANS.find((p) => p.key === acct.plan)?.name ?? t('plus')] },
+        { person: kavya, role: t('rolePartner'), detail: t('detailPartner'), tags: [t('ownIndex'), t('ownConsents')] },
+        { person: lakshmi, role: t('roleMother'), detail: lakshmiDetail, tags: [t('elderMode'), t('helperArjun')] },
+        { person: HOUSEHOLD_MINOR, role: t('roleDaughter'), detail: t('detailDaughter'), tags: [t('notScored'), t('parentalConsent')] },
+      ]
+  // Lakshmi's own large-type choice also sets this phone's text size.
+  const setLargeType = (v: boolean) => {
+    setElder({ largeType: v })
+    if (asLakshmi) setTextSize(v ? 'large' : 'default')
+  }
 
   return (
     <Screen>
@@ -146,18 +169,25 @@ function Household() {
             </View>
             <Meta>{m.detail}</Meta>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-              {(m.person.id === lakshmi.id ? [acct.elder.largeType || acct.elder.voice ? t('elderMode') : t('standardMode'), acct.elder.helper ? t('helperArjun') : t('noHelper')] : m.tags).map((tag) => (
+              {(m.person.id === lakshmi.id ? [elder.largeType || elder.voice ? t('elderMode') : t('standardMode'), elder.helper ? t('helperArjun') : elder.asked ? t('elAskedPill') : t('noHelper')] : m.tags).map((tag) => (
                 <Pill key={tag}>{tag}</Pill>
               ))}
             </View>
             {m.person.id === lakshmi.id ? (
-              <Button variant="secondary" size="sm" icon="sliders" onPress={() => setHelperOpen(true)}>
-                {t('helperSettings')}
-              </Button>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s1 }}>
+                <Button variant="secondary" size="sm" icon="sliders" onPress={() => setHelperOpen(true)}>
+                  {asLakshmi ? t('lkSettings') : t('helperSettings')}
+                </Button>
+                {asLakshmi ? null : (
+                  <Button variant="ghost" size="sm" icon="smartphone" onPress={() => setPreviewOpen(true)}>
+                    {t('pvOpen')}
+                  </Button>
+                )}
+              </View>
             ) : null}
           </Card>
         ))}
-        {acct.invites.map((iv) => (
+        {(asLakshmi ? [] : acct.invites).map((iv) => (
           <Card key={iv.id} tone="outline" style={{ gap: 4 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
               <Body weight="medium">{iv.name}</Body>
@@ -169,9 +199,11 @@ function Household() {
             </Button>
           </Card>
         ))}
-        <Button variant="secondary" icon="user-plus" onPress={() => setInviteOpen(true)}>
-          {t('invite')}
-        </Button>
+        {asLakshmi ? null : (
+          <Button variant="secondary" icon="user-plus" onPress={() => setInviteOpen(true)}>
+            {t('invite')}
+          </Button>
+        )}
       </View>
 
       {kindRec.kind === 'fjo' ? (
@@ -186,6 +218,13 @@ function Household() {
         />
       ) : null}
 
+      {asLakshmi ? (
+        <Card tone="sunk" style={{ flexDirection: 'row', gap: 10 }}>
+          <Icon name="lock" size={16} color={c.ink3} />
+          <Meta style={{ flex: 1 }}>{t('lkCouple')}</Meta>
+        </Card>
+      ) : (
+      <>
       {/* Household page */}
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{t('page')}</SectionTitle>
@@ -308,6 +347,9 @@ function Household() {
         </Card>
       </View>
 
+      </>
+      )}
+
       {/* Charter */}
       <CharterCard isPatron={isPatron} adults={[arjun, kavya, lakshmi].map((p) => p.name.split(' ')[0])} minor={HOUSEHOLD_MINOR.name.split(' ')[0]} onToast={toastAfterSheet} />
 
@@ -317,28 +359,100 @@ function Household() {
         onInvite={(iv) => setAcct((a) => ({ ...a, invites: [...a.invites, iv] }))}
       />
 
-      <Sheet open={helperOpen} onClose={() => setHelperOpen(false)} title={t('lakshmiSettings')} footer={<Button variant="secondary" block onPress={() => setHelperOpen(false)}>{tc('done')}</Button>}>
-        <Meta>{t('lakshmiBody')}</Meta>
-        <Toggle checked={acct.elder.largeType} onChange={(v) => setAcct((a) => ({ ...a, elder: { ...a.elder, largeType: v } }))} label={t('larger')} description={t('largerD')} />
-        <Toggle checked={acct.elder.voice} onChange={(v) => setAcct((a) => ({ ...a, elder: { ...a.elder, voice: v } }))} label={t('voice')} description={t('voiceD')} />
+      <Sheet open={helperOpen} onClose={() => setHelperOpen(false)} title={asLakshmi ? t('lkSettings') : t('lakshmiSettings')} footer={<Button variant="secondary" block onPress={() => setHelperOpen(false)}>{tc('done')}</Button>}>
+        <Meta>{asLakshmi ? t('lkSettingsBody') : t('lakshmiBody')}</Meta>
+        {/* Her helper changes these only while he is her helper; she always can. */}
+        <Toggle checked={elder.largeType} disabled={!asLakshmi && !elder.helper} onChange={setLargeType} label={t('larger')} description={asLakshmi ? `${t('largerD')} ${t('lkTextNote')}` : t('largerD')} />
+        <Toggle checked={elder.voice} disabled={!asLakshmi && !elder.helper} onChange={(v) => setElder({ voice: v })} label={t('voice')} description={t('voiceD')} />
+        {!asLakshmi && !elder.helper ? <Meta size={14} tone="ink3">{t('elHelperOnly')}</Meta> : null}
         <Divider />
         <Eyebrow>{t('helperConsent')}</Eyebrow>
-        {acct.elder.helper ? (
+        {asLakshmi ? (
+          elder.helper ? (
+            <>
+              <Body>{t('lkHelperOn', { date: fmtDate(helperSince) })}</Body>
+              {lkWithdrawOpen ? (
+                <Card tone="sunk" padding={16} style={{ gap: space.s1 }}>
+                  <Body>{t('lkWithdrawQ')}</Body>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s1, justifyContent: 'flex-end' }}>
+                    <Button variant="ghost" size="sm" onPress={() => setLkWithdrawOpen(false)}>{tc('keepIt')}</Button>
+                    <Button
+                      variant="ink"
+                      size="sm"
+                      icon="rotate-ccw"
+                      onPress={() => {
+                        setElder({ helper: false, asked: false })
+                        setLkWithdrawOpen(false)
+                        setHelperOpen(false)
+                        toastAfterSheet(t('lkWithdrawn'))
+                      }}
+                    >
+                      {t('lkWithdrawYes')}
+                    </Button>
+                  </View>
+                </Card>
+              ) : (
+                <Button variant="secondary" icon="user-x" onPress={() => setLkWithdrawOpen(true)}>
+                  {t('lkWithdraw')}
+                </Button>
+              )}
+            </>
+          ) : elder.asked ? (
+            <>
+              <Body>{t('lkAsked')}</Body>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s1 }}>
+                <Button variant="ink" size="sm" icon="check" onPress={() => { setElder({ helper: true, asked: false, helperSince: SPECIMEN_NOW }); setHelperOpen(false); toastAfterSheet(t('lkAgreed')) }}>
+                  {t('lkAgree')}
+                </Button>
+                <Button variant="ghost" size="sm" onPress={() => setElder({ asked: false })}>
+                  {t('lkNotNow')}
+                </Button>
+              </View>
+            </>
+          ) : (
+            <Body>{t('lkNone')}</Body>
+          )
+        ) : elder.helper ? (
           <>
-            <Body>{t('helperBody')}</Body>
-            <Button variant="secondary" icon="user-x" onPress={() => setAcct((a) => ({ ...a, elder: { ...a.elder, helper: false } }))}>
+            <Body>{t('helperBody', { date: fmtDate(helperSince) })}</Body>
+            <Button variant="secondary" icon="user-x" onPress={() => setElder({ helper: false, asked: false })}>
               {t('stepBack')}
             </Button>
           </>
+        ) : elder.asked ? (
+          // Asking again goes through Lakshmi's own consent: nothing changes until she agrees.
+          <View style={{ gap: space.s1 }} accessibilityLiveRegion="polite">
+            <Pill tone="daybreak">{t('elAskedPill')}</Pill>
+            <Body>{t('elAsked')}</Body>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s2 }}>
+              <Button variant="link" onPress={() => { setElder({ helper: true, asked: false, helperSince: SPECIMEN_NOW }); setHelperOpen(false); toastAfterSheet(t('elAdded')) }}>
+                {t('elAgreeDemo')}
+              </Button>
+              <Button variant="link" onPress={() => { setElder({ asked: false }); setHelperOpen(false); toastAfterSheet(t('elDeclined')) }}>
+                {t('elDeclineDemo')}
+              </Button>
+              <Button variant="link" onPress={() => setElder({ asked: false })}>
+                {t('elWithdrawAsk')}
+              </Button>
+            </View>
+            <Meta size={14} tone="ink3">{t('elDemoNote')}</Meta>
+          </View>
         ) : (
           <>
             <Done>{t('noLonger')}</Done>
-            <Button variant="link" onPress={() => setAcct((a) => ({ ...a, elder: { ...a.elder, helper: true } }))}>
+            <Button variant="secondary" icon="send" onPress={() => setElder({ asked: true })}>
               {t('askAgain')}
             </Button>
           </>
         )}
+        {asLakshmi ? null : (
+          <Button variant="ghost" icon="smartphone" onPress={() => { setHelperOpen(false); setTimeout(() => setPreviewOpen(true), 350) }}>
+            {t('pvOpen')}
+          </Button>
+        )}
       </Sheet>
+
+      <ElderPreview open={previewOpen} onClose={() => setPreviewOpen(false)} elder={elder} />
 
       <ShareSheet
         open={shareOpen}
@@ -603,6 +717,96 @@ function InviteSheet({ open, onClose, onInvite }: { open: boolean; onClose: () =
           ) : null}
         </>
       )}
+    </Sheet>
+  )
+}
+
+const PREVIEW_TAGS = ['People', 'Food', 'Faith', 'Music']
+
+/** Lakshmi's Today with her elder-mode settings: large type, voice first, one thing per screen. Nothing is kept. */
+function ElderPreview({ open, onClose, elder }: { open: boolean; onClose: () => void; elder: { largeType: boolean; voice: boolean; helper: boolean } }) {
+  const { c, space, radius } = useTheme()
+  const t = useDict(HOUSE)
+  const tc = useCommon()
+  const tx = useTx()
+  const [did, setDid] = useState(false)
+  const [kept, setKept] = useState<string | null>(null)
+  const [reading, setReading] = useState(false)
+  const [spoken, setSpoken] = useState<string | null>(null)
+  const [calling, setCalling] = useState(false)
+  // Each opening starts fresh: nothing in the preview is kept.
+  useEffect(() => {
+    if (open) {
+      setDid(false)
+      setKept(null)
+      setReading(false)
+      setSpoken(null)
+      setCalling(false)
+    }
+  }, [open])
+  const big = elder.largeType
+  const body = big ? 21 : 16
+  const head = big ? 32 : 23
+  const btnH = big ? 56 : 44
+  const tag = (x: string) => tx(LEDGER_TAG[x], x)
+  const PillBtn = ({ label, on, onPress, icon }: { label: string; on?: boolean; onPress: () => void; icon?: 'phone' | 'mic' | 'volume-2' }) => (
+    <Button variant={on ? 'ink' : 'secondary'} icon={icon} onPress={onPress} accessibilityLabel={label} style={{ minHeight: btnH }}>
+      {label}
+    </Button>
+  )
+  return (
+    <Sheet open={open} onClose={onClose} title={t('pvTitle')} footer={<Button variant="secondary" block onPress={onClose}>{tc('close')}</Button>}>
+      <Meta>{t('pvNote')}</Meta>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+        <Pill>{big ? t('pvLarge') : t('pvStandard')}</Pill>
+        {elder.voice ? <Pill>{t('voice')}</Pill> : null}
+        <Pill>{elder.helper ? t('helperArjun') : t('noHelper')}</Pill>
+      </View>
+      {/* The phone */}
+      <View accessibilityLabel={t('pvTitle')} style={{ borderRadius: 36, borderWidth: 8, borderColor: c.inkGround, backgroundColor: c.paper, padding: space.s2 + 4, gap: space.s2, alignSelf: 'stretch' }}>
+        <Body size={head} style={{ lineHeight: head * 1.15 }}>{t('pvGreeting')}</Body>
+        {elder.voice ? (
+          <View style={{ gap: 6 }}>
+            <PillBtn label={t('pvHear')} icon="volume-2" on={reading} onPress={() => setReading((r) => !r)} />
+            {reading ? <Meta size={Math.max(14, body - 4)} accessibilityLiveRegion="polite">{t('pvReading')}</Meta> : null}
+          </View>
+        ) : null}
+        <View style={{ backgroundColor: c.paperSunk, borderRadius: radius.card, padding: 16, gap: 10 }}>
+          <Eyebrow>{t('pvOneThing')}</Eyebrow>
+          <Body size={body}>{t('pvAction')}</Body>
+          {did ? (
+            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }} accessibilityLiveRegion="polite">
+              <Icon name="check" size={big ? 22 : 17} color={c.ink2} />
+              <Body size={body} tone="ink2" style={{ flex: 1 }}>{t('pvThanks')}</Body>
+            </View>
+          ) : (
+            <PillBtn label={t('pvDidIt')} on onPress={() => setDid(true)} />
+          )}
+        </View>
+        <View style={{ gap: 8 }}>
+          <Body size={body}>{t('pvLedgerQ')}</Body>
+          {elder.voice ? <PillBtn label={t('pvSpeak')} icon="mic" onPress={() => setSpoken('Kavya made pongal for me')} /> : null}
+          {spoken ? <Body size={body} tone="ink2" accessibilityLiveRegion="polite">{t('pvSpoken', { text: spoken })}</Body> : null}
+          <View style={{ flexDirection: big ? 'column' : 'row', flexWrap: 'wrap', gap: 8 }}>
+            {PREVIEW_TAGS.map((x) => (
+              <PillBtn key={x} label={tag(x)} on={kept === x} onPress={() => setKept(x)} />
+            ))}
+          </View>
+          {kept ? <Meta accessibilityLiveRegion="polite">{t('pvSaved', { tag: tag(kept) })}</Meta> : null}
+        </View>
+        <View style={{ borderWidth: 1, borderColor: c.line, borderRadius: radius.card, padding: 16, gap: 8 }}>
+          {elder.helper ? (
+            <>
+              <Body size={body}>{t('pvHelper')}</Body>
+              <PillBtn label={t('pvCallHelper')} icon="phone" onPress={() => setCalling(true)} />
+              {calling ? <Meta size={13} tone="ink3" accessibilityLiveRegion="polite">{t('pvCalling')}</Meta> : null}
+            </>
+          ) : (
+            <Body size={body} tone="ink2">{t('pvNoHelper')}</Body>
+          )}
+        </View>
+      </View>
+      <Eyebrow style={{ textAlign: 'center' }}>{t('pvOnly')}</Eyebrow>
     </Sheet>
   )
 }

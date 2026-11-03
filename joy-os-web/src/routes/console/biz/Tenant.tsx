@@ -10,7 +10,8 @@ import { termByKey, termColor } from '@/data/terms'
 import type { TermKey } from '@/domain/types'
 import { AGG_COHORTS, AGG_PERIODS, EAP_ROUTING, INSURER, INSURER_FLAGS, INSURER_PROFILE, TENANT_FLAGS, TENANT_KIND, TENANT_PROFILE, publishedDepartments, type AdminRole, type AggCohortKey, type AggPeriod, type PublishedDept, type TenantKind } from './_data'
 import { AGG_TERMS, AggregateFilters, ApiAccessCard, BrandLineCard, ClinicalFeaturesCard, type AggTermFilter } from './_tenantExtras'
-import { AccessNote, CardHead, ChartLead, Field, Kpi, Legend, Meter, Row, ScrollTabs, StatusTag, Swatch, downloadHtml, esc, fieldCls, fmtDate, inr, pct, tabPanelProps, tick, tipLabel, tipStyle, useTabParam } from './_parts'
+import { PreviewBanner, useConsoleAccess } from '../care/_gate'
+import { AccessNote, CanActProvider, CardHead, ChartLead, Field, Kpi, Legend, Meter, Row, ScrollTabs, StatusTag, Swatch, Writes, downloadHtml, esc, fieldCls, fmtDate, inr, pct, tabPanelProps, tick, tipLabel, tipStyle, useCanAct, useTabParam } from './_parts'
 
 // TENANT ADMIN (Memo p.25; Architecture p.24): Joyspan@Work and insurer tenants.
 // Aggregates only: k ≥ 10 for any cell, employers see groups of 50 or more, no drill-down,
@@ -45,6 +46,8 @@ export default function Tenant() {
   const seen = useRef(new Set<string>())
   seen.current.add(`${view}:${tab}`)
   const cfg = TENANT_KIND[view]
+  // The tenant admin acts here; every other role sees a read-only preview (the care gate).
+  const { canAct } = useConsoleAccess('/console/tenant')
 
   const addReport = (v: View) => setReports((r) => (r[v].some((x) => x.id === NEXT_REPORT[v].id) ? r : { ...r, [v]: [{ ...NEXT_REPORT[v], date: '28 Jan 2027', downloads: 0 }, ...r[v]] }))
   const countDownload = (v: View, id: string) => setReports((r) => ({ ...r, [v]: r[v].map((x) => (x.id === id ? { ...x, downloads: x.downloads + 1 } : x)) }))
@@ -57,9 +60,10 @@ export default function Tenant() {
       </Card>
     )
     if (t === 'outcomes') return <>{k === 'employer' ? <Outcomes /> : <InsurerOutcomes />}{library}</>
-    if (t === 'enrolment') return <Enrolment kind={k} />
-    if (t === 'access') return <Access kind={k} stepUp={stepUp[k]} setStepUp={(v) => setStepUp((x) => ({ ...x, [k]: v }))} />
-    return <Settings kind={k} lastPublished={reports[k][0].date} />
+    // Enrolment, sign-in and settings are all writes: one switch turns each panel off for a role that cannot act.
+    if (t === 'enrolment') return <Writes><Enrolment kind={k} /></Writes>
+    if (t === 'access') return <Writes><Access kind={k} stepUp={stepUp[k]} setStepUp={(v) => setStepUp((x) => ({ ...x, [k]: v }))} /></Writes>
+    return <Writes><Settings kind={k} lastPublished={reports[k][0].date} /></Writes>
   }
 
   return (
@@ -83,6 +87,8 @@ export default function Tenant() {
         }
       />
 
+      <PreviewBanner path="/console/tenant" />
+
       <AccessNote icon="shield" className="mb-8">
         <span className="text-ink">AIWO, not the {view === 'employer' ? 'employer' : 'insurer'}, holds the data.</span> This console shows aggregates only: groups of {cfg.group} or more, small cells suppressed and rounded, no drill-down to individuals and no free text. Ease screens, journals and any term below the aggregate never reach a tenant.
       </AccessNote>
@@ -101,6 +107,7 @@ export default function Tenant() {
         ]}
       />
 
+      <CanActProvider value={canAct}>
       {VIEWS.map((k) =>
         TABS.map((t) => {
           const id = `${k}:${t}`
@@ -119,6 +126,7 @@ export default function Tenant() {
       <Sheet open={reportOpen} onClose={() => setReportOpen(false)} title="Quarterly aggregate report">
         <ReportSheet key={view} view={view} reports={reports[view]} stepUp={stepUp[view]} onPrepared={() => addReport(view)} onDownloaded={(id) => countDownload(view, id)} />
       </Sheet>
+      </CanActProvider>
     </div>
   )
 }
@@ -128,7 +136,9 @@ export default function Tenant() {
 function ReportSheet({ view, reports, stepUp, onPrepared, onDownloaded }: { view: View; reports: Report[]; stepUp: boolean; onPrepared: () => void; onDownloaded: (id: string) => void }) {
   const ready = reports.some((r) => r.id === NEXT_REPORT[view].id)
   const [phase, setPhase] = useState<'idle' | 'preparing' | 'done'>(ready ? 'done' : 'idle')
+  const canAct = useCanAct()
   const prepare = () => {
+    if (!canAct) return
     setPhase('preparing')
     window.setTimeout(() => { onPrepared(); setPhase('done') }, 900)
   }
@@ -150,7 +160,8 @@ function ReportSheet({ view, reports, stepUp, onPrepared, onDownloaded }: { view
         <p className="mt-1">Names, member IDs, individual scores, Ease results, journal text, free-text answers, or any cell under ten.</p>
       </div>
       <div className="mt-6" aria-live="polite">
-        {phase === 'idle' && <Button variant="ink" onClick={prepare}>Prepare the report</Button>}
+        {phase === 'idle' && <Button variant="ink" onClick={prepare} disabled={!canAct}>Prepare the report</Button>}
+        {phase === 'idle' && !canAct && <p className="mt-2 text-[13px] text-ink-3">View only. The tenant admin prepares and downloads reports.</p>}
         {phase === 'preparing' && (
           <div>
             <p className="text-[15px] text-ink">Preparing {NEXT_REPORT[view].id}: suppressing small cells and pinning the method…</p>
@@ -207,7 +218,7 @@ function ReportLibrary({ view, reports, stepUp, onDownloaded, className }: { vie
   }
 
   return (
-    <div className={className}>
+    <Writes className={className}>
       <ul className="divide-y divide-line">
         {reports.map((r) => (
           <li key={r.id} className="py-3">
@@ -237,7 +248,7 @@ function ReportLibrary({ view, reports, stepUp, onDownloaded, className }: { vie
           </li>
         ))}
       </ul>
-    </div>
+    </Writes>
   )
 }
 
@@ -496,6 +507,7 @@ type Wave = { id: string; name: string; sent: string; invited: number; opened: n
 
 function Enrolment({ kind }: { kind: View }) {
   const cfg = TENANT_KIND[kind]
+  const canAct = useCanAct()
   const inputId = useId()
   const [upload, setUpload] = useState<UploadState>({ phase: 'idle' })
   const [drag, setDrag] = useState(false)
@@ -537,6 +549,7 @@ function Enrolment({ kind }: { kind: View }) {
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     setDrag(false)
+    if (!canAct) return
     const f = e.dataTransfer.files?.[0]
     if (f) take(f.name)
   }
@@ -573,7 +586,7 @@ function Enrolment({ kind }: { kind: View }) {
             <p className="mt-3 text-[16px] text-ink">Drop a .csv file here</p>
             <p className="mt-1 text-[14px] text-ink-2">or</p>
             <div className="mt-3 flex flex-wrap justify-center gap-2">
-              <label htmlFor={inputId} className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-full border border-line-strong bg-paper-raised px-4 text-[15px] font-medium text-ink hover:bg-paper-sunk focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-daybreak">
+              <label htmlFor={inputId} className={clsx('inline-flex h-11 items-center gap-2 rounded-full border border-line-strong bg-paper-raised px-4 text-[15px] font-medium text-ink focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-daybreak', canAct ? 'cursor-pointer hover:bg-paper-sunk' : 'cursor-not-allowed opacity-50')}>
                 <FileSpreadsheet size={16} aria-hidden /> Choose a file
                 <input id={inputId} type="file" accept=".csv,text/csv" className="sr-only" onChange={onFile} />
               </label>

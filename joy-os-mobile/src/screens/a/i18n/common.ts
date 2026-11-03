@@ -44,4 +44,10 @@ export const COMMON = dict({
   // Shared specimen: circle
   'Monday 7 pm': ['திங்கள் இரவு 7 மணி', 'सोमवार शाम 7 बजे'],
   'Circle of eight · Fairmont January': ['எட்டு பேர் வட்டம் · Fairmont ஜனவரி', 'आठ लोगों का सर्कल · Fairmont जनवरी'],
+  // Minors gate (parts NotScored) and VIVA run in a room or tool (vivaParts)
+  'Under 18 · not scored': ['18-க்குக் கீழ் · மதிப்பெண் இல்லை', '18 से कम · स्कोर नहीं'],
+  'Not scored while under 18.': ['18 வயதுக்குக் கீழ் இருக்கும்வரை மதிப்பெண் இல்லை.', '18 से कम उम्र तक कोई स्कोर नहीं।'],
+  'You asked: {ask}': ['நீங்கள் கேட்டது: {ask}', 'आपने पूछा: {ask}'],
+  'VIVA is drafting…': ['VIVA வரைந்துகொண்டிருக்கிறது…', 'VIVA मसौदा लिख रहा है…'],
+  'Drafted by VIVA · method v1.0 · no diagnosis, no advice': ['VIVA வரைந்தது · முறை v1.0 · நோயறிதல் இல்லை, ஆலோசனை இல்லை', 'VIVA का मसौदा · विधि v1.0 · न निदान, न सलाह'],
 })

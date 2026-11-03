@@ -4,13 +4,13 @@ import { ArrowRight, Check, CreditCard, MapPin, Quote as QuoteIcon, Stethoscope 
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Delta, Eyebrow, MethodLine, SpecimenTag, TermChip, TermDot, useFmtDate } from '@/components/joy/primitives'
-import { Avatar, Button, Card, EmptyState, LoopRing, PageHeader, Pill, SectionTitle, Tabs, Toggle } from '@/components/ui'
+import { Avatar, Button, Card, LoopRing, PageHeader, Pill, SectionTitle, Tabs, Toggle } from '@/components/ui'
 import { CATIONS, CATION_PHASES, CIRCLE } from '@/data/platform'
 import { INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
 import { TERMS } from '@/data/terms'
 import type { TermKey } from '@/domain/types'
 import { MY_CATION, SIGNAL_READINGS } from './_data'
-import { HereMarker, OccasionsCard, PrimaryChip, fade } from './_parts'
+import { HereMarker, JourneyEmpty, OccasionsCard, PrimaryChip, fade } from './_parts'
 import { addDays, setDemoNoCation, useJourney } from './_store'
 import { useJ } from './_i18n'
 
@@ -66,7 +66,7 @@ export default function CationHome() {
             <p className="mt-2 text-[1.5rem] font-light leading-snug text-ink">{t('cationAt', { name: joycation.name, venue: MY_CATION.venue })}</p>
             <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px] text-ink-2">
               <span className="num">{fmtDate(MY_CATION.arrived)} – {fmtDate(MY_CATION.checkedOut)}</span>
-              <span aria-hidden>·</span><span>{t('nightsN', { n: parseInt(joycation.nights, 10) })}</span>
+              <span aria-hidden>·</span><span>{r('nightsN', { n: parseInt(joycation.nights, 10) })}</span>
               <span aria-hidden>·</span><span className="num">{MY_CATION.bookingRef}</span>
             </p>
           </div>
@@ -99,7 +99,7 @@ export default function CationHome() {
                 <div className="min-w-0 lg:mt-4">
                   <p className="eyebrow text-ink-3">{tx(ph.when)}</p>
                   <p className={clsx('mt-1 break-words text-[17px]', st === 'next' ? 'text-ink-2' : 'text-ink')}>{tx(ph.name)}</p>
-                  {st === 'now' && <div className="mt-2"><HereMarker label={t('youAreHere', { day: MEMBER.dayOfLoop })} /></div>}
+                  {st === 'now' && <div className="mt-2"><HereMarker label={r('youAreHere', { day: MEMBER.dayOfLoop })} /></div>}
                   <p className="mt-2 text-[14px] leading-relaxed text-ink-2 lg:pr-2">{tx(ph.what)}</p>
                   <span className="sr-only">{t(st === 'done' ? 'completed' : st === 'now' ? 'current' : 'upcomingSr')}</span>
                 </div>
@@ -197,7 +197,7 @@ export default function CationHome() {
           <LoopRing day={MEMBER.dayOfLoop} size={96} />
           <div>
             <Eyebrow>{t('ninetyEyebrow')}</Eyebrow>
-            <p className="mt-2 text-[17px] text-ink">{r('ninetyBody', { day: String(MEMBER.dayOfLoop), coach: coachFirst, date: fmtDate(reviewOn), name: joycation.name, measure: <span className="text-ink">{tx(joycation.day90Measure)}</span> })}</p>
+            <p className="mt-2 text-[17px] text-ink">{r('ninetyBody', { day: MEMBER.dayOfLoop, d45: 45, d90: 90, d76: 76, coach: coachFirst, date: { n: fmtDate(reviewOn) }, name: joycation.name, measure: <span className="text-ink">{tx(joycation.day90Measure)}</span> })}</p>
             <ol className="mt-4 flex flex-wrap gap-2" aria-label={t('milestonesAria')}>
               {([['0', 'ms_checkout'], ['15', 'ms_review'], ['45', 'ms_review'], ['60', 'ms_next'], ['76', 'ms_remeasure'], ['90', 'ms_delta']] as const).map(([d, k]) => {
                 const past = Number(d) <= MEMBER.dayOfLoop
@@ -223,9 +223,9 @@ export default function CationHome() {
               <span className="eyebrow text-ink-3">{r('lowestTermScore', { v: { n: latest.terms.find((x) => x.key === latest.lowestTerm)?.value ?? '' } })}</span>
             </div>
             <h2 className="mt-4 text-[2rem] font-light leading-tight text-ink">{suggested.name}</h2>
-            <p className="mt-2 text-[17px] text-ink-2">{t('suggestedBody', { promise: tx(suggested.promise), lowest: lowestName, day: MEMBER.dayOfLoop, coach: coachFirst })}</p>
+            <p className="mt-2 text-[17px] text-ink-2">{r('suggestedBody', { promise: tx(suggested.promise), lowest: lowestName, day: MEMBER.dayOfLoop, d60: 60, coach: coachFirst })}</p>
             <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-[14px] text-ink-2">
-              <li>{t('nightsN', { n: parseInt(suggested.nights, 10) })}</li>
+              <li>{r('nightsN', { n: parseInt(suggested.nights, 10) })}</li>
               <li className="flex items-center gap-1"><MapPin size={14} /> {suggested.venues.map((v) => tx(v)).join(' · ')}</li>
               <li>{r('fromPrice', { p: <span className="num text-ink">{suggested.priceFrom}</span> })}</li>
             </ul>
@@ -282,7 +282,8 @@ function Catalogue({ suggestedSlug, noCation = false }: { suggestedSlug: string;
 
         {filter === latest.lowestTerm && lowestCations.length > 0 && (
           <div className="mb-6">
-            <EmptyState
+            <JourneyEmpty
+              kind="cation"
               title={r('emptyLowestTitle', { name: lowestName })}
               body={t('emptyLowestBody', { list: lowestCations.map((c) => c.name).join(t('andJoin')) })}
               action={<Link to={lowestReq ? `/app/cation/${lowestReq.slug}#request` : `/app/cation/${suggested.slug}`} className="inline-flex h-11 items-center gap-2 rounded-full border border-line-strong bg-paper-raised px-4 text-[15px] text-ink hover:bg-paper-sunk focus-ring">{lowestReq ? t('seeYourRequest') : t('startWith', { name: suggested.name })} <ArrowRight size={15} /></Link>}
@@ -300,7 +301,7 @@ function Catalogue({ suggestedSlug, noCation = false }: { suggestedSlug: string;
                 </div>
                 <p className="mt-4 flex items-baseline justify-between gap-2">
                   <span className="min-w-0 text-[1.3rem] font-light text-ink">{c.name}</span>
-                  <span className="eyebrow shrink-0 text-ink-3">{t('nightsN', { n: parseInt(c.nights, 10) })}</span>
+                  <span className="eyebrow shrink-0 text-ink-3">{r('nightsN', { n: parseInt(c.nights, 10) })}</span>
                 </p>
                 <p className="mt-1 text-[15px] text-ink-2">{tx(c.promise)}</p>
                 {!noCation && c.slug === MY_CATION.slug && <p className="mt-3 text-[13px] text-daybreak-ink">{t('youTookThis', { venue: MY_CATION.venue })}</p>}
@@ -361,9 +362,10 @@ function NoCation() {
 
       {invite && (
         <section aria-labelledby="none-invite">
-          <EmptyState
+          <JourneyEmpty
+            kind="cation"
             title={<span id="none-invite" className="flex flex-col items-center gap-3"><TermChip term={lowest} withSpace size="md" /><span className="text-[1.6rem] font-light leading-tight">{t('noneTitle', { name: invite.name })}</span></span>}
-            body={<>{r('noneBody', { lowest: lowestName, v: { n: score }, cation: invite.name, promise: tx(invite.promise) })}<span className="mt-3 block text-[14px] text-ink-3">{t('day90Colon', { m: tx(invite.day90Measure) })} · {t('nightsN', { n: parseInt(invite.nights, 10) })} · {r('fromLower', { p: { n: invite.priceFrom } })}</span>{others.length > 0 && <span className="mt-1 block text-[14px] text-ink-3">{t('noneMore', { lowest: lowestName, list: others.map((c) => c.name).join(t('andJoin')) })}</span>}</>}
+            body={<>{r('noneBody', { lowest: lowestName, v: { n: score }, cation: invite.name, promise: tx(invite.promise) })}<span className="mt-3 block text-[14px] text-ink-3">{t('day90Colon', { m: tx(invite.day90Measure) })} · {r('nightsN', { n: parseInt(invite.nights, 10) })} · {r('fromLower', { p: { n: invite.priceFrom } })}</span>{others.length > 0 && <span className="mt-1 block text-[14px] text-ink-3">{t('noneMore', { lowest: lowestName, list: others.map((c) => c.name).join(t('andJoin')) })}</span>}</>}
             action={
               <div className="flex flex-col items-center gap-2">
                 {req && <Pill tone="daybreak">{r('requestedRef', { ref: { n: req.ref } })}</Pill>}

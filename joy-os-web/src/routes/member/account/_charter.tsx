@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom'
 import { SpecimenTag, fmtDate } from '@/components/joy/primitives'
 import { Button, Card, Pill, Sheet } from '@/components/ui'
 import { useDict } from '@/lib/i18n'
-import { activeLang } from '@/lib/store'
+import { activeLang, interceptsCrisis, useApp } from '@/lib/store'
 import { SPECIMEN_NOW } from './_data'
 import { Checkbox, Field, Section, Select } from './_parts'
 import { inputCls, rich, usePersisted } from './_util'
@@ -16,6 +16,8 @@ import { HH } from './_i18n'
 // generations, a Family Joy Charter, a named physician and concierge, an annual report in
 // aggregate only). The charter is written by the family: values, rituals, one shared joy a
 // week; every adult agrees before it is kept. Specimen data; kept per viewer.
+// Every free-text field runs the emergency intercept first (Arch p.27): words of crisis open the
+// P0 sheet, and the text is held until the member chooses to keep it (a second press).
 
 export type HouseholdKind = 'couple' | 'family' | 'fjo'
 type HhKey = keyof typeof HH
@@ -274,16 +276,28 @@ function CharterEditor({ open, charter, onClose, onSave }: { open: boolean; char
   const [rituals, setRituals] = useState<Ritual[]>([])
   const [joy, setJoy] = useState({ what: '', day: 0 })
   const [tried, setTried] = useState(false)
+  const { setCrisisOpen } = useApp()
+  // Texts already shown to the crisis sheet: pressing again keeps them, as everywhere else.
+  const [held, setHeld] = useState<Set<string>>(() => new Set())
+  /** True when this text should stop here: it reads as crisis and has not been held yet. */
+  const intercept = (texts: string[]) => {
+    const hit = texts.map((x) => x.trim()).filter((x) => x && !held.has(x) && interceptsCrisis(x))
+    if (!hit.length) return false
+    setCrisisOpen(true)
+    setHeld((h) => new Set([...h, ...hit]))
+    return true
+  }
   // Each opening starts from what is kept (or one empty ritual for a first draft).
   useEffect(() => {
     if (!open) return
     setValues(charter.values); setValue(''); setValueErr(null)
     setRituals(charter.rituals.length ? charter.rituals : [{ id: `r${Date.now()}`, what: '', when: 'weekly' }])
-    setJoy(charter.joy); setTried(false)
+    setJoy(charter.joy); setTried(false); setHeld(new Set())
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
   const addValue = () => {
     const v = value.trim()
     if (v.length < 2) return
+    if (intercept([v])) return
     if (values.length >= 5) { setValueErr(tr('chValueMax')); return }
     if (values.some((x) => x.toLowerCase() === v.toLowerCase())) { setValueErr(tr('chValueDup')); return }
     setValues([...values, v]); setValue(''); setValueErr(null)
@@ -303,6 +317,7 @@ function CharterEditor({ open, charter, onClose, onSave }: { open: boolean; char
         onSubmit={(e) => {
           e.preventDefault(); setTried(true)
           if (errs.values || errs.rituals || errs.joy) return
+          if (intercept([...values, ...rituals.map((r) => r.what), joy.what])) return
           onSave({ ...charter, values, rituals: rituals.map((r) => ({ ...r, what: r.what.trim() })), joy: { what: joy.what.trim(), day: joy.day } })
         }}
       >

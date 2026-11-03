@@ -58,6 +58,8 @@ export const E = {
   adj_AE: { en: 'UAE', ta: 'அமீரக', hi: 'UAE' },
   adj_GB: { en: 'UK', ta: 'UK', hi: 'UK' },
   adj_SG: { en: 'Singapore', ta: 'சிங்கப்பூர்', hi: 'सिंगापुर का' },
+  // Playbook p17/p44: wherever Joyspan is defined in public. The name stays in Latin.
+  credit: { en: 'The word Joyspan is credited to Dr Kerry Burnight.', ta: 'ஜாய்ஸ்பான் (Joyspan) என்ற சொல்லின் பெருமை Dr Kerry Burnight அவர்களைச் சேரும்.', hi: 'जॉयस्पैन (Joyspan) शब्द का श्रेय Dr Kerry Burnight को जाता है।' },
 } satisfies Dict
 
 /** Country key by dialling code, for the country names above. */
@@ -112,7 +114,8 @@ export const SI = {
   demoSwitch: { en: 'Switch roles any time from the Demo button. Consoles are role-gated in the real platform.', ta: 'Demo பொத்தானில் எப்போது வேண்டுமானாலும் பங்கை மாற்றலாம். உண்மையான தளத்தில் கன்சோல்கள் பங்கின்படி மட்டுமே திறக்கும்.', hi: 'Demo बटन से कभी भी भूमिका बदलें। असली प्लेटफ़ॉर्म में कंसोल भूमिका के हिसाब से ही खुलते हैं।' },
   // Demo accounts, by key: title, button, and the line under the title.
   acc_member_title: { en: 'Member', ta: 'உறுப்பினர்', hi: 'सदस्य' },
-  acc_coach_title: { en: 'Coach & concierge', ta: 'பயிற்சியாளர் & உதவியாளர்', hi: 'कोच और कंसीयर्ज' },
+  acc_coach_title: { en: 'Coach', ta: 'பயிற்சியாளர்', hi: 'कोच' },
+  acc_concierge_title: { en: 'Concierge', ta: 'உதவியாளர்', hi: 'कंसीयर्ज' },
   acc_clinician_title: { en: 'Clinician', ta: 'மருத்துவர்', hi: 'चिकित्सक' },
   acc_partner_title: { en: 'Partner venue', ta: 'கூட்டாளர் இடம்', hi: 'पार्टनर स्थल' },
   acc_tenant_title: { en: 'Tenant admin', ta: 'நிறுவன நிர்வாகி', hi: 'संस्था एडमिन' },
@@ -121,6 +124,7 @@ export const SI = {
   acc_ops_title: { en: 'Engineering & ops', ta: 'பொறியியல் & இயக்கம்', hi: 'इंजीनियरिंग और ऑप्स' },
   acc_member_enter: { en: 'Enter as member', ta: 'உறுப்பினராக நுழையுங்கள்', hi: 'सदस्य के रूप में जाएँ' },
   acc_coach_enter: { en: 'Enter as coach', ta: 'பயிற்சியாளராக நுழையுங்கள்', hi: 'कोच के रूप में जाएँ' },
+  acc_concierge_enter: { en: 'Enter as concierge', ta: 'உதவியாளராக நுழையுங்கள்', hi: 'कंसीयर्ज के रूप में जाएँ' },
   acc_clinician_enter: { en: 'Enter as clinician', ta: 'மருத்துவராக நுழையுங்கள்', hi: 'चिकित्सक के रूप में जाएँ' },
   acc_partner_enter: { en: 'Enter as partner', ta: 'கூட்டாளராக நுழையுங்கள்', hi: 'पार्टनर के रूप में जाएँ' },
   acc_tenant_enter: { en: 'Enter as tenant', ta: 'நிர்வாகியாக நுழையுங்கள்', hi: 'एडमिन के रूप में जाएँ' },
@@ -129,6 +133,7 @@ export const SI = {
   acc_ops_enter: { en: 'Enter as ops', ta: 'பொறியியல் குழுவாக நுழையுங்கள்', hi: 'ऑप्स के रूप में जाएँ' },
   acc_member_who: { en: 'Arjun Rao · Day 23 of 90', ta: 'Arjun Rao · 90 இல் நாள் 23', hi: 'Arjun Rao · 90 में से दिन 23' },
   acc_coach_who: { en: 'Priya Natarajan', ta: 'Priya Natarajan', hi: 'Priya Natarajan' },
+  acc_concierge_who: { en: 'Ravi Shankar', ta: 'Ravi Shankar', hi: 'Ravi Shankar' },
   acc_clinician_who: { en: 'Dr Meera Iyer', ta: 'Dr Meera Iyer', hi: 'Dr Meera Iyer' },
   acc_partner_who: { en: 'Fairmont Mumbai', ta: 'Fairmont Mumbai', hi: 'Fairmont Mumbai' },
   acc_tenant_who: { en: 'Northwind Capital', ta: 'Northwind Capital', hi: 'Northwind Capital' },
@@ -591,6 +596,8 @@ export const OB = {
   aTitle: { en: 'Create your {em}.', ta: 'உங்கள் {em}-ஐ உருவாக்குங்கள்.', hi: 'अपनी {em} बनाएँ।' },
   aLead: { en: 'One identity across LifeOS and Joy OS. No password, ever: a passkey on this device, or a one-time code when you need one.', ta: 'LifeOS, Joy OS இரண்டிலும் ஒரே அடையாளம். கடவுச்சொல் ஒருபோதும் இல்லை: இந்தச் சாதனத்தில் ஒரு பாஸ்கீ, அல்லது தேவைப்படும்போது ஒருமுறைக் குறியீடு.', hi: 'LifeOS और Joy OS में एक ही पहचान। पासवर्ड कभी नहीं: इस डिवाइस पर एक पासकी, या ज़रूरत पड़ने पर एक बार का कोड।' },
   firstName: { en: 'First name', ta: 'முதல் பெயர்', hi: 'पहला नाम' },
+  lastName: { en: 'Family name', ta: 'குடும்பப் பெயர்', hi: 'उपनाम' },
+  lastNameHelp: { en: 'Shown on your Joy Passport and records.', ta: 'உங்கள் Joy Passport-இலும் பதிவுகளிலும் காட்டப்படும்.', hi: 'आपके Joy Passport और रिकॉर्ड पर दिखता है।' },
   nameHelp: { en: 'What your coach and VIVA will call you.', ta: 'உங்கள் பயிற்சியாளரும் VIVA-வும் உங்களை அழைக்கும் பெயர்.', hi: 'आपके कोच और VIVA आपको इसी नाम से बुलाएँगे।' },
   reach: { en: 'How should we reach you?', ta: 'உங்களை எப்படித் தொடர்புகொள்ளலாம்?', hi: 'हम आपसे कैसे संपर्क करें?' },
   mobile: { en: 'Mobile', ta: 'மொபைல்', hi: 'मोबाइल' },
@@ -654,6 +661,8 @@ export const OB = {
   pubNever: { en: 'Entirely optional. Saying no changes nothing about your care.', ta: 'முழுக்க விருப்பத்துக்குரியது. வேண்டாம் என்று சொன்னால் உங்கள் கவனிப்பில் எதுவும் மாறாது.', hi: 'पूरी तरह वैकल्पिक। ना कहने से आपकी देखभाल में कुछ नहीं बदलता।' },
   neededPill: { en: 'Needed for your Index', ta: 'உங்கள் குறியீட்டுக்குத் தேவை', hi: 'आपके इंडेक्स के लिए ज़रूरी' },
   optionalPill: { en: 'Optional', ta: 'விருப்பத்துக்குரியது', hi: 'वैकल्पिक' },
+  cVersion: { en: 'Consent text {v}', ta: 'ஒப்புதல் உரை {v}', hi: 'सहमति पाठ {v}' },
+  cVersionNote: { en: 'Each yes is recorded with the version of the text you read. If a text changes, its version changes, and we ask again before the new version counts.', ta: 'ஒவ்வொரு சம்மதமும் நீங்கள் படித்த உரையின் பதிப்புடன் பதிவாகும். உரை மாறினால் அதன் பதிப்பும் மாறும்; புதிய பதிப்பு நடைமுறைக்கு வரும் முன் மீண்டும் உங்களிடம் கேட்போம்.', hi: 'हर हाँ उस पाठ के संस्करण के साथ दर्ज होती है जो आपने पढ़ा। पाठ बदले तो उसका संस्करण बदलता है, और नया संस्करण लागू होने से पहले हम फिर से पूछते हैं।' },
   cFoot: { en: 'Withdraw any consent in one tap from the {link}; it is honoured within 24 hours. Device, calendar and WhatsApp permissions are asked separately, when you first use them.', ta: '{link} பக்கத்திலிருந்து எந்த ஒப்புதலையும் ஒரே தட்டலில் திரும்பப் பெறலாம்; 24 மணி நேரத்துக்குள் நடைமுறைக்கு வரும். சாதனம், நாட்காட்டி, WhatsApp அனுமதிகள் நீங்கள் முதலில் பயன்படுத்தும்போது தனியாகக் கேட்கப்படும்.', hi: '{link} से कोई भी सहमति एक टैप में वापस लें; 24 घंटे के भीतर लागू होती है। डिवाइस, कैलेंडर और WhatsApp की अनुमतियाँ अलग से माँगी जाती हैं, जब आप पहली बार उन्हें इस्तेमाल करते हैं।' },
   dTitle: { en: 'Do you wear {em}?', ta: 'நீங்கள் {em} அணிகிறீர்களா?', hi: 'क्या आप {em} पहनते हैं?' },
   dTitleEm: { en: 'anything', ta: 'ஏதாவது', hi: 'कुछ' },

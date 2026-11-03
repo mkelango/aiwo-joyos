@@ -4,12 +4,12 @@ import { ArrowRight, Check, CreditCard, MapPin, MessageCircle, Plus, ShieldCheck
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { DaybreakButton, Eyebrow, SpecimenTag, useFmtDate } from '@/components/joy/primitives'
-import { Button, Card, EmptyState, PageHeader, Pill, SectionTitle } from '@/components/ui'
+import { Button, Card, PageHeader, Pill, SectionTitle } from '@/components/ui'
 import { HOUSEHOLD, MEMBER, TEAM } from '@/data/member'
 import type { TermKey } from '@/domain/types'
 // One shared emergency intercept for every member free-text field (Memo p.24).
 import { useCrisisGuard } from '@/routes/member/spaces/_SpaceShell'
-import { PrimaryChip, fade } from './_parts'
+import { JourneyEmpty, PrimaryChip, fade } from './_parts'
 import { addOccasionRequest, useJourney, withdrawOccasionRequest, type OccasionGeneration, type OccasionGuest, type OccasionRequest } from './_store'
 import { useJ, type JourneyKey } from './_i18n'
 
@@ -100,7 +100,7 @@ export default function Occasions() {
                 </div>
                 <p className="mt-4 flex items-baseline justify-between gap-2">
                   <span className="min-w-0 text-[1.35rem] font-light text-ink">{t(`occ_${x.id}`)}</span>
-                  <span className="eyebrow shrink-0 text-ink-3">{t('nightsN', { n: x.nights })}</span>
+                  <span className="eyebrow shrink-0 text-ink-3">{r('nightsN', { n: x.nights })}</span>
                 </p>
                 <p className="mt-1 text-[15px] text-ink-2">{t(`occP_${x.id}`)}</p>
                 <ul className="mt-4 space-y-1.5 text-[14px] text-ink">
@@ -135,7 +135,7 @@ export default function Occasions() {
             </motion.div>
           ) : (
             <motion.div key="choose" {...fade}>
-              <EmptyState title={t('occPlan')} body={t('occChoose')} />
+              <JourneyEmpty kind="occasions" title={t('occPlan')} body={t('occChoose')} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -288,7 +288,7 @@ function OccasionForm({ id, tpl, existing, onSent, onKeep }: { id: string; tpl: 
           <p className="text-[1.4rem] font-light text-ink">{t('occFormTitle', { name })}</p>
           <PrimaryChip primary={tpl.primary} />
         </div>
-        <p className="mt-1 text-[15px] text-ink-2">{r('occFrom', { p: { n: tpl.priceFrom } })} · {t('nightsN', { n: tpl.nights })}</p>
+        <p className="mt-1 text-[15px] text-ink-2">{r('occFrom', { p: { n: tpl.priceFrom } })} · {r('nightsN', { n: tpl.nights })}</p>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
           <div className="space-y-5">

@@ -2,7 +2,8 @@ import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { useEffect, useId, useRef, type ReactNode } from 'react'
-import type { Person } from '@/domain/types'
+import type { Person, TermKey } from '@/domain/types'
+import { EmptyIllustration, type IllustrationKind } from '@/components/joy/EmptyIllustration'
 import { useDict } from '@/lib/i18n'
 import { SHARED } from '@/components/_i18n'
 
@@ -245,9 +246,12 @@ export function Sheet({ open, onClose, title, children, side = 'right' }: { open
   )
 }
 
-export function EmptyState({ title, body, action }: { title: ReactNode; body?: ReactNode; action?: ReactNode }) {
+/** An empty list or screen. `illustration` adds the Playbook's single-weight Ink drawing with one
+ *  Daybreak (or term-colour, via `fill`) fill above the words (Playbook p51). */
+export function EmptyState({ title, body, action, illustration, fill }: { title: ReactNode; body?: ReactNode; action?: ReactNode; illustration?: IllustrationKind; fill?: 'daybreak' | TermKey }) {
   return (
     <div className="rounded-card border border-dashed border-line-strong p-8 text-center">
+      {illustration && <EmptyIllustration kind={illustration} fill={fill} width={150} className="mb-5" />}
       <p className="text-[17px] text-ink">{title}</p>
       {body && <p className="mx-auto mt-2 max-w-md text-[15px] text-ink-2">{body}</p>}
       {action && <div className="mt-5 flex justify-center">{action}</div>}

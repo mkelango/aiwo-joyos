@@ -23,19 +23,23 @@ import {
   TermChip,
   Title,
 } from '@/components'
+import { useIsMinor } from '@/lib/minor'
 import { Rich, useA } from '@/screens/a/i18n'
+import { formulaIn } from '@/screens/a/i18n/formula'
 import { H2, usePlanned } from '@/screens/a/local'
-import { HumanWritten, Provenance, Sparkline } from '@/screens/a/parts'
+import { HumanWritten, NotScored, Sparkline } from '@/screens/a/parts'
 import { ROOM_VERDICT, VIVA_DRAFT, actionsFor, termHistory } from '@/screens/a/spacesData'
 import { SPACE_TITLE, SpaceTools } from '@/screens/a/tools'
+import { RoomViva } from '@/screens/a/viva'
 import { INDEX_HISTORY } from '@/shared/member'
 import { TERMS } from '@/shared/terms'
 import { useTheme } from '@/theme/ThemeProvider'
 
 // ONE SPACE (Memo p.19; Plan §4A): score, band, delta, framework, instruments and method;
 // the 90-day pulse; three actions (one planned with the Daybreak); the room's signature tools;
-// a VIVA draft with provenance (never on Ease). Driven by slug: body · purpose · people ·
-// freedom · pleasure · ease.
+// the room's VIVA tool, run here with provenance (never on Ease). Driven by slug: body · purpose ·
+// people · freedom · pleasure · ease. Under 18 the score, band, delta and pulse give way to a calm
+// "not scored" note; the framework, actions and tools stay.
 
 export default function SpaceDetail() {
   const { slug } = useLocalSearchParams<{ slug: string }>()
@@ -45,6 +49,7 @@ export default function SpaceDetail() {
   const term = TERMS.find((t) => t.slug === slug)
   const [chosen, setChosen] = useState(0)
   const { planned: plannedBySpace, plan } = usePlanned()
+  const minor = useIsMinor()
 
   if (!term) {
     return (
@@ -76,36 +81,46 @@ export default function SpaceDetail() {
         title={<Rich text={tx(SPACE_TITLE[k])} wrap={(w) => <Serif>{w}</Serif>} />}
       />
 
-      {/* Score */}
-      <Card tone="raised" style={{ gap: space.s2 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s1, flexWrap: 'wrap' }}>
-          <TermChip term={k} withSpace={term.name !== term.space} />
-          <SpecimenTag />
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.s2 }}>
-          <Numeral size={72} accessibilityLabel={t('{name} {minus}{value} of 100', { name: name(k), minus: inverse ? t('minus ') : '', value: String(score.value) })}>
-            {shown}
-          </Numeral>
-          <View style={{ paddingBottom: 10, gap: 4 }}>
-            <Delta value={score.delta} inverse={inverse} size={17} />
-            <BandLabel band={score.band} />
+      {/* Score — none for a member under 18 */}
+      {minor ? (
+        <Card tone="raised" style={{ gap: space.s2 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s1, flexWrap: 'wrap' }}>
+            <TermChip term={k} withSpace={term.name !== term.space} />
+            <SpecimenTag />
           </View>
-        </View>
-        <Body tone="ink2">{tx(ROOM_VERDICT[k])}</Body>
-        {inverse ? <Meta>{t('Burden is the one term where lower is better. It is subtracted from the Index at a quarter of its weight.')}</Meta> : null}
-        <View style={{ gap: space.s1, marginTop: space.half }}>
-          <Meta>
-            <Rich text={t('Your weekly pulse over the last ninety days, from *{a}* to *{b}*.', { a: String(first.value), b: String(last.value) })} wrap={(w) => <Mono tone="ink">{w}</Mono>} />
-          </Meta>
-          <Sparkline
-            values={history.map((h) => h.value)}
-            labels={[date(first.label), date(last.label)]}
-            color={col.main}
-            label={t('{name} weekly pulse, fourteen weeks from {from} to {to}: {a} to {b}.', { name: name(k), from: date(first.label), to: date(last.label), a: first.value, b: last.value })}
-          />
-        </View>
-        <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />
-      </Card>
+          <NotScored body={t('Joy OS never scores anyone under 18, so this room shows no number, band or change. What it measures, the three small things and its tools are all yours to use.')} />
+        </Card>
+      ) : (
+        <Card tone="raised" style={{ gap: space.s2 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s1, flexWrap: 'wrap' }}>
+            <TermChip term={k} withSpace={term.name !== term.space} />
+            <SpecimenTag />
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.s2 }}>
+            <Numeral size={72} accessibilityLabel={t('{name} {minus}{value} of 100', { name: name(k), minus: inverse ? t('minus ') : '', value: String(score.value) })}>
+              {shown}
+            </Numeral>
+            <View style={{ paddingBottom: 10, gap: 4 }}>
+              <Delta value={score.delta} inverse={inverse} size={17} />
+              <BandLabel band={score.band} />
+            </View>
+          </View>
+          <Body tone="ink2">{tx(ROOM_VERDICT[k])}</Body>
+          {inverse ? <Meta>{t('Burden is the one term where lower is better. It is subtracted from the Index at a quarter of its weight.')}</Meta> : null}
+          <View style={{ gap: space.s1, marginTop: space.half }}>
+            <Meta>
+              <Rich text={t('Your weekly pulse over the last ninety days, from *{a}* to *{b}*.', { a: String(first.value), b: String(last.value) })} wrap={(w) => <Mono tone="ink">{w}</Mono>} />
+            </Meta>
+            <Sparkline
+              values={history.map((h) => h.value)}
+              labels={[date(first.label), date(last.label)]}
+              color={col.main}
+              label={t('{name} weekly pulse, fourteen weeks from {from} to {to}: {a} to {b}.', { name: name(k), from: date(first.label), to: date(last.label), a: first.value, b: last.value })}
+            />
+          </View>
+          <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />
+        </Card>
+      )}
 
       {/* What this room measures */}
       <Card tone="sunk" style={{ gap: space.s2 }}>
@@ -114,7 +129,7 @@ export default function SpaceDetail() {
         <View style={{ gap: 6 }}>
           <Eyebrow>{t('Formula · method v1.0')}</Eyebrow>
           <Mono tone="ink" size={15}>
-            {term.formula}
+            {formulaIn(term.formula, lang)}
           </Mono>
         </View>
         <View style={{ gap: 8 }}>
@@ -221,25 +236,9 @@ export default function SpaceDetail() {
       {/* Signature tools */}
       <SpaceTools term={k} />
 
-      {/* VIVA draft — never on Ease */}
+      {/* The room's VIVA tool — never on Ease */}
       {draft ? (
-        <Card tone="raised" style={{ gap: space.s2 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Icon name="message-circle" size={16} color={c.ink2} />
-            <Eyebrow {...H2} style={{ flexShrink: 1 }}>{t('VIVA · AI drafts, a person signs')}</Eyebrow>
-          </View>
-          <Meta>
-            <Rich text={t('You asked: *“{ask}”*', { ask: tx(draft.ask) })} wrap={(w) => <Meta tone="ink">{w}</Meta>} />
-          </Meta>
-          <Body>{tx(draft.draft)}</Body>
-          <Provenance tool={draft.tool} />
-          <Meta size={14} tone="ink3">
-            {tx(draft.reviewer)}
-          </Meta>
-          <ArrowLink icon="message-circle" onPress={() => router.push('/viva')}>
-            {t('Ask VIVA about {space}', { space: spaceName(k) })}
-          </ArrowLink>
-        </Card>
+        <RoomViva term={k} />
       ) : (
         <Card tone="outline" style={{ gap: space.s1 }}>
           <Eyebrow {...H2}>{t('Why VIVA is quiet here')}</Eyebrow>

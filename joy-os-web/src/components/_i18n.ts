@@ -78,6 +78,19 @@ export const SHARED = {
     ta: 'இன்றிரவு பணியில் உள்ளார் · 15 நிமிடங்களுக்குள் உங்களைத் தொடர்புகொள்வார்',
     hi: 'आज रात ड्यूटी पर हैं · 15 मिनट के भीतर आपसे संपर्क करेंगे',
   },
+  // A voluntary tap tells no one, so manual mode promises no call-back: it says how to reach them.
+  onCallManual: {
+    en: 'On call tonight · nobody has been told; write to them below if you want a person',
+    ta: 'இன்றிரவு பணியில் உள்ளார் · யாருக்கும் தெரிவிக்கப்படவில்லை; ஒரு மனிதர் வேண்டுமெனில் கீழே அவருக்கு எழுதுங்கள்',
+    hi: 'आज रात ड्यूटी पर हैं · किसी को बताया नहीं गया है; किसी इंसान से बात करनी हो तो नीचे उन्हें लिखें',
+  },
+  clinicianOnCall: { en: '{name} · psychologist on call', ta: '{name} · பணியில் உள்ள உளவியலாளர்', hi: '{name} · ड्यूटी पर मनोवैज्ञानिक' },
+  clinicianMessage: { en: 'Message {name} now', ta: '{name} அவர்களுக்கு இப்போதே செய்தி அனுப்பவும்', hi: '{name} को अभी संदेश भेजें' },
+  clinicianMessageSub: {
+    en: 'Opens your Care messages. A person reads it, not AI.',
+    ta: 'உங்கள் கவனிப்புச் செய்திகளைத் திறக்கும். இதை AI அல்ல, ஒரு மனிதர் படிப்பார்.',
+    hi: 'आपके देखभाल संदेश खुलेंगे। इसे AI नहीं, एक इंसान पढ़ेगा।',
+  },
   ecEyebrow: { en: 'Your emergency contact', ta: 'உங்கள் அவசரத் தொடர்பு', hi: 'आपका आपातकालीन संपर्क' },
   ecCall: { en: 'Call {name}', ta: '{name} அவர்களை அழைக்கவும்', hi: '{name} को कॉल करें' },
   ecTell: { en: 'Tell {name} for me', ta: 'எனக்காக {name} அவர்களிடம் சொல்லுங்கள்', hi: 'मेरी ओर से {name} को बता दें' },
@@ -143,4 +156,55 @@ export const SHARED = {
   minus: { en: 'minus ', ta: 'கழித்தல் ', hi: 'माइनस ' },
   wheelDay0: { en: '. Day 0 outline: {list}', ta: '. நாள் 0 வெளிக்கோடு: {list}', hi: '। दिन 0 की रूपरेखा: {list}' },
   wheelGhostKey: { en: 'Outline: where each petal stood on Day 0', ta: 'வெளிக்கோடு: நாள் 0 அன்று ஒவ்வொரு இதழும் இருந்த அளவு', hi: 'रूपरेखा: दिन 0 पर हर पंखुड़ी कहाँ थी' },
+
+  // Minors: never scored (Architecture p26)
+  minorNotScored: { en: 'Not scored while under 18', ta: '18 வயது ஆகும் வரை மதிப்பெண் இல்லை', hi: '18 साल का होने तक कोई स्कोर नहीं' },
+  minorNotScoredSub: {
+    en: 'Your Spaces, Ledger and Practice stay open. The Index opens on your 18th birthday.',
+    ta: 'உங்கள் இடங்கள், லெட்ஜர், பயிற்சி எல்லாம் திறந்தே இருக்கும். உங்கள் 18வது பிறந்தநாளில் குறியீடு திறக்கும்.',
+    hi: 'आपके स्पेस, लेजर और अभ्यास खुले रहेंगे। इंडेक्स आपके 18वें जन्मदिन पर खुलेगा।',
+  },
+  minorBand: { en: 'not scored', ta: 'மதிப்பெண் இல்லை', hi: 'स्कोर नहीं' },
+  minorWheel: { en: 'six petals, not scored while under 18', ta: 'ஆறு இதழ்கள், 18 வயது ஆகும் வரை மதிப்பெண் இல்லை', hi: 'छह पंखुड़ियाँ, 18 साल का होने तक कोई स्कोर नहीं' },
+
+  // App lock (Settings · Biometric lock): simulated, nothing biometric is read
+  lockTitle: { en: 'Joy OS is locked', ta: 'Joy OS பூட்டப்பட்டுள்ளது', hi: 'Joy OS लॉक है' },
+  lockGreeting: { en: 'Welcome back, {name}', ta: 'மீண்டும் வருக, {name}', hi: 'फिर से स्वागत है, {name}' },
+  lockBody: {
+    en: 'Use Face ID or your fingerprint to open. Your biometrics stay on this device.',
+    ta: 'திறக்க Face ID அல்லது கைரேகையைப் பயன்படுத்தவும். உங்கள் பயோமெட்ரிக் தகவல் இந்தச் சாதனத்திலேயே இருக்கும்.',
+    hi: 'खोलने के लिए Face ID या फ़िंगरप्रिंट का उपयोग करें। आपकी बायोमेट्रिक जानकारी इसी डिवाइस पर रहती है।',
+  },
+  lockAway: {
+    en: 'Locked after {x} away. Change this in Settings.',
+    ta: '{x} விலகியிருந்ததால் பூட்டப்பட்டது. அமைப்புகளில் மாற்றலாம்.',
+    hi: '{x} दूर रहने पर लॉक हुआ। इसे सेटिंग्स में बदलें।',
+  },
+  lockAwayNow: {
+    en: 'Locked as soon as you left. Change this in Settings.',
+    ta: 'நீங்கள் விலகியதும் பூட்டப்பட்டது. அமைப்புகளில் மாற்றலாம்.',
+    hi: 'आपके हटते ही लॉक हुआ। इसे सेटिंग्स में बदलें।',
+  },
+  lockMinutes: { en: '{n} min', ta: '{n} நிமி', hi: '{n} मिनट' },
+  lockUnlock: { en: 'Unlock with Face ID or fingerprint', ta: 'Face ID அல்லது கைரேகை மூலம் திறக்கவும்', hi: 'Face ID या फ़िंगरप्रिंट से खोलें' },
+  lockChecking: { en: 'Checking…', ta: 'சரிபார்க்கிறது…', hi: 'जाँच हो रही है…' },
+  lockUnlocked: { en: 'Unlocked', ta: 'திறக்கப்பட்டது', hi: 'खुल गया' },
+  lockUseId: { en: 'Use your AIWO ID instead', ta: 'பதிலாக உங்கள் AIWO ID-ஐப் பயன்படுத்தவும்', hi: 'इसके बजाय अपनी AIWO ID का उपयोग करें' },
+  lockIdBody: {
+    en: 'We send a six-digit code to the phone or email on your AIWO ID.',
+    ta: 'உங்கள் AIWO ID-யில் உள்ள தொலைபேசி அல்லது மின்னஞ்சலுக்கு ஆறு இலக்கக் குறியீட்டை அனுப்புவோம்.',
+    hi: 'हम आपकी AIWO ID वाले फ़ोन या ईमेल पर छह अंकों का कोड भेजते हैं।',
+  },
+  lockSendCode: { en: 'Send a code', ta: 'குறியீட்டை அனுப்பவும்', hi: 'कोड भेजें' },
+  lockCodeSent: { en: 'Code sent to your AIWO ID', ta: 'உங்கள் AIWO ID-க்குக் குறியீடு அனுப்பப்பட்டது', hi: 'आपकी AIWO ID पर कोड भेजा गया' },
+  lockCodeLabel: { en: 'Six-digit code', ta: 'ஆறு இலக்கக் குறியீடு', hi: 'छह अंकों का कोड' },
+  lockCodeHint: {
+    en: 'Specimen: nothing is sent. Any six digits unlock.',
+    ta: 'மாதிரி: எதுவும் அனுப்பப்படவில்லை. எந்த ஆறு இலக்கங்களும் திறக்கும்.',
+    hi: 'नमूना: कुछ भी नहीं भेजा जाता। कोई भी छह अंक खोल देंगे।',
+  },
+  lockCodeError: { en: 'Enter all six digits of the code.', ta: 'குறியீட்டின் ஆறு இலக்கங்களையும் உள்ளிடவும்.', hi: 'कोड के सभी छह अंक डालें।' },
+  lockUnlockCode: { en: 'Unlock', ta: 'திறக்கவும்', hi: 'खोलें' },
+  lockBack: { en: 'Use Face ID or fingerprint instead', ta: 'பதிலாக Face ID அல்லது கைரேகையைப் பயன்படுத்தவும்', hi: 'इसके बजाय Face ID या फ़िंगरप्रिंट का उपयोग करें' },
+  lockSpecimen: { en: 'Specimen lock · no biometric data is read', ta: 'மாதிரிப் பூட்டு · பயோமெட்ரிக் தரவு எதுவும் படிக்கப்படவில்லை', hi: 'नमूना लॉक · कोई बायोमेट्रिक डेटा नहीं पढ़ा जाता' },
 } satisfies Dict

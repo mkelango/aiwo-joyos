@@ -1,10 +1,10 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, BookOpen, Check, Clock, MapPin, ShieldCheck, Sparkles } from 'lucide-react'
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { BandLabel, Delta, Eyebrow, MethodLine, SpecimenTag, TermDot } from '@/components/joy/primitives'
+import { BandLabel, Delta, Eyebrow, MethodLine, SpecimenTag } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill } from '@/components/ui'
 import { INDEX_HISTORY } from '@/data/member'
 import { interceptsCrisis, useApp } from '@/lib/store'
@@ -13,6 +13,8 @@ import { termByKey, termColor } from '@/data/terms'
 import type { TermKey } from '@/domain/types'
 import { LE8, LE8_KEY, LE8_LOG_START, ROOM_VERDICT, VIVA_DRAFT, VIVA_MATCH, VIVA_MORE, actionsFor, le8Latest, le8Score, termHistory, type Le8Key } from './_data'
 import { useSpaceText } from './_i18n'
+import { TermIcon } from '@/components/joy/icons'
+import { useIsMinor } from '@/lib/minor'
 import { readSpaceState, useSpaceState } from './_state'
 
 // Shared shell for the six spaces (Memo p.19): the term, its score with method,
@@ -233,17 +235,53 @@ function ScoreHero({ term }: { term: TermKey }) {
   )
 }
 
+/** Under 18 the term is not scored (the minors gate): the hero keeps the framework and
+ *  instruments, and says so calmly in place of the score, band, delta and history. */
+function MinorHero({ term }: { term: TermKey }) {
+  const t = termByKey(term)
+  const { t: tx, tt, d } = useSpaceText()
+  return (
+    <Card className="relative overflow-hidden !p-0">
+      <TermRule term={term} className="!h-1 rounded-none" />
+      <div className="grid gap-8 p-5 md:grid-cols-2 md:p-7">
+        <div className="min-w-0">
+          <Eyebrow>{tt.name(term)}</Eyebrow>
+          <p className="mt-3 text-[1.6rem] font-light leading-snug text-ink">{tx('mn.title')}</p>
+          <p className="mt-2 max-w-[48ch] text-[16px] text-ink-2">{tx('mn.body')}</p>
+        </div>
+        <dl className="min-w-0 space-y-3 text-[14px] md:border-l md:border-line md:pl-6">
+          <div>
+            <dt className="eyebrow text-ink-3">{tx('sh.framework')}</dt>
+            <dd className="mt-1 break-words text-ink">{d(t.framework)}</dd>
+          </div>
+          <div>
+            <dt className="eyebrow text-ink-3">{tx('sh.instruments')}</dt>
+            <dd className="mt-1.5 flex flex-wrap gap-1.5">
+              {t.instruments.map((i) => (
+                <span key={i} className="rounded-full border border-line px-2.5 py-0.5 font-mono text-[12px] text-ink-2">{d(i)}</span>
+              ))}
+            </dd>
+          </div>
+        </dl>
+      </div>
+    </Card>
+  )
+}
+
+/** Digits inside an instrument name ('Ikigai-9', 'LSNS-6') set in mono, like every number. */
+const monoDigits = (s: string): ReactNode => s.split(/(\d+)/).map((p, i) => (/^\d+$/.test(p) ? <span key={i} className="num">{p}</span> : p))
+
 function WhatMoves({ term }: { term: TermKey }) {
   const t = termByKey(term)
   const { t: tx, d } = useSpaceText()
-  const parts = [...t.formula.split('=')[1].matchAll(/([0-9.]+)·([^+]+)/g)].map((m) => ({ w: Number(m[1]), name: m[2].trim() }))
+  const parts = [...t.formula.split('=')[1].matchAll(/([0-9.]+)·([^+]+)/g)].map((m) => ({ w: Number(m[1]), ws: m[1], name: m[2].trim() }))
   return (
     <ToolCard eyebrow={tx('sh.whatMoves')} title={d(t.whatMoves)} sub={tx(term === 'B' ? 'sh.whatMovesSubB' : 'sh.whatMovesSub')}>
       <ul className="space-y-3">
         {parts.map((p) => (
           <li key={p.name}>
             <div className="flex items-baseline justify-between gap-3 text-[14px]">
-              <span className="min-w-0 break-words text-ink">{d(p.name)}</span>
+              <span className="min-w-0 break-words text-ink">{monoDigits(d(p.name))}</span>
               <span className="num text-ink-3">×{p.w.toFixed(2)}</span>
             </div>
             <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-paper-sunk">
@@ -252,7 +290,13 @@ function WhatMoves({ term }: { term: TermKey }) {
           </li>
         ))}
       </ul>
-      <p className="mt-5 break-words font-mono text-[12px] text-ink-3">{t.formula}</p>
+      {/* The formula with its component words in the member's language; letters, weights and instrument names stay as written. */}
+      <p className="mt-5 break-words font-mono text-[12px] text-ink-3">
+        {term} ={' '}
+        {parts.map((p, i) => (
+          <Fragment key={p.name}>{i > 0 && ' + '}{p.ws}·{d(p.name)}</Fragment>
+        ))}
+      </p>
     </ToolCard>
   )
 }
@@ -314,6 +358,7 @@ function VivaTool({ term }: { term: TermKey }) {
   const t = termByKey(term)
   const { t: tx, d: dx } = useSpaceText()
   const guard = useCrisisGuard()
+  const minor = useIsMinor()
   // Every named tool that can be asked here: the space's first draft, then its second tool.
   const drafts = [VIVA_DRAFT[term], ...VIVA_MORE[term]].filter(Boolean) as VivaDraft[]
   const [state, setState] = useState<'idle' | 'drafting' | 'shown'>('idle')
@@ -326,6 +371,8 @@ function VivaTool({ term }: { term: TermKey }) {
   /** The draft's words. le8_coach reads the LE8 log Body saved, so it names the two lowest of the eight. */
   const draftText = (dr: VivaDraft) => {
     if (dr.tool !== 'le8_coach') return dx(dr.draft)
+    // Under 18 nothing is scored, so the draft names no scores and ranks none of the eight.
+    if (minor) return tx('mn.vivaLe8')
     const latest = le8Latest(readSpaceState(LE8_KEY, { log: LE8_LOG_START }).log)
     const ranked = LE8.map((m) => ({ name: m.name, r: latest[m.key as Le8Key] }))
       .filter((x) => x.r)
@@ -452,6 +499,7 @@ function PracticeLink({ term }: { term: TermKey }) {
 export function SpaceShell({ term, title, headerActions, children }: { term: TermKey; title: ReactNode; headerActions?: ReactNode; children: ReactNode }) {
   const t = termByKey(term)
   const { t: tx, tt, d } = useSpaceText()
+  const minor = useIsMinor()
   const space = tt.space(term)
   const name = tt.name(term)
   return (
@@ -460,12 +508,12 @@ export function SpaceShell({ term, title, headerActions, children }: { term: Ter
         <ArrowLeft size={15} /> {tx('sh.allSpaces')}
       </Link>
       <PageHeader
-        eyebrow={<span className="inline-flex items-center gap-2 text-ink"><TermDot term={term} size={11} /> {t.space === t.name ? space : `${space} · ${name}`}</span>}
+        eyebrow={<span className="inline-flex items-center gap-2 text-ink"><span className="inline-flex shrink-0" style={{ color: inkColor[term] }} aria-hidden><TermIcon term={term} size={18} /></span> {t.space === t.name ? space : `${space} · ${name}`}</span>}
         title={title}
-        lead={d(ROOM_VERDICT[term])}
+        lead={minor ? tx(`mn.lead.${term}`) : d(ROOM_VERDICT[term])}
         actions={headerActions}
       />
-      <Reveal><ScoreHero term={term} /></Reveal>
+      <Reveal>{minor ? <MinorHero term={term} /> : <ScoreHero term={term} />}</Reveal>
       <div className="mt-8 space-y-6">{children}</div>
       <section className="mt-14" aria-labelledby={`around-${term}`}>
         <div className="mb-5 flex items-center gap-3">

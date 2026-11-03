@@ -7,7 +7,7 @@ import { HOUSEHOLD, MEMBER } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
 import { PLANS } from '@/screens/b/_data'
 import { abhaStore, accountStore, maskPhone, nomineeStore, sessionStore, useStore, type AccountState } from '@/screens/b/bStore'
-import { Done, Field, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
+import { Done, Field, useAccount, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
 import { useDict } from '@/lib/i18n'
 import { PROFILE, SETTINGS, RELATION_TEXT } from '@/screens/b/i18n/account'
 import { useCommon, useTx } from '@/screens/b/i18n/common'
@@ -34,6 +34,8 @@ function Profile() {
   const [abha] = useStore(abhaStore)
   const planName = `${PLANS.find((p) => p.key === acct.plan)?.name ?? MEMBER.plan} + ${MEMBER.membership}`
   const [, setSession] = useStore(sessionStore)
+  // The account signed in (M1): Arjun, Lakshmi in elder mode, or the one made in onboarding.
+  const account = useAccount()
   const [copied, setCopied] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [emOpen, setEmOpen] = useState(false)
@@ -68,8 +70,8 @@ function Profile() {
 
   const copy = () => {
     // No clipboard module in this build: the web uses the browser clipboard, a phone the share sheet.
-    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) navigator.clipboard.writeText(MEMBER.aiwoId).catch(() => {})
-    else Share.share({ message: MEMBER.aiwoId, title: 'AIWO ID' }).catch(() => {})
+    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) navigator.clipboard.writeText(account.aiwoId).catch(() => {})
+    else Share.share({ message: account.aiwoId, title: 'AIWO ID' }).catch(() => {})
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -77,8 +79,10 @@ function Profile() {
     const e: Record<string, string> = {}
     if (!guard(draft.name, () => { discard(); setDetailsOpen(false) })) return false
     if (draft.name.trim().length < 2) e.name = t('errName')
-    if (!/^[6-9]\d{9}$/.test(draft.phone)) e.phone = t('errPhone')
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(draft.email.trim())) e.email = t('errEmail')
+    // A phone, an email or both: an account made with an email may have no phone yet.
+    if (draft.phone && !/^[6-9]\d{9}$/.test(draft.phone)) e.phone = t('errPhone')
+    if (draft.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(draft.email.trim())) e.email = t('errEmail')
+    if (!draft.phone && !draft.email.trim()) e.phone = t('errContact')
     setErrs(e)
     return Object.keys(e).length === 0
   }
@@ -100,7 +104,7 @@ function Profile() {
     setSaved(t('savedSync'))
   }
   const signOut = () => {
-    setSession({ signedIn: false, onboarded: true })
+    setSession((s) => ({ ...s, signedIn: false, onboarded: true }))
     setOutOpen(false)
     router.replace('/welcome')
   }
@@ -119,10 +123,24 @@ function Profile() {
 
       <Card tone="raised" style={{ gap: space.s2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s2 }}>
-          <Avatar person={{ ...me, name: draft.name }} size={64} />
+          <Avatar person={{ ...me, name: draft.name, initials: draft.name.trim().split(/\s+/).map((w) => w[0] ?? '').join('').slice(0, 2).toUpperCase() || me.initials }} size={64} />
           <View style={{ flex: 1, gap: 2 }}>
             <Title size={24}>{draft.name}</Title>
-            <Meta>{`${MEMBER.age} · ${city} · ${planName}`}</Meta>
+            <Meta>
+              {account.id === 'lakshmi' ? (
+                <>
+                  <Mono size={15} tone="ink2">{String(account.age)}</Mono>
+                  {` · ${city} · ${acct.elder.helper ? t('elderLine') : t('elderLineNoHelper')}`}
+                </>
+              ) : account.id === 'new' ? (
+                `${t('newLine')} · ${planName}`
+              ) : (
+                <>
+                  <Mono size={15} tone="ink2">{String(account.age ?? MEMBER.age)}</Mono>
+                  {` · ${city} · ${planName}`}
+                </>
+              )}
+            </Meta>
           </View>
         </View>
         <Divider />
@@ -130,7 +148,7 @@ function Profile() {
           <View style={{ gap: 2 }}>
             <Eyebrow>AIWO ID</Eyebrow>
             <Mono tone="ink" size={18}>
-              {MEMBER.aiwoId}
+              {account.aiwoId}
             </Mono>
           </View>
           <Button variant="secondary" size="sm" icon={copied ? 'check' : 'copy'} onPress={copy} accessibilityLabel={copied ? t('copied') : t('copyId')}>
@@ -145,9 +163,9 @@ function Profile() {
         <Card tone="raised" padding={8} style={{ paddingHorizontal: 16 }}>
           <ListRow title={tc('name')} sub={draft.name} />
           <Divider />
-          <ListRow title={t('mobile')} sub={maskPhone(draft.phone)} />
+          <ListRow title={t('mobile')} sub={draft.phone ? maskPhone(draft.phone) : '—'} />
           <Divider />
-          <ListRow title={tc('email')} sub={draft.email} />
+          <ListRow title={tc('email')} sub={draft.email || '—'} />
           <Divider />
           <ListRow title={tc('language')} sub={draft.language} />
         </Card>
@@ -156,8 +174,14 @@ function Profile() {
       <View style={{ gap: space.s1 }}>
         <SectionTitle aside={<Button variant="link" onPress={() => setEmOpen(true)}>{tc('edit')}</Button>}>{t('emergency')}</SectionTitle>
         <Card tone="raised" style={{ gap: 4 }}>
-          <Body weight="medium">{em.name}</Body>
-          <Meta>{`${tx(RELATION_TEXT[em.relation], em.relation)} · ${maskPhone(em.phone)}`}</Meta>
+          {em.name.trim() ? (
+            <>
+              <Body weight="medium">{em.name}</Body>
+              <Meta>{`${tx(RELATION_TEXT[em.relation], em.relation)} · ${maskPhone(em.phone)}`}</Meta>
+            </>
+          ) : (
+            <Body>{t('emergencyNone')}</Body>
+          )}
           <Meta size={14} tone="ink3">{t('calledOnly')}</Meta>
         </Card>
       </View>

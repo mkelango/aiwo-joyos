@@ -2,7 +2,7 @@ import clsx from 'clsx'
 import { motion } from 'framer-motion'
 import { AlertCircle, Apple, Check, CircleDot, Clock, Link2, RefreshCw, ShieldOff, Smartphone, Watch } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Bar, BarChart, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { DaybreakButton, SpecimenTag, TermChip } from '@/components/joy/primitives'
 import { Button, Card, EmptyState, PageHeader, Pill, Sheet } from '@/components/ui'
@@ -13,17 +13,26 @@ import { useDict, useLang, useTermText } from '@/lib/i18n'
 import { DEV, useData } from './_i18n'
 import { finishedOnboarding } from './_onboarding'
 import { WatchComplication } from './_watch'
+import { ALL_PURPOSES, consentAllows, readConsents, setDeviceConsent, termsFor, type ConsentRecord, type DevicePurpose } from './_links'
 
 // DEVICES (Signals, Memo p.15–16): Oura by default via Terra, Apple Health with
 // per-type HealthKit reads and mindful-minutes write-back, Health Connect, WHOOP,
 // Garmin, Ultrahuman. Freshness and data-quality flags are shown plainly.
 // Joy OS never imports a vendor's readiness, strain or age score into the Index.
 // One Daybreak: "Sync now".
-type Device = (typeof DEVICES)[number]
-type DeviceOverride = { state: DeviceState; lastSync?: string; freshness?: 'fresh' | 'stale' }
-function applyDeviceStates(states: Record<string, DeviceOverride>): Device[] {
+// A device is connected only while its consent is given (see _links): connecting grants it with
+// the purposes chosen here, disconnecting withdraws it, and a withdrawal in the Trust centre
+// disconnects the device. Each change is a consent_event in the Trust centre's history.
+type Device = (typeof DEVICES)[number] & { purposes?: DevicePurpose[] }
+type DeviceOverride = { state: DeviceState; lastSync?: string; freshness?: 'fresh' | 'stale'; purposes?: DevicePurpose[] }
+function applyDeviceStates(states: Record<string, DeviceOverride>, consents: ConsentRecord): Device[] {
   // Android-only sources keep their own state; a disconnected default ring becomes "available" again.
-  return DEVICES.map((d) => (states[d.id] ? { ...d, ...states[d.id], state: states[d.id].state === 'available' && d.state === 'android' ? 'android' : states[d.id].state } : d))
+  return DEVICES.map((d): Device => {
+    const o = states[d.id]
+    const merged: Device = o ? { ...d, ...o, state: o.state === 'available' && d.state === 'android' ? 'android' : o.state } : d
+    // A withdrawn consent always wins: the device stops reading, whatever the record says.
+    return merged.state === 'connected' && !consentAllows(d.id, consents) ? { ...merged, state: 'available' } : merged
+  })
 }
 /** A wear-chart night (day of January 2027) as a localised day and month. */
 const wearDay = (d: string) => fmtShortDate(`2027-01-${d.padStart(2, '0')}`)
@@ -39,11 +48,14 @@ export default function Devices() {
   const [toast, showToast] = useToast()
   // Connection state is kept per viewer so Profile and a reload show the same devices.
   const [saved, setSaved] = usePersisted<{ states: Record<string, DeviceOverride> }>('devices', { states: {} })
-  const devices = useMemo(() => applyDeviceStates(saved.states), [saved])
+  // The Trust centre's consents, re-read after every change made here.
+  const [consents, setConsents] = useState<ConsentRecord>(readConsents)
+  const devices = useMemo(() => applyDeviceStates(saved.states, consents), [saved, consents])
   const setDevices = (fn: (ds: Device[]) => Device[]) => setSaved((cur) => {
-    const next = fn(applyDeviceStates(cur.states))
-    return { states: Object.fromEntries(next.map((d) => [d.id, { state: d.state, lastSync: d.lastSync, freshness: d.freshness }])) }
+    const next = fn(applyDeviceStates(cur.states, consents))
+    return { states: Object.fromEntries(next.map((d) => [d.id, { state: d.state, lastSync: d.lastSync, freshness: d.freshness, purposes: d.purposes }])) }
   })
+  const linkConsent = (id: string, on: boolean, purposes?: DevicePurpose[]) => { setDeviceConsent(id, on, purposes); setConsents(readConsents()) }
   const [syncing, setSyncing] = useState(false)
   const syncTimer = useRef<number | undefined>(undefined)
   useEffect(() => () => window.clearTimeout(syncTimer.current), [])
@@ -57,7 +69,16 @@ export default function Devices() {
   const connected = devices.filter((d) => d.state === 'connected')
   // Devices linked during onboarding (the hand-off seeds them as connected; this only labels them).
   const [fromSetup] = useState<string[]>(() => finishedOnboarding()?.linked ?? [])
-  const { hash } = useLocation()
+  const { hash, search } = useLocation()
+  const nav = useNavigate()
+  // Arriving from the Trust centre to give a device consent (?connect=whoop): open its connect flow.
+  useEffect(() => {
+    const id = new URLSearchParams(search).get('connect')
+    if (!id) return
+    const d = devices.find((x) => x.id === id)
+    if (d && d.state === 'available') setConnect(d)
+    nav({ search: '', hash }, { replace: true })
+  }, [search]) // eslint-disable-line react-hooks/exhaustive-deps
   // Arriving from the WhatsApp and watch screen with #watch (or any section): scroll once rendered.
   useEffect(() => {
     if (!hash) return
@@ -134,7 +155,11 @@ export default function Devices() {
               <div className="mt-4 flex flex-wrap gap-1.5">
                 {d.signals.map((s) => <Pill key={s}>{dx(s)}</Pill>)}
               </div>
-              <p className="mt-4 flex flex-wrap items-center gap-2 text-[13px] text-ink-3">{t('feeds')} {d.terms.map((t) => <TermChip key={t} term={t} />)}</p>
+              <p className="mt-4 flex flex-wrap items-center gap-2 text-[13px] text-ink-3">{t('feeds')} {termsFor(d.terms, d.purposes).map((t) => <TermChip key={t} term={t} />)}</p>
+              <p className="mt-2 text-[13px] text-ink-3">
+                {d.purposes && d.purposes.length < ALL_PURPOSES.length ? t('consentFor', { space: tt.space(d.purposes[0] === 'ease' ? 'B' : 'H') }) : t('consentAll')}{' '}
+                <Link to="/app/trust#consents" className="text-ink-2 underline underline-offset-4 hover:text-ink focus-ring">{t('consentTrust')}</Link>
+              </p>
 
               {d.id === 'apple' && (
                 <div className="mt-5 border-t border-line pt-5">
@@ -254,8 +279,9 @@ export default function Devices() {
       <ConnectSheet
         device={connect}
         onClose={() => setConnect(null)}
-        onConnected={(d) => {
-          setDevices((ds) => ds.map((x) => (x.id === d.id ? { ...x, state: 'connected', lastSync: 'Just now', freshness: 'fresh' } : x)))
+        onConnected={(d, purposes) => {
+          linkConsent(d.id, true, purposes)
+          setDevices((ds) => ds.map((x) => (x.id === d.id ? { ...x, state: 'connected', lastSync: 'Just now', freshness: 'fresh', purposes } : x)))
           setConnect(null)
           showToast(t('connectedToast', { name: d.name }))
         }}
@@ -265,10 +291,11 @@ export default function Devices() {
         {disconnect && (
           <>
             <p className="text-[17px] text-ink-2">{t('disconnectBody')}</p>
+            <p className="mt-3 text-[15px] text-ink-2">{t('disconnectConsent')}</p>
             {disconnect.isDefault && <p className="mt-3 text-[15px] text-ink-2">{t('disconnectDefault', { body: tt.space('H'), ease: tt.space('B') })}</p>}
             <div className="mt-6 flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setDisconnect(null)}>{t('keepConnected')}</Button>
-              <Button variant="ink" onClick={() => { setDevices((ds) => ds.map((x) => (x.id === disconnect.id ? { ...x, state: 'available' } : x))); showToast(t('disconnectedToast', { name: disconnect.name })); setDisconnect(null) }}>{t('disconnect')}</Button>
+              <Button variant="ink" onClick={() => { linkConsent(disconnect.id, false); setDevices((ds) => ds.map((x) => (x.id === disconnect.id ? { ...x, state: 'available' } : x))); showToast(t('disconnectedToast', { name: disconnect.name })); setDisconnect(null) }}>{t('disconnect')}</Button>
             </div>
           </>
         )}
@@ -295,13 +322,14 @@ function QualityRow({ label, value, note, ok }: { label: string; value: string; 
   )
 }
 
-function ConnectSheet({ device, onClose, onConnected }: { device: Device | null; onClose: () => void; onConnected: (d: Device) => void }) {
+function ConnectSheet({ device, onClose, onConnected }: { device: Device | null; onClose: () => void; onConnected: (d: Device, purposes: DevicePurpose[]) => void }) {
   const t = useDict(DEV)
   const tt = useTermText()
   const [purposes, setPurposes] = useState({ body: true, ease: true })
   const [step, setStep] = useState<'consent' | 'redirect'>('consent')
   const [tried, setTried] = useState(false)
-  const close = () => { setStep('consent'); setTried(false); onClose() }
+  const close = () => { setStep('consent'); setTried(false); setPurposes({ body: true, ease: true }); onClose() }
+  const chosen: DevicePurpose[] = [...(purposes.body ? ['body' as const] : []), ...(purposes.ease ? ['ease' as const] : [])]
   const any = purposes.body || purposes.ease
   return (
     <Sheet open={!!device} onClose={close} title={device ? t('connectName', { name: device.name }) : t('connect')}>
@@ -318,6 +346,7 @@ function ConnectSheet({ device, onClose, onConnected }: { device: Device | null;
             <li className="flex gap-2"><Check size={15} className="mt-0.5 shrink-0 text-ink-3" /> {t('neverAds')}</li>
             <li className="flex gap-2"><Check size={15} className="mt-0.5 shrink-0 text-ink-3" /> {t('ownPage', { name: device.name })}</li>
           </ul>
+          <p className="text-[13px] text-ink-3">{t('consentRecorded')}</p>
           <Button variant="ink" className="w-full" onClick={() => { setTried(true); if (any) setStep('redirect') }}>{t('continueTo', { name: device.name })}</Button>
         </div>
       )}
@@ -328,7 +357,7 @@ function ConnectSheet({ device, onClose, onConnected }: { device: Device | null;
           <p className="text-[14px] text-ink-2">{t('vendorSpecimen')}</p>
           <div className="flex gap-2">
             <Button variant="ghost" onClick={close}>{t('cancel')}</Button>
-            <Button variant="ink" onClick={() => { onConnected(device); setStep('consent'); setTried(false) }}>{t('simulate')}</Button>
+            <Button variant="ink" onClick={() => { onConnected(device, chosen); setStep('consent'); setTried(false); setPurposes({ body: true, ease: true }) }}>{t('simulate')}</Button>
           </div>
         </motion.div>
       )}

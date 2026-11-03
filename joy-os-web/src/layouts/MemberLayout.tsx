@@ -1,16 +1,22 @@
 import clsx from 'clsx'
 import {
-  BookOpen, CalendarDays, CircleDot, Compass, HeartHandshake, Home, MessageCircle, Plane, Settings,
-  ShieldCheck, Sparkles, Users, WifiOff, Feather, Watch, CreditCard, Bell, UserRound, RefreshCw, Check, ArrowRight, Mail, FileText,
+  CalendarDays, Compass, HeartHandshake, Home, MessageCircle, Settings,
+  ShieldCheck, Sparkles, WifiOff, Feather, Watch, CreditCard, Bell, UserRound, RefreshCw, Check, ArrowRight, FileText,
 } from 'lucide-react'
-import { useSyncExternalStore } from 'react'
+import { AnimatePresence } from 'framer-motion'
+import { useSyncExternalStore, type ComponentType } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { AppLock, useAppLock } from '@/components/joy/AppLock'
 import { JoyOsLockup } from '@/components/joy/Brand'
+import { DaybreakMark } from '@/components/joy/DaybreakMark'
+import { JoyIcon, type JoyIconName } from '@/components/joy/icons'
 import { fmtDate } from '@/components/joy/primitives'
 import { LoopRing } from '@/components/ui'
 import { MEMBER, PAYMENTS_GRACE } from '@/data/member'
 import { useApp } from '@/lib/store'
 import { useDict, useT } from '@/lib/i18n'
+import { useMemberName } from '@/lib/memberName'
+import { MemberScoreScope } from '@/lib/minor'
 import { SHARED } from '@/components/_i18n'
 import { CrisisSheet, ThemeToggle } from './shared'
 
@@ -55,6 +61,24 @@ function MarkWithTagline({ tagline }: { tagline: string }) {
   )
 }
 
+type NavIcon = ComponentType<{ size?: number; strokeWidth?: number; className?: string }>
+/** Joy OS's own objects use the brand icon set (Playbook p51); everything else is lucide. */
+const joy = (name: JoyIconName): NavIcon => {
+  const Icon = ({ size, className }: { size?: number; className?: string }) => <JoyIcon name={name} size={size} className={className} />
+  Icon.displayName = `JoyIcon(${name})`
+  return Icon
+}
+const CationIcon = joy('cation')
+const PracticeIcon = joy('practice')
+const IndexIcon = joy('index')
+const LetterIcon = joy('letter')
+const CircleIcon = joy('circle')
+
+/** Numbers are Mono (Playbook p40), also inside a translated line. */
+function monoDigits(line: string) {
+  return line.split(/(\d+)/).map((part, i) => (/^\d+$/.test(part) ? <span key={i} className="num">{part}</span> : part))
+}
+
 // Five tabs (Memo p.17): Today, Spaces, ’Cation, Practice, Care.
 export default function MemberLayout() {
   const t = useT()
@@ -67,18 +91,18 @@ export default function MemberLayout() {
   const TABS = [
     { to: '/app', label: t('today'), icon: Home, end: true },
     { to: '/app/spaces', label: t('spaces'), icon: Compass },
-    { to: '/app/cation', label: t('cation'), icon: Plane },
-    { to: '/app/practice', label: t('practice'), icon: BookOpen },
+    { to: '/app/cation', label: t('cation'), icon: CationIcon },
+    { to: '/app/practice', label: t('practice'), icon: PracticeIcon },
     { to: '/app/care', label: t('care'), icon: HeartHandshake },
   ]
   const MORE = [
     { to: '/app/notifications', label: s('notifications'), icon: Bell },
     { to: '/app/ledger', label: s('ledger'), icon: Feather },
-    { to: '/app/index', label: s('myIndex'), icon: CircleDot },
+    { to: '/app/index', label: s('myIndex'), icon: IndexIcon },
     { to: '/app/viva', label: s('viva'), icon: Sparkles },
     { to: '/app/day-40', label: s('day40'), icon: FileText },
-    { to: '/app/letter', label: s('letter'), icon: Mail },
-    { to: '/app/circles', label: s('circles'), icon: Users },
+    { to: '/app/letter', label: s('letter'), icon: LetterIcon },
+    { to: '/app/circles', label: s('circles'), icon: CircleIcon },
     { to: '/app/events', label: s('events'), icon: CalendarDays },
     { to: '/app/household', label: s('household'), icon: HeartHandshake },
     { to: '/app/devices', label: s('devices'), icon: Watch },
@@ -89,9 +113,18 @@ export default function MemberLayout() {
     { to: '/app/settings', label: s('settings'), icon: Settings },
   ]
   const immersive = pathname.startsWith('/app/index/take')
+  const name = useMemberName()
+  const lock = useAppLock()
 
   return (
-    <div className="min-h-screen bg-paper">
+    <MemberScoreScope>
+    {/* App open: the 2.4 s daybreak, once per session (skipped under reduced motion). */}
+    <DaybreakMark />
+    {/* Biometric lock (Settings · Security): over everything, the app behind it inert. */}
+    <AnimatePresence>
+      {lock.locked && <AppLock key="lock" reason={lock.locked} minutes={lock.minutes} onUnlock={lock.unlock} />}
+    </AnimatePresence>
+    <div className="min-h-screen bg-paper" inert={!!lock.locked} aria-hidden={lock.locked ? true : undefined}>
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-ink focus:px-4 focus:py-2 focus:text-paper">{s('skip')}</a>
       {/* Desktop rail */}
       {!immersive && (
@@ -100,7 +133,7 @@ export default function MemberLayout() {
           <div className="mx-4 mb-4 flex items-center gap-3 rounded-card bg-paper-sunk px-4 py-3">
             <LoopRing day={MEMBER.dayOfLoop} size={44} />
             <div className="min-w-0 break-words leading-tight">
-              <p className="text-[14px] text-ink">{t('dayOf', { n: MEMBER.dayOfLoop })}</p>
+              <p className="text-[14px] text-ink">{monoDigits(t('dayOf', { n: MEMBER.dayOfLoop }))}</p>
               <p className="eyebrow mt-1 text-ink-3">{s('nextMeasureOn', { date: fmtDate(MEMBER.nextMeasure, lang) })}</p>
             </div>
           </div>
@@ -115,7 +148,7 @@ export default function MemberLayout() {
           </nav>
           <div className="flex items-center justify-between border-t border-line px-5 py-3">
             <div className="text-[13px] leading-tight">
-              <p className="text-ink">{MEMBER.firstName} {MEMBER.lastName}</p>
+              <p className="text-ink">{name.fullName}</p>
               <p className="text-ink-3">{MEMBER.plan} · {MEMBER.membership}</p>
             </div>
             <ThemeToggle />
@@ -175,7 +208,7 @@ export default function MemberLayout() {
                 <NavLink to={to} end={end} className={({ isActive }) => clsx('flex flex-col items-center gap-1 px-0.5 py-2.5 text-[11px] focus-ring', isActive ? 'text-ink' : 'text-ink-3')}>
                   {({ isActive }) => (
                     <>
-                      <Icon size={21} strokeWidth={isActive ? 2 : 1.5} />
+                      <Icon size={21} strokeWidth={isActive ? 1.75 : 1.5} />
                       <span className={clsx('eyebrow max-w-full break-words text-center', indic ? '!text-[11px] !leading-tight !tracking-normal' : '!text-[9.5px] !tracking-[0.1em]')}>{label}</span>
                     </>
                   )}
@@ -187,10 +220,11 @@ export default function MemberLayout() {
       )}
       <CrisisSheet />
     </div>
+    </MemberScoreScope>
   )
 }
 
-function RailLink({ to, label, icon: Icon, end, small }: { to: string; label: string; icon: typeof Home; end?: boolean; small?: boolean }) {
+function RailLink({ to, label, icon: Icon, end, small }: { to: string; label: string; icon: NavIcon; end?: boolean; small?: boolean }) {
   return (
     <li>
       <NavLink
@@ -200,7 +234,7 @@ function RailLink({ to, label, icon: Icon, end, small }: { to: string; label: st
           clsx('flex items-center gap-3 rounded-lg px-3 transition-colors focus-ring', small ? 'py-2 text-[15px]' : 'py-2.5 text-[16px]', isActive ? 'bg-paper-sunk text-ink' : 'text-ink-2 hover:bg-paper-sunk/60 hover:text-ink')
         }
       >
-        <Icon size={small ? 17 : 19} strokeWidth={1.6} className="shrink-0" />
+        <Icon size={small ? 17 : 19} strokeWidth={1.5} className="shrink-0" />
         <span className="min-w-0 break-words">{label}</span>
       </NavLink>
     </li>

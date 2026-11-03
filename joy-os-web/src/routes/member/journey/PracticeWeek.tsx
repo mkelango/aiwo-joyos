@@ -4,11 +4,11 @@ import { ArrowLeft, ArrowRight, BookOpen, Check, FlaskConical, Lock, MessageCirc
 import { useId, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { DaybreakButton, Eyebrow, MethodLine, TermDot, useFmtDate } from '@/components/joy/primitives'
-import { Button, Card, EmptyState, PageHeader, Pill, SectionTitle } from '@/components/ui'
+import { Button, Card, PageHeader, Pill, SectionTitle } from '@/components/ui'
 import { CIRCLE, PRACTICE_WEEKS } from '@/data/platform'
 import { INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
 import { PRACTICE_CONTENT } from './_data'
-import { AudioPlayer, PrimaryChip, Quote, fade, useAfterIndex } from './_parts'
+import { AudioPlayer, JourneyEmpty, PrimaryChip, Quote, fade, useAfterIndex } from './_parts'
 // One shared emergency intercept for every member free-text field (Memo p.24).
 import { useCrisisGuard } from '@/routes/member/spaces/_SpaceShell'
 import { addDays, isoDate, practisedToday, saveReflection, setWeekPractised, togglePractisedToday, useJourney, weekPractised } from './_store'
@@ -45,7 +45,7 @@ function WeekView({ n }: { n: string }) {
     return (
       <div>
         <PageHeader eyebrow={t('practiceName')} title={t('nfWeekTitle')} lead={t('nfWeekLead')} />
-        <EmptyState title={t('nfWeekEmpty')} body={t('nfWeekBody')} action={<Link to="/app/practice" className="btn-daybreak">{t('backToPractice')}</Link>} />
+        <JourneyEmpty kind="generic" title={t('nfWeekEmpty')} body={t('nfWeekBody')} action={<Link to="/app/practice" className="btn-daybreak">{t('backToPractice')}</Link>} />
       </div>
     )
   }

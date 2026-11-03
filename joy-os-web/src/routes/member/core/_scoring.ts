@@ -28,6 +28,11 @@ function normalise(block: InstrumentBlock, item: SampleItem, v: number) {
 
 export interface SittingResult {
   terms: TermScore[]
+  /** The Index, or null while any term is not yet measured (withheld, never guessed). */
+  value: number | null
+  /** Terms with no answers (skipped for now): drawn dotted and named "not yet measured". */
+  missing: TermKey[]
+  /** The engine's working (GM and λ·B are 0 while the Index is withheld). */
   engine: NonNullable<ReturnType<typeof joyspanIndex>>
   survey: Record<TermKey, number | null>
   lowest: TermKey
@@ -48,8 +53,19 @@ export const WEARABLE_SIGNAL_IDS: string[] = ORDER.flatMap((k) =>
 )
 export const isWearableSignal = (id: string) => WEARABLE_SIGNAL_IDS.includes(id)
 
-export function scoreAnswers(answers: Record<string, number>, signalsOff: string[] = []): SittingResult {
+/** The term each item feeds. */
+export const ITEM_TERM: Record<string, TermKey> = Object.fromEntries(SITTINGS.flatMap((sit) => sit.blocks.flatMap((b) => b.sample.map((i) => [i.id, b.term] as const))))
+
+/** The answers without the items of the terms skipped for now. */
+export function withoutSkipped(answers: Record<string, number>, skipped: TermKey[] = []) {
+  if (skipped.length === 0) return answers
+  const skip = new Set(skipped)
+  return Object.fromEntries(Object.entries(answers).filter(([id]) => !skip.has(ITEM_TERM[id])))
+}
+
+export function scoreAnswers(raw: Record<string, number>, signalsOff: string[] = [], skipped: TermKey[] = []): SittingResult {
   const latest = INDEX_HISTORY[0]
+  const answers = withoutSkipped(raw, skipped)
   const off = new Set(signalsOff)
   const sums: Record<TermKey, { s: number; n: number }> = { H: { s: 0, n: 0 }, P: { s: 0, n: 0 }, R: { s: 0, n: 0 }, F: { s: 0, n: 0 }, D: { s: 0, n: 0 }, B: { s: 0, n: 0 } }
   for (const sit of SITTINGS)
@@ -76,10 +92,12 @@ export function scoreAnswers(answers: Record<string, number>, signalsOff: string
     return { key: k, value, band: bandFor(value, k === 'B'), delta: prev == null ? undefined : value - prev }
   })
 
-  const engine = joyspanIndex(terms, latest.method) ?? { gm: 0, burden: 0, lambda: 0.25, value: 0 }
+  const ji = joyspanIndex(terms, latest.method)
+  const engine = ji ?? { gm: 0, burden: 0, lambda: 0.25, value: 0 }
   const a = (id: string) => answers[id] ?? 0
   // PHQ-4: either two-item subscale at 3 or more is the clinician-review threshold.
   const phqFlag = a('phq-24') + a('phq-25') >= 3 || a('phq-26') + a('phq-27') >= 3
   const surveyOnly = WEARABLE_SIGNAL_IDS.every((id) => off.has(id))
-  return { terms, engine, survey, lowest: lowestTerm(terms), phqFlag, surveyOnly }
+  const missing = terms.filter((t) => t.value === null).map((t) => t.key)
+  return { terms, value: ji ? ji.value : null, missing, engine, survey, lowest: lowestTerm(terms), phqFlag, surveyOnly }
 }

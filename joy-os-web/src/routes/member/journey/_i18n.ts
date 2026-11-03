@@ -100,7 +100,7 @@ export const JOURNEY = {
   firstReading: { en: 'First reading', ta: 'முதல் அளவீடு', hi: 'पहला माप' },
   readingsFoot: { en: 'For sit-to-stand, a lower time is better; the arrow shows improvement. Blood pressure reviewed by {name}, who was present on the floor throughout.', ta: 'உட்கார்ந்து-எழுதலில் குறைந்த நேரமே சிறந்தது; அம்புக்குறி முன்னேற்றத்தைக் காட்டுகிறது. இரத்த அழுத்தத்தை {name} பார்வையிட்டார்; அவர் முழு நேரமும் அங்கேயே இருந்தார்.', hi: 'सिट-टू-स्टैंड में कम समय बेहतर है; तीर सुधार दिखाता है। ब्लड प्रेशर {name} ने देखा, जो पूरे समय वहीं मौजूद थीं।' },
   ninetyEyebrow: { en: 'The ninety days · from checkout', ta: 'தொண்ணூறு நாட்கள் · புறப்பட்டதிலிருந்து', hi: 'नब्बे दिन · चेक-आउट से' },
-  ninetyBody: { en: 'Day {day}. Your Day-45 review with {coach} is on {date}. The Day-90 measure for {name} is a {measure}, opening on Day 76.', ta: 'நாள் {day}. {coach} உடன் உங்கள் நாள்-45 மதிப்பாய்வு {date} அன்று. {name} க்கான நாள்-90 அளவீடு: {measure}; இது நாள் 76 அன்று திறக்கும்.', hi: 'दिन {day}। {coach} के साथ आपकी दिन-45 समीक्षा {date} को है। {name} का दिन-90 माप है {measure}, जो दिन 76 पर खुलेगा।' },
+  ninetyBody: { en: 'Day {day}. Your Day-{d45} review with {coach} is on {date}. The Day-{d90} measure for {name} is a {measure}, opening on Day {d76}.', ta: 'நாள் {day}. {coach} உடன் உங்கள் நாள்-{d45} மதிப்பாய்வு {date} அன்று. {name} க்கான நாள்-{d90} அளவீடு: {measure}; இது நாள் {d76} அன்று திறக்கும்.', hi: 'दिन {day}। {coach} के साथ आपकी दिन-{d45} समीक्षा {date} को है। {name} का दिन-{d90} माप है {measure}, जो दिन {d76} पर खुलेगा।' },
   milestonesAria: { en: 'Ninety-day milestones', ta: 'தொண்ணூறு நாள் மைல்கற்கள்', hi: 'नब्बे दिनों के पड़ाव' },
   ms_checkout: { en: 'Checkout', ta: 'புறப்பாடு', hi: 'चेक-आउट' },
   ms_review: { en: 'Review', ta: 'மதிப்பாய்வு', hi: 'समीक्षा' },
@@ -109,7 +109,7 @@ export const JOURNEY = {
   ms_delta: { en: 'Signed delta', ta: 'கையொப்பமிட்ட மாற்றம்', hi: 'हस्ताक्षरित बदलाव' },
   suggestedTitle: { en: 'Suggested for your lowest term', ta: 'உங்கள் மிகக் குறைந்த கூறுக்குப் பரிந்துரை', hi: 'आपके सबसे कम पहलू के लिए सुझाव' },
   lowestTermScore: { en: 'Lowest term · {v}', ta: 'மிகக் குறைந்த கூறு · {v}', hi: 'सबसे कम पहलू · {v}' },
-  suggestedBody: { en: '{promise} {lowest} is still your lowest term on Day {day}. This is the conversation {coach} will open at Day 60; you can look now.', ta: '{promise} நாள் {day} அன்றும் {lowest} தான் உங்கள் மிகக் குறைந்த கூறு. நாள் 60 அன்று {coach} தொடங்கும் உரையாடல் இதுதான்; நீங்கள் இப்போதே பார்க்கலாம்.', hi: '{promise} दिन {day} पर भी {lowest} आपका सबसे कम पहलू है। दिन 60 पर {coach} यही बातचीत शुरू करेंगी; आप अभी देख सकते हैं।' },
+  suggestedBody: { en: '{promise} {lowest} is still your lowest term on Day {day}. This is the conversation {coach} will open at Day {d60}; you can look now.', ta: '{promise} நாள் {day} அன்றும் {lowest} தான் உங்கள் மிகக் குறைந்த கூறு. நாள் {d60} அன்று {coach} தொடங்கும் உரையாடல் இதுதான்; நீங்கள் இப்போதே பார்க்கலாம்.', hi: '{promise} दिन {day} पर भी {lowest} आपका सबसे कम पहलू है। दिन {d60} पर {coach} यही बातचीत शुरू करेंगी; आप अभी देख सकते हैं।' },
   fromPrice: { en: 'From {p}', ta: '{p} முதல்', hi: '{p} से शुरू' },
   fromLower: { en: 'from {p}', ta: '{p} முதல்', hi: '{p} से' },
   day90Colon: { en: 'Day-90 measure: {m}', ta: 'நாள்-90 அளவீடு: {m}', hi: 'दिन-90 माप: {m}' },
@@ -487,7 +487,7 @@ export const JOURNEY = {
   yourIndex: { en: 'Your Index', ta: 'உங்கள் குறியீடு', hi: 'आपका इंडेक्स' },
   // ’Cation home · no ’cation yet (specimen switch)
   demoSwitch: { en: 'Specimen view: a member with no ’cation yet', ta: 'மாதிரிப் பார்வை: இன்னும் ’கேஷன் எடுக்காத உறுப்பினர்', hi: 'नमूना दृश्य: ऐसा सदस्य जिसने अभी कोई ’केशन नहीं लिया' },
-  demoSwitchDesc: { en: 'See this tab as it looks before a first stay. Turn it off to return to Arjun’s Joycation.', ta: 'முதல் தங்கலுக்கு முன் இந்தத் தாவல் எப்படித் தெரியும் என்று பாருங்கள். அர்ஜுனின் ஜாய்கேஷனுக்குத் திரும்ப இதை அணையுங்கள்.', hi: 'देखिए कि पहले ठहराव से पहले यह टैब कैसा दिखता है। अर्जुन के जॉयकेशन पर लौटने के लिए इसे बंद करें।' },
+  demoSwitchDesc: { en: 'See this tab as it looks before a first stay. Turn it off to return to your Joycation.', ta: 'முதல் தங்கலுக்கு முன் இந்தத் தாவல் எப்படித் தெரியும் என்று பாருங்கள். உங்கள் ஜாய்கேஷனுக்குத் திரும்ப இதை அணையுங்கள்.', hi: 'देखिए कि पहले ठहराव से पहले यह टैब कैसा दिखता है। अपने जॉयकेशन पर लौटने के लिए इसे बंद करें।' },
   noneEyebrow: { en: '’Cation · none taken yet', ta: '’கேஷன் · இன்னும் எதுவும் எடுக்கவில்லை', hi: '’केशन · अभी कोई नहीं लिया' },
   noneLead: { en: 'You have not taken a ’cation yet. Your Index already says where one would help most.', ta: 'நீங்கள் இன்னும் ’கேஷன் எடுக்கவில்லை. எது அதிகம் உதவும் என்பதை உங்கள் குறியீடு ஏற்கெனவே சொல்கிறது.', hi: 'आपने अभी कोई ’केशन नहीं लिया है। आपका इंडेक्स पहले से बताता है कि सबसे ज़्यादा मदद कहाँ होगी।' },
   noneTitle: { en: 'Your first ’cation, for your lowest term: {name}', ta: 'உங்கள் முதல் ’கேஷன், உங்கள் மிகக் குறைந்த கூறுக்காக: {name}', hi: 'आपका पहला ’केशन, आपके सबसे कम पहलू के लिए: {name}' },
@@ -611,12 +611,44 @@ export const JOURNEY = {
   repWithCoach: { en: 'With Coach {c}', ta: 'கோச் {c} இடம்', hi: 'कोच {c} के पास' },
   repWithdrawAria: { en: 'Withdraw the concern about {name}', ta: '{name} பற்றிய கவலையைத் திரும்பப் பெறு', hi: '{name} के बारे में चिंता वापस लें' },
   repFlagAria: { en: 'Raise a concern about {name}', ta: '{name} பற்றிக் கவலையைத் தெரிவியுங்கள்', hi: '{name} के बारे में चिंता बताएँ' },
+  // Joyspan 2027 · New Year's Eve and the Declaration card (Playbook p61)
+  nyeTitle: { en: 'New Year’s Eve · the programme', ta: 'புத்தாண்டு முன்னிரவு · நிகழ்ச்சி நிரல்', hi: 'नए साल की पूर्व संध्या · कार्यक्रम' },
+  nyeLead: { en: 'The last evening of {y}. At ten to midnight every guest made the same promise, and signed it.', ta: '{y} இன் கடைசி மாலை. நள்ளிரவுக்குப் பத்து நிமிடம் முன், ஒவ்வொரு விருந்தினரும் ஒரே உறுதிமொழியை எடுத்து, அதில் கையொப்பமிட்டனர்.', hi: '{y} की आख़िरी शाम। आधी रात से दस मिनट पहले हर मेहमान ने एक ही वादा किया, और उस पर हस्ताक्षर किए।' },
+  nyeYourCard: { en: 'Your card', ta: 'உங்கள் அட்டை', hi: 'आपका कार्ड' },
+  declEyebrow: { en: 'Declaration · {time}', ta: 'உறுதிமொழி · {time}', hi: 'घोषणा · {time}' },
+  declText: { en: 'In {y} I will raise my lowest term, and I will measure it honestly.', ta: '{y} இல் என் மிகக் குறைந்த கூறை உயர்த்துவேன்; அதை நேர்மையாக அளவிடுவேன்.', hi: '{y} में मेरा संकल्प: अपना सबसे कम पहलू ऊपर उठाना, और उसे ईमानदारी से मापना।' },
+  declLowest: { en: 'My lowest term: {term}', ta: 'என் மிகக் குறைந்த கூறு: {term}', hi: 'मेरा सबसे कम पहलू: {term}' },
+  declSigned: { en: 'Signed', ta: 'கையொப்பம்', hi: 'हस्ताक्षर' },
+  declSignedOn: { en: 'Signed on {d}', ta: '{d} அன்று கையொப்பமிட்டது', hi: '{d} को हस्ताक्षर किए' },
+  declCardAria: { en: 'Your Declaration card', ta: 'உங்கள் உறுதிமொழி அட்டை', hi: 'आपका घोषणा कार्ड' },
+  declSignLabel: { en: 'Sign it: type your name', ta: 'கையொப்பமிடுங்கள்: உங்கள் பெயரைத் தட்டச்சு செய்யுங்கள்', hi: 'हस्ताक्षर करें: अपना नाम लिखें' },
+  declSignHint: { en: 'Type your name as you would sign it. The signed card stays on this device.', ta: 'நீங்கள் கையொப்பமிடுவது போலவே உங்கள் பெயரைத் தட்டச்சு செய்யுங்கள். கையொப்பமிட்ட அட்டை இந்தச் சாதனத்திலேயே இருக்கும்.', hi: 'अपना नाम वैसे ही लिखें जैसे आप हस्ताक्षर करते हैं। हस्ताक्षर किया कार्ड इसी डिवाइस पर रहता है।' },
+  declSignBtn: { en: 'Sign the card', ta: 'அட்டையில் கையொப்பமிடு', hi: 'कार्ड पर हस्ताक्षर करें' },
+  declErr: { en: 'Type your name to sign the card.', ta: 'அட்டையில் கையொப்பமிட உங்கள் பெயரைத் தட்டச்சு செய்யுங்கள்.', hi: 'कार्ड पर हस्ताक्षर के लिए अपना नाम लिखें।' },
+  declDone: { en: 'Signed. Keep it on screen, or print it and put it somewhere you will see it.', ta: 'கையொப்பமிடப்பட்டது. திரையில் வைத்திருங்கள், அல்லது அச்சிட்டு நீங்கள் பார்க்கும் இடத்தில் வையுங்கள்.', hi: 'हस्ताक्षर हो गए। इसे स्क्रीन पर रखें, या प्रिंट करके ऐसी जगह लगाएँ जहाँ यह दिखता रहे।' },
+  declPrint: { en: 'Print the card', ta: 'அட்டையை அச்சிடு', hi: 'कार्ड प्रिंट करें' },
+  declResign: { en: 'Sign again', ta: 'மீண்டும் கையொப்பமிடு', hi: 'फिर से हस्ताक्षर करें' },
+  declFoot: { en: 'Your lowest term comes from the Index taken at {name}. Your Day-{d} measure says whether it rose.', ta: 'உங்கள் மிகக் குறைந்த கூறு {name} இல் எடுத்த குறியீட்டிலிருந்து வருகிறது. அது உயர்ந்ததா என்பதை உங்கள் நாள்-{d} அளவீடு சொல்லும்.', hi: 'आपका सबसे कम पहलू {name} में लिए गए इंडेक्स से है। यह बढ़ा या नहीं, आपका दिन-{d} माप बताएगा।' },
+
+  // ’Cation detail · the venue's published itinerary (C11)
+  itinFromVenue: { en: 'From {venue}', ta: '{venue} இடமிருந்து', hi: '{venue} से' },
+  itinTemplate: { en: 'The template', ta: 'மாதிரித் திட்டம்', hi: 'मूल ढाँचा' },
+  itinVenueTag: { en: 'From the venue', ta: 'இடத்திடமிருந்து', hi: 'जगह की ओर से' },
+  itinVenueNote: { en: 'Published by {venue} · {d}, {time}. This is the schedule the venue set for your stay.', ta: '{venue} வெளியிட்டது · {d}, {time}. உங்கள் தங்குதலுக்காக அந்த இடம் அமைத்த அட்டவணை இது.', hi: '{venue} ने प्रकाशित किया · {d}, {time}। यह आपके ठहराव के लिए उस जगह का तय किया कार्यक्रम है।' },
+  itinSourceAria: { en: 'Whose itinerary to show', ta: 'எந்த அட்டவணையைக் காட்டுவது', hi: 'कौन-सा कार्यक्रम दिखाएँ' },
 } satisfies Dict
 
 export type JourneyKey = keyof typeof JOURNEY
 
 // ─── Data text, keyed by the English: [Tamil, Hindi] ─────────────────────
 const DATA: Record<string, [string, string]> = {
+  // New Year's Eve at AIWO Joyspan 2027
+  'The slow dinner at the Long Table': ['லாங் டேபிளில் நிதானமான இரவு விருந்து', 'लॉन्ग टेबल पर इत्मीनान का डिनर'],
+  'The Long Table': ['லாங் டேபிள்', 'लॉन्ग टेबल'],
+  'The quiet hour: the Wardrobe and the Quiet Pods': ['அமைதியான நேரம்: வார்ட்ரோப் மற்றும் குவைட் பாட்ஸ்', 'शांत घंटा: वार्डरोब और क्वाइट पॉड्स'],
+  'Pavilion': ['பெவிலியன்', 'पवेलियन'],
+  'The Declaration': ['உறுதிமொழி', 'घोषणा'],
+  'Begin 2027 with joy: the sun rises on the stage': ['மகிழ்ச்சியுடன் 2027 ஐத் தொடங்குங்கள்: மேடையில் சூரியன் உதிக்கிறது', 'खुशी के साथ 2027 की शुरुआत: मंच पर सूरज उगता है'],
   // places
   'Chennai': ['சென்னை', 'चेन्नई'],
   'Mumbai': ['மும்பை', 'मुंबई'],

@@ -4,6 +4,7 @@ import Svg, { Circle, Defs, Pattern, Rect } from 'react-native-svg'
 import { useDict, useTermText } from '../lib/i18n'
 import type { Band, TermKey } from '../shared/types'
 import { useTheme } from '../theme/ThemeProvider'
+import { TermIcon } from './JoyIcons'
 import { Body, Eyebrow, Meta } from './Text'
 import { KIT } from './_i18n'
 
@@ -41,7 +42,8 @@ export function TermDot({ term, size = 10 }: { term: TermKey; size?: number }) {
   )
 }
 
-/** Term chip — a colour never appears without its name (Principle 06). */
+/** Term chip — a colour never appears without its name (Principle 06). The term's own icon
+ *  (Playbook p51) in its Spectrum colour, beside its name. */
 export function TermChip({ term, withSpace = false, size = 'sm', style }: { term: TermKey; withSpace?: boolean; size?: 'sm' | 'md'; style?: StyleProp<ViewStyle> }) {
   const t = useTheme()
   const tt = useTermText()
@@ -67,7 +69,7 @@ export function TermChip({ term, withSpace = false, size = 'sm', style }: { term
         style,
       ]}
     >
-      <TermDot term={term} />
+      <TermIcon term={term} size={size === 'sm' ? 16 : 18} />
       {size === 'sm' ? <Meta tone="ink" size={14} style={{ flexShrink: 1 }}>{label}</Meta> : <Body size={15} style={{ flexShrink: 1 }}>{label}</Body>}
     </View>
   )

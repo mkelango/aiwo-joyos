@@ -44,6 +44,10 @@ export const ONB = {
   neededDot: { en: 'Needed for your Index.', ta: 'உங்கள் குறியீட்டுக்குத் தேவை.', hi: 'इंडेक्स के लिए ज़रूरी।' },
   optional: { en: 'Optional', ta: 'விருப்பத்தேர்வு', hi: 'वैकल्पिक' },
   optionalDot: { en: 'Optional.', ta: 'விருப்பத்தேர்வு.', hi: 'वैकल्पिक।' },
+  // Each purpose is a consent artefact with a version (Arch p17; consent_event keeps it).
+  consVersion: { en: 'Consent text ', ta: 'ஒப்புதல் உரை ', hi: 'सहमति पाठ ' },
+  consVersionA11y: { en: 'consent text version {v}', ta: 'ஒப்புதல் உரை பதிப்பு {v}', hi: 'सहमति पाठ संस्करण {v}' },
+  consVersionNote: { en: 'You agree to the version shown. The Trust centre keeps it with the date; a new version is asked for again, never assumed.', ta: 'காட்டப்பட்ட பதிப்புக்கே நீங்கள் ஒப்புதல் தருகிறீர்கள். நம்பிக்கை மையம் அதைத் தேதியுடன் வைத்திருக்கும்; புதிய பதிப்புக்கு மீண்டும் கேட்கப்படும், ஒருபோதும் தானாக எடுத்துக்கொள்ளப்படாது.', hi: 'आप दिखाए गए संस्करण पर सहमति देते हैं। ट्रस्ट सेंटर इसे तारीख़ के साथ रखता है; नए संस्करण के लिए फिर से पूछा जाता है, कभी मान नहीं लिया जाता।' },
   consNote: { en: 'Withdraw any consent in one tap from the Trust centre; it is honoured within 24 hours. Device, calendar and WhatsApp permissions are asked separately, when you first use them.', ta: 'நம்பிக்கை மையத்தில் ஒரே தட்டலில் எந்த ஒப்புதலையும் திரும்பப் பெறலாம்; 24 மணிநேரத்துக்குள் அது நடைமுறைக்கு வரும். சாதனம், நாள்காட்டி, WhatsApp அனுமதிகள் நீங்கள் முதலில் பயன்படுத்தும்போது தனியாகக் கேட்கப்படும்.', hi: 'ट्रस्ट सेंटर से एक टैप में कोई भी सहमति वापस लें; 24 घंटे में लागू हो जाती है। डिवाइस, कैलेंडर और WhatsApp की अनुमति अलग से, पहली बार इस्तेमाल पर माँगी जाती है।' },
   devA: { en: 'Do you wear ', ta: 'நீங்கள் ', hi: 'क्या आप ' },
   devSerif: { en: 'anything', ta: 'ஏதாவது', hi: 'कुछ' },

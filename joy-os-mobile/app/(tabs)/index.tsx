@@ -8,6 +8,7 @@ import {
   Body,
   Button,
   Card,
+  CountUp,
   DaybreakButton,
   Delta,
   describeWheel,
@@ -19,7 +20,7 @@ import {
   Meta,
   MethodLine,
   Mono,
-  Numeral,
+  Pill,
   Screen,
   Serif,
   Sheet,
@@ -36,13 +37,18 @@ import { INDEX_HISTORY, LEDGER_WEEK, MEMBER, TODAY_ACTION } from '@/shared/membe
 import { termByKey } from '@/shared/terms'
 import { useTheme } from '@/theme/ThemeProvider'
 import { actionsFor } from '@/screens/a/spacesData'
-import { isSpecimenToday, usePlanned } from '@/screens/a/local'
+import { isSpecimenToday, useLocal, usePlanned } from '@/screens/a/local'
+import { measuredScore, type MeasuredIndex } from '@/shared/indexScoring'
 import type { TermKey } from '@/shared/types'
 import { Rich, useA } from '@/screens/a/i18n'
+import { NotScored } from '@/screens/a/parts'
+import { useIsMinor } from '@/lib/minor'
 
 // TODAY (Memo p.14, p.17, p.18; Playbook p62): the Index and Wheel, the lowest term, one
 // action, the circle's next call, Day N of 90 and the next measure date. One Daybreak button.
 // Mobile port of joy-os-web/src/routes/member/core/Today.tsx — the exemplar for every screen.
+// Under 18 (minors gate) nothing is scored: no Index, Wheel, delta, band or term values, no
+// re-measure or signed delta in the ninety days; the action, circle and Ledger stay.
 
 /** Monday to Wednesday from the specimen; Thursday (today) comes from the Ledger itself. */
 const LEDGER_PAST = [true, true, true]
@@ -59,6 +65,14 @@ const MILESTONES: [number, 'Measured' | 'Review' | 'Next step' | 'Re-measure' | 
   [76, 'Re-measure'],
   [90, 'Signed delta'],
 ]
+/** A minor's ninety days: no baseline, no re-measure, a look back with the guardian at Day 90. */
+const MILESTONES_MINOR: [number, 'Begin · no score' | 'Review' | 'Next step' | 'A look back · no score'][] = [
+  [0, 'Begin · no score'],
+  [15, 'Review'],
+  [45, 'Review'],
+  [60, 'Next step'],
+  [90, 'A look back · no score'],
+]
 
 export default function Today() {
   const t = useT()
@@ -68,9 +82,14 @@ export default function Today() {
   const { actionState, setActionState, ledger } = useApp()
   const { planned, plan } = usePlanned()
   const [whyOpen, setWhyOpen] = useState(false)
+  const minor = useIsMinor()
 
-  const latest = INDEX_HISTORY[0]
-  const previous = INDEX_HISTORY[1]
+  // A sitting taken on this phone is the newest Index (as on the Index result); a survey-only
+  // sitting (signals down) says so here too.
+  const [measured] = useLocal<MeasuredIndex>('measuredIndex', null)
+  const latest = measured ? measuredScore(measured) : INDEX_HISTORY[0]
+  const previous = measured ? INDEX_HISTORY[0] : INDEX_HISTORY[1]
+  const change = latest.value - previous.value
   const lowest = termByKey(latest.lowestTerm)
   const lowestScore = latest.terms.find((s) => s.key === latest.lowestTerm)?.value
   const action = TODAY_ACTION
@@ -85,72 +104,110 @@ export default function Today() {
 
   return (
     <Screen inTabs top={<AppBar />}>
-      {/* The Index — the largest element on the screen */}
-      <Card tone="raised" padding={20} style={{ gap: space.s2 }}>
-        <View style={{ gap: space.s1 }}>
-          <Eyebrow accessibilityRole="header" aria-level={1}>
-            {t('yourJoyspan')} · {t('dayOf', { n: day })}
-          </Eyebrow>
-          <SpecimenTag />
-        </View>
-
-        <Pressable
-          onPress={() => router.push('/index-result')}
-          accessibilityRole="link"
-          accessibilityLabel={ta('{wheel} Opens your Index.', { wheel: describeWheel(latest.terms, latest.value, lang) })}
-          style={({ pressed }) => ({ alignItems: 'center', opacity: pressed ? 0.85 : 1, marginVertical: space.half })}
-        >
-          <JoyspanWheel terms={latest.terms} size={236} />
-        </Pressable>
-
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.s2 }}>
-          <Numeral size={96} accessibilityLabel={ta('Joyspan Index {n} of 100', { n: latest.value })}>
-            {latest.value}
-          </Numeral>
-          <View style={{ paddingBottom: 14, gap: 4 }}>
-            <Delta value={latest.value - previous.value} size={17} />
-            <BandLabel band={latest.band} />
+      {/* The Index — the largest element on the screen; none for a member under 18 */}
+      {minor ? (
+        <Card tone="raised" padding={20} style={{ gap: space.s2 }}>
+          <View style={{ gap: space.s1 }}>
+            <Eyebrow accessibilityRole="header" aria-level={1}>
+              {t('yourJoyspan')} · {t('dayOf', { n: day })}
+            </Eyebrow>
+            <SpecimenTag />
           </View>
-        </View>
-        <Body tone="ink2">
-          {ta('Up from {n}. Lowest term:', { n: previous.value })} <Body>{name(lowest.key)}</Body>{lang === 'hi' ? '।' : '.'}
-        </Body>
-
-        <Divider />
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 2, columnGap: space.s3 }}>
-          {latest.terms.map((s) => {
-            const term = termByKey(s.key)
-            const shown = s.key === 'B' ? `−${s.value}` : String(s.value)
-            return (
+          <NotScored body={ta('Joy OS never scores anyone under 18. The Ledger, the practices and your people are open from today, and each space is there to explore.')} />
+          <Divider />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 2, columnGap: space.s3 }}>
+            {latest.terms.map((s) => (
               <Pressable
                 key={s.key}
-                onPress={() => router.push(`/spaces/${term.slug}`)}
+                onPress={() => router.push(`/spaces/${termByKey(s.key).slug}`)}
                 accessibilityRole="link"
-                accessibilityLabel={ta('{space}, {name} {minus}{value}, {band}', { space: spaceName(s.key), name: name(s.key), minus: s.key === 'B' ? ta('minus ') : '', value: String(s.value), band: tx(s.band) })}
+                accessibilityLabel={ta('Opens the {space} space', { space: spaceName(s.key) })}
                 style={({ pressed }) => ({ width: '45%', flexGrow: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, opacity: pressed ? 0.6 : 1 })}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
                   <TermDot term={s.key} />
                   <Meta style={{ flexShrink: 1 }}>{spaceName(s.key)}</Meta>
                 </View>
-                <Mono tone="ink">{shown}</Mono>
+                <Icon name="chevron-right" size={16} color={c.ink3} />
               </Pressable>
-            )
-          })}
-        </View>
-        <Divider />
-        <MethodLine method={latest.method} grade={latest.grade} next={latest.nextMeasure} />
-        <Pressable onPress={() => router.push('/trust')} accessibilityRole="link" hitSlop={6} style={{ minHeight: 44, justifyContent: 'center' }}>
-          <Eyebrow tone="ink2" style={{ textDecorationLine: 'underline' }}>
-            {t('trust')}
-          </Eyebrow>
-        </Pressable>
-      </Card>
+            ))}
+          </View>
+          <Pressable onPress={() => router.push('/trust')} accessibilityRole="link" hitSlop={6} style={{ minHeight: 44, justifyContent: 'center' }}>
+            <Eyebrow tone="ink2" style={{ textDecorationLine: 'underline' }}>
+              {t('trust')}
+            </Eyebrow>
+          </Pressable>
+        </Card>
+      ) : (
+        <Card tone="raised" padding={20} style={{ gap: space.s2 }}>
+          <View style={{ gap: space.s1 }}>
+            <Eyebrow accessibilityRole="header" aria-level={1}>
+              {t('yourJoyspan')} · {t('dayOf', { n: day })}
+            </Eyebrow>
+            <SpecimenTag />
+          </View>
+
+          <Pressable
+            onPress={() => router.push('/index-result')}
+            accessibilityRole="link"
+            accessibilityLabel={ta('{wheel} Opens your Index.', { wheel: describeWheel(latest.terms, latest.value, lang) })}
+            style={({ pressed }) => ({ alignItems: 'center', opacity: pressed ? 0.85 : 1, marginVertical: space.half })}
+          >
+            <JoyspanWheel terms={latest.terms} size={236} />
+          </Pressable>
+
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.s2 }}>
+            <CountUp value={latest.value} size={96} accessibilityLabel={ta('Joyspan Index {n} of 100', { n: latest.value })} />
+            <View style={{ paddingBottom: 14, gap: 4 }}>
+              <Delta value={change} size={17} />
+              <BandLabel band={latest.band} />
+            </View>
+          </View>
+          {latest.surveyOnly ? (
+            <View style={{ flexDirection: 'row' }}>
+              <Pill>{ta('Survey only · no device signal')}</Pill>
+            </View>
+          ) : null}
+          <Body tone="ink2">
+            {ta(change > 0 ? 'Up from {n}. Lowest term:' : change < 0 ? 'Down from {n}. Lowest term:' : 'Level with {n}. Lowest term:', { n: previous.value })} <Body>{name(lowest.key)}</Body>{lang === 'hi' ? '।' : '.'}
+          </Body>
+
+          <Divider />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 2, columnGap: space.s3 }}>
+            {latest.terms.map((s) => {
+              const term = termByKey(s.key)
+              const shown = s.key === 'B' ? `−${s.value}` : String(s.value)
+              return (
+                <Pressable
+                  key={s.key}
+                  onPress={() => router.push(`/spaces/${term.slug}`)}
+                  accessibilityRole="link"
+                  accessibilityLabel={ta('{space}, {name} {minus}{value}, {band}', { space: spaceName(s.key), name: name(s.key), minus: s.key === 'B' ? ta('minus ') : '', value: String(s.value), band: tx(s.band) })}
+                  style={({ pressed }) => ({ width: '45%', flexGrow: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, opacity: pressed ? 0.6 : 1 })}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
+                    <TermDot term={s.key} />
+                    <Meta style={{ flexShrink: 1 }}>{spaceName(s.key)}</Meta>
+                  </View>
+                  <Mono tone="ink">{shown}</Mono>
+                </Pressable>
+              )
+            })}
+          </View>
+          <Divider />
+          <MethodLine method={latest.method} grade={latest.grade} next={latest.nextMeasure} />
+          <Pressable onPress={() => router.push('/trust')} accessibilityRole="link" hitSlop={6} style={{ minHeight: 44, justifyContent: 'center' }}>
+            <Eyebrow tone="ink2" style={{ textDecorationLine: 'underline' }}>
+              {t('trust')}
+            </Eyebrow>
+          </Pressable>
+        </Card>
+      )}
 
       {/* The one action */}
       <Card tone="sunk" style={{ gap: space.s2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s1, flexWrap: 'wrap' }}>
-          <Eyebrow tone="daybreak" style={{ flexShrink: 1 }}>{`${t('today')} · ${name(lowest.key)}`}</Eyebrow>
+          <Eyebrow tone="daybreak" style={{ flexShrink: 1 }}>{`${t('today')} · ${name(minor ? action.term : lowest.key)}`}</Eyebrow>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Icon name="clock" size={14} color={c.ink3} />
             <Meta tone="ink3" size={14}>
@@ -307,11 +364,12 @@ export default function Today() {
       {/* The ninety days */}
       <Card tone="outline" style={{ gap: space.s2 }}>
         <Eyebrow>{ta('The ninety days')}</Eyebrow>
-        <Body>{ta('Day {n}. Your next review with Priya is on Day 45; the re-measure opens on Day 76.', { n: day })}</Body>
+        <Body>{minor ? ta('Day {n}. Your next review with Priya is on Day 45. Nothing is re-measured: under 18 there is no score.', { n: day }) : ta('Day {n}. Your next review with Priya is on Day 45; the re-measure opens on Day 76.', { n: day })}</Body>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.s1 }} accessibilityLabel={ta('Loop milestones')} accessibilityRole="list">
-          {MILESTONES.map(([d, label]) => {
+          {(minor ? MILESTONES_MINOR : MILESTONES).map(([d, label]) => {
             const past = d <= day
-            const link = MILESTONE_LINK[d]
+            // Day 76 and Day 90 open scored screens, so a minor's milestones are not links.
+            const link = minor ? undefined : MILESTONE_LINK[d]
             const pill = (
               <View
                 key={d}
@@ -351,11 +409,15 @@ export default function Today() {
             )
           })}
         </View>
-        <Divider />
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }} accessible accessibilityLabel={`${t('nextMeasure')}, ${fmtDateDots(MEMBER.nextMeasure)}`}>
-          <Eyebrow>{t('nextMeasure')}</Eyebrow>
-          <Mono tone="ink">{fmtDateDots(MEMBER.nextMeasure)}</Mono>
-        </View>
+        {minor ? null : (
+          <>
+            <Divider />
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }} accessible accessibilityLabel={`${t('nextMeasure')}, ${fmtDateDots(MEMBER.nextMeasure)}`}>
+              <Eyebrow>{t('nextMeasure')}</Eyebrow>
+              <Mono tone="ink">{fmtDateDots(MEMBER.nextMeasure)}</Mono>
+            </View>
+          </>
+        )}
       </Card>
 
       <Sheet open={whyOpen} onClose={() => setWhyOpen(false)} title={ta('Why this, today')}>
@@ -363,10 +425,15 @@ export default function Today() {
           <TermChip term={action.term} withSpace />
           <Eyebrow>next_best_action · rules v1.0</Eyebrow>
         </View>
-        <Body>{tx(action.why)}</Body>
+        {minor ? null : <Body>{tx(action.why)}</Body>}
         <View style={{ gap: space.s2 }} accessibilityRole="list">
           {[
-            [ta('Term.'), ta('The lowest term on your latest Index is {name} ({score}). No ’cation protocol or safety flag is open.', { name: name(lowest.key), score: String(lowestScore) })],
+            [
+              ta('Term.'),
+              minor
+                ? ta('Not scored under 18, so this comes from {name}, the gentlest place to begin. No safety flag is open.', { name: name(action.term) })
+                : ta('The lowest term on your latest Index is {name} ({score}). No ’cation protocol or safety flag is open.', { name: name(lowest.key), score: String(lowestScore) }),
+            ],
             [ta('Candidates.'), ta('40 curated {space} actions, each claims-gated and tagged with evidence.', { space: spaceName(lowest.key) })],
             [ta('Fit.'), ta('Calendar clear after 7 pm (consented), Kavya linked, sunset 18:12.')],
             [ta('One.'), ta('Shown with one reason. “Not today” is never punished.')],

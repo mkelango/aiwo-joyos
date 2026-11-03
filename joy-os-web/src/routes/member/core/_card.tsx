@@ -5,6 +5,7 @@ import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
 import { TermDot, useBandText } from '@/components/joy/primitives'
 import { Button } from '@/components/ui'
 import type { Grade, MethodVersion, TermKey, TermScore } from '@/domain/types'
+import { JoyspanEquation } from '@/components/joy/JoyspanEquation'
 import { useX } from './_i18nX'
 import { useCore } from './_i18n'
 
@@ -29,7 +30,8 @@ export function dotDate(iso: string) {
 
 export interface IndexCardProps {
   id?: string
-  value: number
+  /** null while a term is not yet measured: the card says so and carries no number. */
+  value: number | null
   terms: TermScore[]
   takenOn: string
   method: MethodVersion
@@ -92,7 +94,11 @@ export function IndexCardView({ id, value, terms, takenOn, method, grade, next, 
             <div className="flex min-w-0 flex-col">
               <AiwoMark size={18} />
               <p className="eyebrow mt-2 text-ink-3">{x('icYourIndex')}</p>
-              <p className="num mt-5 text-[4.5rem] font-light leading-[0.85] tracking-tight text-ink sm:text-[5rem]" aria-label={c('jiAria', { v: value })}>{value}</p>
+              {value === null ? (
+                <p className="mt-5 text-[2rem] font-light leading-tight text-ink">{x('skNoIndex')}</p>
+              ) : (
+                <p className="num mt-5 text-[4.5rem] font-light leading-[0.85] tracking-tight text-ink sm:text-[5rem]" aria-label={c('jiAria', { v: value })}>{value}</p>
+              )}
               <p className="eyebrow mt-3 text-ink-2">{x('icOf100', { date: dotDate(takenOn) })}</p>
               <p className="eyebrow text-ink-2">{x('icMethod', { m: method })}</p>
 
@@ -122,7 +128,7 @@ export function IndexCardView({ id, value, terms, takenOn, method, grade, next, 
                         <span className="num w-9 text-right text-[13px] text-ink">
                           {s?.value == null ? '—' : isB ? <><span style={{ color: 'var(--term-b)' }}>−</span>{s.value}</> : s.value}
                         </span>
-                        <span className="eyebrow w-[4.5rem] text-ink-3">{s ? band(s.band) : ''}</span>
+                        <span className="eyebrow w-[4.5rem] text-ink-3">{s ? band(s.value == null ? 'not-yet-measured' : s.band) : ''}</span>
                       </dd>
                     </div>
                   )
@@ -144,10 +150,8 @@ export function IndexCardView({ id, value, terms, takenOn, method, grade, next, 
               <p lang="en" className="mt-2 font-serif text-[17px]">Years Worth Living.</p>
             </div>
             <div className="min-w-0 sm:max-w-[60%] sm:text-right">
-              <p className="font-serif text-[14px] leading-relaxed">
-                Joyspan = {name('H')} + {name('P')} + {name('R')} + {name('F')} + {name('D')}{' '}
-                <span style={{ color: '#e3a86e' }}>−</span> {name('B')}
-              </p>
+              {/* The word equation, verbatim, the minus in Amber the only colour (Playbook p44, p47). */}
+              <JoyspanEquation onDark className="text-[14px] leading-relaxed" />
               <p className="eyebrow mt-3" style={{ color: 'color-mix(in srgb, var(--aiwo-stone) 72%, var(--aiwo-ink))' }}>
                 <span lang="en">AIWO.COM/METHOD</span> · {x('icCanGoDown')}
               </p>

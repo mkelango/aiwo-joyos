@@ -9,6 +9,7 @@ import { termByKey, termColor } from '@/data/terms'
 import type { TermKey } from '@/domain/types'
 import { ARRIVALS, BLOCK_LIBRARY, ITINERARY_TEMPLATES, PACKAGES, PASSES, RECEIVABLES, SIGNAL_POINTS, VENUE, VENUE_COHORTS, WEBHOOKS, WEBHOOK_EVENTS, ZONES } from './_data'
 import { PreviewBanner, useConsoleAccess } from './_gate'
+import { partner, usePartnerField } from './_partnerStore'
 import { CardHead, Kpi, ScrollTabs, fieldCls, fmtClock, inr, labelCls, useConsoleNow, useTabParam } from './_parts'
 
 // PARTNER & VENUE CONSOLE (Memo p.20, p.25; Architecture p6, p24): ’cation arrivals with no PHI,
@@ -50,10 +51,11 @@ export default function Partner() {
   const now = useConsoleNow()
   const { canAct } = useConsoleAccess('/console/partner')
   const [tab, setTab] = useTabParam(TABS, 'floor')
-  const [arrivals, setArrivals] = useState<Arrival[]>(ARRIVALS)
-  const [devices, setDevices] = useState<Device[]>(SIGNAL_POINTS.map((d) => ({ ...d, reported: false })))
-  const [logs, setLogs] = useState(SEED_LOGS)
-  const [hooks, setHooks] = useState<Hook[]>(SEED_HOOKS)
+  // The venue's work is kept on this device (_partnerStore), so it survives leaving the console.
+  const [arrivals, setArrivals] = usePartnerField<Arrival[]>('arrivals', () => ARRIVALS)
+  const [devices, setDevices] = usePartnerField<Device[]>('devices', () => SIGNAL_POINTS.map((d) => ({ ...d, reported: false })))
+  const [logs, setLogs] = usePartnerField('logs', () => SEED_LOGS)
+  const [hooks, setHooks] = usePartnerField<Hook[]>('hooks', () => SEED_HOOKS)
   const online = devices.filter((s) => s.status === 'online').length
   const calibrating = devices.filter((s) => s.status === 'calibration').length
   const checkedIn = arrivals.filter((a) => a.status === 'arrived').length
@@ -121,6 +123,11 @@ export default function Partner() {
         {tab === 'commerce' && <Commerce />}
         <div hidden={tab !== 'developers'}><Developers logs={logs} setLogs={setLogs} hooks={hooks} setHooks={setHooks} now={now} canAct={canAct} /></div>
       </div>
+
+      <p className="mt-10 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-3">
+        Your work in this console is kept on this device, as specimen data. Published itineraries stay published.
+        <button type="button" disabled={!canAct} onClick={() => { if (window.confirm('Reset the venue console to the specimen start? Arrivals, Signal Points, passes, zones, draft itineraries and webhooks all go back. Published itineraries stay with the guest app and the concierge.')) partner.reset() }} className="text-ink-2 underline underline-offset-4 hover:text-ink focus-ring disabled:opacity-50">Reset the venue specimen</button>
+      </p>
     </div>
   )
 }
@@ -148,8 +155,8 @@ function Floor({ arrivals, setArrivals, devices, setDevices, now, canAct, onEven
 }) {
   // Passes scanned in earlier start in the zone they are in (part of the specimen zone counts);
   // any other scanned pass is checked in but not in a zone right now.
-  const [passes, setPasses] = useState<Pass[]>(PASSES.map((p) => ({ ...p, inZone: p.checkedIn ? (SEED_ZONE[p.code] ?? null) : null })))
-  const [zones, setZones] = useState(ZONES)
+  const [passes, setPasses] = usePartnerField<Pass[]>('passes', () => PASSES.map((p) => ({ ...p, inZone: p.checkedIn ? (SEED_ZONE[p.code] ?? null) : null })))
+  const [zones, setZones] = usePartnerField('zones', () => ZONES)
   const [code, setCode] = useState('')
   const [zone, setZone] = useState(ZONES[1].id)
   const [result, setResult] = useState<null | { ok: boolean; msg: string }>(null)
@@ -362,7 +369,7 @@ function Itinerary({ now, canAct, onPublish }: { now: number; canAct: boolean; o
   const [guestId, setGuestId] = useState(guests[0].id)
   const guest = guests.find((g) => g.id === guestId)!
   const days = guest.nights + 1
-  const [plans, setPlans] = useState<Record<string, Plan>>(() => Object.fromEntries(guests.map((g) => [g.id, planFor(g.cation, g.id, g.eta)])))
+  const [plans, setPlans] = usePartnerField<Record<string, Plan>>('plans', () => Object.fromEntries(guests.map((g) => [g.id, planFor(g.cation, g.id, g.eta)])))
   const plan = plans[guestId]
   const slots = plan.slots
   const [add, setAdd] = useState({ blockId: BLOCK_LIBRARY[1].id, day: 2, start: '08:00' })
@@ -398,6 +405,20 @@ function Itinerary({ now, canAct, onPublish }: { now: number; canAct: boolean; o
     if (!canAct || conflicts.size) return
     const v = plan.published ? plan.version + 1 : plan.version
     setPlans((ps) => ({ ...ps, [guestId]: { ...ps[guestId], version: v, published: { v, at: fmtClock(now) }, dirty: false } }))
+    // The same schedule goes to the guest's app ('Cation detail) and to concierge Ravi's pre-arrival list.
+    partner.publish({
+      cation: guest.cation.toLowerCase(),
+      venue: VENUE.name,
+      days: Array.from({ length: days }, (_, i) => ({
+        day: i + 1,
+        items: slots.filter((x) => x.day === i + 1).sort((a, b) => toMin(a.start) - toMin(b.start)).map((x) => ({ time: x.start, title: blockOf(x.blockId).name })),
+      })),
+      guestId,
+      guest: guest.name,
+      room: guest.room,
+      v,
+      clock: fmtClock(now),
+    })
     setJustPublished({ delivered: onPublish(guest.room, v) })
   }
   // Resetting the draft keeps the published history, so the next publish is still the next version.
@@ -503,6 +524,7 @@ function Itinerary({ now, canAct, onPublish }: { now: number; canAct: boolean; o
                   {justPublished.delivered
                     ? <>Webhook <span className="num">itinerary.published</span> delivered to live; see API &amp; webhooks.</>
                     : <>The guest app and concierge have it. No live webhook subscribes to <span className="num">itinerary.published</span>, so nothing was sent to your PMS; add one under API &amp; webhooks.</>}
+                  {justPublished.delivered && <> The guest app and concierge Ravi have it too.</>}
                 </span>
               </motion.p>
             )}
@@ -688,7 +710,7 @@ function Developers({ logs, setLogs, hooks, setHooks, now, canAct }: {
 }) {
   const [env, setEnv] = useState<Env>('sandbox')
   const [secret, setSecret] = useState<string | null>(null)
-  const [rotatedAt, setRotatedAt] = useState<Record<Env, string>>({ sandbox: '12 Jan 2027', live: '12 Jan 2027' })
+  const [rotatedAt, setRotatedAt] = usePartnerField<Record<Env, string>>('rotatedAt', () => ({ sandbox: '12 Jan 2027', live: '12 Jan 2027' }))
   const [confirmRotate, setConfirmRotate] = useState(false)
   const [url, setUrl] = useState('')
   const [events, setEvents] = useState<string[]>(['arrival.created'])

@@ -84,6 +84,13 @@ export const DEV = {
   watchCancel: { en: 'Back to the watch face', ta: 'கடிகார முகப்புக்குத் திரும்பு', hi: 'घड़ी के चेहरे पर लौटें' },
   watchSaved: { en: 'Added to your Ledger: {tag}. It is on the phone too.', ta: 'உங்கள் லெட்ஜரில் சேர்க்கப்பட்டது: {tag}. தொலைபேசியிலும் உள்ளது.', hi: 'आपके लेजर में जुड़ा: {tag}। यह फ़ोन पर भी है।' },
   openLedger: { en: 'Open the Ledger', ta: 'லெட்ஜரைத் திற', hi: 'लेजर खोलें' },
+  // Signals down (Arch p.30): the Index is survey-only until a device is connected and fresh
+  sigDownTitle: { en: 'Signals are down', ta: 'சமிக்ஞைகள் வரவில்லை', hi: 'संकेत नहीं आ रहे' },
+  sigDownNone: { en: 'No device is connected. Your next Index is taken from your answers only, and it is marked survey-only.', ta: 'எந்தச் சாதனமும் இணைக்கப்படவில்லை. உங்கள் அடுத்த குறியீடு உங்கள் பதில்களிலிருந்து மட்டுமே கணக்கிடப்படும்; அது “கேள்வித்தாள் மட்டும்” எனக் குறிக்கப்படும்.', hi: 'कोई डिवाइस जुड़ा नहीं है। आपका अगला इंडेक्स सिर्फ़ आपके जवाबों से बनेगा, और उस पर “सिर्फ़ सर्वे” लिखा होगा।' },
+  sigDownStale: { en: 'Every connected device is stale. Until one syncs, your next Index is taken from your answers only, and it is marked survey-only.', ta: 'இணைக்கப்பட்ட எல்லாச் சாதனங்களும் பழையதாகிவிட்டன. ஒன்று ஒத்திசைக்கும் வரை, உங்கள் அடுத்த குறியீடு உங்கள் பதில்களிலிருந்து மட்டுமே கணக்கிடப்படும்; அது “கேள்வித்தாள் மட்டும்” எனக் குறிக்கப்படும்.', hi: 'जुड़े हुए सारे डिवाइस पुराने पड़ गए हैं। जब तक कोई सिंक न हो, आपका अगला इंडेक्स सिर्फ़ आपके जवाबों से बनेगा, और उस पर “सिर्फ़ सर्वे” लिखा होगा।' },
+  sigDownNoFall: { en: 'Nothing is lost and nothing is counted against you.', ta: 'எதுவும் இழக்கப்படவில்லை; எதுவும் உங்களுக்கு எதிராகக் கணக்கிடப்படாது.', hi: 'कुछ नहीं खोता, और कुछ भी आपके ख़िलाफ़ नहीं गिना जाता।' },
+  markStale: { en: 'Specimen: show my devices as stale', ta: 'மாதிரி: என் சாதனங்களைப் பழையதாகக் காட்டு', hi: 'नमूना: मेरे डिवाइस पुराने दिखाएँ' },
+  markedStale: { en: 'Shown as stale. Sync now brings them back.', ta: 'பழையதாகக் காட்டப்படுகிறது. “இப்போது ஒத்திசை” அவற்றைத் திரும்பக் கொண்டுவரும்.', hi: 'पुराने दिखाए गए। “अभी सिंक करें” से वे लौट आएँगे।' },
 } satisfies Dict
 
 export const DEVICE_NOTE: Record<string, { via?: L3; note: L3; lastSync?: L3 }> = {

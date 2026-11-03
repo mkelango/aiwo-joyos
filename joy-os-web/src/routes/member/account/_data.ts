@@ -187,6 +187,22 @@ export const INVOICES = [
 ]
 export const GSTIN_AIWO = '33AAKCA4417M1Z2'
 export const GST_RATE = 0.18
+/** GST state codes (the first two digits of a GSTIN). AIWO's GSTIN is Tamil Nadu (33). */
+export const SUPPLIER_STATE = { state: 'Tamil Nadu', code: '33' }
+const CITY_STATE: Record<string, { state: string; code: string }> = {
+  Chennai: SUPPLIER_STATE,
+  Mumbai: { state: 'Maharashtra', code: '27' },
+  Pune: { state: 'Maharashtra', code: '27' },
+  Bengaluru: { state: 'Karnataka', code: '29' },
+  Delhi: { state: 'Delhi', code: '07' },
+  Hyderabad: { state: 'Telangana', code: '36' },
+  Kochi: { state: 'Kerala', code: '32' },
+  Kolkata: { state: 'West Bengal', code: '19' },
+}
+/** Place of supply for a member's invoice: the state of the city on their Profile. */
+export function placeOfSupply(city: string) {
+  return CITY_STATE[city] ?? SUPPLIER_STATE
+}
 
 export const ENTITLEMENTS = [
   { name: 'All six spaces in full', from: 'Plus', use: 'Included' },

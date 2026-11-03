@@ -16,6 +16,7 @@ export default {
           h: v('term-h'), p: v('term-p'), r: v('term-r'), f: v('term-f'), d: v('term-d'), b: v('term-b'),
         },
         error: v('error'),
+        rise: { DEFAULT: v('rise'), ink: v('rise-ink') },
       },
       fontFamily: {
         sans: ['var(--font-sans)'],
@@ -26,6 +27,8 @@ export default {
       boxShadow: { card: 'var(--shadow-card)', lift: 'var(--shadow-lift)' },
       maxWidth: { page: '1280px' },
       transitionTimingFunction: { brand: 'cubic-bezier(0.2, 0, 0, 1)' },
+      // Motion duration tokens (Playbook p53): instant, settle, step, bloom, daybreak.
+      transitionDuration: { instant: '120ms', settle: '240ms', step: '480ms', bloom: '960ms', daybreak: '2400ms' },
     },
   },
   plugins: [],

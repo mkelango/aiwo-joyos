@@ -104,5 +104,15 @@ export const RESULT = {
   cardFormulaHead: { en: 'Joyspan', ta: 'ஜாய்ஸ்பான்', hi: 'जॉयस्पैन' },
   cardFooter: { en: 'aiwo.com/method · the number can go down', ta: 'aiwo.com/method · எண் குறையவும் கூடும்', hi: 'aiwo.com/method · नंबर नीचे भी जा सकता है' },
   cardTagline: { en: 'Years Worth Living.', ta: 'வாழத் தகுந்த ஆண்டுகள்.', hi: 'जीने लायक़ साल।' },
-  cardEdgeNote: { en: 'Front · 85.6 × 54 mm · Daybreak painted edge', ta: 'முன்பக்கம் · 85.6 × 54 மி.மீ · Daybreak வண்ண விளிம்பு', hi: 'सामने · 85.6 × 54 मिमी · Daybreak रंगा किनारा' },
+  cardFront: { en: 'Front', ta: 'முன்பக்கம்', hi: 'सामने' },
+  cardBack: { en: 'Back', ta: 'பின்பக்கம்', hi: 'पीछे' },
+  cardBackA11y: { en: 'Back of the card: AIWO, Years Worth Living, the Joyspan equation, aiwo.com/method, the number can go down.', ta: 'அட்டையின் பின்பக்கம்: AIWO, வாழத் தகுந்த ஆண்டுகள், ஜாய்ஸ்பான் சமன்பாடு, aiwo.com/method, எண் குறையவும் கூடும்.', hi: 'कार्ड का पिछला हिस्सा: AIWO, जीने लायक़ साल, जॉयस्पैन समीकरण, aiwo.com/method, नंबर नीचे भी जा सकता है।' },
+  cardSizeA: { en: 'Front and back · ', ta: 'முன்பக்கமும் பின்பக்கமும் · ', hi: 'आगे और पीछे · ' },
+  cardSizeB: { en: ' · Daybreak painted edge on the long side', ta: ' · நீளப் பக்கத்தில் Daybreak வண்ண விளிம்பு', hi: ' · लंबी तरफ़ Daybreak रंगा किनारा' },
+  // Signals down → a survey-only Index, flagged (Arch p30, p22 confidence)
+  surveyOnly: { en: 'Survey only', ta: 'கேள்வித்தாள் மட்டும்', hi: 'सिर्फ़ प्रश्नावली' },
+  surveyOnlyBody: { en: 'No device signal was read for this measure: every term comes from your answers. It is compared like for like, and says so wherever it appears.', ta: 'இந்த அளவீட்டுக்கு எந்தச் சாதனச் சமிக்ஞையும் படிக்கப்படவில்லை: ஒவ்வொரு அம்சமும் உங்கள் பதில்களிலிருந்தே. இது சமமாக ஒப்பிடப்படுகிறது, காட்டப்படும் இடமெல்லாம் இதைச் சொல்கிறது.', hi: 'इस माप में किसी डिवाइस का संकेत नहीं पढ़ा गया: हर पहलू आपके जवाबों से है। इसकी तुलना बराबरी से होती है, और यह जहाँ भी दिखे, यह बताता है।' },
+  signalsDownNote: { en: 'Signals are down: no device is connected, or its readings are old. Your next sitting will be survey-only unless you link one.', ta: 'சமிக்ஞைகள் கிடைக்கவில்லை: எந்தச் சாதனமும் இணைக்கப்படவில்லை, அல்லது அதன் அளவீடுகள் பழையவை. ஒன்றை இணைக்காவிட்டால் உங்கள் அடுத்த அமர்வு கேள்வித்தாள் மட்டுமாக இருக்கும்.', hi: 'संकेत बंद हैं: कोई डिवाइस जुड़ा नहीं, या उसकी रीडिंग पुरानी हैं। जब तक आप एक नहीं जोड़ते, आपकी अगली बैठक सिर्फ़ प्रश्नावली होगी।' },
+  openDevices: { en: 'Open Devices', ta: 'சாதனங்களைத் திற', hi: 'डिवाइस खोलें' },
+  historySurvey: { en: 'survey only', ta: 'கேள்வித்தாள் மட்டும்', hi: 'सिर्फ़ प्रश्नावली' },
 } satisfies Dict

@@ -17,6 +17,7 @@ import { useDict, useTermText } from '@/lib/i18n'
 import { HH, useData } from './_i18n'
 import { ReadAloud, SpeakAnswer } from './_voice'
 import { useCore } from '@/routes/member/core/_i18n'
+import { useMemberName } from '@/lib/memberName'
 import { CharterCard, FjoOffice, KindStrip, useHouseholdKind } from './_charter'
 
 /** Lakshmi's elder mode and her family helper (by her consent, which she can withdraw and give again). */
@@ -53,7 +54,11 @@ export default function Household() {
   const [kindRec, setKind] = useHouseholdKind()
   const me = INDEX_HISTORY[0]
   const kavyaIndex = CASELOAD.find((c) => c.name === 'Kavya Rao')!.index
-  const [arjun, kavya, lakshmi] = HOUSEHOLD
+  const { firstName: myName, fullName: myFull } = useMemberName()
+  const [specimenSelf, kavya, lakshmi] = HOUSEHOLD
+  // The member is shown by their own name; grants keep the specimen id 'Arjun' for "me".
+  const arjun = { ...specimenSelf, name: myFull, initials: myFull.split(' ').map((s) => s[0] ?? '').join('').slice(0, 2).toUpperCase() }
+  const who = (id: string) => (id === 'Arjun' ? myName : id)
 
   /** A scope appears on the household page only if both partners have an active grant for it. */
   const mutual = (s: GrantScope) =>
@@ -86,7 +91,7 @@ export default function Household() {
             detail={elder.helper
               ? rich(tr('elderDetail', { modes: [elder.large && tr('largeType'), elder.voice && tr('voiceLower')].filter(Boolean).join(', ') || tr('standardType') }), { date: <span className="num">{fmtDate(elder.helperSince)}</span> })
               : tr('elDetailNone', { modes: [elder.large && tr('largeType'), elder.voice && tr('voiceLower')].filter(Boolean).join(', ') || tr('standardType') })}
-            tags={[tr('elderMode'), elder.helper ? tr('helperArjun') : tr('elNoHelper')]}
+            tags={[tr('elderMode'), elder.helper ? tr('helperArjun', { name: myName }) : tr('elNoHelper')]}
             extra={
               <>
                 <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[13px] text-ink-2">
@@ -104,7 +109,7 @@ export default function Household() {
           <MemberCard
             person={HOUSEHOLD_MINOR}
             role={tr('daughterMinor')}
-            detail={tr('minorDetail')}
+            detail={tr('minorDetail', { date: fmtDate('2027-01-12') })}
             tags={[tr('notScored'), tr('parentalConsent')]}
             icon={<Baby size={16} />}
           />
@@ -198,7 +203,7 @@ export default function Household() {
                 <motion.li key={g.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between md:px-6">
                   <div className="flex flex-wrap items-center gap-3">
                     <span className="flex items-center gap-1.5 text-[15px] text-ink">
-                      {g.from} <ArrowRight size={14} className="text-ink-3" /> {g.to}
+                      {who(g.from)} <ArrowRight size={14} className="text-ink-3" /> {who(g.to)}
                     </span>
                     <span className="flex flex-wrap gap-1.5">
                       {g.scope.map((s) => (s === 'index' ? <Pill key={s}>{tr('indexOnly')}</Pill> : <TermChip key={s} term={s} />))}
@@ -206,7 +211,7 @@ export default function Household() {
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
                     {g.state === 'active' && <Pill tone="positive"><Check size={12} /> {rich(tr('agreedOn'), { date: <span className="num">{fmtDate(g.since)}</span> })}</Pill>}
-                    {g.state === 'waiting' && <Pill tone="caution">{tr('waitingFor', { name: g.to })}</Pill>}
+                    {g.state === 'waiting' && <Pill tone="caution">{tr('waitingFor', { name: who(g.to) })}</Pill>}
                     {g.state === 'revoked' && <Pill><EyeOff size={12} /> {tr('revoked')}</Pill>}
                     {g.from === 'Arjun' && g.state !== 'revoked' && (
                       <Button size="sm" variant="ghost" onClick={() => setRevoke(g)}>{g.state === 'waiting' ? tr('withdraw') : tr('revoke')}</Button>
@@ -310,14 +315,14 @@ export default function Household() {
           <p className="eyebrow text-ink-3">{tr('familyHelper')}</p>
           {elder.helper ? (
             <>
-              <p className="mt-2 text-[16px] text-ink">{rich(tr('helperConsent'), { date: <span className="num">{fmtDate(elder.helperSince)}</span> })}</p>
+              <p className="mt-2 text-[16px] text-ink">{rich(tr('helperConsent', { name: myName }), { date: <span className="num">{fmtDate(elder.helperSince)}</span> })}</p>
               <p className="mt-1 text-[14px] text-ink-2">{tr('helperBody')}</p>
               {confirmWithdraw ? (
                 <div className="mt-3 rounded-card border border-line bg-paper-raised p-3">
-                  <p className="text-[15px] text-ink">{tr('elWithdrawQ')}</p>
+                  <p className="text-[15px] text-ink">{tr('elWithdrawQ', { name: myName })}</p>
                   <div className="mt-3 flex flex-wrap justify-end gap-2">
                     <Button size="sm" variant="ghost" onClick={() => setConfirmWithdraw(false)}>{tr('keepIt')}</Button>
-                    <Button size="sm" variant="ink" onClick={() => { setElder((e) => ({ ...e, helper: false, asked: false })); setConfirmWithdraw(false); showToast(tr('elWithdrawn')) }}><Undo2 size={14} /> {tr('elWithdrawConfirm')}</Button>
+                    <Button size="sm" variant="ink" onClick={() => { setElder((e) => ({ ...e, helper: false, asked: false })); setConfirmWithdraw(false); showToast(tr('elWithdrawn', { name: myName })) }}><Undo2 size={14} /> {tr('elWithdrawConfirm')}</Button>
                   </div>
                 </div>
               ) : (
@@ -333,7 +338,7 @@ export default function Household() {
               {elder.asked ? (
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                   <Pill tone="caution">{tr('elAsked')}</Pill>
-                  <Button size="sm" variant="link" className="text-[14px]" onClick={() => { setElder((e) => ({ ...e, helper: true, asked: false, helperSince: SPECIMEN_NOW })); showToast(tr('elAdded')) }}>{tr('elAgreeDemo')}</Button>
+                  <Button size="sm" variant="link" className="text-[14px]" onClick={() => { setElder((e) => ({ ...e, helper: true, asked: false, helperSince: SPECIMEN_NOW })); showToast(tr('elAdded', { name: myName })) }}>{tr('elAgreeDemo')}</Button>
                 </div>
               ) : (
                 <Button size="sm" variant="secondary" className="mt-3" onClick={() => { setElder((e) => ({ ...e, asked: true })); showToast(tr('elAskedToast')) }}>{tr('elAsk')}</Button>
@@ -450,6 +455,7 @@ function InviteSheet({ open, onClose, onInvite }: { open: boolean; onClose: () =
 /** Lakshmi's simplified Today with her elder-mode settings: large type, voice-first, one thing per screen. */
 function ElderPreview({ open, onClose, elder }: { open: boolean; onClose: () => void; elder: Elder }) {
   const tr = useDict(HH)
+  const { firstName: myName } = useMemberName()
   const { tag } = useCore()
   const [did, setDid] = useState(false)
   const [kept, setKept] = useState<string | null>(null)
@@ -466,7 +472,7 @@ function ElderPreview({ open, onClose, elder }: { open: boolean; onClose: () => 
       <div className="mt-3 flex flex-wrap gap-1.5">
         <Pill>{elder.large ? tr('largeType') : tr('standardType')}</Pill>
         {elder.voice && <Pill><Mic size={11} /> {tr('voiceFirst')}</Pill>}
-        <Pill><HandHeart size={11} /> {elder.helper ? tr('helperArjun') : tr('elNoHelper')}</Pill>
+        <Pill><HandHeart size={11} /> {elder.helper ? tr('helperArjun', { name: myName }) : tr('elNoHelper')}</Pill>
       </div>
       <div className="mx-auto mt-5 w-full max-w-[350px] rounded-[2.4rem] border-[9px] border-ink-ground bg-ink-ground shadow-lift ring-1 ring-line-strong" role="region" aria-label={tr('pvTitle')}>
         <div className="flex min-h-[580px] flex-col gap-5 overflow-hidden rounded-[1.9rem] bg-paper px-5 py-6">
@@ -499,9 +505,9 @@ function ElderPreview({ open, onClose, elder }: { open: boolean; onClose: () => 
           <div className="mt-auto rounded-card border border-line p-4">
             {elder.helper ? (
               <>
-                <p className={clsx('text-ink', body)}>{tr('pvHelper')}</p>
-                <button type="button" onClick={() => setCalling(true)} className={clsx('mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-line-strong bg-paper-raised font-medium text-ink focus-ring', btn)}><Phone size={elder.large ? 20 : 16} /> {tr('pvCallHelper')}</button>
-                {calling && <p role="status" className="mt-2 text-[13px] text-ink-3">{tr('pvCalling')}</p>}
+                <p className={clsx('text-ink', body)}>{tr('pvHelper', { name: myName })}</p>
+                <button type="button" onClick={() => setCalling(true)} className={clsx('mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-line-strong bg-paper-raised font-medium text-ink focus-ring', btn)}><Phone size={elder.large ? 20 : 16} /> {tr('pvCallHelper', { name: myName })}</button>
+                {calling && <p role="status" className="mt-2 text-[13px] text-ink-3">{tr('pvCalling', { name: myName })}</p>}
               </>
             ) : (
               <p className={clsx('text-ink-2', body)}>{tr('pvNoHelper')}</p>

@@ -47,6 +47,12 @@ export interface Palette {
   wheelGhost: string
   /** Modal scrim behind sheets. */
   scrim: string
+  /** Change states (Playbook p39): a rise is Jade #1F8A68 with ↑ and the value; a fall is Ink
+   *  with ↓, never red. `rise` is the Jade mark itself; `riseInk` is Jade at text contrast (AA). */
+  rise: string
+  riseInk: string
+  /** The minus in the Joyspan equation: Amber on Paper, Amber Light on dark grounds (p44). */
+  minusAmber: string
 }
 
 /** Brand primaries (never change with the scheme). */
@@ -100,6 +106,9 @@ export const light: Palette = {
   wheelGuide: 'rgba(28,19,20,0.12)',
   wheelGhost: 'rgba(28,19,20,0.14)',
   scrim: 'rgba(28,19,20,0.32)',
+  rise: '#1f8a68',
+  riseInk: '#17694f',
+  minusAmber: '#a8703f',
 }
 
 /** Warm Ink dark mode (Playbook p39). Spectrum mains stay; soft/ink variants and the minus shift. */
@@ -136,6 +145,9 @@ export const dark: Palette = {
   wheelGuide: 'rgba(242,238,232,0.14)',
   wheelGhost: 'rgba(242,238,232,0.14)',
   scrim: 'rgba(0,0,0,0.55)',
+  rise: '#5fc6a0',
+  riseInk: '#5fc6a0',
+  minusAmber: '#e3a86e',
 }
 
 export const palettes: Record<Scheme, Palette> = { light, dark }
@@ -238,12 +250,56 @@ export const radius = {
   pill: 999,
 } as const
 
+/** Duration tokens (Playbook p53, motion.duration.*): instant 120, gentle 240, settle 480,
+ *  bloom 960 (the Wheel and the Index) and daybreak 2400 (the animated mark, once per session). */
 export const motion = {
   d1: 120,
   d2: 240,
   d3: 480,
   bloom: 960,
+  daybreak: 2400,
 } as const
+
+/** The one brand easing: cubic-bezier(0.2, 0, 0, 1). Fast out, long calm arrival (p53). */
+export const EASE_BRAND = [0.2, 0, 0, 1] as const
+
+/** Evaluate a CSS cubic-bezier(x1, y1, x2, y2) timing curve at progress x (0..1). */
+export function cubicBezier(x1: number, y1: number, x2: number, y2: number) {
+  const cx = 3 * x1
+  const bx = 3 * (x2 - x1) - cx
+  const ax = 1 - cx - bx
+  const cy = 3 * y1
+  const by = 3 * (y2 - y1) - cy
+  const ay = 1 - cy - by
+  const sx = (t: number) => ((ax * t + bx) * t + cx) * t
+  const sy = (t: number) => ((ay * t + by) * t + cy) * t
+  const dx = (t: number) => (3 * ax * t + 2 * bx) * t + cx
+  return (x: number) => {
+    if (x <= 0) return 0
+    if (x >= 1) return 1
+    // Newton first, then bisection if the slope is too flat to trust.
+    let t = x
+    for (let i = 0; i < 8; i++) {
+      const e = sx(t) - x
+      if (Math.abs(e) < 1e-5) return sy(t)
+      const d = dx(t)
+      if (Math.abs(d) < 1e-6) break
+      t -= e / d
+    }
+    let lo = 0
+    let hi = 1
+    t = x
+    while (hi - lo > 1e-5) {
+      if (sx(t) < x) lo = t
+      else hi = t
+      t = (lo + hi) / 2
+    }
+    return sy(t)
+  }
+}
+
+/** The brand easing as a function of progress. */
+export const easeBrand = cubicBezier(...EASE_BRAND)
 
 /** Maximum Dynamic Type multiplier per role (accessibility sizes up to 200%). */
 export const maxScale = {

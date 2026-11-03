@@ -1,4 +1,4 @@
-import { router } from 'expo-router'
+import { router, useLocalSearchParams } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { AccessibilityInfo, KeyboardAvoidingView, Platform, Pressable, ScrollView, View, type ScrollViewInstance } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -27,10 +27,10 @@ import { SCREEN_HISTORY, SCREEN_META } from '@/screens/a/spacesData'
 import { joyspanIndex } from '@/shared/indexEngine'
 import { INDEX_HISTORY, TEAM, TODAY_ACTION } from '@/shared/member'
 import { CIRCLE, PRACTICE_WEEKS } from '@/shared/platform'
-import { termByKey } from '@/shared/terms'
+import { TERMS, termByKey } from '@/shared/terms'
 import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
-import { memberOnly } from '@/screens/b/parts'
+import { memberOnly, useAccount } from '@/screens/b/parts'
 import { fill, useDict, useLang, useTermText } from '@/lib/i18n'
 import type { Lang } from '@/lib/store'
 import { VIVA, TOOL_TEXT, GUARD_TEXT } from '@/screens/b/i18n/viva'
@@ -108,15 +108,26 @@ function Viva() {
   const [memoryOn, setMemoryOn] = useLocal<Record<TermKey, boolean>>('vivaMemoryOn', MEMORY_ON_DEFAULT)
   const [memory, setMemory] = useLocal('vivaMemory', VIVA_MEMORY)
   const [notice, setNotice] = useState('')
-  const [msgs, setMsgs] = useState<Msg[]>([
+  const me = useAccount()
+  // A space's "Ask VIVA about {space}" opens /viva?space=<slug>: VIVA starts on that space, with
+  // a question about it ready in the box for the member to send or change.
+  const { space: spaceSlug } = useLocalSearchParams<{ space?: string }>()
+  const fromTerm = TERMS.find((x) => x.slug === spaceSlug)?.key ?? null
+  const [msgs, setMsgs] = useState<Msg[]>(() => [
     {
       id: 'hello',
       from: 'viva',
       kind: 'reply',
       tool: 'index_explainer',
-      text: VIVA.hello[lang],
+      text: fill(VIVA.hello[lang], { name: me.firstName }),
     },
+    ...(fromTerm ? [{ id: 'from-space', from: 'viva' as const, kind: 'reply' as const, tool: 'space_context', text: tr(lang, 'fromSpace', { space: tt.space(fromTerm) }) }] : []),
   ])
+  useEffect(() => {
+    if (fromTerm) setDraft(tr(lang, 'spaceAsk', { space: tt.space(fromTerm) }))
+    // Only when VIVA is opened from a space (or another space's link replaces it).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromTerm])
 
   useEffect(() => {
     const t = setTimeout(() => scroller.current?.scrollToEnd({ animated: true }), 60)
@@ -260,7 +271,7 @@ function Viva() {
           {/* Conversation */}
           <View style={{ gap: space.s2 }}>
             {msgs.map((m) => (
-              <Bubble key={m.id} m={m.id === 'hello' ? { ...m, text: t('hello') } : m} onWriteDown={writeDown} />
+              <Bubble key={m.id} m={m.id === 'hello' ? { ...m, text: t('hello', { name: me.firstName }) } : m.id === 'from-space' && fromTerm ? { ...m, text: t('fromSpace', { space: tt.space(fromTerm) }) } : m} onWriteDown={writeDown} />
             ))}
             {typing ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} accessible accessibilityLabel={t('drafting')}>

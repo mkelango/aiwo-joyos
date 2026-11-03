@@ -8,6 +8,7 @@ import { AiwoMark } from '@/components/joy/Brand'
 import { BandLabel, DaybreakButton, Eyebrow, MethodLine, SpecimenTag, TermDot, useFmtDate } from '@/components/joy/primitives'
 import { Button, Card, LoopRing, PageHeader, Pill, SectionTitle, Sheet } from '@/components/ui'
 import { INDEX_HISTORY, MEMBER } from '@/data/member'
+import { useMemberName } from '@/lib/memberName'
 import { FLAGSHIP_NEXT, PASSES, PASSPORT, SESSIONS_ALLOWANCE } from './_data'
 import { QRCode, SheetFocus } from './_parts'
 import { setWallet, useJourney } from './_store'
@@ -39,6 +40,7 @@ export default function Passport() {
   const [flipped, setFlipped] = useState(false)
   const [hideIndex, setHideIndex] = useState(false)
   const journey = useJourney()
+  const me = useMemberName()
   const wallet = journey.wallet
   const { t, r, tx, term, termLabel, en } = useJ()
   const fmtDate = useFmtDate()
@@ -82,7 +84,7 @@ export default function Passport() {
                 <div className="relative mt-8 grid grid-cols-[1fr_auto] items-end gap-4">
                   <div className="min-w-0">
                     <p className="eyebrow opacity-60">{t('member')}</p>
-                    <p className="mt-1 truncate text-[1.6rem] font-light leading-tight md:text-[2rem]">{MEMBER.firstName} {MEMBER.lastName}</p>
+                    <p className="mt-1 truncate text-[1.6rem] font-light leading-tight md:text-[2rem]">{me.fullName}</p>
                     <p className="mt-1 font-mono text-[12px] tracking-wider opacity-70">{MEMBER.aiwoId} · {MEMBER.membership}</p>
                   </div>
                   <div className="text-right">
@@ -259,7 +261,7 @@ export default function Passport() {
         <SheetFocus />
         <div className="flex flex-col items-center text-center">
           <QRCode value={`${PASSPORT.number}:${MEMBER.aiwoId}:live`} size={232} />
-          <p className="mt-4 text-[1.3rem] font-light text-ink">{MEMBER.firstName} {MEMBER.lastName}</p>
+          <p className="mt-4 text-[1.3rem] font-light text-ink">{me.fullName}</p>
           <p className="num text-[14px] text-ink-2">{PASSPORT.number} · {MEMBER.aiwoId}</p>
           {upcoming.length > 0 && (
             <ul className="mt-4 w-full space-y-1.5 border-t border-line pt-4 text-left text-[14px]" aria-label={t('bookingsAria')}>

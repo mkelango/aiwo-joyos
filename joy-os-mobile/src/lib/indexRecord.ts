@@ -31,6 +31,8 @@ export interface SubmittedIndex {
   at: string
   answers: Record<string, number>
   amendments: Amendment[]
+  /** Scored without device signals (signals down, or switched off for the sitting). Kept for rescoring. */
+  surveyOnly?: boolean
 }
 
 export const SUBMITTED_KEY = 'indexSubmitted'

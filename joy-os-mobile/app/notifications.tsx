@@ -1,12 +1,14 @@
 import { router } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Pressable, View } from 'react-native'
-import { Body, Button, Card, DaybreakButton, Divider, Eyebrow, Icon, Meta, Mono, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Toggle, type IconName } from '@/components'
+import { Body, Button, Card, DaybreakButton, Divider, Eyebrow, Icon, Meta, Mono, Screen, ScreenHeader, SectionTitle, Serif, Toggle, type IconName } from '@/components'
 import { useTheme } from '@/theme/ThemeProvider'
 import { NOTICES, type Notice } from '@/screens/b/_data'
 import { notifPrefsStore, notifReadStore, useStore, validatePrefs, type NotifPrefs } from '@/screens/b/bStore'
-import { Done, TimeStepper, memberOnly } from '@/screens/b/parts'
-import { useDict } from '@/lib/i18n'
+import { Done, NumberSegmented, TimeStepper, memberOnly } from '@/screens/b/parts'
+import { useDict, useLang } from '@/lib/i18n'
+import { parseIsoDate } from '@/components/MethodLine'
+import type { Lang } from '@/lib/store'
 import { NOTIF, NOTICE_TEXT } from '@/screens/b/i18n/notifications'
 import { perDayKey, useCommon, usePrefsError, useTx } from '@/screens/b/i18n/common'
 
@@ -18,6 +20,16 @@ const ICON: Record<Notice['kind'], IconName> = { action: 'sun', ledger: 'feather
 
 export default memberOnly(Notifications)
 
+const DAY_LOCALE: Record<Lang, string> = { en: 'en-GB', ta: 'ta-IN', hi: 'hi-IN' }
+/** "24 Jan" in the member's language (Latin digits). */
+function dayMonth(iso: string, lang: Lang) {
+  try {
+    return parseIsoDate(iso).toLocaleDateString(DAY_LOCALE[lang], { day: 'numeric', month: 'short', numberingSystem: 'latn' } as Intl.DateTimeFormatOptions)
+  } catch {
+    return iso
+  }
+}
+
 function Notifications() {
   const { c, space } = useTheme()
   const [prefs, setPrefs] = useStore(notifPrefsStore)
@@ -27,6 +39,7 @@ function Notifications() {
   const [dirty, setDirty] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const t = useDict(NOTIF)
+  const lang = useLang()
   const tc = useCommon()
   const tx = useTx()
   const prefsErr = usePrefsError()
@@ -105,7 +118,8 @@ function Notifications() {
                   const title = tx(nt?.title, n.title)
                   const body = tx(nt?.body, n.body)
                   const cta = tx(nt?.cta, n.cta)
-                  const at = tx(nt?.at, n.at)
+                  // A dated notice reads its day and month in the member's language.
+                  const at = n.date ? dayMonth(n.date, lang) : tx(nt?.at, n.at)
                   return (
                     <Pressable
                       key={n.id}
@@ -164,7 +178,7 @@ function Notifications() {
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{tc('remindersADay')}</SectionTitle>
         <Card tone="raised" style={{ gap: space.s2 }}>
-          <Segmented<string> value={String(draft.perDay)} onChange={(v) => edit((d) => ({ ...d, perDay: Number(v) }))} items={['0', '1', '2', '3'].map((n) => ({ value: n, label: n }))} />
+          <NumberSegmented value={draft.perDay} onChange={(v) => edit((d) => ({ ...d, perDay: v }))} items={[0, 1, 2, 3]} label={tc('remindersADay')} />
           <Meta>{tc(perDayKey(draft.perDay))}</Meta>
           <Divider />
           <Toggle checked={draft.kinds.action} onChange={(v) => edit((d) => ({ ...d, kinds: { ...d.kinds, action: v } }))} label={tc('kAction')} description={tc('kActionD')} />

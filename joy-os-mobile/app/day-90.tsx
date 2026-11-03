@@ -1,7 +1,7 @@
 import { router } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Pressable, View } from 'react-native'
-import { ArrowLink, Avatar, Body, Button, DaybreakButton, Eyebrow, Icon, InkSurface, JoyspanWheel, Meta, MethodLine, Mono, Numeral, Segmented, Serif, Sheet, TermDot, Title, fmtDate } from '@/components'
+import { ArrowLink, Avatar, Body, Button, CountUp, DaybreakButton, Eyebrow, Icon, InkSurface, JoyspanWheel, Meta, MethodLine, Mono, Numeral, Screen, ScreenHeader, Segmented, Serif, Sheet, TermDot, Title, fmtDate } from '@/components'
 import { kit } from '@/components/_i18n'
 import { REMEASURE_DATES, REMEASURE_INITIAL, useClinicalRemeasure, useSignOffTimer } from '@/lib/indexRecord'
 import { bandFor } from '@/shared/indexEngine'
@@ -17,6 +17,8 @@ import { memberOnly } from '@/screens/b/parts'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
 import { DAY90, SLOT_TEXT } from '@/screens/b/i18n/day90'
 import { useCommon, useTx } from '@/screens/b/i18n/common'
+import { LAB_TEXT, TAKE } from '@/screens/b/i18n/indexTake'
+import { useIsMinor } from '@/lib/minor'
 import { txFor } from '@/screens/a/i18n'
 
 // DAY 90 (Memo p.18 screen 04; Playbook p39): the re-measure where the number went down.
@@ -42,7 +44,30 @@ type PlanState = 'open' | 'agreed' | 'note' | 'noted'
 type Day90Saved = { confirmed: boolean; slot: Slot; planState: PlanState; note: string }
 const DAY90_INITIAL: Day90Saved = { confirmed: false, slot: 'thu', planState: 'open', note: '' }
 
-export default memberOnly(Day90)
+export default memberOnly(Day90Gate)
+
+/** Minors gate: a member under 18 is never scored, so there is no Day-90 number to show. */
+function Day90Gate() {
+  const minor = useIsMinor()
+  const t = useDict(TAKE)
+  const tc = useCommon()
+  if (!minor) return <Day90 />
+  return (
+    <Screen>
+      <ScreenHeader
+        back
+        eyebrow={t('minorEyebrow')}
+        title={
+          <>
+            {t('minorA')}<Serif>{t('minorSerif')}</Serif>{t('minorB')}
+          </>
+        }
+        lead={t('minorLead')}
+      />
+      <DaybreakButton onPress={() => router.replace('/')}>{tc('backToday')}</DaybreakButton>
+    </Screen>
+  )
+}
 
 function Day90() {
   const { space, radius } = useTheme()
@@ -187,7 +212,7 @@ function Day90() {
             <Icon name="clock" size={18} color={INK.ink2} />
           </View>
           <Meta accessibilityLiveRegion="polite">{left > 0 ? t('awaitTimer', { s: left }) : t('awaitSigning')}</Meta>
-          <Meta>{rm.labs && rm.labs.length ? t('awaitLabs', { list: rm.labs.join(', ') }) : t('awaitNoLabs')}</Meta>
+          <Meta>{rm.labs && rm.labs.length ? t('awaitLabs', { list: rm.labs.map((n) => (lang === 'en' ? n : LAB_TEXT[n]?.[lang] ?? n)).join(', ') }) : t('awaitNoLabs')}</Meta>
           <MethodLine method="v1.0" grade="clinical" />
         </View>
         <Meta>{t('awaitWhile')}</Meta>
@@ -246,7 +271,8 @@ function Day90() {
             <Icon name="arrow-right" size={22} color={INK.ink3} />
           </View>
           <View style={{ gap: 2 }}>
-            <Numeral size={96}>{toV}</Numeral>
+            {/* Counts from the Day-0 number to the Day-90 one: a fall moves at the same speed as a rise. */}
+            <CountUp value={toV} from={fromV} size={96} />
             <Eyebrow>{t('day90')}</Eyebrow>
           </View>
         </View>

@@ -2,7 +2,7 @@ import { router } from 'expo-router'
 import { useState } from 'react'
 import { Pressable, View } from 'react-native'
 import Svg, { Circle, G, Text as SvgText } from 'react-native-svg'
-import { ArrowLink, Body, Button, Divider, Eyebrow, Icon, Meta, Mono, Pill, Progress, Segmented, Sheet, SpecimenTag } from '@/components'
+import { ArrowLink, Body, Button, Divider, EmptyIllustration, Eyebrow, Icon, Meta, Mono, Pill, Progress, Segmented, Sheet, SpecimenTag } from '@/components'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { useLocal } from '@/screens/a/local'
 import { IconButton, TextField } from '@/screens/a/parts'
@@ -296,7 +296,12 @@ function TwoAm() {
   return (
     <ToolCard title={t('The 2 a.m. list')} lead={t('Who would you call at two in the morning? Private to you; it is not shared with anyone on it.')}>
       <View>
-        {names.length === 0 ? <Meta tone="ink3">{t('No one on it yet. One name is enough to start.')}</Meta> : null}
+        {names.length === 0 ? (
+          <View style={{ gap: 6 }}>
+            <EmptyIllustration kind="circle" fill="R" width={128} />
+            <Meta tone="ink3" align="center">{t('No one on it yet. One name is enough to start.')}</Meta>
+          </View>
+        ) : null}
         {names.map((n, i) => (
           <View key={`${n}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 }}>
             <Mono size={13} tone="ink3" style={{ width: 20 }}>

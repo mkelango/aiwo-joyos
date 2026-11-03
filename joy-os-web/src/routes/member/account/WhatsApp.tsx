@@ -18,6 +18,8 @@ import { recordConsentEvent } from './_consent'
 // Joy Ledger prompts and reminders — consented, at most three a day, quiet hours,
 // and never clinical content. Quick replies move the conversation on. Free text
 // runs the emergency intercept first. One Daybreak: "Turn on WhatsApp prompts".
+// With consent given, a moment kept here is a real Joy Ledger entry (useApp().addLedger, as the
+// Ledger screen and the watch add one). Before consent the chat is a preview and says so.
 
 type Scenario = 'ledger' | 'check' | 'reminders'
 interface Reply { label: string; next: string; tag?: string }
@@ -78,10 +80,14 @@ function addMinutes(t: string, m: number) {
 }
 
 const CLINICAL = /\b(result|results|doctor|medicine|tablet|dose|blood|lab|prescription|symptom|pain|diagnos\w*)\b/i
+/** Said instead of "Saved to your Joy Ledger" while the chat is only a preview. */
+const PREVIEW_NOT_SAVED = 'Preview only: with prompts on, this moment would be saved to your Joy Ledger.'
+/** The Ledger prompt for a chat clock time (12:40, 16:15, 21:30), as the Ledger schedule has it. */
+const promptAt = (hhmm: string): 1 | 2 | 3 => { const [h, m] = hhmm.split(':').map(Number); const t = h * 60 + m; return t < 16 * 60 + 15 ? 1 : t < 21 * 60 + 30 ? 2 : 3 }
 
 export default function WhatsApp() {
   const tw = useDict(WA)
-  const { setCrisisOpen } = useApp()
+  const { setCrisisOpen, addLedger } = useApp()
   const lang = useLang()
   const lk = useLookup(WA)
   const tt = useTermText()
@@ -132,11 +138,24 @@ export default function WhatsApp() {
   useEffect(() => { start(scenario); return clear }, [scenario]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const el = scroller.current; if (el) el.scrollTop = el.scrollHeight }, [msgs, typing])
 
+  /** Keep a moment in the Joy Ledger, only once WhatsApp consent is given. */
+  const keep = (tags: string[], word?: string) => {
+    if (!consented) return false
+    addLedger({ prompt: promptAt(clock.current), tags, ...(word ? { word } : {}) })
+    showToast(tw('ledgerToast'))
+    return true
+  }
+
   const pick = (msgId: number, r: Reply) => {
     const newTag = r.tag ?? tag
     if (r.tag) setTag(r.tag)
     setMsgs((m) => [...m.map((x) => (x.id === msgId ? { ...x, answered: true } : x)), { id: ++seq.current, from: 'me', text: r.label, time: clock.current, vars: { reply: '1' } }])
     const node = SCRIPTS[scenario].nodes[r.next]
+    // The tag, and the word if one was tapped, become one Ledger entry.
+    if (scenario === 'ledger' && r.next === 'l3' && !keep([newTag], r.label === 'Skip' ? undefined : r.label)) {
+      botSay([PREVIEW_NOT_SAVED, ...node.bot.slice(1)], node.replies, newTag)
+      return
+    }
     botSay(node.bot, node.replies, newTag)
   }
 
@@ -181,6 +200,10 @@ export default function WhatsApp() {
       return
     }
     if (scenario === 'ledger' && !t.includes('?') && t.length <= 80) {
+      if (!keep([], t)) {
+        botSay([PREVIEW_NOT_SAVED], [{ label: 'Thanks', next: 'lend' }])
+        return
+      }
       botSay(['Saved to your Joy Ledger: “{text}”. Ten seconds, well spent.', 'Next prompt around 16:15.'], [{ label: 'This week so far', next: 'l4' }, { label: 'Thanks', next: 'lend' }], tag, { text: t })
       return
     }

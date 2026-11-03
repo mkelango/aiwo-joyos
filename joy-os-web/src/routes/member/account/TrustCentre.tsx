@@ -2,20 +2,22 @@ import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, Building2, Check, Download, FileJson, Globe2, HelpCircle, KeyRound, Lock, Server, ShieldCheck, Trash2, UserRound } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { DaybreakButton, SpecimenTag, fmtDate } from '@/components/joy/primitives'
 import { Button, Card, DataTable, PageHeader, Pill, Sheet } from '@/components/ui'
-import { ACCESS_LOG, CONSENTS, INDEX_HISTORY, MEMBER } from '@/data/member'
+import { CONSENTS, INDEX_HISTORY, MEMBER } from '@/data/member'
 import { TENANT } from '@/data/platform'
 import { METHODS } from '@/domain/indexEngine'
-import type { AccessEvent, Consent } from '@/domain/types'
-import { CLAIMS_LOG, DEFAULT_NOMINEE, EXPORTS_PAST, EXTRA_ACCESS, SPECIMEN_NOW } from './_data'
+import type { Consent } from '@/domain/types'
+import { CLAIMS_LOG, DEFAULT_NOMINEE, EXPORTS_PAST, SPECIMEN_NOW } from './_data'
 import { Checkbox, Field, Section, Segmented, Select, Toggle } from './_parts'
 import { inputCls, rich, syncWhatsAppChannel, useMemberProfile, usePersisted, useToast } from './_util'
 import { AbhaCard } from './_abha'
 import { ARTEFACT_VERSION, CONSENT_SEED, latestFor, makeEvent, type ConsentAction, type ConsentEvent, type ConsentHistory } from './_consent'
 import { StepUp } from './_stepup'
-import { useDict } from '@/lib/i18n'
+import { CONSENT_DEVICE, EXTRA_DEVICE_CONSENTS, disconnectForConsent, type ConsentRecord } from './_links'
+import { useMemberAccessLog, type MemberAccess } from './_access'
+import { useDict, useTermText } from '@/lib/i18n'
 import { TRUST, useData } from './_i18n'
 
 // TRUST CENTRE (Memo module 14, p.27): who has seen my data, consents by purpose,
@@ -32,16 +34,29 @@ export default function TrustCentre() {
   // WhatsApp consent is the same stored value the WhatsApp page and Profile use.
   const [wa, setWa] = usePersisted('wa', { consented: CONSENTS.find((c) => c.id === 'c_wa')!.granted })
   // Consents are kept per viewer so a withdrawal survives a reload; WhatsApp always follows the shared value.
-  const [stored, setStored] = usePersisted<Record<string, { on: boolean; pending?: boolean }>>('consents', Object.fromEntries(CONSENTS.map((c) => [c.id, { on: c.granted }])))
-  const consents = { ...stored, c_wa: { ...stored.c_wa, on: wa.consented } }
+  const [stored, setStored] = usePersisted<ConsentRecord>('consents', Object.fromEntries(CONSENTS.map((c) => [c.id, { on: c.granted }])))
+  // The insurer's aggregate decision (grant / decline / undecided) is the c_star consent itself;
+  // this record only remembers a decline, which a plain "off" cannot tell apart from undecided.
+  const [ins, setIns] = usePersisted<{ state: InsurerState }>('insurer', { state: 'not-granted' })
+  const consents: ConsentRecord = { ...stored, c_wa: { ...stored.c_wa, on: wa.consented } }
+  const insurer: InsurerState = consents.c_star?.on ? 'granted' : ins.state === 'declined' ? 'declined' : 'not-granted'
+  // Device consents beyond the specimen list appear once the member has connected that device.
+  const list = useMemo(() => [...CONSENTS, ...EXTRA_DEVICE_CONSENTS.filter((c) => stored[c.id])], [stored])
   // Every grant and withdrawal is kept as an event with the artefact version (consent_event).
   const [history, setHistory] = usePersisted<ConsentHistory>('consent-history', CONSENT_SEED)
   const record = (ref: string, action: ConsentAction) => setHistory((h) => ({ events: [...h.events, makeEvent(ref, action, 'trust')] }))
-  const setConsent = (id: string, on: boolean) => {
-    setStored((s) => ({ ...s, [id]: { on, pending: true } }))
+  const nav = useNavigate()
+  const setConsent = (id: string, on: boolean, action: ConsentAction = on ? 'granted' : 'withdrawn') => {
+    // A device consent is given in the device's own connect flow (purposes, then the vendor's
+    // sign-in); withdrawing it here disconnects the device and it stops syncing.
+    if (CONSENT_DEVICE[id] && on) { nav(`/app/devices?connect=${CONSENT_DEVICE[id]}`); return }
+    setStored((s) => ({ ...s, [id]: { ...s[id], on, pending: true } }))
     if (id === 'c_wa') { setWa({ consented: on }); syncWhatsAppChannel(on) }
-    record(id, on ? 'granted' : 'withdrawn')
+    if (CONSENT_DEVICE[id] && !on) disconnectForConsent(id)
+    if (id === 'c_star') setIns({ state: on ? 'granted' : action === 'declined' ? 'declined' : 'not-granted' })
+    record(id, action)
   }
+  const accessLog = useMemberAccessLog()
   const { hash } = useLocation()
   // Arriving from Settings or Profile with #data / #consents: scroll once the page has rendered.
   useEffect(() => {
@@ -58,14 +73,14 @@ export default function TrustCentre() {
         actions={<Link to="/app/method" className="inline-flex h-11 items-center gap-2 rounded-full border border-line-strong bg-paper-raised px-4 text-[15px] font-medium text-ink hover:bg-paper-sunk focus-ring">{t('theMethod')} <ArrowRight size={15} /></Link>}
       />
 
-      <Summary given={Object.values(consents).filter((c) => c.on).length} />
-      <AccessLog onAsk={(who) => showToast(t('askToast', { who }))} />
-      <Consents state={consents} history={history} setConsent={setConsent} onChange={showToast} />
+      <Summary given={list.filter((c) => consents[c.id]?.on).length} total={list.length} log={accessLog} />
+      <AccessLog log={accessLog} onAsk={(who) => showToast(t('askToast', { who }))} />
+      <Consents list={list} state={consents} history={history} setConsent={setConsent} onChange={showToast} />
       <ConsentLog history={history} />
 
       <Section id="data" className="mt-16" eyebrow={t('dataEyebrow')} title={t('dataTitle')}>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <ExportCard consents={consents} onDone={showToast} />
+          <ExportCard list={list} consents={consents} onDone={showToast} />
           <DeleteCard />
           <NomineeCard onSaved={showToast} />
           <div className="grid gap-6">
@@ -75,7 +90,15 @@ export default function TrustCentre() {
         </div>
       </Section>
 
-      <Aggregates onChange={showToast} onRecord={record} />
+      <Aggregates insurer={insurer} onDecide={(v) => {
+        // One consent: granting here turns the Star Health toggle on, and declining keeps it off.
+        if (v === insurer) return
+        if (v === 'granted') setConsent('c_star', true)
+        else if (insurer === 'granted') setConsent('c_star', false, 'withdrawn')
+        else if (v === 'declined') setConsent('c_star', false, 'declined')
+        else setIns({ state: 'not-granted' })
+        if (v === 'declined' && insurer === 'granted') setIns({ state: 'declined' })
+      }} onChange={showToast} />
       <MethodAndClaims />
       <Residency />
       {toast}
@@ -83,14 +106,12 @@ export default function TrustCentre() {
   )
 }
 
-function Summary({ given }: { given: number }) {
+function Summary({ given, total, log }: { given: number; total: number; log: MemberAccess[] }) {
   const t = useDict(TRUST)
-  const all = [...ACCESS_LOG, ...EXTRA_ACCESS]
-  const people = new Set(all.filter((e) => e.role !== 'System').map((e) => e.who)).size
-  const on = given
+  const people = new Set(log.filter((e) => e.role !== 'System').map((e) => e.who)).size
   const items = [
     { icon: UserRound, label: t('sawData'), value: String(people), sub: t('sawDataSub') },
-    { icon: ShieldCheck, label: t('consentsGiven'), value: `${on}/${CONSENTS.length}`, sub: t('consentsSub') },
+    { icon: ShieldCheck, label: t('consentsGiven'), value: `${given}/${total}`, sub: t('consentsSub') },
     { icon: Globe2, label: t('whereLives'), value: t('india'), sub: t('whereSub') },
     { icon: Building2, label: t('employers'), value: `≥${TENANT.minCohort}`, sub: t('employersSub', { n: TENANT.minCell }) },
   ]
@@ -108,19 +129,20 @@ function Summary({ given }: { given: number }) {
   )
 }
 
-function AccessLog({ onAsk }: { onAsk: (who: string) => void }) {
+function AccessLog({ log, onAsk }: { log: MemberAccess[]; onAsk: (who: string) => void }) {
   const t = useDict(TRUST)
   const dx = useData()
   const [role, setRole] = useState('all')
   const [q, setQ] = useState('')
   const [asked, setAsked] = useState<Set<string>>(() => new Set())
-  const ask = (e: AccessEvent) => { setAsked((s) => new Set(s).add(e.id)); onAsk(e.who) }
+  const ask = (e: MemberAccess) => { setAsked((s) => new Set(s).add(e.id)); onAsk(e.who) }
+  // The specimen log plus every console read of this record in this browser, newest first.
   const rows = useMemo(() => {
-    const all: AccessEvent[] = [...ACCESS_LOG, ...EXTRA_ACCESS].sort((a, b) => b.at.localeCompare(a.at))
     const needle = q.trim().toLowerCase()
-    return all.filter((e) => (role === 'all' || e.role === role) && (!needle || `${e.who} ${e.what} ${e.purpose}`.toLowerCase().includes(needle)))
-  }, [role, q])
-  const roles = Array.from(new Set([...ACCESS_LOG, ...EXTRA_ACCESS].map((e) => e.role)))
+    return log.filter((e) => (role === 'all' || e.role === role) && (!needle || `${e.who} ${e.what} ${e.purpose}`.toLowerCase().includes(needle)))
+  }, [log, role, q])
+  const roles = Array.from(new Set(log.map((e) => e.role)))
+  const live = log.filter((e) => e.live).length
   return (
     <Section
       id="access"
@@ -135,7 +157,7 @@ function AccessLog({ onAsk }: { onAsk: (who: string) => void }) {
           <Field label={t('who')} className="sm:w-56">{(id) => <Select id={id} value={role} onChange={setRole} options={[{ value: 'all', label: t('everyone') }, ...roles.map((r) => ({ value: r, label: dx(r) }))]} />}</Field>
           <Field label={t('search')} className="flex-1">{(id) => <input id={id} type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('searchPh')} className={inputCls} />}</Field>
         </div>
-        <p className="mt-4 text-[14px] text-ink-2" aria-live="polite">{rich(t(rows.length === 1 ? 'entryOne' : 'entryMany'), { n: <span className="num">{rows.length}</span> })}{asked.size > 0 && rich(t(asked.size === 1 ? 'questionsOne' : 'questionsMany'), { n: <span className="num">{asked.size}</span> })}</p>
+        <p className="mt-4 text-[14px] text-ink-2" aria-live="polite">{rich(t(rows.length === 1 ? 'entryOne' : 'entryMany'), { n: <span className="num">{rows.length}</span> })}{live > 0 && rich(t('accessSession'), { n: <span className="num">{live}</span> })}{asked.size > 0 && rich(t(asked.size === 1 ? 'questionsOne' : 'questionsMany'), { n: <span className="num">{asked.size}</span> })}</p>
         {rows.length === 0 ? (
           <div className="mt-4 rounded-card bg-paper-sunk p-6 text-center">
             <p className="text-[15px] text-ink-2">{t('noMatch')}</p>
@@ -149,7 +171,7 @@ function AccessLog({ onAsk }: { onAsk: (who: string) => void }) {
             rowKey={(r) => r.id}
             columns={[
               { key: 'at', header: t('when'), render: (r) => <span className="num whitespace-nowrap text-ink-2">{r.at}</span> },
-              { key: 'who', header: t('who'), render: (r) => <span className="whitespace-nowrap"><span className="block text-ink">{dx(r.who)}</span><span className="text-[13px] text-ink-3">{dx(r.role)}</span></span> },
+              { key: 'who', header: t('who'), render: (r) => <span className="whitespace-nowrap"><span className="block text-ink">{dx(r.who)}</span><span className="text-[13px] text-ink-3">{dx(r.role)}{r.live && <> · <span className="eyebrow">{t('thisSession')}</span></>}</span></span> },
               { key: 'what', header: t('what'), render: (r) => <span className="text-ink-2">{dx(r.what)}</span>, className: 'min-w-[180px]' },
               { key: 'purpose', header: t('why'), render: (r) => <span className="text-ink-2">{dx(r.purpose)}</span>, className: 'min-w-[200px]' },
               { key: 'ask', header: '', align: 'right', render: (r) => asked.has(r.id) ? <span className="inline-flex items-center gap-1 whitespace-nowrap px-2 py-1 text-[13px] text-ink-3"><Check size={13} /> {rich(t('asked'), { n: <span className="num">7</span> })}</span> : <button onClick={() => ask(r)} className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-[13px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring" aria-label={t('askWhyAria', { who: dx(r.who) })}><HelpCircle size={14} /> {t('askWhy')}</button> },
@@ -161,15 +183,18 @@ function AccessLog({ onAsk }: { onAsk: (who: string) => void }) {
   )
 }
 
-function Consents({ state, history, setConsent, onChange }: { state: Record<string, { on: boolean; pending?: boolean }>; history: ConsentHistory; setConsent: (id: string, on: boolean) => void; onChange: (m: string) => void }) {
+function Consents({ list, state, history, setConsent, onChange }: { list: Consent[]; state: ConsentRecord; history: ConsentHistory; setConsent: (id: string, on: boolean) => void; onChange: (m: string) => void }) {
   const t = useDict(TRUST)
   const dx = useData()
+  const tt = useTermText()
   const [confirm, setConfirm] = useState<Consent | null>(null)
   const apply = (c: Consent, v: boolean) => {
     setConsent(c.id, v)
-    onChange(t(v ? 'consentOn' : 'consentOff', { name: dx(c.name) }))
+    // Giving a device consent opens the device's connect flow instead; it says so itself.
+    if (v && CONSENT_DEVICE[c.id]) return
+    onChange(t(v ? 'consentOn' : CONSENT_DEVICE[c.id] ? 'deviceOff' : 'consentOff', { name: dx(c.name) }))
   }
-  const groups = (['core', 'device', 'calendar', 'whatsapp', 'cohort', 'partner'] as const).map((g) => ({ g, items: CONSENTS.filter((c) => c.scope === g) })).filter((x) => x.items.length)
+  const groups = (['core', 'device', 'calendar', 'whatsapp', 'cohort', 'partner'] as const).map((g) => ({ g, items: list.filter((c) => c.scope === g) })).filter((x) => x.items.length)
   return (
     <Section
       id="consents"
@@ -184,18 +209,22 @@ function Consents({ state, history, setConsent, onChange }: { state: Record<stri
             <p className="eyebrow px-5 pt-5 text-ink-3 md:px-6">{t(SCOPE_LABEL[g])}</p>
             <ul className="divide-y divide-line">
               {items.map((c) => {
-                const s = state[c.id]
-                const last = latestFor(history, c.id)
+                const s = state[c.id] ?? { on: c.granted }
+                const last = latestFor(history, c.id) ?? (c.id === 'c_star' ? latestFor(history, 'insurer') : undefined)
                 const version = s.on && last?.action === 'granted' ? last.version : ARTEFACT_VERSION[c.id]
                 return (
                   <li key={c.id} className="px-5 py-4 md:px-6">
                     <Toggle
                       checked={s.on}
-                      onChange={(v) => (!v && c.scope === 'core' ? setConfirm(c) : apply(c, v))}
+                      onChange={(v) => (!v && (c.scope === 'core' || c.scope === 'device') ? setConfirm(c) : apply(c, v))}
                       label={dx(c.name)}
                       description={
                         <>
                           {dx(c.purpose)}
+                          {c.scope === 'device' && s.purposes && (
+                            <span className="mt-1 block text-[13px] text-ink-2">{t('chosenFor', { spaces: s.purposes.map((p) => tt.space(p === 'ease' ? 'B' : 'H')).join(' · ') })}</span>
+                          )}
+                          {c.scope === 'device' && !s.on && <span className="mt-1 block text-[13px] text-ink-2">{t('deviceGive')}</span>}
                           <span className="mt-1 block text-[13px] text-ink-3">
                             {s.pending ? (
                               <span className="inline-flex items-center gap-1 text-ink-2"><Check size={13} /> {t('changeRecorded')}</span>
@@ -226,11 +255,13 @@ function Consents({ state, history, setConsent, onChange }: { state: Record<stri
         {confirm && (
           <>
             <p className="text-[17px] text-ink-2">
-              {confirm.id === 'c_care'
-                ? t('wCare')
-                : confirm.id === 'c_data'
-                  ? t('wData')
-                  : t('wPub')}
+              {confirm.scope === 'device'
+                ? t('wDevice', { name: dx(confirm.name) })
+                : confirm.id === 'c_care'
+                  ? t('wCare')
+                  : confirm.id === 'c_data'
+                    ? t('wData')
+                    : t('wPub')}
             </p>
             <p className="mt-3 text-[15px] text-ink-2">{t('giveAgain')}</p>
             <div className="mt-6 flex justify-end gap-2">
@@ -245,7 +276,7 @@ function Consents({ state, history, setConsent, onChange }: { state: Record<stri
 }
 
 const ACTION_LABEL: Record<ConsentAction, keyof typeof TRUST> = { granted: 'actGranted', withdrawn: 'actWithdrawn', declined: 'actDeclined' }
-const VIA_LABEL: Record<ConsentEvent['via'], keyof typeof TRUST> = { setup: 'viaSetup', trust: 'viaTrust', whatsapp: 'viaWhatsapp', reply: 'viaReply', update: 'viaUpdate' }
+const VIA_LABEL: Record<ConsentEvent['via'], keyof typeof TRUST> = { setup: 'viaSetup', trust: 'viaTrust', whatsapp: 'viaWhatsapp', reply: 'viaReply', update: 'viaUpdate', devices: 'viaDevices' }
 const LOG_SHORT = 6
 
 /** Consent history: every grant and withdrawal (consent_event), newest first, with the artefact version. */
@@ -256,7 +287,7 @@ function ConsentLog({ history }: { history: ConsentHistory }) {
   const rows = useMemo(() => [...history.events].reverse().sort((a, b) => b.at.localeCompare(a.at)), [history])
   const live = rows.filter((e) => e.live).length
   const shown = all ? rows : rows.slice(0, LOG_SHORT)
-  const name = (ref: string) => ref === 'research' ? t('researchLabel') : ref === 'insurer' ? t('insurerName') : dx(CONSENTS.find((c) => c.id === ref)?.name ?? ref)
+  const name = (ref: string) => ref === 'research' ? t('researchLabel') : ref === 'insurer' ? t('insurerName') : dx([...CONSENTS, ...EXTRA_DEVICE_CONSENTS].find((c) => c.id === ref)?.name ?? ref)
   return (
     <Section id="consent-history" className="mt-16" eyebrow={t('histEyebrow')} title={rich(t('histTitle'), { em: <em className="font-serif">{t('histEm')}</em> })} lead={t('histLead')} aside={<SpecimenTag />}>
       <Card>
@@ -283,7 +314,7 @@ function ConsentLog({ history }: { history: ConsentHistory }) {
 }
 
 type ExportStatus = 'idle' | 'requested' | 'preparing' | 'ready'
-function ExportCard({ consents, onDone }: { consents: Record<string, { on: boolean; pending?: boolean }>; onDone: (m: string) => void }) {
+function ExportCard({ list, consents, onDone }: { list: Consent[]; consents: ConsentRecord; onDone: (m: string) => void }) {
   const t = useDict(TRUST)
   const dx = useData()
   const profile = useMemberProfile()
@@ -295,10 +326,10 @@ function ExportCard({ consents, onDone }: { consents: Record<string, { on: boole
   const setDownloaded = (v: boolean) => setExp((e) => ({ ...e, downloaded: v }))
   const download = () => {
     // The file says what the screen says: the member's own consent choices, not the seeded ones.
-    const granted = (c: (typeof CONSENTS)[number]) => consents[c.id]?.on ?? c.granted
+    const granted = (c: Consent) => consents[c.id]?.on ?? c.granted
     const body = format === 'fhir'
-      ? { resourceType: 'Bundle', type: 'collection', timestamp: `${SPECIMEN_NOW}T17:40:00+05:30`, meta: { tag: [{ code: 'specimen', display: 'Specimen · not a real member' }] }, entry: [{ resource: { resourceType: 'Patient', identifier: [{ system: 'https://aiwo.in/id', value: MEMBER.aiwoId }], name: [{ given: [profile.firstName], family: profile.lastName }] } }, ...INDEX_HISTORY.map((ix) => ({ resource: { resourceType: 'Observation', status: 'final', code: { text: 'Joyspan Index' }, effectiveDateTime: ix.takenOn, valueQuantity: { value: ix.value, unit: '/100' }, method: { text: `Method ${ix.method}` } } })), ...CONSENTS.map((c) => ({ resource: { resourceType: 'Consent', status: granted(c) ? 'active' : 'inactive', scope: { text: c.scope }, category: [{ text: c.name }], dateTime: c.since ?? null, policyRule: { text: c.purpose } } }))] }
-      : { specimen: true, aiwoId: MEMBER.aiwoId, method: 'v1.0', exportedAt: SPECIMEN_NOW, index: INDEX_HISTORY, consents: CONSENTS.map((c) => ({ ...c, granted: granted(c) })) }
+      ? { resourceType: 'Bundle', type: 'collection', timestamp: `${SPECIMEN_NOW}T17:40:00+05:30`, meta: { tag: [{ code: 'specimen', display: 'Specimen · not a real member' }] }, entry: [{ resource: { resourceType: 'Patient', identifier: [{ system: 'https://aiwo.in/id', value: MEMBER.aiwoId }], name: [{ given: [profile.firstName], family: profile.lastName }] } }, ...INDEX_HISTORY.map((ix) => ({ resource: { resourceType: 'Observation', status: 'final', code: { text: 'Joyspan Index' }, effectiveDateTime: ix.takenOn, valueQuantity: { value: ix.value, unit: '/100' }, method: { text: `Method ${ix.method}` } } })), ...list.map((c) => ({ resource: { resourceType: 'Consent', status: granted(c) ? 'active' : 'inactive', scope: { text: c.scope }, category: [{ text: c.name }], dateTime: c.since ?? null, policyRule: { text: c.purpose } } }))] }
+      : { specimen: true, aiwoId: MEMBER.aiwoId, method: 'v1.0', exportedAt: SPECIMEN_NOW, index: INDEX_HISTORY, consents: list.map((c) => ({ ...c, granted: granted(c) })) }
     try {
       const blob = new Blob([JSON.stringify(body, null, 2)], { type: format === 'fhir' ? 'application/fhir+json' : 'application/json' })
       const url = URL.createObjectURL(blob)
@@ -513,20 +544,13 @@ function ResearchCard({ onChange, onRecord }: { onChange: (m: string) => void; o
 }
 
 type InsurerState = 'not-granted' | 'granted' | 'declined'
-function Aggregates({ onChange, onRecord }: { onChange: (m: string) => void; onRecord: (ref: string, action: ConsentAction) => void }) {
+/** The insurer card decides the same consent as the Star Health toggle above (c_star). */
+function Aggregates({ insurer, onDecide, onChange }: { insurer: InsurerState; onDecide: (v: InsurerState) => void; onChange: (m: string) => void }) {
   const t = useDict(TRUST)
-  const [ins, setIns] = usePersisted<{ state: InsurerState }>('insurer', { state: 'not-granted' })
-  const insurer = ins.state
-  const setInsurer = (v: InsurerState) => setIns({ state: v })
   const [review, setReview] = useState(false)
   const decide = (v: InsurerState) => {
     // Only real changes become consent events; going back to undecided after a decline records nothing.
-    if (v !== insurer) {
-      if (v === 'granted') onRecord('insurer', 'granted')
-      else if (v === 'declined') onRecord('insurer', 'declined')
-      else if (insurer === 'granted') onRecord('insurer', 'withdrawn')
-    }
-    setInsurer(v)
+    onDecide(v)
     setReview(false)
     onChange(v === 'granted' ? t('insGranted') : v === 'declined' ? t('insDeclined') : t('insReset'))
   }
@@ -613,7 +637,7 @@ function MethodAndClaims() {
             {CLAIMS_LOG.map((c) => (
               <li key={c.claim} className="flex flex-col gap-2 p-5 sm:flex-row sm:items-start sm:justify-between md:px-6">
                 <div>
-                  <p className={clsx('text-[16px]', c.state === 'Refused' ? 'text-ink-2 line-through decoration-line-strong' : 'text-ink')}>{c.claim}</p>
+                  <p className={clsx('text-[16px]', c.state === 'Refused' ? 'text-ink-2 line-through decoration-line-strong' : 'text-ink')}>{dx(c.claim)}</p>
                   <p className="mt-1 text-[14px] text-ink-2">{dx(c.note)}</p>
                   <p className="eyebrow mt-1.5 text-ink-3">{dx(c.by)} · <span className="num">{fmtDate(c.on)}</span></p>
                 </div>

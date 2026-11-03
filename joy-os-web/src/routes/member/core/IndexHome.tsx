@@ -1,6 +1,5 @@
-import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowDown, ArrowRight, CircleDashed, FileText, History, Mail, Pencil, RotateCcw, ShieldCheck, Watch, X } from 'lucide-react'
+import { ArrowDown, ArrowRight, CircleDashed, FileText, Mail, Pencil, RotateCcw, ShieldCheck, Watch, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -12,10 +11,15 @@ import { INSTRUMENTS } from '@/data/platform'
 import { termByKey, termColor } from '@/data/terms'
 import { METHODS, bandFor, joyspanIndex, lowestTerm } from '@/domain/indexEngine'
 import type { IndexScore, TermKey } from '@/domain/types'
-import { HISTORY_METHOD, METHOD_V10_PUBLISHED, NOT_YET_EXAMPLE, SITTINGS, TERM_DETAIL } from './_data'
+import { HISTORY_METHOD, METHOD_V10_PUBLISHED, NOT_YET_EXAMPLE, TERM_DETAIL } from './_data'
 import { KV, PrintOnly, TICK, TOOLTIP_STYLE } from './_parts'
-import { SPECIMEN_TODAY, amendedAnswers, useMeasured, useSignalsDown, type Amendment, type MeasuredIndex } from './_store'
-import { scaleOf, scoreAnswers } from './_scoring'
+import { useMeasured, useSignalsDown, type Amendment, type MeasuredIndex } from './_store'
+import type { SittingResult } from './_scoring'
+import { AmendPanel } from './_amend'
+import { formulaText } from './_extra'
+import { CountUp } from '@/components/joy/CountUp'
+import { JoyspanEquation } from '@/components/joy/JoyspanEquation'
+import { regTx } from '@/routes/entry/_i18n'
 import { IndexCardView } from './_card'
 import { RemeasureCard } from './_remeasure'
 import { useX } from './_i18nX'
@@ -94,7 +98,7 @@ export default function IndexHome() {
           <div className="mt-4 flex flex-col items-center gap-2 xl:flex-row xl:items-center xl:justify-between">
             <div className="self-start xl:self-center">
               <div className="flex items-end gap-3">
-                <span className="num text-[6.5rem] font-light leading-[0.85] tracking-tight text-ink md:text-[7.5rem]" aria-label={c('jiAria', { v: latest.value })}>{latest.value}</span>
+                <span className="num text-[6.5rem] font-light leading-[0.85] tracking-tight text-ink md:text-[7.5rem]" aria-label={c('jiAria', { v: latest.value })}><CountUp value={latest.value} /></span>
                 <span className="mb-2 flex flex-col">
                   <Delta value={latest.value - previous.value} />
                   <BandLabel band={latest.band} className="mt-1" />
@@ -205,7 +209,7 @@ function TermDetailPanel({ termKey }: { termKey: TermKey }) {
   const score = latest.terms.find((t) => t.key === termKey)!
   const detail = TERM_DETAIL[termKey]
   const isB = termKey === 'B'
-  const { t: c, name, space, pick, method } = useCore()
+  const { t: c, name, space, pick, method, lang } = useCore()
   const fmtDate = useFmtDate()
   const dt = TERM_DETAIL_TEXT[termKey]
   const instruments = term.instruments.map((name) => {
@@ -235,7 +239,7 @@ function TermDetailPanel({ termKey }: { termKey: TermKey }) {
 
           <div className="mt-5 rounded-card bg-paper-sunk px-4 py-3">
             <p className="eyebrow text-ink-3">{c('ixFormula', { method: method(latest.method) })}</p>
-            <p className="num mt-1.5 text-[14px] text-ink">{term.formula}</p>
+            <p className="num mt-1.5 text-[14px] text-ink">{formulaText(term.formula, lang)}</p>
             {isB && <p className="mt-1.5 text-[13px] text-ink-2">{c('ixBurdenInverse')}</p>}
           </div>
 
@@ -261,7 +265,7 @@ function TermDetailPanel({ termKey }: { termKey: TermKey }) {
           <dl className="mt-5">
             <p className="eyebrow mb-1 text-ink-3">{c('ixInstruments')}</p>
             {instruments.map(({ name, reg }) => (
-              <KV key={name} k={name} v={reg ? c('ixItemsLicence', { n: reg.items, licence: reg.licence }) : c('ixProtocol')} />
+              <KV key={name} k={regTx(name, lang)} v={reg ? c('ixItemsLicence', { n: reg.items, licence: regTx(reg.licence, lang) }) : c('ixProtocol')} />
             ))}
           </dl>
 
@@ -306,10 +310,17 @@ function FormulaCard() {
   }
   const five = (['H', 'P', 'R', 'F', 'D'] as TermKey[]).map((k) => vals[k])
   const { t: c, name, method } = useCore()
+  const x = useX()
 
   return (
     <Card tone="raised">
       <SectionTitle aside={<span className="eyebrow text-ink-3">indexEngine · {latest.engineBuild}</span>}>{c('fxTitle')}</SectionTitle>
+      {/* The word equation, set verbatim (Playbook p44, p47), with the word's credit. */}
+      <div className="mb-5 rounded-card border border-line px-4 py-3">
+        <p className="eyebrow text-ink-3">{x('eqTitle')}</p>
+        <JoyspanEquation className="mt-2 text-[1.15rem]" />
+        <p className="mt-2 text-[13px] text-ink-2">{x('eqCredit')} {x('eqOwns')}</p>
+      </div>
       <p className="text-[17px] text-ink">
         {rich(c('fxLine'), { f: <span className="num">JI = GM(H, P, R, F, D) − λ·B</span>, l: <span className="num">{METHODS[latest.method].lambda}</span>, method: method(latest.method) })}
       </p>
@@ -384,7 +395,7 @@ function FormulaCard() {
             </>
           ) : changed ? (
             <>
-              {rich(c('fxSandboxLine'), { v: <span className="num text-ink">{live.value}</span>, d: <span className="num">{live.value - real.value >= 0 ? '+' : '−'}{Math.abs(live.value - real.value)}</span>, r: <span className="num">{real.value}</span>, term: name(lowestNow) })}
+              {rich(c('fxSandboxLine'), { v: <span className="num text-ink">{live.value}</span>, d: <Delta value={live.value - real.value} />, r: <span className="num">{real.value}</span>, term: name(lowestNow) })}
               {bumped.lowest !== undefined && c('fxNowTry', { term: name(highest) })}
               {bumped.highest !== undefined && c('fxNowTry', { term: name(latest.lowestTerm) })}
             </>
@@ -449,7 +460,7 @@ function HistoryCard() {
         <div>
           <Eyebrow>{c('hsEyebrow', { n: rows.length })}</Eyebrow>
           <p className="mt-2 max-w-2xl text-[17px] text-ink">
-            {rich(c(rows[rows.length - 1].value >= rows[0].value ? 'hsRisen' : 'hsMoved'), { a: <span className="num">{rows[0].value}</span>, b: <span className="num">{rows[rows.length - 1].value}</span>, n: rows.length, low: c(lowRow, { term: name(INDEX_HISTORY[0].lowestTerm) }) })}
+            {rich(c(rows[rows.length - 1].value >= rows[0].value ? 'hsRisen' : 'hsMoved'), { a: <span className="num">{rows[0].value}</span>, b: <span className="num">{rows[rows.length - 1].value}</span>, n: <span className="num">{rows.length}</span>, low: c(lowRow, { term: name(INDEX_HISTORY[0].lowestTerm) }) })}
           </p>
         </div>
         <Tabs value={view} onChange={setView} items={[{ value: 'index', label: c('index') }, { value: 'terms', label: c('hsSixTerms') }]} />
@@ -531,10 +542,31 @@ function MeasuredBanner({ m, onClear }: { m: MeasuredIndex; onClear: () => void 
   const latest = INDEX_HISTORY[0]
   const [confirming, setConfirming] = useState(false)
   const [amending, setAmending] = useState(false)
+  const [, setMeasured] = useMeasured()
   const { t: c, name } = useCore()
   const x = useX()
+  const band = useBandText()
   const fmtDate = useFmtDate()
   const amends = m.amendments ?? []
+  // Terms skipped for now: not yet measured, and the Index is withheld until they are.
+  const missing = ORDER.filter((k) => m.terms.find((t) => t.key === k)?.value == null)
+  const firstValue = m.original ? m.original.value : m.value
+  const onAppend = (a: Amendment, r: SittingResult) =>
+    setMeasured((prev) =>
+      prev
+        ? {
+            ...prev,
+            original: prev.original ?? { value: prev.value, terms: prev.terms, lowestTerm: prev.lowestTerm },
+            value: r.value,
+            gm: r.engine.gm,
+            burden: r.engine.burden,
+            terms: r.terms,
+            lowestTerm: r.lowest,
+            phqFlag: r.phqFlag,
+            amendments: [...(prev.amendments ?? []), a],
+          }
+        : prev,
+    )
   return (
     <Card tone="soft" className="mb-6 lg:mb-8" aria-label={c('mbAria')}>
       <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
@@ -543,14 +575,26 @@ function MeasuredBanner({ m, onClear }: { m: MeasuredIndex; onClear: () => void 
           <div className="min-w-0">
             <Eyebrow tone="daybreak">{c('mbMeasured', { kind: c(m.preview ? 'mbPreview' : 'mbRemeasure'), date: fmtDate(m.takenOn) })}</Eyebrow>
             <div className="mt-1 flex flex-wrap items-end gap-x-3 gap-y-1">
-              <span className="num text-[2.6rem] font-light leading-none text-ink">{m.value}</span>
-              <Delta value={m.value - latest.value} />
+              {m.value === null ? (
+                <span className="text-[1.6rem] font-light leading-none text-ink">{x('skNoIndex')}</span>
+              ) : (
+                <>
+                  <span className="num text-[2.6rem] font-light leading-none text-ink">{m.value}</span>
+                  <Delta value={m.value - latest.value} />
+                </>
+              )}
               <span className="text-[15px] text-ink-2">{rich(c('mbVs'), { v: <span className="num">{latest.value}</span>, date: fmtDate(latest.takenOn) })}</span>
             </div>
             <p className="mt-1 text-[15px] text-ink-2">
               {rich(c('lowestTermIs'), { term: <span className="text-ink">{name(m.lowestTerm)}</span> })}{' '}
               {m.preview ? c('mbKept') : c('mbAwaiting')}
             </p>
+            {missing.length > 0 && (
+              <p className="mt-2 flex flex-wrap items-center gap-2 text-[14px] text-ink-2">
+                <CircleDashed size={14} className="shrink-0 text-ink-3" aria-hidden />
+                {x('nyBanner', { terms: missing.map((k) => name(k)).join(x('skJoin')) })}
+              </p>
+            )}
             {m.surveyOnly && (
               <p className="mt-2 flex flex-wrap items-center gap-2 text-[14px] text-ink-2">
                 <Pill tone="neutral">{c('soPill')}</Pill> {c('soBanner')}
@@ -559,12 +603,17 @@ function MeasuredBanner({ m, onClear }: { m: MeasuredIndex; onClear: () => void 
             {amends.length > 0 && (
               <p className="mt-2 flex flex-wrap items-center gap-2 text-[14px] text-ink-2">
                 <Pill tone="neutral">{x('amAmendedPill')}</Pill>
-                {rich(x(amends.length === 1 ? 'amAmendedOne' : 'amAmendedMany'), { n: <span className="num">{amends.length}</span>, v: <span className="num">{m.original?.value ?? m.value}</span> })}
+                {rich(x(amends.length === 1 ? 'amAmendedOne' : 'amAmendedMany'), { n: <span className="num">{amends.length}</span>, v: <span className="num">{firstValue ?? '—'}</span> })}
               </p>
             )}
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {missing.map((k) => (
+            <Link key={k} to={`/app/index/take?term=${k}`} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line-strong px-3 text-[14px] text-ink hover:bg-paper-sunk focus-ring">
+              <TermDot term={k} /> {x('skMeasureNow', { term: name(k) })}
+            </Link>
+          ))}
           <Button size="sm" variant="secondary" onClick={() => setAmending(true)}>
             <Pencil size={14} /> {x('amCorrect')}
           </Button>
@@ -596,8 +645,14 @@ function MeasuredBanner({ m, onClear }: { m: MeasuredIndex; onClear: () => void 
           return (
             <li key={k} className="flex items-center gap-2 text-[14px] text-ink-2">
               <TermDot term={k} /> {name(k)}
-              <span className="num text-ink">{t.value === null ? '—' : k === 'B' ? `−${t.value}` : t.value}</span>
-              <Delta value={t.delta} inverse={k === 'B'} />
+              {t.value === null ? (
+                <span className="eyebrow text-ink-3">{band('not-yet-measured')}</span>
+              ) : (
+                <>
+                  <span className="num text-ink">{k === 'B' ? `−${t.value}` : t.value}</span>
+                  <Delta value={t.delta} inverse={k === 'B'} />
+                </>
+              )}
             </li>
           )
         })}
@@ -607,144 +662,9 @@ function MeasuredBanner({ m, onClear }: { m: MeasuredIndex; onClear: () => void 
         <WheelGhostKey />
       </div>
       <Sheet open={amending} onClose={() => setAmending(false)} title={x('amTitle')} side="right">
-        <AmendPanel m={m} />
+        <AmendPanel src={{ answers: m.answers, amendments: m.amendments, value: m.value, firstValue, takenOn: m.takenOn, signalsOff: m.signalsOff, skipped: m.skipped }} onAppend={onAppend} />
       </Sheet>
     </Card>
-  )
-}
-
-// ─── Correct right: append-only amendments after scoring (Architecture p26) ──
-const ALL_ITEMS = SITTINGS.flatMap((sit) => sit.blocks.flatMap((block) => block.sample.map((item) => ({ block, item }))))
-
-function AmendPanel({ m }: { m: MeasuredIndex }) {
-  const [, setMeasured] = useMeasured()
-  const x = useX()
-  const { t: c } = useCore()
-  const fmtDate = useFmtDate()
-  const amends = m.amendments ?? []
-  const current = m.answers ? amendedAnswers(m.answers, amends) : null
-  const [itemId, setItemId] = useState<string>(ALL_ITEMS[0]?.item.id ?? '')
-  const [to, setTo] = useState<number | null>(null)
-  const [reason, setReason] = useState('')
-  const [done, setDone] = useState<number | null>(null)
-  const sel = ALL_ITEMS.find((r) => r.item.id === itemId)
-  const scale = sel ? scaleOf(sel.block, sel.item) : []
-  const labelOf = (id: string, v: number | undefined) => {
-    const r = ALL_ITEMS.find((a) => a.item.id === id)
-    return r ? scaleOf(r.block, r.item).find((o) => o.value === v)?.label ?? '—' : '—'
-  }
-  const textOf = (id: string) => ALL_ITEMS.find((a) => a.item.id === id)?.item.text ?? id
-  const when = (at: string) => `${fmtDate(at.slice(0, 10))} · ${at.slice(11, 16)}`
-
-  if (!current) return <p className="text-[15px] text-ink-2">{x('amNoAnswers')}</p>
-
-  const was = current[itemId]
-  const same = to !== null && to === was
-  const append = () => {
-    if (to === null || same || !m.answers) return
-    const nextAnswers = { ...current, [itemId]: to }
-    const r = scoreAnswers(nextAnswers, m.signalsOff ?? [])
-    // On the specimen clock, like a Ledger entry: the specimen day at the real local time.
-    const now = new Date()
-    const at = `${SPECIMEN_TODAY}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
-    const a: Amendment = { id: `am_${Date.now().toString(36)}`, itemId, from: was, to, reason: reason.trim(), at, before: m.value, after: r.engine.value }
-    setMeasured((prev) =>
-      prev
-        ? {
-            ...prev,
-            original: prev.original ?? { value: prev.value, terms: prev.terms, lowestTerm: prev.lowestTerm },
-            value: r.engine.value,
-            gm: r.engine.gm,
-            burden: r.engine.burden,
-            terms: r.terms,
-            lowestTerm: r.lowest,
-            phqFlag: r.phqFlag,
-            amendments: [...(prev.amendments ?? []), a],
-          }
-        : prev,
-    )
-    setDone(r.engine.value)
-    setTo(null)
-    setReason('')
-  }
-
-  return (
-    <div>
-      <p className="text-[15px] leading-relaxed text-ink-2">{x('amLead')}</p>
-      <p className="mt-2 text-[13px] text-ink-3">{x('amBefore')}</p>
-
-      <label className="mt-5 block">
-        <span className="eyebrow text-ink-3">{x('amWhich')}</span>
-        <select
-          value={itemId}
-          onChange={(e) => {
-            setItemId(e.target.value)
-            setTo(null)
-            setDone(null)
-          }}
-          className="mt-1.5 block w-full rounded-lg border border-line-strong bg-paper-raised px-3 py-2.5 text-[15px] text-ink focus-ring"
-        >
-          {SITTINGS.map((sit) => (
-            <optgroup key={sit.n} label={c('ovSitting', { n: sit.n })}>
-              {sit.blocks.flatMap((b) => b.sample.map((item) => (
-                <option key={item.id} value={item.id} lang="en">{b.code} · {item.position} · {item.text.length > 64 ? `${item.text.slice(0, 62)}…` : item.text}</option>
-              )))}
-            </optgroup>
-          ))}
-        </select>
-      </label>
-
-      {sel && (
-        <div className="mt-4 rounded-card border border-line p-4">
-          <div className="flex items-center gap-2"><TermDot term={sel.block.term} /> <span lang="en" className="eyebrow text-ink-3">{sel.block.code} · {sel.block.timeframe}</span></div>
-          {sel.item.stem && <p lang="en" className="mt-2 text-[14px] text-ink-2">{sel.item.stem}</p>}
-          <p lang="en" className="mt-1 text-[17px] text-ink">{sel.item.text}</p>
-          <p className="mt-2 text-[14px] text-ink-2">{x('amYour')} <span lang="en" className="text-ink">{labelOf(itemId, was)}</span></p>
-          <fieldset className="mt-4">
-            <legend className="eyebrow mb-2 text-ink-3">{x('amNew')}</legend>
-            <div className="space-y-2">
-              {scale.map((o) => {
-                const on = to === o.value
-                return (
-                  <label key={o.value} className={clsx('flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-[15px] focus-within:ring-2 focus-within:ring-daybreak', on ? 'border-ink text-ink' : 'border-line text-ink-2')}>
-                    <input type="radio" name="amend-to" className="sr-only" checked={on} onChange={() => { setTo(o.value); setDone(null) }} />
-                    <span className={clsx('flex h-4 w-4 shrink-0 items-center justify-center rounded-full border', on ? 'border-ink' : 'border-line-strong')}>{on && <span className="h-2 w-2 rounded-full bg-ink" />}</span>
-                    <span lang="en">{o.label}</span>
-                    {o.value === was && <span className="ml-auto text-[13px] text-ink-3">{x('amCurrent')}</span>}
-                  </label>
-                )
-              })}
-            </div>
-          </fieldset>
-          <label className="mt-4 block">
-            <span className="eyebrow text-ink-3">{x('amWhy')}</span>
-            <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} maxLength={200} placeholder={x('amWhyPh')} className="mt-1.5 block w-full rounded-lg border border-line-strong bg-paper-raised px-3 py-2 text-[15px] text-ink placeholder:text-ink-3 focus-ring" />
-          </label>
-          {same && <p className="mt-2 text-[14px] text-ink-2">{x('amSame')}</p>}
-          <Button variant="ink" className="mt-4 w-full" onClick={append} disabled={to === null || same}>{x('amAppend')}</Button>
-          {done !== null && <p role="status" className="mt-3 text-[14px] text-ink-2">{rich(x('amAdded'), { v: <span className="num text-ink">{done}</span> })}</p>}
-        </div>
-      )}
-
-      <section className="mt-6" aria-label={x('amHistory')}>
-        <p className="eyebrow mb-2 flex items-center gap-2 text-ink-3"><History size={13} aria-hidden /> {x('amHistory')} <Pill tone="neutral">{x('amAppendOnly')}</Pill></p>
-        <ol className="divide-y divide-line rounded-card border border-line">
-          <li className="px-4 py-3 text-[14px] text-ink-2">
-            {rich(x('amScored'), { v: <span className="num text-ink">{m.original?.value ?? m.value}</span>, date: <span className="num">{fmtDate(m.takenOn)}</span> })}
-          </li>
-          {amends.map((a, i) => (
-            <li key={a.id} className="px-4 py-3">
-              <p className="num text-[12px] text-ink-3">{String(i + 1).padStart(2, '0')} · {when(a.at)}</p>
-              <p lang="en" className="mt-1 text-[14px] text-ink">{textOf(a.itemId)}</p>
-              <p className="mt-0.5 text-[14px] text-ink-2"><span lang="en">{labelOf(a.itemId, a.from)}</span> → <span lang="en" className="text-ink">{labelOf(a.itemId, a.to)}</span></p>
-              {a.reason && <p className="mt-0.5 text-[13px] text-ink-3">“{a.reason}”</p>}
-              <p className="mt-0.5 text-[13px] text-ink-2">{rich(x('amIndexMoved'), { a: <span className="num">{a.before}</span>, b: <span className="num text-ink">{a.after}</span> })}</p>
-            </li>
-          ))}
-          {amends.length === 0 && <li className="px-4 py-3 text-[14px] text-ink-3">{x('amNone')}</li>}
-        </ol>
-      </section>
-    </div>
   )
 }
 

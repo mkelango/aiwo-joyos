@@ -15,6 +15,7 @@ import { REMEASURE_OPENS, addDays, liveLedger, useLedgerRemoved } from './_store
 import { ACTION_TEXT, rich, useCore } from './_i18n'
 import { useX } from './_i18nX'
 import { dotDate } from './_card'
+import { useMemberName } from '@/lib/memberName'
 
 // THE DAY-40 PAGE (Memo p17: "print: the Index card, the Day-40 page, the Joyspan Letter").
 // One printed page at the middle of the ninety days: where the member started, what they
@@ -26,7 +27,8 @@ import { dotDate } from './_card'
 const DAY40 = addDays(DAY90_DATES.day0, 40)
 // Specimen counts for the days so far (the action has no history store in the front end).
 const SO_FAR = { actionDays: 17, circleCalls: 3, practiceWeek: 3 }
-const COACH_NOTE = 'Arjun, the verandah tea is working. Most of your Ledger moments are evenings at home with Kavya. Keep it, and guard one evening a week from meetings: that is where Freedom will come back.'
+// The coach's own words; the greeting carries the member's name from setup.
+const COACH_NOTE = '{name}, the verandah tea is working. Most of your Ledger moments are evenings at home with Kavya. Keep it, and guard one evening a week from meetings: that is where Freedom will come back.'
 const SIGNALS = ['d4Sig1', 'd4Sig2', 'd4Sig3'] as const
 
 export default function Day40() {
@@ -34,6 +36,7 @@ export default function Day40() {
   const tr = useT()
   const { name, pick, tag, lang } = useCore()
   const fmtDate = useFmtDate()
+  const who = useMemberName()
   const { ledger } = useApp()
   const [removed] = useLedgerRemoved()
   const day0 = INDEX_HISTORY[0]
@@ -82,7 +85,7 @@ export default function Day40() {
             <p className="eyebrow mt-2 text-ink-3">{x('d4Eyebrow', { n: 40 })}</p>
           </div>
           <div className="text-right">
-            <p className="eyebrow text-ink-3">{MEMBER.firstName} {MEMBER.lastName}</p>
+            <p className="eyebrow text-ink-3">{who.fullName}</p>
             <p className="num text-[13px] text-ink-3">{dotDate(DAY40)}</p>
           </div>
         </header>
@@ -141,7 +144,7 @@ export default function Day40() {
         {/* A note from the coach, in her own words */}
         <section className="mt-8 border-t border-line pt-6">
           <Eyebrow>{x('d4Coach', { coach })}</Eyebrow>
-          <blockquote lang="en" className="mt-3 font-serif text-[1.35rem] font-light italic leading-snug text-ink">“{COACH_NOTE}”</blockquote>
+          <blockquote lang="en" className="mt-3 font-serif text-[1.35rem] font-light italic leading-snug text-ink">“{COACH_NOTE.replace('{name}', who.firstName)}”</blockquote>
           <p className="mt-2 text-[14px] text-ink-3">{CIRCLE.coach} · {x('d4CoachRole')}</p>
         </section>
 

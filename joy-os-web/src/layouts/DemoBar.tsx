@@ -6,7 +6,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import type { Role } from '@/domain/types'
 import { useApp } from '@/lib/store'
 import { grantActs, isLive, standingRequest, useAccessRequests } from '@/routes/console/care/_accessStore'
-import { actsAt, deskOf, deskRoleOf, roleOption } from '@/routes/console/care/_gate'
+import { actsAt, deskOf, deskRoleOf, memberOfLocation, roleOption } from '@/routes/console/care/_gate'
 import { consoleNowMs } from '@/routes/console/care/_parts'
 
 // Demo surface switcher — moves a reviewer between the member app and the consoles.
@@ -62,8 +62,9 @@ export function DemoBar() {
   const here = desk ? desk.split('#')[0] : null
   const now = consoleNowMs()
   const grant = here && roleOption(role) ? standingRequest(requests, here, role, now) : null
-  // A grant is for the console's main desk, never for a second desk inside it.
-  const opens = !!desk && (actsAt(desk, role) || (!!grant && desk === here && isLive(grant, now) && grantActs(grant)))
+  // A grant is for the console's main desk, never for a second desk inside it, and only within
+  // its scope: a one-named-member grant opens that member's record, aggregates never a member.
+  const opens = !!desk && (actsAt(desk, role) || (!!grant && desk === here && isLive(grant, now) && grantActs(grant, memberOfLocation(pathname, search))))
   const offered = desk && !opens ? deskRoleOf(desk) : null
   const offeredOpt = offered && offered !== role ? roleOption(offered) : null
   const current = DEMO_ROLES.find((r) => r.role === role)

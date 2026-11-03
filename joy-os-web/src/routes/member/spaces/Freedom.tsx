@@ -9,9 +9,7 @@ import { Button, Pill, Progress, Tabs } from '@/components/ui'
 import { NO_SUGGESTIONS, PEACE_OF_MIND, TIME_AUDIT, TIME_KINDS } from './_data'
 import { ChartTip, SpaceShell, ToolCard, axisTick, rovingRadio, useCrisisGuard, Toggle } from './_SpaceShell'
 import { useSpaceText, type SpKey } from './_i18n'
-import { CONSENTS } from '@/data/member'
-import { ACCT_CHANGED } from '@/routes/member/account/_prefs'
-import { useSpaceState } from './_state'
+import { CAL_KEY, CAL_NAME, CAL_PROVIDERS, useSpaceState, useTrustConsent, type CalConnection, type CalProvider } from './_state'
 
 // FREEDOM (Memo p.19): the time audit (two weeks of calendar, consented,
 // summarised then discarded: whose time is it?), the No list, the digital
@@ -42,53 +40,20 @@ export default function Freedom() {
 // audit, read once, summarised to hours by kind, raw events discarded. The purpose-level
 // consent lives in the Trust centre (joyos:acct:consents, c_cal); this screen only reads it,
 // so a withdrawal there turns the audit off here.
-type CalProvider = 'google' | 'microsoft'
-const CAL_PROVIDERS: readonly CalProvider[] = ['google', 'microsoft']
-const CAL_NAME: Record<CalProvider, string> = { google: 'Google Calendar', microsoft: 'Microsoft Outlook' }
-type CalConnection = { provider: CalProvider | null }
-
-function readCalendarConsent(): { on: boolean; withdrawnAt?: string } {
-  const fallback = CONSENTS.find((c) => c.id === 'c_cal')?.granted ?? false
-  let on = fallback
-  try {
-    const raw = localStorage.getItem('joyos:acct:consents')
-    const v = raw ? (JSON.parse(raw) as Record<string, { on?: unknown }>) : null
-    if (v && typeof v.c_cal?.on === 'boolean') on = v.c_cal.on
-  } catch {
-    /* storage unavailable: the specimen consent stands */
-  }
-  if (on) return { on }
-  // The Trust centre's consent history carries the date of the withdrawal, when there is one.
-  try {
-    const raw = localStorage.getItem('joyos:acct:consent-history')
-    const h = raw ? (JSON.parse(raw) as { events?: { ref: string; action: string; at: string }[] }) : null
-    const last = (h?.events ?? []).filter((e) => e.ref === 'c_cal').sort((a, b) => a.at.localeCompare(b.at)).pop()
-    return { on, withdrawnAt: last?.action === 'withdrawn' ? last.at.slice(0, 10) : undefined }
-  } catch {
-    return { on }
-  }
-}
+// Provider names and the saved connection are shared with Pleasure (see _state.ts).
+// The specimen audit reads two weeks of the calendar; a re-run is offered for the next fortnight.
+const AUDIT_FROM = '2027-01-11'
+const AUDIT_TO = '2027-01-24'
+const AUDIT_RERUN = '2027-02-07'
 
 /** The Trust centre's calendar consent, read-only, following changes made elsewhere. */
 function useCalendarConsent() {
-  const [c, setC] = useState(readCalendarConsent)
-  useEffect(() => {
-    const sync = () => setC(readCalendarConsent())
-    window.addEventListener(ACCT_CHANGED, sync)
-    window.addEventListener('storage', sync)
-    window.addEventListener('focus', sync)
-    return () => {
-      window.removeEventListener(ACCT_CHANGED, sync)
-      window.removeEventListener('storage', sync)
-      window.removeEventListener('focus', sync)
-    }
-  }, [])
-  return c
+  return useTrustConsent('c_cal')
 }
 
 function TimeAudit() {
   const consent = useCalendarConsent()
-  const [conn, setConn] = useSpaceState<CalConnection>('freedom.calendar.v1', { provider: null })
+  const [conn, setConn] = useSpaceState<CalConnection>(CAL_KEY, { provider: null })
   const [rerun, setRerun] = useSpaceState<'idle' | 'asked'>('freedom.audit.rerun.v1', 'idle')
   const [note, setNote] = useState('')
   const provider = conn.provider && CAL_PROVIDERS.includes(conn.provider) ? conn.provider : null
@@ -103,7 +68,7 @@ function CalendarOptIn({ note, onConnect }: { note: string; onConnect: (p: CalPr
   const [provider, setProvider] = useState<CalProvider>('google')
   const [agree, setAgree] = useState(false)
   const [phase, setPhase] = useState(0)
-  const { t } = useSpaceText()
+  const { t, dm } = useSpaceText()
   const radio = rovingRadio(CAL_PROVIDERS, provider, setProvider)
   // Reading is simulated: three short beats, then the summary appears and the raw entries are gone.
   useEffect(() => {
@@ -146,7 +111,7 @@ function CalendarOptIn({ note, onConnect }: { note: string; onConnect: (p: CalPr
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-line p-4">
                 <Eyebrow>{t('fr.cal.can')}</Eyebrow>
-                <p className="mt-2 flex gap-2 text-[14px] text-ink"><Check size={15} className="mt-0.5 shrink-0" aria-hidden /> {t('fr.cal.can1')}</p>
+                <p className="mt-2 flex gap-2 text-[14px] text-ink"><Check size={15} className="mt-0.5 shrink-0" aria-hidden /> {t('fr.cal.can1', { from: dm(AUDIT_FROM), to: dm(AUDIT_TO) })}</p>
               </div>
               <div className="rounded-2xl border border-line p-4">
                 <Eyebrow>{t('fr.cal.cannot')}</Eyebrow>
@@ -199,7 +164,7 @@ function CalendarOff({ provider, withdrawnAt, onDisconnect }: { provider: CalPro
 
 function AuditView({ provider, rerun, onRerun, onDisconnect }: { provider: CalProvider; rerun: 'idle' | 'asked'; onRerun: () => void; onDisconnect: () => void }) {
   const [view, setView] = useState<'day' | 'total'>('day')
-  const { t, d, r, day } = useSpaceText()
+  const { t, d, r, day, dm } = useSpaceText()
   const dayLabel = (v: string) => { const [w, n] = v.split(' '); return `${day(w)} ${n}` }
   const totals = useMemo(() => {
     const t = { mine: 0, chosenWork: 0, asked: 0, admin: 0 }
@@ -212,7 +177,7 @@ function AuditView({ provider, rerun, onRerun, onDisconnect }: { provider: CalPr
   const names = Object.fromEntries(TIME_KINDS.map((k) => [k.key, d(k.label)]))
   return (
     <ToolCard
-      eyebrow={t('fr.ta.eyebrow', { p: CAL_NAME[provider] })}
+      eyebrow={t('fr.ta.eyebrow', { p: CAL_NAME[provider], from: dm(AUDIT_FROM), to: dm(AUDIT_TO) })}
       title={<>{r('fr.ta.title', { p: <span className="num">{pct(totals.mine)}%</span>, e: <em>{t('fr.ta.titleE')}</em> })}</>}
       sub={t('fr.ta.sub', { all: Math.round(all), mine: pct(totals.mine), asked: pct(totals.asked), wk: weekdayAsked })}
       aside={<SpecimenTag />}
@@ -261,7 +226,7 @@ function AuditView({ provider, rerun, onRerun, onDisconnect }: { provider: CalPr
       <div className="mt-6 flex flex-col gap-3 border-t border-line pt-4 md:flex-row md:items-center md:justify-between">
         <p className="flex items-start gap-2 text-[13px] text-ink-3"><ShieldCheck size={15} className="mt-0.5 shrink-0" aria-hidden /> <span>{r('fr.ta.footer', { p: CAL_NAME[provider], link: <Link to="/app/trust#consents" className="rounded underline underline-offset-4 focus-ring">{t('c.trust')}</Link> })}</span></p>
         <div className="flex flex-wrap items-center gap-2">
-          {rerun === 'idle' ? <Button size="sm" onClick={onRerun}><CalendarCheck size={14} /> {t('fr.ta.rerun')}</Button> : <p className="text-[13px] text-ink-2" role="status">{t('fr.ta.scheduled')}</p>}
+          {rerun === 'idle' ? <Button size="sm" onClick={onRerun}><CalendarCheck size={14} /> {t('fr.ta.rerun')}</Button> : <p className="text-[13px] text-ink-2" role="status">{t('fr.ta.scheduled', { d: dm(AUDIT_RERUN) })}</p>}
           <Button size="sm" variant="ghost" onClick={onDisconnect}>{t('fr.ta.disconnect', { p: CAL_NAME[provider] })}</Button>
         </div>
       </div>

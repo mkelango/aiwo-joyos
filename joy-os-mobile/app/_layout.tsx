@@ -8,7 +8,18 @@ import { NunitoSans_400Regular } from '@expo-google-fonts/nunito-sans/400Regular
 import { NunitoSans_500Medium } from '@expo-google-fonts/nunito-sans/500Medium'
 import { NunitoSans_600SemiBold } from '@expo-google-fonts/nunito-sans/600SemiBold'
 import { NunitoSans_700Bold } from '@expo-google-fonts/nunito-sans/700Bold'
+import { Mukta_300Light } from '@expo-google-fonts/mukta/300Light'
+import { Mukta_400Regular } from '@expo-google-fonts/mukta/400Regular'
+import { Mukta_600SemiBold } from '@expo-google-fonts/mukta/600SemiBold'
+import { Mukta_700Bold } from '@expo-google-fonts/mukta/700Bold'
+import { MuktaMalar_300Light } from '@expo-google-fonts/mukta-malar/300Light'
+import { MuktaMalar_400Regular } from '@expo-google-fonts/mukta-malar/400Regular'
+import { MuktaMalar_600SemiBold } from '@expo-google-fonts/mukta-malar/600SemiBold'
+import { MuktaMalar_700Bold } from '@expo-google-fonts/mukta-malar/700Bold'
+import { NotoSerifTamil_300Light_Italic } from '@expo-google-fonts/noto-serif-tamil/300Light_Italic'
+import { TiroDevanagariHindi_400Regular_Italic } from '@expo-google-fonts/tiro-devanagari-hindi/400Regular_Italic'
 import Feather from '@expo/vector-icons/Feather'
+import * as Font from 'expo-font'
 import { useFonts } from 'expo-font'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavThemeProvider, router, type ErrorBoundaryProps } from 'expo-router'
@@ -18,12 +29,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { Linking, Platform, Pressable, ScrollView, Text, View, useColorScheme } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { CrisisSheet } from '../src/components/CrisisSheet'
+import { DaybreakMark } from '../src/components'
 import { LockScreen } from '../src/components/LockScreen'
 import { sessionStore, useStore } from '../src/screens/b/bStore'
 import { kit } from '../src/components/_i18n'
 import { AppProvider, useApp, type Lang } from '../src/lib/store'
 import { ThemeProvider, useTheme } from '../src/theme/ThemeProvider'
-import { fonts, palettes, radius, space } from '../src/theme/tokens'
+import { fonts as latinFonts, indicFonts, palettes, radius, space } from '../src/theme/tokens'
 
 SplashScreen.preventAutoHideAsync().catch(() => {})
 
@@ -97,9 +109,17 @@ function RootNavigator() {
         </Stack>
       </View>
       {showLock ? <LockScreen /> : <CrisisSheet />}
+      {/* The animated mark (Playbook p53): 2.4 s, once per session, skipped under reduced motion. */}
+      <DaybreakMark />
     </NavThemeProvider>
   )
 }
+
+/** The script faces the error fallback sets (its sans, semibold, bold and serif roles). */
+const ERROR_SCRIPT_FONTS = {
+  ta: { MuktaMalar_300Light, MuktaMalar_400Regular, MuktaMalar_600SemiBold, MuktaMalar_700Bold, NotoSerifTamil_300Light_Italic },
+  hi: { Mukta_300Light, Mukta_400Regular, Mukta_600SemiBold, Mukta_700Bold, TiroDevanagariHindi_400Regular_Italic },
+} as const
 
 /**
  * Error boundary (Plan §4A.5: a failed screen is never blank). expo-router renders this in place
@@ -126,6 +146,23 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
       })
       .catch(() => {})
   }, [])
+  // Tamil and Hindi copy needs its script faces: the providers that normally load them are gone
+  // here, so the fallback loads the roles it uses itself. Until they are in, the Latin set stands.
+  const [script, setScript] = useState<null | 'ta' | 'hi'>(null)
+  useEffect(() => {
+    if (lang === 'en') return setScript(null)
+    let alive = true
+    const want = lang
+    Font.loadAsync(ERROR_SCRIPT_FONTS[want])
+      .then(() => alive && setScript(want))
+      .catch(() => {
+        /* the phone's own font draws the script */
+      })
+    return () => {
+      alive = false
+    }
+  }, [lang])
+  const fonts = script ? indicFonts[script] : latinFonts
   const scheme = pref === 'system' ? (system === 'dark' ? 'dark' : 'light') : pref
   const c = palettes[scheme]
   const t = (k: Parameters<typeof kit>[1]) => kit(lang, k)
@@ -146,7 +183,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
       <ScrollView contentContainerStyle={{ paddingHorizontal: space.gutter, paddingTop: 72, paddingBottom: space.s5, gap: space.s3, width: '100%', maxWidth: 640, alignSelf: 'center' }}>
         <Text style={{ fontFamily: fonts.mono, fontSize: 12, letterSpacing: 1.7, color: c.ink2 }}>AIWO · JOY OS</Text>
         <View style={{ gap: space.s1 }}>
-          <Text style={{ fontFamily: fonts.mono, fontSize: 12, letterSpacing: 1.7, textTransform: 'uppercase', color: c.daybreakInk }}>{t('errEyebrow')}</Text>
+          <Text style={{ fontFamily: script ? fonts.sansSemi : fonts.mono, fontSize: 12, letterSpacing: script ? 0 : 1.7, textTransform: 'uppercase', color: c.daybreakInk }}>{t('errEyebrow')}</Text>
           <Text accessibilityRole="header" style={{ fontFamily: fonts.sansLight, fontSize: 32, lineHeight: 40, color: c.ink }}>
             {t('errTitleA')}
             <Text style={{ fontFamily: fonts.serifLightItalic }}>{t('errTitleSerif')}</Text>

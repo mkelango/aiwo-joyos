@@ -6,7 +6,8 @@ import { interceptsCrisis, useApp } from '@/lib/store'
 import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { palettes } from '@/theme/tokens'
-import { sessionStore, useStore } from './bStore'
+import { ACCOUNT_PROFILES, accountStore, sessionStore, useStore } from './bStore'
+import { onboardingAccountStore } from '@/lib/onboardingAccount'
 import { useDict } from '@/lib/i18n'
 import { PARTS } from './i18n/parts'
 
@@ -227,6 +228,53 @@ export function FilterChips<T extends string>({ value, onChange, items, label }:
       })}
     </ScrollView>
   )
+}
+
+/** A segmented choice of numbers (reminders a day): the same control as Segmented, figures in Mono. */
+export function NumberSegmented({ value, onChange, items, label }: { value: number; onChange: (v: number) => void; items: number[]; label: string }) {
+  const { c, radius } = useTheme()
+  return (
+    <View accessibilityRole="tablist" accessibilityLabel={label} style={{ flexDirection: 'row', flexWrap: 'wrap', backgroundColor: c.paperSunk, borderRadius: radius.pill, padding: 4, gap: 4, alignSelf: 'flex-start', maxWidth: '100%' }}>
+      {items.map((n) => {
+        const on = n === value
+        return (
+          <Pressable
+            key={n}
+            onPress={() => onChange(n)}
+            accessibilityRole="tab"
+            accessibilityLabel={String(n)}
+            accessibilityState={{ selected: on }}
+            aria-selected={on}
+            style={{ minHeight: 40, minWidth: 44, paddingHorizontal: 16, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? c.paperRaised : undefined }}
+          >
+            <Mono size={15} weight={on ? 'medium' : 'regular'} color={on ? c.ink : c.ink2}>
+              {String(n)}
+            </Mono>
+          </Pressable>
+        )
+      })}
+    </View>
+  )
+}
+
+/**
+ * The account signed in on this phone (M1): Arjun (the specimen member), Lakshmi in elder mode,
+ * or the account made in onboarding. Its name is the profile's; its AIWO ID follows the account.
+ */
+export function useAccount() {
+  const [session] = useStore(sessionStore)
+  const [acct] = useStore(accountStore)
+  const [onb] = useStore(onboardingAccountStore)
+  const id = session.account ?? 'arjun'
+  const name = acct.profile.name.trim() || (id === 'new' ? onb.name.trim() : ACCOUNT_PROFILES[id].profile.name)
+  return {
+    id,
+    name,
+    firstName: name.split(' ')[0],
+    aiwoId: id === 'new' ? onb.aiwoId ?? ACCOUNT_PROFILES.arjun.aiwoId : ACCOUNT_PROFILES[id].aiwoId,
+    age: id === 'new' ? null : ACCOUNT_PROFILES[id].age,
+    elder: id === 'lakshmi',
+  }
 }
 
 /** One vertical timeline step: marker, connector, content. state drives the marker. */
@@ -450,6 +498,8 @@ export function StepProgress({ step, steps }: { step: number; steps: readonly st
 /** A heading block for a flow step (one serif word allowed in the title). */
 export function StepHead({ eyebrow, title, lead }: { eyebrow: string; title: ReactNode; lead?: string }) {
   const { space } = useTheme()
+  // Sign in and onboarding show a StepHead: the account's text size follows it in (M1).
+  useElderType()
   return (
     <View style={{ gap: space.s1 }}>
       <Eyebrow tone="daybreak">{eyebrow}</Eyebrow>
@@ -477,6 +527,7 @@ export function CheckLine({ children, icon = 'check' }: { children: ReactNode; i
 /** Inline success/status line with a check (announced politely). */
 export function Done({ children }: { children: ReactNode }) {
   const { c } = useTheme()
+  useElderType()
   return (
     <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }} accessibilityLiveRegion="polite">
       <View style={{ paddingTop: 3 }}>
@@ -554,11 +605,50 @@ export function useSheetCrisisGuard() {
 export function memberOnly<P extends object>(Screen: ComponentType<P>) {
   function MemberOnly(props: P) {
     const [session] = useStore(sessionStore)
+    useElderType()
     if (sessionStore.hydrated() && !session.signedIn) return <Redirect href="/welcome" />
     return <Screen {...props} />
   }
   MemberOnly.displayName = `MemberOnly(${Screen.displayName ?? Screen.name ?? 'Screen'})`
   return MemberOnly
+}
+
+/**
+ * Lakshmi signs in with her elder mode (M1): with large type on, the app's text size goes up to
+ * Larger once per sign-in (she can still change it in Settings, and her choice wins). When another
+ * account signs in, or she signs out, a size raised here goes back to Default, so the next person
+ * on the phone does not inherit it. Mounted by memberOnly screens and the sign-in and onboarding
+ * steps (StepHead, Done); the root layout can mount it too, or render <ElderType />.
+ */
+export function useElderType() {
+  const [session, setSession] = useStore(sessionStore)
+  const [acct] = useStore(accountStore)
+  const { hydrated, textSize, setTextSize } = useApp()
+  // The stored text size lands a render after `hydrated`; act only once it has.
+  const [ready, setReady] = useState(false)
+  useEffect(() => {
+    if (hydrated) setReady(true)
+  }, [hydrated])
+  const lakshmi = session.signedIn && session.account === 'lakshmi'
+  const due = ready && lakshmi && acct.elder.largeType && session.elderTypeFor !== (session.at ?? 'signed-in')
+  const undo = ready && !lakshmi && sessionStore.hydrated() && !!session.elderTypeRaised
+  useEffect(() => {
+    if (!due) return
+    const raise = textSize === 'default'
+    if (raise) setTextSize('large')
+    setSession((s) => ({ ...s, elderTypeFor: s.at ?? 'signed-in', elderTypeRaised: raise || s.elderTypeRaised }))
+  }, [due, textSize, setTextSize, setSession])
+  useEffect(() => {
+    if (!undo) return
+    // Only a size elder mode set: if it was changed since, that choice stays.
+    if (textSize === 'large') setTextSize('default')
+    setSession((s) => ({ ...s, elderTypeRaised: false }))
+  }, [undo, textSize, setTextSize, setSession])
+}
+/** useElderType as a component, for a layout to mount once. */
+export function ElderType() {
+  useElderType()
+  return null
 }
 
 /**

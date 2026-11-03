@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Linking, Pressable, ScrollView, View } from 'react-native'
 import type { ScrollViewInstance } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ArrowLink, BandLabel, Body, Button, Card, DaybreakButton, Eyebrow, Icon, JoyspanWheel, Meta, MethodLine, Mono, Numeral, Progress, Serif, TermChip, TermDot, Title } from '@/components'
+import { ArrowLink, BandLabel, Body, Button, Card, DaybreakButton, Eyebrow, Icon, JoyspanEquation, JoyspanWheel, Meta, MethodLine, Mono, Numeral, Progress, Serif, TermChip, TermDot, Title } from '@/components'
 import { termByKey } from '@/shared/terms'
 import type { Band, TermKey, TermScore } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
@@ -92,6 +92,26 @@ export default function Check() {
   )
 }
 
+// ─── Joyspan, defined (Playbook p17, p44) ──────────────────────────────────
+// The Check is public and defines Joyspan, so it carries the word equation, set verbatim, and
+// the credit for the word.
+
+function JoyspanDefined() {
+  const { space } = useTheme()
+  const t = useDict(CHECK)
+  const lang = useLang()
+  return (
+    <Card tone="outline" style={{ gap: space.s2 }}>
+      <Eyebrow>{t('joyspanIs')}</Eyebrow>
+      <JoyspanEquation />
+      <View style={{ gap: 4 }}>
+        {lang !== 'en' ? <Meta size={14} tone="ink3">{t('equationNote')}</Meta> : null}
+        <Meta size={14}>{t('credit')}</Meta>
+      </View>
+    </Card>
+  )
+}
+
 // ─── Intro ────────────────────────────────────────────────────────────────
 
 function Intro({ onBegin }: { onBegin: () => void }) {
@@ -129,6 +149,7 @@ function Intro({ onBegin }: { onBegin: () => void }) {
         <Eyebrow>{t('bandsNever')}</Eyebrow>
         <Body>{t('bandsBody')}</Body>
       </Card>
+      <JoyspanDefined />
       <Card tone="sunk" style={{ gap: 6 }}>
         <Eyebrow>{t('staysTitle')}</Eyebrow>
         <Body>{t('staysBody')}</Body>
@@ -353,6 +374,8 @@ function Result({ answers, onRestart }: { answers: Record<string, number>; onRes
           <Meta size={14}>{t('free24')}</Meta>
         </Card>
       ) : null}
+
+      <JoyspanDefined />
 
       <Card tone="outline" style={{ gap: space.s1 }}>
         <Eyebrow>{t('whyBands')}</Eyebrow>

@@ -1,3 +1,4 @@
+import { router } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Modal, Pressable, ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -8,7 +9,7 @@ import { useTheme } from '@/theme/ThemeProvider'
 import { palettes } from '@/theme/tokens'
 import { useApp, useReduceMotion } from '@/lib/store'
 import { CAPTIONS, CIRCLE_NEXT, CIRCLE_SESSIONS, OTHER_CIRCLES, PRACTICE_CONTENT, SALONS } from '@/screens/b/journeyData'
-import { a11yStore, accountStore, circleReportsStore, useStore } from '@/screens/b/bStore'
+import { a11yStore, accountStore, circleReportsStore, refCode, useStore, type BookedPass } from '@/screens/b/bStore'
 import { CheckLine, ChoiceCard, Done, Field, FilterChips, TimelineStep, fmtWhen, memberOnly, useSheetCrisisGuard } from '@/screens/b/parts'
 import { useDict } from '@/lib/i18n'
 import { CIRCLES, OTHER_CIRCLE_TEXT, CIRCLE_STATUS, SALON_TITLE, CIRCLE_PROMPT } from '@/screens/b/i18n/journey'
@@ -30,8 +31,24 @@ function Circles() {
   const [left, setLeft] = useState<RoomMode | null>(null)
   const [acct, setAcct] = useStore(accountStore)
   const setCircle = (p: Partial<typeof acct.circle>) => setAcct((a) => ({ ...a, circle: { ...a.circle, ...p } }))
-  const [requested, setRequested] = useState<Record<string, boolean>>({})
-  const [saved, setSaved] = useState<Record<string, boolean>>({})
+  // Join and accept requests and salon places are kept on the phone (accountStore); a salon
+  // booking is a pass that Events shows with its QR, gate and wallet.
+  const requested = acct.circleRequests ?? {}
+  const setRequested = (id: string, on: boolean) => setAcct((a) => ({ ...a, circleRequests: { ...(a.circleRequests ?? {}), [id]: on } }))
+  const [undoneNote, setUndoneNote] = useState<Record<string, string>>({})
+  const salonPass = (id: string) => (acct.passes ?? []).find((p) => p.kind === 'Salon' && p.id === id)
+  const bookSalon = (id: string, guests: 1 | 2) => {
+    const pass: BookedPass = { id, kind: 'Salon', code: refCode('CS'), guests, at: new Date().toISOString() }
+    setAcct((a) => ({ ...a, passes: [...(a.passes ?? []).filter((p) => !(p.kind === 'Salon' && p.id === id)), pass] }))
+    setUndoneNote((n) => ({ ...n, [id]: '' }))
+  }
+  const giveUpSalon = (id: string, title: string) => {
+    setAcct((a) => {
+      const code = (a.passes ?? []).find((p) => p.kind === 'Salon' && p.id === id)?.code
+      return { ...a, passes: (a.passes ?? []).filter((p) => !(p.kind === 'Salon' && p.id === id)), wallet: code ? (a.wallet ?? []).filter((x) => x !== code) : a.wallet }
+    })
+    setUndoneNote((n) => ({ ...n, [id]: t('gaveUp', { title }) }))
+  }
   const t = useDict(CIRCLES)
   const tc = useCommon()
   const tx = useTx()
@@ -184,14 +201,38 @@ function Circles() {
                 {tx(ot?.note, oc.note)}
               </Meta>
               {oc.status === 'Member' ? null : done ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44 }} accessibilityLiveRegion="polite">
-                  <Icon name="check" size={15} color={c.ink2} />
-                  <Meta style={{ flexShrink: 1 }}>{oc.status === 'Invited' ? t('accepted') : t('requested', { lead: oc.lead.split(' ').slice(-2).join(' ') })}</Meta>
+                <View style={{ gap: 2 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44 }} accessibilityLiveRegion="polite">
+                    <Icon name="check" size={15} color={c.ink2} />
+                    <Meta style={{ flexShrink: 1 }}>{oc.status === 'Invited' ? t('accepted') : t('requested', { lead: oc.lead.split(' ').slice(-2).join(' ') })}</Meta>
+                  </View>
+                  {/* Accepting can be undone; a request to join can be withdrawn. */}
+                  <Button
+                    variant="link"
+                    style={{ alignSelf: 'flex-start' }}
+                    accessibilityLabel={`${tx(ot?.name, oc.name)}, ${oc.status === 'Invited' ? t('undo') : t('withdraw')}`}
+                    onPress={() => {
+                      setRequested(oc.id, false)
+                      setUndoneNote((n) => ({ ...n, [oc.id]: oc.status === 'Invited' ? t('undoneInvite') : t('withdrawnJoin', { lead: oc.lead.split(' ').slice(-2).join(' ') }) }))
+                    }}
+                  >
+                    {oc.status === 'Invited' ? t('undo') : t('withdraw')}
+                  </Button>
                 </View>
               ) : (
-                <Button size="sm" variant="secondary" onPress={() => setRequested((r) => ({ ...r, [oc.id]: true }))}>
-                  {oc.status === 'Invited' ? t('accept') : t('ask')}
-                </Button>
+                <View style={{ gap: 6 }}>
+                  {undoneNote[oc.id] ? <Meta size={14} accessibilityLiveRegion="polite">{undoneNote[oc.id]}</Meta> : null}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onPress={() => {
+                      setRequested(oc.id, true)
+                      setUndoneNote((n) => ({ ...n, [oc.id]: '' }))
+                    }}
+                  >
+                    {oc.status === 'Invited' ? t('accept') : t('ask')}
+                  </Button>
+                </View>
               )}
             </Card>
           )
@@ -213,9 +254,38 @@ function Circles() {
             <Meta size={14} tone="ink3">
               <Mono size={14} tone="ink3">{String(s.seats)}</Mono>{t('seats')}
             </Meta>
-            <Button size="sm" variant={saved[s.id] ? 'ghost' : 'secondary'} icon={saved[s.id] ? 'check' : 'bookmark'} onPress={() => setSaved((x) => ({ ...x, [s.id]: !x[s.id] }))}>
-              {saved[s.id] ? t('seatReq') : t('reqSeat')}
-            </Button>
+            {(() => {
+              const title = tx(SALON_TITLE[s.id], s.title)
+              const pass = salonPass(s.id)
+              if (pass)
+                return (
+                  <View style={{ gap: 2 }} accessibilityLiveRegion="polite">
+                    <Done>{pass.guests === 2 ? t('heldTwo', { code: pass.code }) : t('heldOne', { code: pass.code })}</Done>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s2 }}>
+                      <Button variant="link" icon="arrow-right" onPress={() => router.push('/events')}>
+                        {t('seePass')}
+                      </Button>
+                      <Button variant="link" accessibilityLabel={`${title}, ${t('giveUp')}`} onPress={() => giveUpSalon(s.id, title)}>
+                        {t('giveUp')}
+                      </Button>
+                    </View>
+                  </View>
+                )
+              return (
+                <View style={{ gap: 6 }}>
+                  {undoneNote[s.id] ? <Meta size={14} accessibilityLiveRegion="polite">{undoneNote[s.id]}</Meta> : null}
+                  <Meta size={14} tone="ink">{t('placesLabel')}</Meta>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s1 }}>
+                    <Button size="sm" variant="secondary" icon="user" accessibilityLabel={t('bookFor', { title, n: 1 })} onPress={() => bookSalon(s.id, 1)}>
+                      {t('bookOne')}
+                    </Button>
+                    <Button size="sm" variant="secondary" icon="users" accessibilityLabel={t('bookFor', { title, n: 2 })} onPress={() => bookSalon(s.id, 2)}>
+                      {t('bookTwo')}
+                    </Button>
+                  </View>
+                </View>
+              )
+            })()}
           </Card>
         ))}
       </View>

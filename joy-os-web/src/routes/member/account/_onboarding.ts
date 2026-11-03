@@ -1,6 +1,8 @@
 import type { TermKey } from '@/domain/types'
 import { ONBOARDING_KEY, readJSON, type SavedOnboarding } from '@/routes/entry/_store'
-import { DEFAULT_NOTIF_PREFS, type NotifPrefs } from './_data'
+import { DEFAULT_NOTIF_PREFS, SPECIMEN_NOW, type NotifPrefs } from './_data'
+import { CONSENT_ARTEFACTS, CONSENT_SEED, ARTEFACT_VERSION, type ConsentEvent, type ConsentHistory } from './_consent'
+import { DEVICE_CONSENT } from './_links'
 
 // The onboarding hand-off. When a member finishes setup (/onboarding writes 'joyos:onboarding'),
 // the account screens take over those choices the first time they read their own records:
@@ -54,7 +56,6 @@ function remindersToPrefs(perDay: number, cur: NotifPrefs): Pick<NotifPrefs, 'ty
 }
 
 const INVITE_ROLE: Record<string, 'adult' | 'elder'> = { Parent: 'elder' }
-const DEVICE_CONSENT: Record<string, string> = { oura: 'c_oura', apple: 'c_hk' }
 
 /**
  * Merge a finished setup into the account records, once per finished setup. Called before any
@@ -114,12 +115,30 @@ export function seedFromOnboarding() {
     write(ACCT('notifs'), next)
   }
 
-  // Trust centre: the consents given in setup, plus the device consents for what was linked.
+  // Trust centre: the consents given in setup, plus the device consents for what was linked
+  // (every device with a consent, WHOOP, Garmin and Ultrahuman included).
   if (ob.consents) {
     const cur = read<Record<string, { on: boolean; pending?: boolean }>>(ACCT('consents')) ?? {}
     const next: Record<string, { on: boolean; pending?: boolean }> = { ...cur, c_care: { on: ob.consents.care }, c_data: { on: ob.consents.data }, c_pub: { on: ob.consents.publishing } }
     for (const id of ob.linked ?? []) if (DEVICE_CONSENT[id]) next[DEVICE_CONSENT[id]] = { on: true }
     write(ACCT('consents'), next)
+
+    // Consent history: the setup rows say what the member actually chose in setup (granted or
+    // declined), with the artefact version the setup cards showed. They replace the specimen's
+    // own setup rows for the same purposes (and the specimen's later Care update, since the
+    // member agreed to the current Care text in setup).
+    const at = `${SPECIMEN_NOW} ${clock(ob.completedAt)}`
+    const ev = (ref: string, granted: boolean, version: string): ConsentEvent => ({ id: `setup-${ref}`, ref, action: granted ? 'granted' : 'declined', version, at, via: 'setup' })
+    const fresh: ConsentEvent[] = [
+      ev('c_care', ob.consents.care, CONSENT_ARTEFACTS.care.version),
+      ev('c_data', ob.consents.data, CONSENT_ARTEFACTS.data.version),
+      ev('c_pub', ob.consents.publishing, CONSENT_ARTEFACTS.publishing.version),
+      ...(ob.linked ?? []).filter((id) => DEVICE_CONSENT[id]).map((id) => ev(DEVICE_CONSENT[id], true, ARTEFACT_VERSION[DEVICE_CONSENT[id]] ?? 'v1')),
+    ]
+    const replaced = new Set(fresh.map((e) => e.ref))
+    const hist = read<ConsentHistory>(ACCT('consent-history')) ?? CONSENT_SEED
+    const kept = hist.events.filter((e) => !e.id.startsWith('setup-') && !(e.id.startsWith('seed-') && replaced.has(e.ref)))
+    write(ACCT('consent-history'), { events: [...kept, ...fresh] })
   }
 
   // Profile: the name given in setup (the AIWO ID contact is read straight from the record).
@@ -131,6 +150,12 @@ export function seedFromOnboarding() {
   }
 
   write(SEEDED_KEY, ob.completedAt)
+}
+
+/** 'HH:MM' of a finished setup (India time on the specimen calendar); 09:12 when unreadable. */
+function clock(iso: string) {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '09:12' : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
 function hash(s: string) {

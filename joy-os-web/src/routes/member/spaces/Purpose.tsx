@@ -14,6 +14,9 @@ import { useSpaceState } from './_state'
 // daily anchors), the Tomorrow Question weekly, the 25-year statement from the
 // Atelier revisited at Day 90, the contribution log, and an optional career Venn.
 // The one Daybreak button: save this week's Tomorrow Question.
+// The specimen map was last changed on this day (before the member edits it here).
+const IKIGAI_CHANGED_ON = '2027-01-18'
+
 export default function Purpose() {
   const { t, r } = useSpaceText()
   return (
@@ -43,7 +46,7 @@ function IkigaiMap() {
   const [newAnchor, setNewAnchor] = useState('')
   const [saved, setSaved] = useState(false)
   const [err, setErr] = useState<{ direction?: SpKey; contribution?: SpKey }>({})
-  const { t } = useSpaceText()
+  const { t, lang } = useSpaceText()
 
   const save = () => {
     const e: typeof err = {}
@@ -129,7 +132,7 @@ function IkigaiMap() {
             <Button variant="ghost" onClick={() => { setEditing(false); setErr({}); setNewAnchor('') }}>{t('c.cancel')}</Button>
           </>
         ) : (
-          <p className="text-[13px] text-ink-3" role="status">{saved ? t('pur.ik.saved') : map.changedOn ? t('pur.ik.changedOn', { d: fmtDate(map.changedOn) }) : t('pur.ik.lastChanged')}</p>
+          <p className="text-[13px] text-ink-3" role="status">{saved ? t('pur.ik.saved') : map.changedOn ? t('pur.ik.changedOn', { d: fmtDate(map.changedOn, lang) }) : t('pur.ik.lastChanged', { d: fmtDate(IKIGAI_CHANGED_ON, lang) })}</p>
         )}
       </div>
     </ToolCard>

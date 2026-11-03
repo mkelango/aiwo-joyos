@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui'
 import type { Role } from '@/domain/types'
 import { useApp } from '@/lib/store'
-import { grantActs, isLive, lastSettled, standingRequest, useAccessRequests } from './_accessStore'
+import { AGGREGATES_ONLY, NAMED_MEMBER, STRUCTURE_ONLY, grantActs, isLive, lastSettled, scopeLabel, standingRequest, useAccessRequests } from './_accessStore'
 import { fmtClock, fmtDuration, useConsoleNow } from './_parts'
 
 // Role gating for the care consoles. A role opens a console; it does not open a member.
@@ -116,11 +116,33 @@ export function useConsoleRole() {
 }
 
 /**
+ * The member record a console location is on, if any: '/console/coach/member/m_0001', or
+ * '/console/clinical?tab=member&member=m_0001'. A one-named-member grant acts only there.
+ */
+export function memberOfLocation(pathname: string, search = '') {
+  const m = pathname.match(/^\/console\/coach\/member\/([^/?#]+)/)
+  if (m) return decodeURIComponent(m[1])
+  if (pathname === '/console/clinical') {
+    const q = new URLSearchParams(search)
+    if (q.get('tab') === 'member') return q.get('member') ?? 'm_0001'
+  }
+  return null
+}
+
+/** Who an audit line names: the signed-in role's specimen person, or a preview visitor. */
+export const actorOf = (a: { chosen: boolean; person: string; roleLabel: string }) => ({
+  who: a.chosen ? a.person : 'No console role · preview',
+  role: a.chosen ? a.roleLabel : 'Preview',
+})
+
+/**
  * Whether the signed-in demo role may act at a desk ('/console/clinical', or
  * '/console/coach#concierge' for a desk inside a console). Fails closed: no chosen role,
- * no action. A live access grant from the DPO lets its holder act for its duration.
+ * no action. A live access grant from the DPO lets its holder act for its duration, within
+ * its scope: canAct is the console as a whole, canActOn(memberId) one member's record.
+ * Pass memberId when the screen is one member's record, and canAct answers for that member.
  */
-export function useConsoleAccess(desk: string) {
+export function useConsoleAccess(desk: string, memberId?: string | null) {
   const { role, setRole, chosen, roleLabel, person } = useConsoleRole()
   const requests = useAccessRequests()
   const now = useConsoleNow(15_000)
@@ -131,11 +153,14 @@ export function useConsoleAccess(desk: string) {
   const live = standing && isLive(standing, now) ? standing : null
   // A grant is for the console's main desk, never for a second desk inside it.
   const grant = live && desk === path ? live : null
-  const canAct = !!chosen && (allowed.includes(role) || (!!grant && grantActs(grant)))
+  const standingActs = !!chosen && allowed.includes(role)
+  const canActOn = (member?: string | null) => standingActs || (!!chosen && !!grant && grantActs(grant, member ?? null))
+  const canAct = canActOn(memberId)
   const native = nativeRoleOf(desk)
   const nativeOpt = roleOption(native)
   return {
     canAct,
+    canActOn,
     chosen: !!chosen,
     role,
     roleLabel,
@@ -155,16 +180,19 @@ export function useConsoleAccess(desk: string) {
 const bannerCls = 'mb-6 flex flex-col gap-3 rounded-card border border-ink bg-paper-raised px-5 py-4 md:flex-row md:items-center md:justify-between'
 const quietLink = 'inline-flex h-9 items-center rounded-full px-3 text-[14px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring'
 
-export function PreviewBanner({ path }: { path: string }) {
-  const { canAct, chosen, roleLabel, opensHere, grant, deskGrant, pending, settled, now, switchTo, nativeLabel, nativePerson } = useConsoleAccess(path)
+export function PreviewBanner({ path, memberId }: { path: string; memberId?: string | null }) {
+  const { canAct, chosen, roleLabel, opensHere, grant, deskGrant, pending, settled, now, switchTo, nativeLabel, nativePerson } = useConsoleAccess(path, memberId)
   const consolePath = path.split('#')[0]
+  // A one-named-member grant acts on that member's record only; elsewhere in the console it looks.
+  const namedElsewhere = !canAct && !!grant && grant.scope === NAMED_MEMBER
 
-  if (canAct && grant) {
+  if ((canAct && grant) || namedElsewhere) {
     return (
       <p role="status" className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-card border border-dashed border-line-strong px-5 py-3 text-[14px] text-ink-2">
         <KeyRound size={15} className="shrink-0 text-ink-3" aria-hidden />
-        <span className="text-ink">Acting under grant <span className="num">{grant.ref}</span></span>
-        · {grant.scope} · <span className="num">{fmtDuration((grant.expiresAt ?? now) - now)}</span> left · every action audited
+        <span className="text-ink">{canAct ? 'Acting under grant' : 'Grant'} <span className="num">{grant!.ref}</span></span>
+        · {scopeLabel(grant!)} · <span className="num">{fmtDuration((grant!.expiresAt ?? now) - now)}</span> left
+        {canAct ? ' · every action audited' : <> · you can act on {grant!.memberName ?? grant!.memberId}’s record only, so every other write here is switched off</>}
       </p>
     )
   }
@@ -223,7 +251,11 @@ export function PreviewBanner({ path }: { path: string }) {
               : deskGrant
                 ? <>Grant <span className="num">{deskGrant.ref}</span> covers this console’s main desk only, not this one.</>
                 : grant
-                ? <>Grant <span className="num">{grant.ref}</span> is structure only: you can look, not act on a member.</>
+                ? grant.scope === AGGREGATES_ONLY
+                  ? <>Grant <span className="num">{grant.ref}</span> is aggregates only: you can look, never act on a member’s record.</>
+                  : grant.scope === STRUCTURE_ONLY
+                    ? <>Grant <span className="num">{grant.ref}</span> is structure only: you can look, not act on a member.</>
+                    : <>Grant <span className="num">{grant.ref}</span> does not cover this record.</>
                 : settled?.status === 'declined'
                   ? <>Request <span className="num">{settled.ref}</span> was declined: {settled.reason}.</>
                   : <>In production this console would not open at all. Access is asked for, never assumed.</>}

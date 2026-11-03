@@ -6,7 +6,7 @@ import { AiwoMark, Avatar, Body, Button, Card, DaybreakButton, Eyebrow, Icon, Me
 import { useApp } from '@/lib/store'
 import { useTheme } from '@/theme/ThemeProvider'
 import { DEMO_ACCOUNTS, SPECIMEN_AIWO_ID, SPECIMEN_OTP } from '@/screens/b/_data'
-import { sessionStore, useStore } from '@/screens/b/bStore'
+import { applyDemoAccount, sessionStore, useStore } from '@/screens/b/bStore'
 import { onboardingAccountStore } from '@/lib/onboardingAccount'
 import { Done, Field, StepHead } from '@/screens/b/parts'
 import { useDict } from '@/lib/i18n'
@@ -72,8 +72,16 @@ export default function SignIn() {
   const nameFor = (id: string) =>
     made.aiwoId && made.aiwoId === id && made.name.trim() ? made.name.trim() : DEMO_ACCOUNTS.find((a) => a.aiwoId === id)?.name.split(' ')[0] ?? 'Arjun'
 
-  const finish = (m: 'passkey' | 'otp' | 'email' | 'demo', name = nameFor(aiwoId)) => {
+  // Which account the AIWO ID opens (M1): the one made in onboarding on this phone becomes the
+  // member's own account; a specimen ID opens that specimen (Lakshmi in elder mode); any other
+  // well-formed ID opens Arjun, the specimen member whose data the app shows.
+  const accountFor = (id: string): 'arjun' | 'lakshmi' | 'new' =>
+    made.aiwoId && made.aiwoId === id ? 'new' : DEMO_ACCOUNTS.find((a) => a.aiwoId === id)?.id === 'lakshmi' ? 'lakshmi' : 'arjun'
+
+  const finish = (m: 'passkey' | 'otp' | 'email' | 'demo', name = nameFor(aiwoId), account = accountFor(aiwoId)) => {
     setWho(name)
+    // The account first (profile, household and elder mode follow it), then how they came in.
+    applyDemoAccount(account)
     setSession((s) => ({ ...s, signedIn: true, method: m, at: new Date().toISOString() }))
     setPhase('done')
   }
@@ -184,7 +192,7 @@ export default function SignIn() {
                   return (
                   <Pressable
                     key={a.id}
-                    onPress={() => finish('demo', a.name.split(' ')[0])}
+                    onPress={() => finish('demo', a.name.split(' ')[0], a.id === 'lakshmi' ? 'lakshmi' : 'arjun')}
                     accessibilityRole="button"
                     accessibilityLabel={t('signInAs', { name: a.name, role })}
                     style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, opacity: pressed ? 0.7 : 1 })}

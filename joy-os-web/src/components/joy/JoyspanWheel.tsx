@@ -1,10 +1,13 @@
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { useId } from 'react'
 import type { TermKey, TermScore } from '@/domain/types'
 import { termColor } from '@/data/terms'
 import { useDict, useTermText } from '@/lib/i18n'
+import { useScoresHidden } from '@/lib/minor'
+import { DUR, useReduceMotion } from '@/lib/motion'
 import { SHARED } from '@/components/_i18n'
 import { useBandText } from './primitives'
+import { useCountUp } from './CountUp'
 
 // The Joyspan Wheel (Brand Identity Playbook p45, p62, p65).
 // Six fixed petals, clockwise from the top: Body, Purpose, People, Freedom, Pleasure, Ease.
@@ -13,6 +16,15 @@ import { useBandText } from './primitives'
 // VoiceOver reads each petal with term, score and band (Architecture p21).
 // With a baseline, each petal also carries the Day-0 outline: a 14% Ink ghost of where it
 // stood at the start of the loop (Playbook p45), so a rise or a fall reads at a glance.
+// Motion (Playbook p53, "Rise. Settle. Measure."): the petals bloom from the centre, in order,
+// clockwise from Healthspan, and the whole bloom takes exactly 960 ms on the brand easing
+// (each petal 480 ms, 96 ms apart: 5 × 96 + 480 = 960) while the centre Index counts up to its
+// value over the same 960 ms. Under reduced motion the finished Wheel fades in over 120 ms.
+// A member under 18 is never scored: inside the member app the Wheel then draws no values.
+
+/** Per-petal duration and stagger, in seconds: the last petal lands at exactly 0.96 s. */
+const PETAL = DUR.step / 1000
+const STAGGER = (DUR.bloom - DUR.step) / 5 / 1000
 
 const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 const SOFT: Record<TermKey, string> = {
@@ -33,8 +45,14 @@ interface Props {
   baseline?: TermScore[] | null
 }
 
-export function JoyspanWheel({ terms, size = 240, value, showLabels = false, highlight = null, onSelect, animate = true, guide = true, baseline = null }: Props) {
-  const reduce = useReducedMotion()
+export function JoyspanWheel({ terms: scored, size = 240, value: scoredValue, showLabels = false, highlight = null, onSelect, animate = true, guide = true, baseline: scoredBaseline = null }: Props) {
+  const reduce = useReduceMotion()
+  const hidden = useScoresHidden()
+  // A minor's Wheel keeps its six petals but carries no value, band or Day-0 outline.
+  const terms = hidden ? scored.map((t) => ({ ...t, value: null })) : scored
+  const value = hidden ? (scoredValue === undefined ? undefined : null) : scoredValue
+  const baseline = hidden ? null : scoredBaseline
+  const centre = useCountUp(value ?? null, { enabled: animate })
   const tx = useDict(SHARED)
   const tt = useTermText()
   const bandText = useBandText()
@@ -64,13 +82,24 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
   const describeBase = baseline
     ? tx('wheelDay0', { list: ORDER.filter((k) => base(k) !== null).map((k) => `${tt.name(k)} ${k === 'B' ? tx('minus') : ''}${base(k)}`).join(', ') })
     : ''
-  const describe = terms.map((t) => readTerm(t.key, t.value, t.band)).join('; ') + describeBase
+  const describe = hidden ? tx('minorWheel') : terms.map((t) => readTerm(t.key, t.value, t.band)).join('; ') + describeBase
   const interactive = !!onSelect
 
   return (
     // A role=img makes its children presentational, so an interactive Wheel is a group:
     // the six petals are then exposed as toggle buttons.
-    <svg width={box} height={box} viewBox={`0 0 ${box} ${box}`} role={interactive ? 'group' : 'img'} aria-label={`${tx('wheel')}${value != null ? tx('wheelIndex', { v: value }) : ''}. ${describe}`} className="h-auto max-w-full shrink-0">
+    <motion.svg
+      width={box}
+      height={box}
+      viewBox={`0 0 ${box} ${box}`}
+      role={interactive ? 'group' : 'img'}
+      aria-label={`${tx('wheel')}${value != null ? tx('wheelIndex', { v: value }) : ''}. ${describe}`}
+      className="h-auto max-w-full shrink-0"
+      // Reduced motion: no bloom, no count — the finished Wheel fades in over 120 ms.
+      initial={animate && reduce ? { opacity: 0 } : false}
+      animate={{ opacity: 1 }}
+      transition={{ duration: DUR.instant / 1000, ease: [0.2, 0, 0, 1] }}
+    >
       <defs>
         <pattern id={`hatch-${uid}`} width="4.5" height="4.5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
           <rect width="4.5" height="4.5" fill="var(--term-b-soft)" />
@@ -107,7 +136,7 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
                 cy={c}
                 initial={animate && !reduce ? { r: inner } : false}
                 animate={{ r: fillTo }}
-                transition={{ duration: 0.96, delay: 0.1 + i * 0.07, ease: [0.2, 0, 0, 1] }}
+                transition={{ duration: PETAL, delay: i * STAGGER, ease: [0.2, 0, 0, 1] }}
               />
             </clipPath>
             <path d={full} fill={v === null ? 'none' : SOFT[k]} stroke={v === null ? 'var(--ink-3)' : termColor[k]} strokeOpacity={v === null ? 0.6 : 0.35} strokeDasharray={v === null ? '3 3' : undefined} strokeWidth={0.8} />
@@ -126,9 +155,9 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
           </g>
         )
       })}
-      {value !== undefined && (
+      {value !== undefined && !hidden && (
         <text aria-hidden x={c} y={c} textAnchor="middle" dominantBaseline="central" fontFamily="var(--font-mono)" fontWeight={300} fontSize={size * 0.13} fill="var(--ink)">
-          {value ?? '—'}
+          {value === null ? '—' : centre.text}
         </text>
       )}
       {showLabels &&
@@ -148,7 +177,7 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
             </g>
           )
         })}
-    </svg>
+    </motion.svg>
   )
 }
 

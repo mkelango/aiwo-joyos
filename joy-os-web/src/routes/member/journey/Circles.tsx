@@ -9,10 +9,11 @@ import { CIRCLE, PRACTICE_WEEKS } from '@/data/platform'
 import { MEMBER, TEAM } from '@/data/member'
 import { CAPTIONS, CIRCLE_NEXT, CIRCLE_SESSIONS, OTHER_CIRCLES, PRACTICE_CONTENT, SALONS } from './_data'
 import { SheetFocus, fade, useFocusTrap } from './_parts'
-import { TODAY, addCircleReport, isoDate, holderName, setCalendar, setCircleRequest, setSalon, useCircleReports, useJourney, withdrawCircleReport } from './_store'
+import { TODAY, addCircleReport, isoDate, setCalendar, setCircleRequest, setSalon, useCircleReports, useJourney, withdrawCircleReport } from './_store'
 import { useJ, type JourneyKey } from './_i18n'
 import { useA11yPrefs } from '@/routes/member/account/_prefs'
 import { useApp } from '@/lib/store'
+import { useMemberName } from '@/lib/memberName'
 // One shared emergency intercept for every member free-text field (Memo p.24).
 import { useCrisisGuard } from '@/routes/member/spaces/_SpaceShell'
 
@@ -35,6 +36,9 @@ const CALL_OPEN = TODAY >= CIRCLE_NEXT.date
 
 type RoomMode = 'waiting' | 'live'
 
+// The member's own seat in the specimen circle; it shows the name given in setup.
+const SELF = MEMBER.firstName
+
 export default function Circles() {
   const coach = TEAM.find((p) => p.role === 'Coach')!
   const coachFirst = coach.name.split(' ')[0]
@@ -50,6 +54,7 @@ export default function Circles() {
   const calAdded = !!journey.calendar['circle-next']
   const alumniCal = !!journey.calendar['alumni-feb']
   const { t, r, tx, term, locale, clock } = useJ()
+  const me = useMemberName()
   const fmtDate = useFmtDate()
   const shortDay = shortDayIn(locale)
   const opensAt = clock(opensDate.getHours(), opensDate.getMinutes())
@@ -92,12 +97,15 @@ export default function Circles() {
           </div>
 
           <ul className="mt-5 flex flex-wrap gap-2" aria-label={t('membersAria')}>
-            {CIRCLE.members.map((m) => (
-              <li key={m} className="flex items-center gap-2 rounded-full border border-line py-1 pl-1 pr-3 text-[14px] text-ink">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full font-mono text-[11px]" style={DISC} aria-hidden>{m[0]}</span>
-                {m}{m === MEMBER.firstName && <span className="text-ink-3">{t('you')}</span>}
-              </li>
-            ))}
+            {CIRCLE.members.map((m) => {
+              const name = m === SELF ? me.firstName : m
+              return (
+                <li key={m} className="flex items-center gap-2 rounded-full border border-line py-1 pl-1 pr-3 text-[14px] text-ink">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full font-mono text-[11px]" style={DISC} aria-hidden>{name[0]}</span>
+                  {name}{m === SELF && <span className="text-ink-3">{t('you')}</span>}
+                </li>
+              )
+            })}
           </ul>
           <div className="mt-3">
             <Button variant="link" className="text-[13px] text-ink-2" onClick={() => setReportFor('')}><Flag size={13} /> {t('repOpen')}</Button>
@@ -142,7 +150,7 @@ export default function Circles() {
                   <span className="eyebrow whitespace-nowrap text-ink-3">{s.week === 0 ? t('formed') : `W${s.week}`}</span>
                   <span className="flex gap-1" aria-hidden>
                     {Array.from({ length: 8 }, (_, i) => (
-                      <span key={i} className="h-2.5 flex-1 rounded-full" style={{ background: i < s.attended ? 'var(--term-r)' : 'var(--line)' }} />
+                      <span key={i} className="h-2.5 flex-1 rounded-full" style={{ background: i < s.attended ? 'var(--ink-2)' : 'var(--line)' }} />
                     ))}
                   </span>
                   <span className="num text-right text-[14px] text-ink">{s.attended}/8</span>
@@ -220,7 +228,7 @@ export default function Circles() {
         <ul className="divide-y divide-line rounded-card border border-line bg-paper-raised">
           {SALONS.map((s) => {
             const seats = journey.salonSeats[s.id]
-            const book = (n: number) => setSalon(s.id, n, { id: s.id, name: `Connections salon · ${s.title}`, when: s.when, where: s.where, kind: 'Salon', code: `CS-${s.id.toUpperCase()}-${MEMBER.id.slice(-4)}`, gate: 'Host at the door', seat: n === 2 ? 'Two places' : 'One place', holder: holderName, guests: n })
+            const book = (n: number) => setSalon(s.id, n, { id: s.id, name: `Connections salon · ${s.title}`, when: s.when, where: s.where, kind: 'Salon', code: `CS-${s.id.toUpperCase()}-${MEMBER.id.slice(-4)}`, gate: 'Host at the door', seat: n === 2 ? 'Two places' : 'One place', holder: me.fullName, guests: n })
             return (
               <li key={s.id} className="grid gap-3 p-4 md:grid-cols-[1fr_auto] md:items-center md:p-5">
                 <div className="min-w-0">
@@ -289,9 +297,10 @@ function CallRoom({ mode, onMode, onLeave }: { mode: RoomMode; onMode: (m: RoomM
   const shortDay = shortDayIn(locale)
   const opensAt = clock(opensDate.getHours(), opensDate.getMinutes())
   const prompt = PRACTICE_CONTENT.find((p) => p.week === CIRCLE.week)!.circlePrompt
-  const others = CIRCLE.members.filter((m) => m !== MEMBER.firstName)
+  const me = useMemberName()
+  const others = CIRCLE.members.filter((m) => m !== SELF)
   const present = others.filter((m) => m !== 'Thomas')
-  const you = { name: MEMBER.firstName, coach: false, you: true }
+  const you = { name: me.firstName, coach: false, you: true }
   const tiles = live
     ? [{ name: coach.name.split(' ')[0], coach: true, you: false }, ...present.map((m) => ({ name: m, coach: false, you: false })), you]
     : [you]
@@ -422,7 +431,7 @@ function ReportForm({ coach, onDone }: { coach: string; onDone: () => void }) {
   const { t } = useJ()
   const guard = useCrisisGuard()
   const { setCrisisOpen } = useApp()
-  const others = CIRCLE.members.filter((m) => m !== MEMBER.firstName)
+  const others = CIRCLE.members.filter((m) => m !== SELF)
   const [about, setAbout] = useState('')
   const [reason, setReason] = useState<Reason | ''>('')
   const [note, setNote] = useState('')

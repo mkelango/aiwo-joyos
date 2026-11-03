@@ -11,7 +11,8 @@ import { TERMS, termByKey } from '@/data/terms'
 import { FIVE, METHODS, geometricMean } from '@/domain/indexEngine'
 import type { MethodVersion, TermKey } from '@/domain/types'
 import { CLAIMS_LOG, COUNCIL_REVIEW, DATA_REQUESTS, INSTRUMENT_LICENCE, GOLDEN_CASES, JOY_REPORT, METHOD_V10_META, NEEDS_CITATION, REFUSED, RESEARCH, SIGNERS, WEIGHTS_V10, WEIGHTS_V11_PROPOSAL, type WeightSet } from './_data'
-import { AccessNote, CardHead, ChartLead, Field, Kpi, ScrollTabs, StatusTag, areaCls, fieldCls, pct, tabPanelProps, tick, tipLabel, tipStyle, useTabParam } from './_parts'
+import { PreviewBanner, useConsoleAccess } from '../care/_gate'
+import { AccessNote, CanActProvider, CardHead, ChartLead, Field, Kpi, ScrollTabs, StatusTag, areaCls, fieldCls, pct, tabPanelProps, tick, tipLabel, tipStyle, useCanAct, useTabParam } from './_parts'
 
 // SCIENCE OFFICE (Memo p.10–11, p.22, p.38; Architecture p.16): methods are configuration,
 // versioned, immutable once published, and need two signers. Results are published up and down;
@@ -72,6 +73,8 @@ export default function Science() {
   // Set by the header action; Methods scrolls to the draft once it has mounted, then clears it.
   const scrollToDraft = useRef(false)
   const draft = useDraft()
+  // The Science Office (and a clinician) act here; every other role sees a read-only preview.
+  const { canAct } = useConsoleAccess('/console/science')
   const [inst, setInst] = useState<Record<string, InstRow>>(() => Object.fromEntries(INSTRUMENTS.map((i) => [i.code, { status: i.status, licence: i.licence }])))
   const [redesign, setRedesign] = useState<Record<string, boolean>>({})
   const [report, setReport] = useState<ReportState>(() => ({ checks: JOY_REPORT.checklist.map((c) => c.done), sent: false, council: 'idle', published: null }))
@@ -100,6 +103,8 @@ export default function Science() {
         }
       />
 
+      <PreviewBanner path="/console/science" />
+
       <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="Method in use" value="v1.0" sub={draft.published ? <>v1.1 published 28 Jan 2027 · in use from J3 · λ <span className="num">{draft.lambda.toFixed(2)}</span></> : <>λ {METHODS['v1.0'].lambda} · published 22 Oct 2026 · v1.1 in draft</>} />
         <Kpi label="Scores on v1.0" value={METHOD_V10_META.scores.toLocaleString('en-IN')} sub="Each carries its method; none silently recomputed" />
@@ -123,6 +128,7 @@ export default function Science() {
         ]}
       />
 
+      <CanActProvider value={canAct}>
       <AnimatePresence mode="wait">
         <motion.div key={tab} {...tabPanelProps('sci', tab)} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
           {tab === 'methods' && <Methods focusKey={focusDraft} scrollRequest={scrollToDraft} d={draft} />}
@@ -133,6 +139,7 @@ export default function Science() {
           {tab === 'report' && <Report state={report} setState={setReport} />}
         </motion.div>
       </AnimatePresence>
+      </CanActProvider>
     </div>
   )
 }
@@ -149,6 +156,7 @@ function Methods({ focusKey, scrollRequest, d }: { focusKey: number; scrollReque
   const [term, setTerm] = useState<TermKey>('H')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const running = tests === 'running'
+  const canAct = useCanAct()
 
   // Runs after this panel has mounted (from another tab, once AnimatePresence has finished the exit) or, when
   // Methods is already open, after the click. Only a request from the header action scrolls; opening the tab by hand does not.
@@ -176,7 +184,7 @@ function Methods({ focusKey, scrollRequest, d }: { focusKey: number; scrollReque
   const ready = testsOk && signed.length === 2
 
   const setW = (k: TermKey, i: number, v: number) => {
-    if (published || running) return
+    if (published || running || !canAct) return
     setWeights((w) => ({ ...w, [k]: w[k].map((c, j) => (j === i ? { ...c, w: Math.round(v * 100) / 100 } : c)) }))
     touch()
   }
@@ -248,7 +256,7 @@ function Methods({ focusKey, scrollRequest, d }: { focusKey: number; scrollReque
         <CardHead
           eyebrow="Method v1.1 · calibration draft"
           title={published ? <>v1.1 is published and <em>sealed</em></> : 'Weights within each term, and λ'}
-          aside={published ? <StatusTag tone="ok"><Lock size={12} aria-hidden /> Immutable</StatusTag> : <StatusTag tone="draft">Draft · editable</StatusTag>}
+          aside={published ? <StatusTag tone="ok"><Lock size={12} aria-hidden /> Immutable</StatusTag> : <StatusTag tone="draft">{canAct ? 'Draft · editable' : 'Draft · view only'}</StatusTag>}
         />
         {published && (
           <AccessNote icon="lock" className="mb-5">Published 28 Jan 2027 · <span className="num">sha256:3b7f…a912</span>. These fields are locked. Any further change starts v1.2 and needs two new signatures.</AccessNote>
@@ -272,7 +280,7 @@ function Methods({ focusKey, scrollRequest, d }: { focusKey: number; scrollReque
           ))}
         </div>
 
-        <fieldset disabled={published || running}>
+        <fieldset disabled={published || running || !canAct} className={clsx(!canAct && '[&_[type=range]]:opacity-60')}>
           <legend className="sr-only">Weights for {termByKey(term).name}</legend>
           <ul className="space-y-4">
             {weights[term].map((c, i) => {
@@ -308,7 +316,7 @@ function Methods({ focusKey, scrollRequest, d }: { focusKey: number; scrollReque
               <label htmlFor="lambda" className="text-[15px] text-ink">λ · the weight of Preventable Suffering</label>
               <span className="num text-[1.4rem] font-light text-ink">{lambda.toFixed(2)}</span>
             </div>
-            <input id="lambda" type="range" min={0.15} max={0.35} step={0.01} value={lambda} onChange={(e) => { if (running) return; setLambda(Number(e.target.value)); touch() }} className="mt-2 w-full accent-[color:var(--ink)]" aria-valuetext={`λ ${lambda.toFixed(2)}`} />
+            <input id="lambda" type="range" min={0.15} max={0.35} step={0.01} value={lambda} onChange={(e) => { if (running || !canAct) return; setLambda(Number(e.target.value)); touch() }} className="mt-2 w-full accent-[color:var(--ink)]" aria-valuetext={`λ ${lambda.toFixed(2)}`} />
             <div className="num mt-1 flex justify-between text-[12px] text-ink-3"><span>0.15</span><span>v1.0 · 0.25</span><span>0.35</span></div>
           </div>
         </fieldset>
@@ -327,7 +335,7 @@ function Methods({ focusKey, scrollRequest, d }: { focusKey: number; scrollReque
             ))}
           </ul>
           {!published && (
-            <Button variant="ghost" size="sm" className="mt-4" disabled={running} onClick={() => { setWeights(cloneWeights(WEIGHTS_V11_PROPOSAL)); setLambda(METHODS['v1.1'].lambda); touch() }}><RotateCcw size={14} aria-hidden /> Reset to the calibration proposal</Button>
+            <Button variant="ghost" size="sm" className="mt-4" disabled={running || !canAct} onClick={() => { setWeights(cloneWeights(WEIGHTS_V11_PROPOSAL)); setLambda(METHODS['v1.1'].lambda); touch() }}><RotateCcw size={14} aria-hidden /> Reset to the calibration proposal</Button>
           )}
         </div>
       </Card>
@@ -351,7 +359,7 @@ function Methods({ focusKey, scrollRequest, d }: { focusKey: number; scrollReque
             <Step done={testsOk} label="Golden files pass for v1.1 and v1.0 parity" />
             {SIGNERS.map((s, i) => {
               const isSigned = signed.includes(s.id)
-              const canSign = testsOk && !published && !isSigned && (i === 0 || signed.includes(SIGNERS[0].id))
+              const canSign = canAct && testsOk && !published && !isSigned && (i === 0 || signed.includes(SIGNERS[0].id))
               return (
                 <li key={s.id} className="flex items-start gap-3">
                   <StepDot done={isSigned} />
@@ -366,9 +374,10 @@ function Methods({ focusKey, scrollRequest, d }: { focusKey: number; scrollReque
             <Step done={published} label="Published and sealed" />
           </ol>
           {!published && (
-            <Button variant="ink" className="mt-5 w-full" disabled={!ready} onClick={() => setConfirmOpen(true)}>Publish v1.1</Button>
+            <Button variant="ink" className="mt-5 w-full" disabled={!ready || !canAct} onClick={() => setConfirmOpen(true)}>Publish v1.1</Button>
           )}
-          {!published && !ready && <p className="mt-2 text-[13px] text-ink-3">Two different signers, after the golden files pass. Editing anything clears both signatures.</p>}
+          {!published && !canAct && <p className="mt-2 text-[13px] text-ink-3">View only. The Science Office edits, signs and publishes methods.</p>}
+          {!published && canAct && !ready && <p className="mt-2 text-[13px] text-ink-3">Two different signers, after the golden files pass. Editing anything clears both signatures.</p>}
         </Card>
       </div>
 
@@ -379,7 +388,7 @@ function Methods({ focusKey, scrollRequest, d }: { focusKey: number; scrollReque
           title="One implementation, a golden file per method version"
           lead="Each case fixes six term scores and the expected Index. The engine must reproduce v1.0 exactly and the draft must produce its own file before anyone can sign."
           aside={
-            <Button variant="secondary" onClick={runTests} disabled={tests === 'running' || !weightsOk || published}>
+            <Button variant="secondary" onClick={runTests} disabled={tests === 'running' || !weightsOk || published || !canAct}>
               <Play size={15} aria-hidden /> {tests === 'running' ? 'Running…' : tests === 'done' ? 'Run again' : 'Run golden files'}
             </Button>
           }
@@ -434,7 +443,7 @@ function Methods({ focusKey, scrollRequest, d }: { focusKey: number; scrollReque
           <li className="flex gap-2"><Check size={15} className="mt-1 shrink-0 text-ink" aria-hidden /> Signed by {SIGNERS.map((s) => s.name).join(' and ')}</li>
         </ul>
         <div className="mt-6 flex flex-wrap gap-2">
-          <Button variant="ink" onClick={() => { setPublished(true); setConfirmOpen(false) }}><Lock size={15} aria-hidden /> Publish and seal</Button>
+          <Button variant="ink" disabled={!canAct} onClick={() => { if (!canAct) return; setPublished(true); setConfirmOpen(false) }}><Lock size={15} aria-hidden /> Publish and seal</Button>
           <Button variant="ghost" onClick={() => setConfirmOpen(false)}>Not yet</Button>
         </div>
       </Sheet>
@@ -529,7 +538,9 @@ function InstrumentDetail({ r, onConfirm }: { r: InstFull; onConfirm: (ref: stri
   const [ref, setRef] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const pendingLicence = r.status === 'gated' || r.status === 'review'
+  const canAct = useCanAct()
   const submit = () => {
+    if (!canAct) return
     if (!/^LGL-\d{3,}$/i.test(ref.trim())) return setErr('Enter the Legal reference for the written confirmation, like LGL-0207.')
     onConfirm(ref.trim().toUpperCase())
   }
@@ -562,9 +573,10 @@ function InstrumentDetail({ r, onConfirm }: { r: InstFull; onConfirm: (ref: stri
           <p className="text-[15px] text-ink">Confirm the licence in writing</p>
           <p className="mt-1 text-[14px] text-ink-2">Decision 4: an instrument reaches members only once Legal holds written confirmation. Record its reference to lift the gate.</p>
           <Field label="Legal reference" htmlFor="lgl-ref" error={err} className="mt-4">
-            <input id="lgl-ref" className={clsx(fieldCls, 'font-mono')} value={ref} onChange={(e) => { setRef(e.target.value); setErr(null) }} placeholder="LGL-0207" aria-invalid={!!err} aria-describedby={err ? 'lgl-ref-err' : undefined} />
+            <input id="lgl-ref" disabled={!canAct} className={clsx(fieldCls, 'font-mono')} value={ref} onChange={(e) => { setRef(e.target.value); setErr(null) }} placeholder="LGL-0207" aria-invalid={!!err} aria-describedby={err ? 'lgl-ref-err' : undefined} />
           </Field>
-          <Button variant="ink" className="mt-4" onClick={submit}><ShieldCheck size={15} aria-hidden /> Mark licence confirmed</Button>
+          <Button variant="ink" className="mt-4" onClick={submit} disabled={!canAct}><ShieldCheck size={15} aria-hidden /> Mark licence confirmed</Button>
+          {!canAct && <p className="mt-2 text-[13px] text-ink-3">View only. The Science Office records the licence.</p>}
         </div>
       ) : (
         <p className="flex items-center gap-2 text-[15px] text-ink" role="status"><Check size={16} aria-hidden /> Licence confirmed. This instrument can be shown to members in its validated languages.</p>
@@ -578,6 +590,7 @@ function InstrumentDetail({ r, onConfirm }: { r: InstFull; onConfirm: (ref: stri
 function Cohorts({ redesign, setRedesign }: { redesign: Record<string, boolean>; setRedesign: React.Dispatch<React.SetStateAction<Record<string, boolean>>> }) {
   const done = COHORTS.filter((c) => c.improved !== null)
   const data = done.map((c) => ({ name: c.name.split(' · ')[0], improved: Math.round((c.improved ?? 0) * 100), flag: (c.improved ?? 0) < 0.5 }))
+  const canAct = useCanAct()
 
   return (
     <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
@@ -608,7 +621,7 @@ function Cohorts({ redesign, setRedesign }: { redesign: Record<string, boolean>;
           {redesign.sleep ? (
             <p className="flex items-center gap-2 text-[15px] text-ink" role="status"><Check size={16} aria-hidden /> Redesign opened with the Sleepcation lead. The next cohort waits for it.</p>
           ) : (
-            <Button variant="ink" onClick={() => setRedesign((r) => ({ ...r, sleep: true }))}>Open the redesign</Button>
+            <Button variant="ink" disabled={!canAct} onClick={() => setRedesign((r) => ({ ...r, sleep: true }))}>Open the redesign</Button>
           )}
         </div>
         <p className="mt-4 text-[13px] text-ink-3">Published in the Science Office cohort register and the India Joy Report draft, 22 Jan 2027, alongside the cohorts that passed.</p>
@@ -769,17 +782,20 @@ function Claims() {
 
 function Report({ state, setState }: { state: ReportState; setState: React.Dispatch<React.SetStateAction<ReportState>> }) {
   const [confirm, setConfirm] = useState(false)
+  const canAct = useCanAct()
   const { checks, sent, council, published } = state
   const shown = JOY_REPORT.states.filter((s) => s.n >= K_MIN)
   const suppressedN = JOY_REPORT.states.filter((s) => s.n < K_MIN).length
   const COUNCIL_IDX = JOY_REPORT.checklist.findIndex((c) => c.item.startsWith('Science Council'))
-  const editable = (i: number) => i !== COUNCIL_IDX && !JOY_REPORT.checklist[i].note && !sent
+  const editable = (i: number) => canAct && i !== COUNCIL_IDX && !JOY_REPORT.checklist[i].note && !sent
   const ownChecks = checks.filter((_, i) => i !== COUNCIL_IDX && !JOY_REPORT.checklist[i].note)
   const send = () => {
+    if (!canAct) return
     setState((x) => ({ ...x, sent: true, council: 'reviewing' }))
     window.setTimeout(() => setState((x) => ({ ...x, council: 'done', checks: x.checks.map((v, i) => (i === COUNCIL_IDX ? true : v)) })), 1800)
   }
   const publish = () => {
+    if (!canAct) return
     setState((x) => ({ ...x, published: { at: '28 Jan 2027', hash: 'sha256:6d2e…41b8' } }))
     setConfirm(false)
   }
@@ -850,8 +866,8 @@ function Report({ state, setState }: { state: ReportState; setState: React.Dispa
         <div className="mt-6 border-t border-line pt-5" aria-live="polite">
           {!sent && (
             <>
-              <Button variant="secondary" onClick={send} disabled={!ownChecks.every(Boolean)}><FlaskConical size={15} aria-hidden /> Send to the Science Council</Button>
-              {!ownChecks.every(Boolean) && <p className="mt-2 text-[13px] text-ink-3">Tick the editor’s four checks first.</p>}
+              <Button variant="secondary" onClick={send} disabled={!canAct || !ownChecks.every(Boolean)}><FlaskConical size={15} aria-hidden /> Send to the Science Council</Button>
+              {!canAct ? <p className="mt-2 text-[13px] text-ink-3">View only. The Science Office editor sends and publishes the report.</p> : !ownChecks.every(Boolean) && <p className="mt-2 text-[13px] text-ink-3">Tick the editor’s four checks first.</p>}
             </>
           )}
           {council === 'reviewing' && <p className="flex items-center gap-2 text-[15px] text-ink-2" role="status"><FileText size={16} aria-hidden /> Sent to the Science Council. Waiting for their review…</p>}
@@ -865,7 +881,7 @@ function Report({ state, setState }: { state: ReportState; setState: React.Dispa
               {published ? (
                 <p className="flex items-start gap-2 text-[15px] text-ink" role="status"><Check size={16} className="mt-1 shrink-0" aria-hidden /> <span>Published and sealed {published.at} as <span className="num">{published.hash}</span>. It goes public on 15 May 2027 with the dissent in print; any correction is a new, dated edition.</span></p>
               ) : (
-                <Button variant="ink" onClick={() => setConfirm(true)}><BookOpen size={15} aria-hidden /> Publish the report</Button>
+                <Button variant="ink" disabled={!canAct} onClick={() => setConfirm(true)}><BookOpen size={15} aria-hidden /> Publish the report</Button>
               )}
             </div>
           )}
@@ -884,7 +900,7 @@ function Report({ state, setState }: { state: ReportState; setState: React.Dispa
           <li className="flex gap-2"><Check size={15} className="mt-1 shrink-0 text-ink" aria-hidden /> Signed by {SIGNERS[0].name}, editor</li>
         </ul>
         <div className="mt-6 flex flex-wrap gap-2">
-          <Button variant="ink" onClick={publish}><Lock size={15} aria-hidden /> Publish and seal</Button>
+          <Button variant="ink" onClick={publish} disabled={!canAct}><Lock size={15} aria-hidden /> Publish and seal</Button>
           <Button variant="ghost" onClick={() => setConfirm(false)}>Not yet</Button>
         </div>
       </Sheet>

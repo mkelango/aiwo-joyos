@@ -11,7 +11,7 @@ import { useApp } from '@/lib/store'
 import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { DEVICES, INTENTS, type DeviceId } from '@/screens/b/entryData'
-import { accountStore, notifPrefsStore, onboardingStore, refCode, sessionStore, useStore, validatePrefs, type NotifPrefs, type OnboardingDraft } from '@/screens/b/bStore'
+import { ARTEFACT_VERSION, accountStore, applyDemoAccount, notifPrefsStore, onboardingStore, refCode, seedFromOnboarding, sessionStore, useStore, validatePrefs, type NotifPrefs, type OnboardingDraft } from '@/screens/b/bStore'
 import { EMPTY_GUARDIAN, GUARDIAN_CODE, accountProblems, contactLabel, guardianProblems, isMinor, migrateOnboardingDraft, newAiwoId, onboardingAccountStore, onboardingLayoutStore, type GuardianConsent, type OnboardingAccount } from '@/lib/onboardingAccount'
 import { SPECIMEN_AIWO_ID } from '@/screens/b/_data'
 import { CheckLine, ChoiceCard, Done, Field, KeyValue, StepHead, StepProgress, TimeStepper, TimelineStep, useCrisisGuard } from '@/screens/b/parts'
@@ -43,6 +43,8 @@ const AGES = [
   { value: 'minor', label: 'Under 18', key: 'hhAgeMinor' },
 ] as const
 type Consents = { care: boolean; data: boolean; publishing: boolean }
+/** The Trust centre's consent ids, so each card shows the artefact version in force. */
+const CONSENT_REF: Record<keyof Consents, string> = { care: 'c_care', data: 'c_data', publishing: 'c_pub' }
 
 const SAMPLE = {
   en: 'Anything good in the last few hours?',
@@ -211,8 +213,13 @@ export default function Onboarding() {
   }
   const complete = () => {
     setDraft((d) => ({ ...d, completedAt: new Date().toISOString(), step: 0 }))
+    // The choices made here are the member's from now on (M1): the three consents go into the
+    // Trust centre with their artefact versions, and a device linked here shows as connected.
+    const linkedId = device !== 'none' && linked[device] === 'linked' ? device : (Object.keys(linked) as DeviceId[]).find((k) => k !== 'none' && linked[k] === 'linked')
+    seedFromOnboarding({ consents, device: linkedId })
     // SPECIMEN: finishing signs the member in with the AIWO ID made on the AIWO ID step (passkey
-    // or one-time code, both simulated). Sign in recognises that ID afterwards.
+    // or one-time code, both simulated). That ID becomes the account; Sign in recognises it.
+    applyDemoAccount('new')
     setSession((s) => ({ ...s, signedIn: true, onboarded: true, method: account.verified === 'code' ? 'otp' : 'passkey', at: new Date().toISOString() }))
   }
 
@@ -672,7 +679,7 @@ export default function Onboarding() {
                   setConsents((v) => ({ ...v, [ci.key]: !v[ci.key] }))
                   setError(null)
                 }}
-                accessibilityLabel={`${cName}: ${cPlain} ${ci.required ? t('neededDot') : t('optionalDot')}`}
+                accessibilityLabel={`${cName}: ${cPlain} ${ci.required ? t('neededDot') : t('optionalDot')} ${t('consVersionA11y', { v: ARTEFACT_VERSION[CONSENT_REF[ci.key]] ?? 'v1' })}`}
                 title={
                   <View style={{ gap: 4 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -680,6 +687,9 @@ export default function Onboarding() {
                       <Pill tone={ci.required ? 'neutral' : 'daybreak'}>{ci.required ? t('needed') : t('optional')}</Pill>
                     </View>
                     <Body>{cPlain}</Body>
+                    <Meta size={13} tone="ink3" accessibilityLabel={t('consVersionA11y', { v: ARTEFACT_VERSION[CONSENT_REF[ci.key]] ?? 'v1' })}>
+                      {t('consVersion')}<Mono size={13} tone="ink3">{ARTEFACT_VERSION[CONSENT_REF[ci.key]] ?? 'v1'}</Mono>
+                    </Meta>
                   </View>
                 }
                 detail={
@@ -695,6 +705,7 @@ export default function Onboarding() {
               />
               )
             })}
+            <Meta size={14}>{t('consVersionNote')}</Meta>
             <Meta size={14}>{t('consNote')}</Meta>
           </>
         ) : null}

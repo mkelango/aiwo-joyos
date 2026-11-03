@@ -9,6 +9,7 @@ import { Button, Card, Pill, Tabs, Toggle } from '@/components/ui'
 import type { TermKey, TermScore } from '@/domain/types'
 import { LANGS, useDict, useLang, useTermText } from '@/lib/i18n'
 import { useApp, type Lang } from '@/lib/store'
+import { CONSENT_ARTEFACTS } from '@/routes/member/account/_consent'
 import { COUNTRIES, DEVICES, EMAIL_RE, INTENTS, ONBOARDING_COPY, ONBOARDING_STEPS as STEPS, countryName, phoneError, type CountryCode, type DeviceId, type OnboardingStep } from './_data'
 import { E, OB, dateLocale } from './_i18n'
 import { FlowTopBar, enterCodeDigits, rich, useBand } from './_parts'
@@ -29,7 +30,7 @@ type Invite = { name: string; relation: (typeof RELATIONS)[number]; contact: str
 type Account = SavedOnboarding['account']
 type Channels = { app: boolean; whatsapp: boolean; email: boolean }
 
-const EMPTY_ACCOUNT: Account = { name: '', via: 'phone', country: '+91', phone: '', email: '', verified: null }
+const EMPTY_ACCOUNT: Account = { name: '', lastName: '', via: 'phone', country: '+91', phone: '', email: '', verified: null }
 const EMPTY_AGE: SavedAge = { dob: '', minor: false, guardian: null }
 const EMPTY_GUARDIAN: Guardian = { name: '', relation: 'Parent', via: 'phone', country: '+91', phone: '', email: '', status: 'draft' }
 const GUARDIAN_RELATIONS: Guardian['relation'][] = ['Parent', 'Legal guardian']
@@ -42,6 +43,16 @@ function isMinor(dob: string) {
 
 function isoDay(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** "Arjun Rao": first name, then the family name when one was given. */
+function fullName(a: Account) {
+  return [a.name.trim(), a.lastName?.trim()].filter(Boolean).join(' ')
+}
+
+/** The version of each consent text as it stands now (the Trust centre's artefacts). */
+function consentVersions(): NonNullable<SavedOnboarding['consentVersions']> {
+  return { care: CONSENT_ARTEFACTS.care.version, data: CONSENT_ARTEFACTS.data.version, publishing: CONSENT_ARTEFACTS.publishing.version }
 }
 
 function guardianContact(g: Guardian) {
@@ -130,6 +141,7 @@ export default function Onboarding() {
     age: { ...age, minor },
     intents,
     consents,
+    consentVersions: consentVersions(),
     device,
     linked: (Object.keys(linked) as DeviceId[]).filter((d) => linked[d] === 'linked'),
     invites,
@@ -459,7 +471,8 @@ function AccountStep({ headingRef, eyebrow, value, onChange, attempted }: HeadRe
       <StepHead headingRef={headingRef} eyebrow={eyebrow} title={<>{rich(t('aTitle'), { em: <em>AIWO ID</em> })}</>} lead={t('aLead')} />
       <Card>
         <fieldset disabled={secure === 'passkey-waiting'} className="min-w-0">
-        <div>
+        <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
+        <div className="min-w-0">
           <label htmlFor="acc-name" className="block text-[14px] text-ink-2">{t('firstName')}</label>
           <input
             id="acc-name"
@@ -473,6 +486,20 @@ function AccountStep({ headingRef, eyebrow, value, onChange, attempted }: HeadRe
             className={clsx('mt-1.5 h-12 w-full rounded-full border bg-paper px-4 text-[16px] text-ink placeholder:text-ink-3 focus-ring', show('name') ? 'border-error' : 'border-line-strong')}
           />
           {show('name') ? <p id="acc-name-err" className="mt-1.5 text-[14px] text-error">{errs.name}</p> : <p id="acc-name-help" className="mt-1.5 text-[13px] text-ink-3">{t('nameHelp')}</p>}
+        </div>
+        <div className="min-w-0">
+          <label htmlFor="acc-last" className="block text-[14px] text-ink-2">{t('lastName')}<span className="text-ink-3">{t('optionalSuffix')}</span></label>
+          <input
+            id="acc-last"
+            value={value.lastName ?? ''}
+            onChange={(e) => set({ lastName: e.target.value })}
+            autoComplete="family-name"
+            aria-describedby="acc-last-help"
+            placeholder="Rao"
+            className="mt-1.5 h-12 w-full rounded-full border border-line-strong bg-paper px-4 text-[16px] text-ink placeholder:text-ink-3 focus-ring"
+          />
+          <p id="acc-last-help" className="mt-1.5 text-[13px] text-ink-3">{t('lastNameHelp')}</p>
+        </div>
         </div>
 
         <div className="mt-6">
@@ -539,7 +566,7 @@ function AccountStep({ headingRef, eyebrow, value, onChange, attempted }: HeadRe
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-ink text-paper"><Check size={22} aria-hidden /></span>
             <div className="min-w-0">
               <p className="text-[17px] text-ink">{value.verified === 'passkey' ? t('pkCreated') : t('codeVerified')}</p>
-              <p className="mt-1 break-words text-[14px] text-ink-2">{rich(t('yourId'), { name: value.name.trim(), contact: <span className={value.via === 'phone' ? 'num' : undefined}>{contactLabel(value)}</span> })}</p>
+              <p className="mt-1 break-words text-[14px] text-ink-2">{rich(t('yourId'), { name: fullName(value), contact: <span className={value.via === 'phone' ? 'num' : undefined}>{contactLabel(value)}</span> })}</p>
               <Button variant="link" className="mt-2" onClick={() => onChange({ ...value, verified: null })}>{t('diffMethod')}</Button>
             </div>
           </div>
@@ -880,6 +907,7 @@ function LanguageStep({ headingRef, eyebrow, value, onChange }: HeadRef & { valu
 function ConsentStep({ headingRef, eyebrow, value, onChange }: HeadRef & { value: Consents; onChange: (v: Consents) => void }) {
   const t = useDict(OB)
   const te = useDict(E)
+  const versions = consentVersions()
   const items: { key: keyof Consents; name: string; required: boolean; plain: string; allows: string[]; never: string }[] = [
     { key: 'care', name: t('care'), required: true, plain: t('carePlain'), allows: [t('careA1'), t('careA2')], never: t('careNever') },
     { key: 'data', name: t('data'), required: true, plain: t('dataPlain'), allows: [t('dataA1'), t('dataA2')], never: t('dataNever') },
@@ -902,6 +930,7 @@ function ConsentStep({ headingRef, eyebrow, value, onChange }: HeadRef & { value
                   <span className="flex flex-wrap items-center gap-2">
                     <span className="text-[19px] text-ink">{c.name}</span>
                     {c.required ? <Pill>{t('neededPill')}</Pill> : <Pill className="border border-line bg-transparent">{t('optionalPill')}</Pill>}
+                    <span className="text-[13px] text-ink-3">{rich(t('cVersion'), { v: <span className="num text-ink-2">{versions[c.key]}</span> })}</span>
                   </span>
                   <span className="mt-1 block text-[17px] text-ink-2">{c.plain}</span>
                 </span>
@@ -919,6 +948,7 @@ function ConsentStep({ headingRef, eyebrow, value, onChange }: HeadRef & { value
       <p className="mt-5 text-[14px] text-ink-3">
         {rich(t('cFoot'), { link: <Link to="/app/trust" className="link">{te('trustCentre')}</Link> })}
       </p>
+      <p className="mt-2 text-[14px] text-ink-3">{t('cVersionNote')}</p>
     </div>
   )
 }
@@ -1101,7 +1131,7 @@ function BeginStep({ headingRef, eyebrow, account, guardian, check, intents, lan
   const L = ONBOARDING_COPY[lang] ?? ONBOARDING_COPY.en
   const reach = [channels.app && t('app'), channels.whatsapp && 'WhatsApp', channels.email && te('email')].filter(Boolean).join(' · ') || t('noMessages')
   const rows: [string, ReactNode][] = [
-    ['AIWO ID', <span className="break-words">{account.name.trim()} · <span className={account.via === 'phone' ? 'num' : undefined}>{contactLabel(account)}</span> <span className="text-ink-3">· {account.verified === 'passkey' ? t('vPasskey') : account.verified === 'code' ? t('vCode') : t('vNone')}</span></span>],
+    ['AIWO ID', <span className="break-words">{fullName(account)} · <span className={account.via === 'phone' ? 'num' : undefined}>{contactLabel(account)}</span> <span className="text-ink-3">· {account.verified === 'passkey' ? t('vPasskey') : account.verified === 'code' ? t('vCode') : t('vNone')}</span></span>],
     [t('rowAge'), guardian ? t('ageMinorRow', { name: guardian.name }) : t('adultH')],
     ...(check ? ([[t('fromCheckRow'), <span className="flex items-center gap-2"><TermDot term={check.lowest} /> {t('spaceIsBand', { space: tt.space(check.lowest), band: lang === 'en' ? check.bands[check.lowest] : band.inline(check.bands[check.lowest]) })}</span>]] as [string, ReactNode][]) : []),
     [t('rowFocus'), <span className="flex flex-wrap gap-3">{intents.map((k) => <span key={k} className="flex items-center gap-2"><TermDot term={k} /> {tt.space(k)}</span>)}</span>],

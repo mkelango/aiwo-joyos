@@ -60,6 +60,8 @@ export interface JourneyState {
   occasionRequests: OccasionRequest[]
   /** Specimen switch: show the ’Cation tab as a member who has not taken a ’cation yet. */
   demoNoCation: boolean
+  /** The Joyspan 2027 Declaration card, signed by the member typing their name (Playbook p61). */
+  declaration: null | { name: string; signedAt: string }
 }
 
 export type OccasionGeneration = 'elders' | 'middle' | 'young'
@@ -122,6 +124,7 @@ const initial: JourneyState = {
   offlineWeeks: [],
   occasionRequests: [],
   demoNoCation: false,
+  declaration: null,
 }
 
 // Offline audio is kept on the device, so its record lives in localStorage and
@@ -139,12 +142,25 @@ function loadOffline(): number[] | null {
   }
 }
 
+// The signed Declaration card is a keepsake, so it also lives in localStorage.
+const DECLARATION_KEY = 'joyos:journey:declaration'
+
+function loadDeclaration(): JourneyState['declaration'] {
+  try {
+    const raw = window.localStorage.getItem(DECLARATION_KEY)
+    const v = raw ? (JSON.parse(raw) as { name?: unknown; signedAt?: unknown } | null) : null
+    return v && typeof v.name === 'string' && typeof v.signedAt === 'string' ? { name: v.name, signedAt: v.signedAt } : null
+  } catch {
+    return null
+  }
+}
+
 function load(): JourneyState {
   try {
     const raw = window.sessionStorage.getItem(KEY)
     const base: JourneyState = raw ? { ...initial, ...(JSON.parse(raw) as Partial<JourneyState>) } : initial
     const offline = loadOffline()
-    return offline ? { ...base, offlineWeeks: offline } : base
+    return { ...base, ...(offline ? { offlineWeeks: offline } : {}), declaration: loadDeclaration() }
   } catch {
     return initial
   }
@@ -156,6 +172,10 @@ const listeners = new Set<() => void>()
 function emit() {
   try { window.sessionStorage.setItem(KEY, JSON.stringify(state)) } catch { /* storage blocked: state lives in memory */ }
   try { window.localStorage.setItem(OFFLINE_KEY, JSON.stringify(state.offlineWeeks)) } catch { /* storage blocked */ }
+  try {
+    if (state.declaration) window.localStorage.setItem(DECLARATION_KEY, JSON.stringify(state.declaration))
+    else window.localStorage.removeItem(DECLARATION_KEY)
+  } catch { /* storage blocked */ }
   listeners.forEach((l) => l())
 }
 
@@ -257,6 +277,65 @@ export function setDemoNoCation(on: boolean) {
   setJourney((s) => ({ ...s, demoNoCation: on }))
 }
 
+export function signDeclaration(name: string | null) {
+  setJourney((s) => ({ ...s, declaration: name ? { name, signedAt: new Date().toISOString() } : null }))
+}
+
+// ─── The venue's published itinerary (C11) ────────────────────────────────
+// The partner console publishes a guest's itinerary to localStorage
+// 'joyos:partner:published' as { cation (slug), venue, days: [{ day, items:
+// [{ time, title }] }], at }. The ’Cation detail shows it in place of the
+// template when the ’cation matches. SPECIMEN.
+
+export interface VenueItinerary { cation: string; venue: string; days: { day: number; items: { time: string; title: string }[] }[]; at: string }
+
+const PUBLISHED_KEY = 'joyos:partner:published'
+let publishedRaw: string | null | undefined
+let publishedCache: VenueItinerary[] = []
+
+const isItin = (v: unknown): v is VenueItinerary => {
+  const x = v as VenueItinerary | null
+  return !!x && typeof x.cation === 'string' && typeof x.venue === 'string' && typeof x.at === 'string' && Array.isArray(x.days)
+}
+
+function publishedSnapshot(): VenueItinerary[] {
+  let raw: string | null = null
+  try { raw = window.localStorage.getItem(PUBLISHED_KEY) } catch { /* storage blocked */ }
+  if (raw === publishedRaw) return publishedCache
+  publishedRaw = raw
+  try {
+    const v = raw ? (JSON.parse(raw) as unknown) : null
+    const list = (Array.isArray(v) ? v : [v]).filter(isItin)
+    publishedCache = list.map((x) => ({
+      ...x,
+      days: x.days
+        .filter((d) => d && typeof d.day === 'number' && Array.isArray(d.items))
+        .map((d) => ({ day: d.day, items: d.items.filter((i) => i && typeof i.time === 'string' && typeof i.title === 'string').sort((a, b) => a.time.localeCompare(b.time)) }))
+        .sort((a, b) => a.day - b.day),
+    }))
+  } catch {
+    publishedCache = []
+  }
+  return publishedCache
+}
+
+function subscribePublished(l: () => void) {
+  // Another tab (the partner console) may publish while this page is open.
+  const onStorage = (e: StorageEvent) => { if (e.key === PUBLISHED_KEY || e.key === null) l() }
+  window.addEventListener('storage', onStorage)
+  return () => window.removeEventListener('storage', onStorage)
+}
+
+const slugOf = (s: string) => s.toLowerCase().replace(/[^a-z]/g, '')
+
+/** The venue's latest published itinerary for this ’cation (by slug or name), if any. */
+export function useVenueItinerary(slug: string, name: string): VenueItinerary | null {
+  const list = useSyncExternalStore(subscribePublished, publishedSnapshot, () => publishedCache)
+  const keys = [slugOf(slug), slugOf(name)]
+  const hits = list.filter((x) => keys.includes(slugOf(x.cation)) && x.days.length > 0)
+  return hits.sort((a, b) => b.at.localeCompare(a.at))[0] ?? null
+}
+
 // ─── Circle reports (W6) ──────────────────────────────────────────────────
 // A member's report about someone in their circle, read by the coach console
 // as a moderation item. Shared contract: localStorage 'joyos:circle:reports',
@@ -307,5 +386,4 @@ export function withdrawCircleReport(id: string) {
   writeReports(readReports().filter((r) => r.id !== id))
 }
 
-export const holderName = `${MEMBER.firstName} ${MEMBER.lastName}`
 export const passCode = (prefix: string, city: string) => `${prefix}-${city.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase()}-${MEMBER.id.slice(-4)}`

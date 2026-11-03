@@ -97,9 +97,9 @@ export const XTRA = {
     hi: 'आपका दोबारा माप दिन 76 को खुलता है। न्योता एक शांत सूचना की तरह आता है, कभी उलटी गिनती की तरह नहीं।',
   },
   rmSpecimenClock: {
-    en: 'Specimen: Arjun is on Day {d}. Opening the invite moves this one flow to Day 76 ({date}); everything else stays on Day {d}.',
-    ta: 'மாதிரி: அர்ஜுன் நாள் {d} இல் இருக்கிறார். அழைப்பைத் திறந்தால் இந்த ஒரு செயல்முறை மட்டும் நாள் 76 ({date}) க்குச் செல்லும்; மற்றவை எல்லாம் நாள் {d} இலேயே இருக்கும்.',
-    hi: 'नमूना: अर्जुन दिन {d} पर हैं। न्योता खोलने से सिर्फ़ यह एक प्रक्रिया दिन 76 ({date}) पर जाती है; बाक़ी सब दिन {d} पर ही रहता है।',
+    en: 'Specimen: {name} is on Day {d}. Opening the invite moves this one flow to Day 76 ({date}); everything else stays on Day {d}.',
+    ta: 'மாதிரி: {name} நாள் {d} இல் இருக்கிறார். அழைப்பைத் திறந்தால் இந்த ஒரு செயல்முறை மட்டும் நாள் 76 ({date}) க்குச் செல்லும்; மற்றவை எல்லாம் நாள் {d} இலேயே இருக்கும்.',
+    hi: 'नमूना: {name} दिन {d} पर हैं। न्योता खोलने से सिर्फ़ यह एक प्रक्रिया दिन 76 ({date}) पर जाती है; बाक़ी सब दिन {d} पर ही रहता है।',
   },
   rmOpenInvite: { en: 'Open the Day-76 invite', ta: 'நாள்-76 அழைப்பைத் திறக்கவும்', hi: 'दिन-76 का न्योता खोलें' },
   rmInviteEyebrow: { en: 'Day 76 · your re-measure invite · {date}', ta: 'நாள் 76 · உங்கள் மறு அளவீட்டு அழைப்பு · {date}', hi: 'दिन 76 · आपके दोबारा माप का न्योता · {date}' },
@@ -310,6 +310,133 @@ export const XTRA = {
   ltSend: { en: 'Send to the Letter desk', ta: 'கடித மேசைக்கு அனுப்பவும்', hi: 'पत्र डेस्क को भेजें' },
   ltSent: { en: 'Sent {date}. Specimen: kept in this browser only.', ta: '{date} அன்று அனுப்பப்பட்டது. மாதிரி: இந்த உலாவியில் மட்டுமே வைக்கப்பட்டுள்ளது.', hi: '{date} को भेजा गया। नमूना: सिर्फ़ इसी ब्राउज़र में रखा गया।' },
   ltYours: { en: 'Your replies to this issue', ta: 'இந்த இதழுக்கான உங்கள் பதில்கள்', hi: 'इस अंक पर आपके जवाब' },
+
+  // ─── Not yet measured: a term skipped for now (Take the Index) ───────────
+  skSkip: { en: 'Skip {term} for now', ta: '{term} அம்சத்தை இப்போதைக்குத் தவிர்க்கவும்', hi: '{term} को अभी के लिए छोड़ें' },
+  skSkipNote: {
+    en: 'A skipped term shows as not yet measured. Nothing is guessed, and your Index waits until every term is measured.',
+    ta: 'தவிர்த்த அம்சம் “இன்னும் அளவிடப்படவில்லை” எனக் காட்டப்படும். எதுவும் ஊகிக்கப்படாது; எல்லா அம்சங்களும் அளவிடப்படும் வரை உங்கள் குறியீடு காத்திருக்கும்.',
+    hi: 'छोड़ा गया पहलू “अभी मापा नहीं गया” दिखता है। कुछ भी अनुमान से नहीं भरा जाता, और हर पहलू मापे जाने तक आपका इंडेक्स रुका रहता है।',
+  },
+  skSkipped: { en: 'Skipped for now · not yet measured', ta: 'இப்போதைக்குத் தவிர்க்கப்பட்டது · இன்னும் அளவிடப்படவில்லை', hi: 'अभी के लिए छोड़ा · अभी मापा नहीं गया' },
+  skAnswer: { en: 'Answer these', ta: 'இவற்றுக்குப் பதில் சொல்லவும்', hi: 'इनके जवाब दें' },
+  skAnswerAria: { en: 'Answer the {term} items', ta: '{term} கேள்விகளுக்குப் பதில் சொல்லவும்', hi: '{term} के सवालों के जवाब दें' },
+  skReviewNote: {
+    en: '{terms}: skipped for now. It will show as not yet measured, and the Index is withheld until it is measured.',
+    ta: '{terms}: இப்போதைக்குத் தவிர்க்கப்பட்டது. அது “இன்னும் அளவிடப்படவில்லை” எனக் காட்டப்படும்; அது அளவிடப்படும் வரை குறியீடு நிறுத்திவைக்கப்படும்.',
+    hi: '{terms}: अभी के लिए छोड़ा गया। यह “अभी मापा नहीं गया” दिखेगा, और इसके मापे जाने तक इंडेक्स रोका रहेगा।',
+  },
+  skJoin: { en: ', ', ta: ', ', hi: ', ' },
+  skNoIndex: { en: 'No Index yet', ta: 'இன்னும் குறியீடு இல்லை', hi: 'अभी कोई इंडेक्स नहीं' },
+  skStage3: { en: 'Index withheld: {terms} not yet measured', ta: 'குறியீடு நிறுத்திவைப்பு: {terms} இன்னும் அளவிடப்படவில்லை', hi: 'इंडेक्स रोका गया: {terms} अभी मापा नहीं गया' },
+  skScoringLine: {
+    en: '{terms} not yet measured, so the Index is withheld until it is. Nothing is guessed.',
+    ta: '{terms} இன்னும் அளவிடப்படவில்லை; அது அளவிடப்படும் வரை குறியீடு நிறுத்திவைக்கப்படும். எதுவும் ஊகிக்கப்படாது.',
+    hi: '{terms} अभी मापा नहीं गया, इसलिए उसके मापे जाने तक इंडेक्स रोका गया है। कुछ भी अनुमान से नहीं भरा जाता।',
+  },
+  skMeasureNow: { en: 'Measure {term} now', ta: '{term} அம்சத்தை இப்போது அளவிடவும்', hi: '{term} अभी मापें' },
+  amNotAnswered: { en: 'not answered', ta: 'பதில் இல்லை', hi: 'जवाब नहीं दिया' },
+  amLater: { en: 'Answered later: the term was skipped at the sitting.', ta: 'பின்னர் பதிலளிக்கப்பட்டது: அமர்வின்போது இந்த அம்சம் தவிர்க்கப்பட்டது.', hi: 'बाद में जवाब दिया: बैठक में यह पहलू छोड़ा गया था।' },
+  amHeld: {
+    en: 'Nothing was added. What you wrote sounds heavy, so support is open now. You can come back to the correction any time.',
+    ta: 'எதுவும் சேர்க்கப்படவில்லை. நீங்கள் எழுதியது கனமாகத் தெரிகிறது; எனவே உதவி இப்போது திறந்துள்ளது. எப்போது வேண்டுமானாலும் திருத்தத்துக்குத் திரும்பலாம்.',
+    hi: 'कुछ नहीं जोड़ा गया। आपने जो लिखा वह भारी लगता है, इसलिए मदद अभी खुली है। सुधार पर आप कभी भी लौट सकते हैं।',
+  },
+  amTalkNow: { en: 'Talk to someone now', ta: 'இப்போதே ஒருவரிடம் பேசுங்கள்', hi: 'अभी किसी से बात करें' },
+  tmEyebrow: { en: 'Measure {term} · your sitting of {date}', ta: '{term} அளவீடு · {date} அன்றைய உங்கள் அமர்வு', hi: '{term} मापें · {date} की आपकी बैठक' },
+  tmTitle: { en: 'Answer the items you *skipped*.', ta: 'நீங்கள் *தவிர்த்த* கேள்விகளுக்குப் பதில் சொல்லுங்கள்.', hi: 'जो सवाल आपने *छोड़े* थे, उनके जवाब दें।' },
+  tmBody: {
+    en: 'Your other answers stay as they were scored. These are added to the record as answered later, and your Index is scored again.',
+    ta: 'உங்கள் மற்ற பதில்கள் மதிப்பிட்டபடியே இருக்கும். இவை “பின்னர் பதிலளித்தவை” எனப் பதிவில் சேர்க்கப்படும்; உங்கள் குறியீடு மீண்டும் மதிப்பிடப்படும்.',
+    hi: 'आपके बाक़ी जवाब वैसे ही रहते हैं जैसे स्कोर हुए थे। ये रिकॉर्ड में “बाद में दिए गए” जवाबों के रूप में जुड़ते हैं, और आपका इंडेक्स दोबारा स्कोर होता है।',
+  },
+  tmBegin: { en: 'Begin', ta: 'தொடங்கவும்', hi: 'शुरू करें' },
+  tmReviewTitle: { en: 'Ready to add to your *result*.', ta: 'உங்கள் *முடிவில்* சேர்க்கத் தயார்.', hi: 'आपके *परिणाम* में जोड़ने को तैयार।' },
+  tmCount: { en: '{a} of {n} answered', ta: '{n} இல் {a} பதில்கள்', hi: '{n} में से {a} जवाब' },
+  tmAdd: { en: 'Add to my result', ta: 'என் முடிவில் சேர்க்கவும்', hi: 'मेरे परिणाम में जोड़ें' },
+  tmNone: {
+    en: 'There is nothing to measure here: this term is already measured, or there is no sitting to add it to.',
+    ta: 'இங்கே அளவிட எதுவும் இல்லை: இந்த அம்சம் ஏற்கனவே அளவிடப்பட்டுவிட்டது, அல்லது இதைச் சேர்க்க அமர்வு எதுவும் இல்லை.',
+    hi: 'यहाँ मापने को कुछ नहीं है: यह पहलू पहले से मापा जा चुका है, या इसे जोड़ने के लिए कोई बैठक नहीं है।',
+  },
+  tmBack: { en: 'Back to My Index', ta: 'என் குறியீட்டுக்குத் திரும்பவும்', hi: 'मेरे इंडेक्स पर वापस' },
+  nyBanner: {
+    en: '{terms} not yet measured. The Index is withheld until every term is measured.',
+    ta: '{terms} இன்னும் அளவிடப்படவில்லை. எல்லா அம்சங்களும் அளவிடப்படும் வரை குறியீடு நிறுத்திவைக்கப்படும்.',
+    hi: '{terms} अभी मापा नहीं गया। हर पहलू मापे जाने तक इंडेक्स रोका रहता है।',
+  },
+  nyToday: { en: 'Your sitting of {date}: {terms} not yet measured.', ta: '{date} அன்றைய உங்கள் அமர்வு: {terms} இன்னும் அளவிடப்படவில்லை.', hi: '{date} की आपकी बैठक: {terms} अभी मापा नहीं गया।' },
+  nyTodayLink: { en: 'Open My Index', ta: 'என் குறியீட்டைத் திறக்கவும்', hi: 'मेरा इंडेक्स खोलें' },
+
+  // ─── Under 18: never scored (Today) ──────────────────────────────────────
+  mnTitle: { en: 'Not scored while you are under 18.', ta: '18 வயதுக்குக் கீழ் இருக்கும் வரை மதிப்பெண் இல்லை.', hi: '18 साल से कम उम्र तक कोई स्कोर नहीं।' },
+  mnBody: {
+    en: 'Nothing here is turned into a number. Your Spaces, the Ledger and the Practice stay open, and today’s action is chosen from them.',
+    ta: 'இங்கே எதுவும் எண்ணாக மாற்றப்படுவதில்லை. உங்கள் இடங்கள், லெட்ஜர், பயிற்சி ஆகியவை திறந்தே இருக்கும்; இன்றைய செயல் அவற்றிலிருந்தே தேர்ந்தெடுக்கப்படுகிறது.',
+    hi: 'यहाँ कुछ भी संख्या में नहीं बदला जाता। आपके स्पेस, लेजर और अभ्यास खुले रहते हैं, और आज का काम उन्हीं से चुना जाता है।',
+  },
+  mnLink: { en: 'What opens at 18', ta: '18 வயதில் என்ன திறக்கும்', hi: '18 पर क्या खुलता है' },
+  mnStep1: { en: 'Chosen from your Spaces and your Ledger, never from a score.', ta: 'உங்கள் இடங்கள், லெட்ஜரிலிருந்து தேர்ந்தெடுக்கப்பட்டது; ஒருபோதும் மதிப்பெண்ணிலிருந்து அல்ல.', hi: 'आपके स्पेस और लेजर से चुना गया, कभी किसी स्कोर से नहीं।' },
+  mnSpeak: { en: 'Not scored while you are under 18.', ta: '18 வயதுக்குக் கீழ் இருக்கும் வரை மதிப்பெண் இல்லை.', hi: '18 साल से कम उम्र तक कोई स्कोर नहीं।' },
+
+  // ─── The coach's override of today's action ──────────────────────────────
+  coChose: { en: 'Chosen by your coach', ta: 'உங்கள் பயிற்சியாளர் தேர்ந்தெடுத்தது', hi: 'आपके कोच ने चुना' },
+  coChoseBy: { en: 'Chosen by your coach, {who}, on {date}.', ta: 'உங்கள் பயிற்சியாளர் {who} {date} அன்று தேர்ந்தெடுத்தது.', hi: 'आपके कोच {who} ने {date} को चुना।' },
+  coWhy: { en: 'Why: {reason}', ta: 'காரணம்: {reason}', hi: 'वजह: {reason}' },
+  coNote: {
+    en: 'Your coach changed today’s action from inside the same evidence library. The engine’s choice returns when the coach hands it back.',
+    ta: 'உங்கள் பயிற்சியாளர் அதே சான்று நூலகத்திலிருந்து இன்றைய செயலை மாற்றினார். பயிற்சியாளர் திருப்பித் தரும்போது இயந்திரத்தின் தேர்வு மீண்டும் வரும்.',
+    hi: 'आपके कोच ने उसी साक्ष्य लाइब्रेरी के भीतर से आज का काम बदला। कोच के लौटाने पर इंजन की पसंद वापस आ जाती है।',
+  },
+
+  // ─── Day 90: corrections after a Clinical-grade submission ───────────────
+  d9Correct: { en: 'Correct an answer', ta: 'ஒரு பதிலைத் திருத்தவும்', hi: 'एक जवाब सुधारें' },
+  d9CorrectSigned: {
+    en: 'This card is signed. A correction is added to the record, the signature is withdrawn, and {who} signs the corrected card again.',
+    ta: 'இந்த அட்டை கையொப்பமிடப்பட்டது. திருத்தம் பதிவில் சேர்க்கப்படும், கையொப்பம் திரும்பப் பெறப்படும், திருத்திய அட்டையில் {who} மீண்டும் கையொப்பமிடுவார்.',
+    hi: 'इस कार्ड पर हस्ताक्षर हो चुके हैं। सुधार रिकॉर्ड में जुड़ता है, हस्ताक्षर वापस ले लिए जाते हैं, और {who} सुधरे कार्ड पर दोबारा हस्ताक्षर करते हैं।',
+  },
+  d9Resign: {
+    en: 'Corrected after sign-off. The earlier signature by {who} on {date} is kept in the history; the corrected card awaits a new signature.',
+    ta: 'கையொப்பத்துக்குப் பிறகு திருத்தப்பட்டது. {date} அன்று {who} இட்ட முந்தைய கையொப்பம் வரலாற்றில் இருக்கும்; திருத்திய அட்டை புதிய கையொப்பத்துக்குக் காத்திருக்கிறது.',
+    hi: 'हस्ताक्षर के बाद सुधारा गया। {date} को {who} के पहले के हस्ताक्षर इतिहास में रहते हैं; सुधरा कार्ड नए हस्ताक्षर की प्रतीक्षा में है।',
+  },
+  d9Withheld: {
+    en: 'Your Clinical-grade sitting left {terms} not yet measured, so the Index is withheld until it is. Nothing is guessed.',
+    ta: 'உங்கள் மருத்துவ நிலை அமர்வில் {terms} இன்னும் அளவிடப்படவில்லை; அது அளவிடப்படும் வரை குறியீடு நிறுத்திவைக்கப்படும். எதுவும் ஊகிக்கப்படாது.',
+    hi: 'आपकी क्लिनिकल ग्रेड बैठक में {terms} अभी मापा नहीं गया, इसलिए उसके मापे जाने तक इंडेक्स रोका गया है। कुछ भी अनुमान से नहीं भरा जाता।',
+  },
+
+  // ─── Joy Ledger: the evening follow-up for a pleasure ────────────────────
+  fuEyebrow: { en: 'This evening · {term}', ta: 'இன்று மாலை · {term}', hi: 'आज शाम · {term}' },
+  fuTitle: { en: 'How was it?', ta: 'அது எப்படி இருந்தது?', hi: 'कैसा रहा?' },
+  fuKept: { en: 'The savouring prompt you kept today', ta: 'இன்று நீங்கள் வைத்துக்கொண்ட ரசிக்கும் தூண்டல்', hi: 'आज आपने जो रस लेने का संकेत रखा' },
+  fuPlanned: { en: 'Your planned pleasure, {time}', ta: 'நீங்கள் திட்டமிட்ட மகிழ்ச்சி, {time}', hi: 'आपका तय किया आनंद, {time}' },
+  fuGood: { en: 'It was good', ta: 'நன்றாக இருந்தது', hi: 'अच्छा रहा' },
+  fuFine: { en: 'It was fine', ta: 'பரவாயில்லை', hi: 'ठीक रहा' },
+  fuMissed: { en: 'It didn’t happen', ta: 'நடக்கவில்லை', hi: 'नहीं हो पाया' },
+  fuWord: { en: 'A word about it (optional)', ta: 'அதைப் பற்றி ஒரு சொல் (விருப்பத்தேர்வு)', hi: 'इसके बारे में एक शब्द (वैकल्पिक)' },
+  fuSave: { en: 'Keep it in the Ledger', ta: 'லெட்ஜரில் சேமிக்கவும்', hi: 'लेजर में सहेजें' },
+  fuSaved: { en: 'Kept in the Ledger.', ta: 'லெட்ஜரில் சேமிக்கப்பட்டது.', hi: 'लेजर में सहेजा गया।' },
+  fuMissedSaved: { en: 'Noted. Nothing is added to the Ledger, and that is fine.', ta: 'குறித்துக்கொண்டோம். லெட்ஜரில் எதுவும் சேர்க்கப்படவில்லை; அதுவும் சரிதான்.', hi: 'नोट कर लिया। लेजर में कुछ नहीं जोड़ा गया, और यह ठीक है।' },
+  fuAsks: { en: 'Asks at {t}', ta: '{t} மணிக்குக் கேட்கும்', hi: '{t} बजे पूछेगा' },
+  fuNow: { en: 'Answer now', ta: 'இப்போதே பதில் சொல்லவும்', hi: 'अभी जवाब दें' },
+  fuNoteIt: { en: 'Note it', ta: 'குறித்துக்கொள்ளவும்', hi: 'नोट करें' },
+  fuChoose: { en: 'Choose one', ta: 'ஒன்றைத் தேர்ந்தெடுக்கவும்', hi: 'एक चुनें' },
+  fuAria: { en: 'How was it: {what}', ta: 'அது எப்படி இருந்தது: {what}', hi: 'कैसा रहा: {what}' },
+
+  // ─── The equation and its credit (Playbook p44, p47; Memorandum) ─────────
+  eqTitle: { en: 'The equation', ta: 'சமன்பாடு', hi: 'समीकरण' },
+  eqCredit: {
+    en: 'The word Joyspan is credited to Dr Kerry Burnight.',
+    ta: 'ஜாய்ஸ்பான் என்ற சொல்லின் பெருமை Dr Kerry Burnight அவர்களைச் சேரும்.',
+    hi: 'जॉयस्पैन शब्द का श्रेय Dr Kerry Burnight को जाता है।',
+  },
+  eqOwns: {
+    en: 'AIWO owns the equation, the Index and the programmes.',
+    ta: 'சமன்பாடு, குறியீடு, திட்டங்கள் ஆகியவை AIWO-வுக்குச் சொந்தமானவை.',
+    hi: 'समीकरण, इंडेक्स और कार्यक्रम AIWO के हैं।',
+  },
 } satisfies Dict
 
 /** The second core dictionary's translator. */

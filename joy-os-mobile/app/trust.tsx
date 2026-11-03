@@ -28,9 +28,9 @@ import { ACCESS_LOG, CONSENTS, INDEX_HISTORY, MEMBER } from '@/shared/member'
 import { TENANT } from '@/shared/platform'
 import type { AccessEvent, Consent } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
-import { CLAIMS_LOG, EXPORTS_PAST, EXTRA_ACCESS } from '@/screens/b/accountData'
-import { ARTEFACT_VERSION, consentHistoryStore, recordConsent, trustStore, useStore, type ConsentAction, type ConsentEvent, type InsurerDecision } from '@/screens/b/bStore'
-import { ChoiceCard, Done, Field, FilterChips, KeyValue, TimelineStep, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
+import { CLAIMS_LOG, EXPORTS_PAST, EXTRA_ACCESS, SPECIMEN_NOW } from '@/screens/b/accountData'
+import { ARTEFACT_VERSION, EXPORT_STAGE_MS, consentHistoryStore, exportStage, recordConsent, trustStore, useStore, type ConsentAction, type ConsentEvent, type ExportDone, type ExportFormat, type InsurerDecision } from '@/screens/b/bStore'
+import { ChoiceCard, Done, Field, FilterChips, KeyValue, TimelineStep, useAccount, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
 import { StepUp } from '@/screens/b/stepUp'
 import { AbhaCard, MethodCard, NomineeCard } from '@/screens/b/trustCards'
 import { useDict } from '@/lib/i18n'
@@ -78,6 +78,7 @@ function Trust() {
   // Consents
   // Consents, research use and a scheduled erasure are kept on the phone (they hold on return).
   const [trust, setTrust] = useStore(trustStore)
+  const account = useAccount()
   // The insurer consent (c_star) is answered on its own card: granted, declined or undecided.
   const insurer: InsurerDecision = trust.insurer ?? 'not-granted'
   const consent: Record<string, { on: boolean; changed?: boolean }> = Object.fromEntries(
@@ -134,8 +135,13 @@ function Trust() {
   const insState = insurer === 'granted' ? t('grantedAgg') : insurer === 'declined' ? t('declined') : t('notGranted')
 
   // Export
-  const [format, setFormat] = useState<'fhir' | 'json'>('fhir')
-  const [exp, setExp] = useState<ExportStatus>('idle')
+  // The request is kept on the phone (trust.exportJob): leaving the Trust centre and coming back
+  // finds it where the clock has taken it. A finished export joins Earlier when it is done.
+  const job = trust.exportJob ?? null
+  const [formatPick, setFormat] = useState<ExportFormat>('fhir')
+  const format: ExportFormat = job?.format ?? formatPick
+  const [now, setNow] = useState(() => Date.now())
+  const exp: ExportStatus = job ? exportStage(job, now) : 'idle'
   const [expAuth, setExpAuth] = useState(false)
   const steps: { key: ExportStatus; label: string }[] = [
     { key: 'requested', label: t('requested') },
@@ -143,19 +149,37 @@ function Trust() {
     { key: 'ready', label: t('readyDl') },
   ]
   const expIdx = steps.findIndex((s) => s.key === exp)
-  const [shared, setShared] = useState(false)
+  const shared = !!job?.handed
+  const setShared = (v: boolean) => setTrust((st) => (st.exportJob ? { ...st, exportJob: { ...st.exportJob, handed: v } } : st))
   const [shareFailed, setShareFailed] = useState(false)
-  // The copy is prepared in stages; each advances on its own (specimen timing).
+  // The copy is prepared in stages; each advances on its own (specimen timing), on screen or not.
   useEffect(() => {
     if (exp !== 'requested' && exp !== 'preparing') return
-    const t = setTimeout(() => setExp(exp === 'requested' ? 'preparing' : 'ready'), 1200)
+    const t = setTimeout(() => setNow(Date.now()), EXPORT_STAGE_MS / 4)
     return () => clearTimeout(t)
-  }, [exp])
+  }, [exp, now])
+  const startExport = () => {
+    setShareFailed(false)
+    setNow(Date.now())
+    setTrust((st) => ({ ...st, exportJob: { ref: `EXP-${Date.now().toString(36).toUpperCase().slice(-6)}`, format: formatPick, at: new Date().toISOString() } }))
+  }
+  /** Done: a ready export joins Earlier (downloaded, shared, or ready and not yet taken). Cancel just clears it. */
+  const closeExport = () => {
+    setShareFailed(false)
+    setTrust((st) => {
+      const j = st.exportJob
+      if (!j) return st
+      const finished = exportStage(j) === 'ready'
+      const done: ExportDone = { id: j.ref, requested: SPECIMEN_NOW, format: j.format, size: '2.6 MB', status: j.handed ? (Platform.OS === 'web' ? 'downloaded' : 'shared') : 'ready' }
+      return { ...st, exportJob: null, exportsDone: finished ? [done, ...(st.exportsDone ?? [])] : st.exportsDone }
+    })
+  }
+  const doneStatus: Record<ExportDone['status'], 'exDownloaded' | 'exShared' | 'exReady'> = { downloaded: 'exDownloaded', shared: 'exShared', ready: 'exReady' }
   const shareCopy = () => {
     const bundle = {
       specimen: true,
       format: format === 'fhir' ? 'FHIR R4 bundle (specimen excerpt)' : 'JSON',
-      member: { aiwoId: MEMBER.aiwoId, name: `${MEMBER.firstName} ${MEMBER.lastName}`, city: MEMBER.city, plan: MEMBER.plan },
+      member: { aiwoId: account.aiwoId, name: account.name, city: MEMBER.city, plan: MEMBER.plan },
       index: INDEX_HISTORY.map((x) => ({ takenOn: x.takenOn, value: x.value, grade: x.grade, method: x.method, terms: x.terms.map((t) => ({ key: t.key, value: t.value })) })),
       consents: Object.entries(consent).map(([id, v]) => ({ id, granted: v.on })),
       exportedAt: new Date().toISOString(),
@@ -389,7 +413,7 @@ function Trust() {
         <Body tone="ink2">{t('exportBody')}</Body>
         <Segmented
           value={format}
-          onChange={setFormat}
+          onChange={(v) => (job ? undefined : setFormat(v))}
           items={[
             { value: 'fhir', label: 'FHIR R4 bundle' },
             { value: 'json', label: 'JSON' },
@@ -427,7 +451,7 @@ function Trust() {
                   {Platform.OS === 'web' ? t('dlCopy') : t('shareCopy')}
                 </Button>
               ) : null}
-              <Button variant="ghost" size="sm" onPress={() => { setExp('idle'); setShared(false); setShareFailed(false) }}>
+              <Button variant="ghost" size="sm" onPress={closeExport}>
                 {exp === 'ready' ? tc('done') : t('cancelReq')}
               </Button>
             </View>
@@ -435,6 +459,11 @@ function Trust() {
         )}
         <Divider />
         <Eyebrow>{t('earlier')}</Eyebrow>
+        {(trust.exportsDone ?? []).map((x) => (
+          <Meta key={x.id} size={14}>
+            <Mono size={14} tone="ink2">{fmtDate(x.requested)}</Mono> · {x.format === 'fhir' ? 'FHIR R4 bundle' : t('jsonFile')} · <Mono size={14} tone="ink2">{x.size}</Mono> · {t(doneStatus[x.status])}
+          </Meta>
+        ))}
         {EXPORTS_PAST.map((x) => (
           <Meta key={x.id} size={14}>
             <Mono size={14} tone="ink2">{fmtDate(x.requested)}</Mono> · {tx(EXPORT_T[x.id]?.format, x.format)} · <Mono size={14} tone="ink2">{x.size}</Mono> · {tx(EXPORT_T[x.id]?.status, x.status)}
@@ -656,9 +685,7 @@ function Trust() {
             onCancel={() => setExpAuth(false)}
             onVerified={() => {
               setExpAuth(false)
-              setShared(false)
-              setShareFailed(false)
-              setExp('requested')
+              startExport()
             }}
           />
         ) : null}

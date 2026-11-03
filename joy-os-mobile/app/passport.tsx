@@ -6,7 +6,7 @@ import { INDEX_HISTORY, MEMBER } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
 import { PASSPORT, SESSIONS_OPEN } from '@/screens/b/journeyData'
 import { accountStore, useStore } from '@/screens/b/bStore'
-import { KeyValue, PrimaryChip, SpecimenQR, fmtWhen, memberOnly } from '@/screens/b/parts'
+import { KeyValue, PrimaryChip, SpecimenQR, fmtWhen, memberOnly, useAccount } from '@/screens/b/parts'
 import { useDict, useT } from '@/lib/i18n'
 import { PASSPORT_T, STAMP_KIND, ENTITLEMENT_TEXT } from '@/screens/b/i18n/journey'
 import { useCommon, useTx } from '@/screens/b/i18n/common'
@@ -26,6 +26,8 @@ function Passport() {
   const [stamp, setStamp] = useState<Stamp | null>(null)
   const latest = INDEX_HISTORY[0]
   const t = useDict(PASSPORT_T)
+  // The holder is the account signed in (M1).
+  const account = useAccount()
   const tc = useCommon()
   const tx = useTx()
   const tg = useT()
@@ -48,8 +50,8 @@ function Passport() {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: space.s1 }}>
           <View style={{ gap: 4, flex: 1 }}>
             <Eyebrow>{t('cardEyebrow')}</Eyebrow>
-            <Title size={26}>{`${MEMBER.firstName} ${MEMBER.lastName}`}</Title>
-            <Mono tone="ink">{MEMBER.aiwoId}</Mono>
+            <Title size={26}>{account.name}</Title>
+            <Mono tone="ink">{account.aiwoId}</Mono>
           </View>
           <SpecimenQR seed={PASSPORT.number} size={88} label={t('qrA11y', { n: PASSPORT.number })} />
         </View>
@@ -147,8 +149,8 @@ function Passport() {
 
       <Sheet open={qrOpen} onClose={() => setQrOpen(false)} title={t('checkin')} footer={<Button variant="secondary" block onPress={() => setQrOpen(false)}>{tc('done')}</Button>}>
         <View style={{ alignItems: 'center', gap: space.s2, paddingVertical: space.s1 }}>
-          <SpecimenQR seed={PASSPORT.number} size={260} label={t('checkinA11y', { name: `${MEMBER.firstName} ${MEMBER.lastName}`, n: PASSPORT.number })} />
-          <Title size={24} align="center">{`${MEMBER.firstName} ${MEMBER.lastName}`}</Title>
+          <SpecimenQR seed={PASSPORT.number} size={260} label={t('checkinA11y', { name: account.name, n: PASSPORT.number })} />
+          <Title size={24} align="center">{account.name}</Title>
           <Mono tone="ink">{PASSPORT.number}</Mono>
           <Meta align="center">{t('brightness')}</Meta>
         </View>

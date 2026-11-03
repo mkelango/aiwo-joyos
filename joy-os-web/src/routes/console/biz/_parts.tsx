@@ -1,10 +1,32 @@
 import clsx from 'clsx'
 import { Lock, ShieldCheck } from 'lucide-react'
-import { useCallback, useId, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useId, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 // Shared parts for the platform consoles (Tenant, Science, Control plane, Leadership).
 // Local to this lane by design; built on the shared kit's tokens only.
+
+/**
+ * Whether the signed-in console role may act on this console (the care gate, care/_gate.tsx).
+ * Each platform console provides it from useConsoleAccess; every write control reads it, so a
+ * role that cannot act sees the same screen as a read-only preview. Outside a provider: true.
+ */
+const CanActContext = createContext(true)
+export const CanActProvider = CanActContext.Provider
+export const useCanAct = () => useContext(CanActContext)
+
+/**
+ * A block of write controls: switched off together when the role cannot act. Never wrap a
+ * Sheet in it unless the only way to open that Sheet is a control inside the same block.
+ */
+export function Writes({ children, className }: { children: ReactNode; className?: string }) {
+  const canAct = useCanAct()
+  return (
+    <fieldset disabled={!canAct} className={clsx('m-0 min-w-0 border-0 p-0', !canAct && '[&_[role=switch]]:opacity-50 [&_[type=checkbox]]:opacity-60 [&_[type=range]]:opacity-60', className)}>
+      {children}
+    </fieldset>
+  )
+}
 
 /** Read a JSON value from localStorage; any failure (private window, blocked storage, bad JSON) gives the fallback. */
 export function readStored<T>(key: string, fallback: T): T {
@@ -195,8 +217,8 @@ export function Field({ label, htmlFor, hint, error, children, className }: { la
   )
 }
 
-export const fieldCls = 'h-11 w-full rounded-lg border border-line-strong bg-paper-raised px-3 text-[15px] text-ink placeholder:text-ink-3 focus-ring'
-export const areaCls = 'w-full rounded-lg border border-line-strong bg-paper-raised px-3 py-2.5 text-[15px] text-ink placeholder:text-ink-3 focus-ring'
+export const fieldCls = 'h-11 w-full rounded-lg border border-line-strong bg-paper-raised px-3 text-[15px] text-ink placeholder:text-ink-3 focus-ring disabled:cursor-not-allowed disabled:opacity-60'
+export const areaCls = 'w-full rounded-lg border border-line-strong bg-paper-raised px-3 py-2.5 text-[15px] text-ink placeholder:text-ink-3 focus-ring disabled:cursor-not-allowed disabled:opacity-60'
 export const labelCls = 'eyebrow mb-1.5 block text-ink-3'
 
 // Chart styling: mono ticks, no gridline clutter, token colours only.

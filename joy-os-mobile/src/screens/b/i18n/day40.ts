@@ -29,6 +29,10 @@ export const DAY40 = {
   print: { en: 'Print the page', ta: 'பக்கத்தை அச்சிடு', hi: 'पन्ना प्रिंट करें' },
   saved: { en: 'Saved to Photos (specimen: nothing left the phone).', ta: 'Photos-இல் சேமிக்கப்பட்டது (மாதிரி: எதுவும் தொலைபேசியை விட்டு வெளியேறவில்லை).', hi: 'Photos में सहेजा गया (नमूना: कुछ भी फ़ोन से बाहर नहीं गया)।' },
   printed: { en: 'The print dialog is open.', ta: 'அச்சு உரையாடல் திறந்துள்ளது.', hi: 'प्रिंट डायलॉग खुला है।' },
+  // Under 18 (minors gate): no Wheel, no lowest term, no measure.
+  minorNote: { en: 'Not scored while under 18. Your ninety days run without a number: the Ledger, the practice and your people are all here.', ta: '18 வயதுக்குக் கீழ் இருக்கும்வரை மதிப்பெண் இல்லை. உங்கள் தொண்ணூறு நாட்கள் எண் இல்லாமல் நடக்கின்றன: லெட்ஜர், பயிற்சி, உங்கள் மனிதர்கள் எல்லாம் இங்கே இருக்கின்றன.', hi: '18 से कम उम्र तक कोई स्कोर नहीं। आपके नब्बे दिन बिना नंबर के चलते हैं: लेजर, अभ्यास और आपके लोग, सब यहीं हैं।' },
+  minorFocus: { en: 'Keep the one practice you chose. It is the thing that carries the next fifty days.', ta: 'நீங்கள் தேர்ந்தெடுத்த ஒரு பயிற்சியைத் தொடருங்கள். அடுத்த ஐம்பது நாட்களை அதுதான் எடுத்துச் செல்லும்.', hi: 'जो एक अभ्यास आपने चुना, उसे जारी रखें। अगले पचास दिन वही आगे ले जाएगा।' },
+  minorNext90: { en: 'Your ninety days close, with your coach', ta: 'உங்கள் தொண்ணூறு நாட்கள் உங்கள் பயிற்சியாளருடன் நிறைவடைகின்றன', hi: 'आपके नब्बे दिन आपके कोच के साथ पूरे होते हैं' },
   seeIndex: { en: 'Your Index, explained', ta: 'உங்கள் குறியீடு, விளக்கமாக', hi: 'आपका इंडेक्स, समझाया हुआ' },
 } satisfies Dict
 

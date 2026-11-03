@@ -70,7 +70,10 @@ export function Progress({ value, max = 100, color, label }: { value: number; ma
   )
 }
 
-/** Segmented control (tabs within a screen). */
+/** A label that is only a figure ("0", "2", "06:30", "1.5×"): mono for measure (Playbook p40). */
+const NUMERIC = /^[\d\s.,:+\u2212×%-]+$/
+
+/** Segmented control (tabs within a screen). Number labels are set in Mono. */
 export function Segmented<T extends string>({ value, onChange, items, style }: { value: T; onChange: (v: T) => void; items: { value: T; label: string }[]; style?: StyleProp<ViewStyle> }) {
   const { c, radius, fonts, textScale } = useTheme()
   // Long Tamil or Hindi labels wrap onto a second row; the pill then softens to a card corner.
@@ -92,7 +95,14 @@ export function Segmented<T extends string>({ value, onChange, items, style }: {
             aria-selected={on}
             style={{ minHeight: 40, paddingHorizontal: 16, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: on ? c.paperRaised : undefined }}
           >
-            <Text maxFontSizeMultiplier={1.6} style={{ fontFamily: on ? fonts.sansSemi : fonts.sans, fontSize: 15 * textScale, color: on ? c.ink : c.ink2 }}>
+            <Text
+              maxFontSizeMultiplier={1.6}
+              style={
+                NUMERIC.test(it.label)
+                  ? { fontFamily: on ? fonts.monoMedium : fonts.mono, fontSize: 15 * textScale, color: on ? c.ink : c.ink2, fontVariant: ['tabular-nums'] }
+                  : { fontFamily: on ? fonts.sansSemi : fonts.sans, fontSize: 15 * textScale, color: on ? c.ink : c.ink2 }
+              }
+            >
               {it.label}
             </Text>
           </Pressable>

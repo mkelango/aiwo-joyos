@@ -12,7 +12,7 @@ import type { Band, TermKey, TermScore } from '@/domain/types'
 import { BAND_PETAL, BAND_PETAL_BURDEN, CHECK_STATEMENTS, COUNTRIES, EMAIL_RE, SCALE, SCALE_BURDEN, checkBand, checkStanding, countryName, phoneError, type CountryCode } from './_data'
 import { CK, E } from './_i18n'
 import { CHECK_KEY, CHECK_PROGRESS_KEY, checkAsksPhone, readJSON, removeKey, writeJSON, type CheckProgress, type SavedCheck } from './_store'
-import { FlowTopBar, LMethodLine, LTermChip, rich, useBand, useFmtDate } from './_parts'
+import { FlowTopBar, JoyspanCredit, LMethodLine, LTermChip, rich, useBand, useFmtDate } from './_parts'
 
 // THE JOYSPAN CHECK (Memo p.10, Grade 1): 18 statements, free, five minutes, no login.
 // Bands only (steady · uneven · thin), never a number. The lowest term is named with
@@ -210,6 +210,7 @@ function Intro({ progress, last, asksPhone, onBegin, onResume, onStartOver, onSe
           <p className="mt-5 max-w-xl text-[19px] leading-relaxed text-ink-2">
             {t('introLead')}
           </p>
+          <JoyspanCredit className="mt-3 max-w-xl" />
           <dl className="mt-8 grid max-w-xl grid-cols-3 gap-4 border-y border-line py-5">
             {[
               ['18', t('statStatements')],
@@ -703,6 +704,7 @@ function Result({ answers, savedAt, contact, onRemoveContact, onRestart, onSaved
       <div className="mt-12 flex flex-col gap-4 border-t border-line pt-6 md:flex-row md:items-center md:justify-between">
         <p className="max-w-2xl text-[14px] text-ink-3">
           {t('footer')}
+          <JoyspanCredit className="mt-1" />
         </p>
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" onClick={onRestart}><RotateCcw size={16} aria-hidden /> {t('clearRestart')}</Button>

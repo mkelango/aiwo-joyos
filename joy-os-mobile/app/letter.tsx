@@ -78,7 +78,7 @@ export default function LetterScreen() {
         <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ width: 6, backgroundColor: c.daybreak }} />
         <View style={{ flex: 1, padding: space.s3, gap: space.s2 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <Eyebrow tone="ink2">{`The Joyspan Letter · ${fmtDate(issue.date)}`}</Eyebrow>
+            <Eyebrow tone="ink2">{t('letterOn', { date: fmtDate(issue.date, lang) })}</Eyebrow>
             <Eyebrow>{t('issueNo', { n: issue.n })}</Eyebrow>
           </View>
           <Title size={30} accessibilityRole="header" aria-level={2}>
@@ -109,7 +109,7 @@ export default function LetterScreen() {
           </View>
           <View style={{ gap: 2, paddingTop: space.s1 }}>
             <Body weight="semibold">{LETTER_AUTHOR.name}</Body>
-            <Meta size={14}>{LETTER_AUTHOR.role}</Meta>
+            <Meta size={14}>{t('authorRole')}</Meta>
           </View>
           <SpecimenTag />
         </View>

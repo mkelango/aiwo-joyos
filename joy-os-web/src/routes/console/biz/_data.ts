@@ -202,17 +202,30 @@ export const AI_TOOLS = [
   { key: 'explain_biomarker', what: 'Explains a panel value in plain words; physician signs', owner: 'Body squad · Clinical', term: 'H' as const, on: false, langs: { EN: 0.94, TA: 0.86, HI: 0.88 }, calls: 0, hold: 'Dr Arvind Natesan · Medical Director' },
 ]
 
-export const RELEASE_FLAGS = [
-  { key: 'health_connect_v2', label: 'Health Connect periodic sync v2', scope: 'All · India', state: '100%', on: true },
-  { key: 'healthkit_background', label: 'HealthKit background delivery', scope: 'All · India', state: '100%', on: true },
-  { key: 'oura_via_terra', label: 'Oura via Terra (default device)', scope: 'All · India', state: '100%', on: true },
-  { key: 'couples_check', label: 'Couples Check', scope: 'Lovecation cohorts', state: 'Cohort', on: true },
-  { key: 'ui_tamil_hindi', label: 'Tamil and Hindi interface', scope: 'Beta cohort', state: '5%', on: true },
-  { key: 'nba_bandit', label: 'Guarded next-best-action bandit (Ease excluded)', scope: 'J3', state: 'Off', on: false },
-  { key: 'tenant_star_health', label: 'Star Health tenant routes', scope: 'J3', state: 'Off', on: false },
+/**
+ * Release-flag targeting (Architecture p.29: flags per tenant, region, cohort and release). A flag
+ * reaches members who match all four, then a staged share of them (mobile rollout 5 → 25 → 100%).
+ */
+export type FlagTarget = { tenant: string; region: string; cohort: string; release: string; rollout: number }
+export const FLAG_COHORTS = ['All members', 'Beta cohort', 'Lovecation cohorts', 'Joyspan@Work members', 'Elder mode members', 'Staff dogfood']
+export const FLAG_RELEASES = ['Every release', 'App 2.6 and later', 'J2 · Mar 2027', 'J3 · FY28']
+export const FLAG_ROLLOUTS = [5, 25, 100]
+const EVERYONE: FlagTarget = { tenant: 'all', region: 'India · Mumbai', cohort: 'All members', release: 'Every release', rollout: 100 }
+
+export const RELEASE_FLAGS: { key: string; label: string; on: boolean; target: FlagTarget; fixed?: string }[] = [
+  { key: 'health_connect_v2', label: 'Health Connect periodic sync v2', on: true, target: EVERYONE },
+  { key: 'healthkit_background', label: 'HealthKit background delivery', on: true, target: EVERYONE },
+  { key: 'oura_via_terra', label: 'Oura via Terra (default device)', on: true, target: EVERYONE },
+  { key: 'couples_check', label: 'Couples Check', on: true, target: { ...EVERYONE, cohort: 'Lovecation cohorts' } },
+  { key: 'ui_tamil_hindi', label: 'Tamil and Hindi interface', on: true, target: { ...EVERYONE, cohort: 'Beta cohort', rollout: 5 } },
+  { key: 'nba_bandit', label: 'Guarded next-best-action bandit (Ease excluded)', on: false, target: { ...EVERYONE, release: 'J3 · FY28', rollout: 5 } },
+  { key: 'tenant_star_health', label: 'Star Health tenant routes', on: false, target: { ...EVERYONE, tenant: 'tnt_star', release: 'J3 · FY28' } },
   // Architecture p.34 leaves open whether the public Check stays anonymous or asks for a phone number: a flag, so either ships.
-  { key: 'check_asks_phone', label: 'Public Check asks for a phone number', scope: 'Public Check · India', state: 'Off', on: false },
+  // The public Check has no tenant or cohort, so this one is on or off for every visitor in India.
+  { key: 'check_asks_phone', label: 'Public Check asks for a phone number', on: false, target: EVERYONE, fixed: 'Public Check · every visitor · India' },
 ]
+/** The control plane's release flags: { [key]: { on, target } }. Specimen only; the Check flag also lives at CHECK_PHONE_KEY. */
+export const RELEASE_FLAGS_KEY = 'joyos:ops:flags:v1'
 
 /** Shared with the public Check (entry lane): JSON boolean, default false = anonymous. */
 export const CHECK_PHONE_KEY = 'joyos:flag:check-asks-phone'

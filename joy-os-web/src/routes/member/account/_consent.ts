@@ -9,14 +9,23 @@ import { SPECIMEN_NOW } from './_data'
 /** The artefact version currently in force for each purpose (the text the member agrees to). */
 export const ARTEFACT_VERSION: Record<string, string> = {
   c_care: 'v3', c_data: 'v3', c_pub: 'v2', c_oura: 'v1', c_hk: 'v2', c_cal: 'v1', c_wa: 'v2', c_star: 'v1',
+  c_whoop: 'v1', c_garmin: 'v1', c_ultrahuman: 'v1',
   research: 'v2', insurer: 'v1',
 }
 
+/** The three setup consents and the artefact version in force, as onboarding shows them. */
+export const CONSENT_ARTEFACTS: Record<'care' | 'data' | 'publishing', { version: string }> = {
+  care: { version: ARTEFACT_VERSION.c_care },
+  data: { version: ARTEFACT_VERSION.c_data },
+  publishing: { version: ARTEFACT_VERSION.c_pub },
+}
+
 export type ConsentAction = 'granted' | 'withdrawn' | 'declined'
-export type ConsentVia = 'setup' | 'trust' | 'whatsapp' | 'reply' | 'update'
+export type ConsentVia = 'setup' | 'trust' | 'whatsapp' | 'reply' | 'update' | 'devices'
 export interface ConsentEvent {
   id: string
-  /** A consent id from CONSENTS, or 'research' / 'insurer' for the Trust centre's own cards. */
+  /** A consent id from CONSENTS (or a device consent from _links), or 'research' for the Trust
+   *  centre's own card. Older records may hold 'insurer', which is the same consent as c_star. */
   ref: string
   action: ConsentAction
   version: string

@@ -1,5 +1,6 @@
 import type { Dict } from '@/lib/i18n'
-import { useApp } from '@/lib/store'
+import { useApp, type Lang } from '@/lib/store'
+import { dateTemplate, localWhen } from './_when'
 
 // Care, Trust and Account lane: every member-facing string, in English, Tamil and Hindi.
 // English is the source and must not change. Stays English by design: questionnaire
@@ -241,8 +242,9 @@ export const DATA = {
   useLinked: { en: 'Oura · Apple Health linked', ta: 'Oura · Apple Health இணைக்கப்பட்டுள்ளன', hi: 'Oura · Apple Health जुड़े हैं' },
   useWeek: { en: 'Week 4 of 8', ta: '8 இல் வாரம் 4', hi: '8 में से हफ़्ता 4' },
   useMondays: { en: 'Mondays 19:00 with Priya', ta: 'திங்கள்தோறும் 19:00, Priya-வுடன்', hi: 'हर सोमवार 19:00, Priya के साथ' },
-  useNext: { en: 'Next: 5 Apr 2027', ta: 'அடுத்து: 5 Apr 2027', hi: 'अगला: 5 Apr 2027' },
-  useSeats: { en: 'Two seats held · 20 Feb, Chennai', ta: 'இரண்டு இருக்கைகள் ஒதுக்கப்பட்டுள்ளன · 20 Feb, சென்னை', hi: 'दो सीटें रखी गई हैं · 20 Feb, चेन्नई' },
+  // Lines with a date are keyed by their template; the date is filled in the member's language (_when.ts).
+  useNext: { en: 'Next: {d0}', ta: 'அடுத்து: {d0}', hi: 'अगला: {d0}' },
+  useSeats: { en: 'Two seats held · {d0}, Chennai', ta: 'இரண்டு இருக்கைகள் ஒதுக்கப்பட்டுள்ளன · {d0}, சென்னை', hi: 'दो सीटें रखी गई हैं · {d0}, चेन्नई' },
   useDay: { en: 'Day 23 of 90', ta: '90 இல் நாள் 23', hi: '90 में से दिन 23' },
   priceFree: { en: 'Free', ta: 'இலவசம்', hi: 'मुफ़्त' },
   perMonth: { en: '/ month', ta: '/ மாதம்', hi: '/ महीना' },
@@ -322,7 +324,7 @@ export const DATA = {
   nDay45: { en: 'Day 45 review with Priya', ta: 'Priya-வுடன் 45-ஆம் நாள் மதிப்பாய்வு', hi: 'Priya के साथ दिन 45 की समीक्षा' },
   nDay45Body: { en: 'By video, thirty minutes. You will hear about it the day before — never at night.', ta: 'வீடியோவில், முப்பது நிமிடம். முந்தைய நாளே உங்களுக்குத் தெரிவிக்கப்படும் — இரவில் ஒருபோதும் இல்லை.', hi: 'वीडियो पर, तीस मिनट। आपको एक दिन पहले बताया जाएगा — रात में कभी नहीं।' },
   nDay76: { en: 'Day 76 · your re-measure window opens', ta: 'நாள் 76 · உங்கள் மறு அளவீட்டுக் காலம் தொடங்குகிறது', hi: 'दिन 76 · दोबारा माप का समय शुरू' },
-  nDay76Body: { en: 'Fourteen days to take the Index again, ahead of Day 90 on 5 Apr.', ta: '5 Apr அன்று வரும் 90-ஆம் நாளுக்கு முன், குறியீட்டை மீண்டும் எடுக்க பதினான்கு நாட்கள்.', hi: '5 Apr को दिन 90 से पहले, इंडेक्स दोबारा देने के लिए चौदह दिन।' },
+  nDay76Body: { en: 'Fourteen days to take the Index again, ahead of Day 90 on {d0}.', ta: '{d0} அன்று வரும் 90-ஆம் நாளுக்கு முன், குறியீட்டை மீண்டும் எடுக்க பதினான்கு நாட்கள்.', hi: '{d0} को दिन 90 से पहले, इंडेक्स दोबारा देने के लिए चौदह दिन।' },
   kLedger: { en: 'Joy Ledger', ta: 'ஜாய் லெட்ஜர்', hi: 'जॉय लेजर' },
   kAction: { en: 'Today’s action', ta: 'இன்றைய செயல்', hi: 'आज का काम' },
   kMessage: { en: 'Message', ta: 'செய்தி', hi: 'संदेश' },
@@ -337,22 +339,74 @@ export const DATA = {
   chWaDesc: { en: 'Ledger and reminders only', ta: 'லெட்ஜரும் நினைவூட்டல்களும் மட்டும்', hi: 'सिर्फ़ लेजर और रिमाइंडर' },
   chEmailDesc: { en: 'Weekly digest, invoices', ta: 'வாராந்திரச் சுருக்கம், விலைப்பட்டியல்கள்', hi: 'साप्ताहिक सारांश, इनवॉइस' },
   chLetterDesc: { en: 'Monthly, by post', ta: 'மாதந்தோறும், தபாலில்', hi: 'हर महीने, डाक से' },
+  // Places of supply for GST (states; Delhi is the city above)
+  stateTN: { en: 'Tamil Nadu', ta: 'தமிழ்நாடு', hi: 'तमिलनाडु' },
+  stateMH: { en: 'Maharashtra', ta: 'மகாராஷ்டிரா', hi: 'महाराष्ट्र' },
+  stateKA: { en: 'Karnataka', ta: 'கர்நாடகா', hi: 'कर्नाटक' },
+  stateTG: { en: 'Telangana', ta: 'தெலங்கானா', hi: 'तेलंगाना' },
+  stateKL: { en: 'Kerala', ta: 'கேரளா', hi: 'केरल' },
+  stateWB: { en: 'West Bengal', ta: 'மேற்கு வங்காளம்', hi: 'पश्चिम बंगाल' },
+  // The claims log (claims quoted as published; translations for reading only)
+  claimLowest: { en: '“Measures and raises your lowest term.”', ta: '“உங்கள் மிகக் குறைந்த அம்சத்தை அளந்து உயர்த்துகிறது.”', hi: '“आपके सबसे कमज़ोर पहलू को मापता और बढ़ाता है।”' },
+  claimMethod: { en: '“Joyspan Index, method v1.0.”', ta: '“ஜாய்ஸ்பான் குறியீடு, method v1.0.”', hi: '“जॉयस्पैन इंडेक्स, method v1.0।”' },
+  claimYears: { en: '“Adds years to your life.”', ta: '“உங்கள் வாழ்நாளில் ஆண்டுகளைச் சேர்க்கிறது.”', hi: '“आपकी ज़िंदगी में साल जोड़ता है।”' },
+  claimAgeing: { en: '“Reverses ageing.”', ta: '“முதுமையைத் திருப்புகிறது.”', hi: '“बुढ़ापा पलट देता है।”' },
+  claimSleep: { en: '“Sleepcation improves sleep for most guests.”', ta: '“Sleepcation பெரும்பாலான விருந்தினர்களின் உறக்கத்தை மேம்படுத்துகிறது.”', hi: '“Sleepcation ज़्यादातर मेहमानों की नींद बेहतर करता है।”' },
+  // Message subjects (the Session subject is keyed by its template; the date follows the language)
+  subjDay15: { en: 'Day 15 review and this week', ta: '15-ஆம் நாள் மதிப்பாய்வும் இந்த வாரமும்', hi: 'दिन 15 की समीक्षा और यह हफ़्ता' },
+  subjPanel: { en: 'January panel · signed', ta: 'ஜனவரி பரிசோதனை முடிவுகள் · கையொப்பமிடப்பட்டது', hi: 'जनवरी की जाँच रिपोर्ट · हस्ताक्षरित' },
+  subjSession: { en: 'Joyspan Session · Chennai, {d0}', ta: 'ஜாய்ஸ்பான் அமர்வு · சென்னை, {d0}', hi: 'जॉयस्पैन सेशन · चेन्नई, {d0}' },
+  // Device consents added when a member connects that device
+  conWhoop: { en: 'WHOOP via Terra', ta: 'Terra வழியாக WHOOP', hi: 'Terra के ज़रिए WHOOP' },
+  conGarmin: { en: 'Garmin via Terra', ta: 'Terra வழியாக Garmin', hi: 'Terra के ज़रिए Garmin' },
+  conUltrahuman: { en: 'Ultrahuman Ring via Terra', ta: 'Terra வழியாக Ultrahuman Ring', hi: 'Terra के ज़रिए Ultrahuman Ring' },
+  conWhoopP: { en: 'Sleep, HRV and resting HR — raw signals only', ta: 'உறக்கம், HRV, ஓய்வு இதயத் துடிப்பு — மூலத் தரவு மட்டும்', hi: 'नींद, HRV और आराम की धड़कन — सिर्फ़ कच्चे सिग्नल' },
+  conGarminP: { en: 'Steps, workouts, sleep and VO₂max — raw signals only', ta: 'அடிகள், உடற்பயிற்சிகள், உறக்கம், VO₂max — மூலத் தரவு மட்டும்', hi: 'कदम, वर्कआउट, नींद और VO₂max — सिर्फ़ कच्चे सिग्नल' },
+  conUltrahumanP: { en: 'Sleep, HRV and movement — raw signals only', ta: 'உறக்கம், HRV, அசைவு — மூலத் தரவு மட்டும்', hi: 'नींद, HRV और हलचल — सिर्फ़ कच्चे सिग्नल' },
+  // What a console read of the member record showed (session reads in Who has seen my data)
+  readCoach: { en: 'Member digest (coach console)', ta: 'உறுப்பினர் சுருக்கம் (பயிற்சியாளர் கன்சோல்)', hi: 'सदस्य सारांश (कोच कंसोल)' },
+  readClinical: { en: 'Clinical record (clinical portal)', ta: 'மருத்துவப் பதிவு (மருத்துவப் போர்டல்)', hi: 'क्लिनिकल रिकॉर्ड (क्लिनिकल पोर्टल)' },
+  readConcierge: { en: 'Booking and household notes (concierge console)', ta: 'முன்பதிவு, குடும்பக் குறிப்புகள் (கன்சியர்ஜ் கன்சோல்)', hi: 'बुकिंग और परिवार के नोट (कंसीयर्ज कंसोल)' },
+  readCare: { en: 'Member record (care console)', ta: 'உறுப்பினர் பதிவு (கவனிப்புக் கன்சோல்)', hi: 'सदस्य रिकॉर्ड (केयर कंसोल)' },
+  // The console roles a session read carries (the consoles' own role labels)
+  readRoleClinician: { en: 'Clinician', ta: 'மருத்துவர்', hi: 'क्लिनिशियन' },
+  readRoleVenue: { en: 'Venue partner', ta: 'தங்குமிடக் கூட்டாளர்', hi: 'स्थल पार्टनर' },
+  readRoleTenant: { en: 'Tenant admin', ta: 'நிறுவன நிர்வாகி', hi: 'संस्था एडमिन' },
+  readRoleLeadership: { en: 'Leadership', ta: 'தலைமை', hi: 'नेतृत्व' },
+  readRoleOps: { en: 'Control plane', ta: 'கட்டுப்பாட்டுத் தளம்', hi: 'कंट्रोल प्लेन' },
+  readRolePreview: { en: 'Preview', ta: 'முன்னோட்டம்', hi: 'पूर्वावलोकन' },
+  readWhoPreview: { en: 'No console role · preview', ta: 'கன்சோல் பங்கு இல்லை · முன்னோட்டம்', hi: 'कोई कंसोल भूमिका नहीं · पूर्वावलोकन' },
 } satisfies Dict
 
-const indexOf = (d: Dict) => new Map<string, Record<'en' | 'ta' | 'hi', string>>(Object.values(d).map((v) => [v.en, v]))
+const indexOf = (d: Dict) => new Map<string, Record<Lang, string>>(Object.values(d).map((v) => [v.en, v]))
 const DATA_INDEX = indexOf(DATA)
 
 /** Look a data string up by its English text; unknown strings (names, people's words) come back unchanged. */
 export function useData() {
   const { lang } = useApp()
-  return (en: string) => (lang === 'en' ? en : DATA_INDEX.get(en)?.[lang] ?? en)
+  return (en: string) => lookupDated(en, lang, DATA_INDEX)
+}
+
+/**
+ * Exact text first; then a bare specimen date ("Mon 1 Feb · 19:00") in the member's language;
+ * then the line as a date template ("Next: {d0}"), its dates filled per language.
+ */
+function lookupDated(en: string, lang: Lang, ...idx: Map<string, Record<Lang, string>>[]) {
+  if (lang === 'en') return en
+  for (const i of idx) { const hit = i.get(en)?.[lang]; if (hit) return hit }
+  const bare = localWhen(en, lang)
+  if (bare !== en) return bare
+  const tpl = dateTemplate(en)
+  if (tpl.key === en) return en
+  for (const i of idx) { const hit = i.get(tpl.key)?.[lang]; if (hit) return tpl.fill(hit, lang) }
+  return en
 }
 
 /** The same lookup by English text, for a screen dictionary whose strings live in state (chat lines). */
 export function useLookup(d: Dict) {
   const { lang } = useApp()
   const idx = indexOf(d)
-  return (en: string) => (lang === 'en' ? en : idx.get(en)?.[lang] ?? DATA_INDEX.get(en)?.[lang] ?? en)
+  return (en: string) => lookupDated(en, lang, idx, DATA_INDEX)
 }
 
 export const SET = {
@@ -492,6 +546,8 @@ export const SET = {
   vtWhere: { en: 'You will hear prompts like this on Today, in your notifications and when you book a consult in Care.', ta: 'இது போன்ற கேள்விகளை இன்று திரையில், உங்கள் அறிவிப்புகளில், Care-இல் ஆலோசனை முன்பதிவு செய்யும்போது கேட்பீர்கள்.', hi: 'ऐसे सवाल आपको Today पर, अपनी सूचनाओं में और Care में परामर्श बुक करते समय सुनाई देंगे।' },
   vtHeard: { en: 'Heard: “{text}”. In the app this goes straight into the box you are answering.', ta: 'கேட்டது: “{text}”. செயலியில் இது நீங்கள் பதிலளிக்கும் பெட்டியில் நேரே சேரும்.', hi: 'सुना गया: “{text}”। ऐप में यह सीधे उसी खाने में जाता है जिसका आप जवाब दे रहे हैं।' },
   vtOffHint: { en: 'Turn on Voice-first to hear prompts read aloud.', ta: 'கேள்விகள் உரக்க வாசிக்கப்படுவதைக் கேட்க, குரல்-முதன்மையை இயக்கவும்.', hi: 'सवाल पढ़कर सुनने के लिए आवाज़-पहले चालू करें।' },
+  secWeb: { en: 'In this browser the lock is simulated: Joy OS asks you to unlock when you first open it, and again after time away. Unlock with your passkey, or with your AIWO ID.', ta: 'இந்த உலாவியில் பூட்டு ஒரு டெமோ: Joy OS-ஐ முதலில் திறக்கும்போதும், சிறிது நேரம் விலகிய பிறகும் திறக்கக் கேட்கும். உங்கள் பாஸ்கீ அல்லது AIWO ID மூலம் திறக்கலாம்.', hi: 'इस ब्राउज़र में लॉक एक डेमो है: Joy OS पहली बार खोलने पर और कुछ देर दूर रहने के बाद अनलॉक करने को कहता है। अपनी पासकी से, या अपनी AIWO ID से खोलें।' },
+  secWebNow: { en: 'In this browser the lock is simulated: Joy OS asks you to unlock when you first open it, and each time you come back to the tab. Unlock with your passkey, or with your AIWO ID.', ta: 'இந்த உலாவியில் பூட்டு ஒரு டெமோ: Joy OS-ஐ முதலில் திறக்கும்போதும், ஒவ்வொரு முறை இந்தத் தாவலுக்குத் திரும்பும்போதும் திறக்கக் கேட்கும். உங்கள் பாஸ்கீ அல்லது AIWO ID மூலம் திறக்கலாம்.', hi: 'इस ब्राउज़र में लॉक एक डेमो है: Joy OS पहली बार खोलने पर और हर बार इस टैब पर लौटने पर अनलॉक करने को कहता है। अपनी पासकी से, या अपनी AIWO ID से खोलें।' },
 } satisfies Dict
 
 export const ABHA = {
@@ -864,6 +920,11 @@ export const DEV = {
   wxComplOn: { en: 'Complication on.', ta: 'குறுக்குவழி இயக்கப்பட்டது.', hi: 'शॉर्टकट चालू।' },
   wxComplOff: { en: 'Complication off.', ta: 'குறுக்குவழி நிறுத்தப்பட்டது.', hi: 'शॉर्टकट बंद।' },
   linkedInSetup: { en: 'Linked during setup', ta: 'அமைப்பின்போது இணைக்கப்பட்டது', hi: 'सेटअप में जोड़ा गया' },
+  consentFor: { en: 'Consent given for {space} only.', ta: '{space}-க்கு மட்டும் ஒப்புதல் அளிக்கப்பட்டுள்ளது.', hi: 'सहमति सिर्फ़ {space} के लिए दी गई है।' },
+  consentAll: { en: 'Consent given.', ta: 'ஒப்புதல் அளிக்கப்பட்டுள்ளது.', hi: 'सहमति दी गई है।' },
+  consentTrust: { en: 'See it in the Trust centre', ta: 'நம்பிக்கை மையத்தில் பார்க்கவும்', hi: 'भरोसा केंद्र में देखें' },
+  disconnectConsent: { en: 'Its consent is withdrawn too, and the change is recorded in your Trust centre.', ta: 'அதன் ஒப்புதலும் திரும்பப் பெறப்படும்; இந்த மாற்றம் உங்கள் நம்பிக்கை மையத்தில் பதிவாகும்.', hi: 'इसकी सहमति भी वापस ली जाएगी, और यह बदलाव आपके भरोसा केंद्र में दर्ज होगा।' },
+  consentRecorded: { en: 'What you tick is your consent for this device. It is recorded, with these purposes, in your Trust centre, and you can withdraw it there or by disconnecting.', ta: 'நீங்கள் தேர்வுசெய்வதே இந்தச் சாதனத்துக்கான உங்கள் ஒப்புதல். இந்த நோக்கங்களுடன் அது உங்கள் நம்பிக்கை மையத்தில் பதிவாகும்; அங்கேயோ, துண்டிப்பதன் மூலமோ திரும்பப் பெறலாம்.', hi: 'आप जो चुनते हैं, वही इस डिवाइस के लिए आपकी सहमति है। यह इन उद्देश्यों के साथ आपके भरोसा केंद्र में दर्ज होती है; आप इसे वहाँ से या डिवाइस हटाकर वापस ले सकते हैं।' },
 } satisfies Dict
 
 export const HH = {
@@ -887,13 +948,13 @@ export const HH = {
   standardType: { en: 'Standard type and touch', ta: 'வழக்கமான எழுத்தும் தொடுதலும்', hi: 'सामान्य अक्षर और टच' },
   elderDetail: { en: '{modes}. You help her as a family helper — by her consent, given on {date}, which she can withdraw.', ta: '{modes}. அவரது ஒப்புதலுடன் நீங்கள் குடும்ப உதவியாளராக அவருக்கு உதவுகிறீர்கள் — {date} அன்று அளித்த அந்த ஒப்புதலை அவர் திரும்பப் பெறலாம்.', hi: '{modes}। आप उनकी सहमति से परिवार-सहायक के रूप में उनकी मदद करते हैं — {date} को दी गई यह सहमति वे वापस ले सकती हैं।' },
   elderMode: { en: 'Elder mode', ta: 'முதியோர் பயன்முறை', hi: 'बुज़ुर्ग मोड' },
-  helperArjun: { en: 'Helper: Arjun', ta: 'உதவியாளர்: Arjun', hi: 'सहायक: Arjun' },
+  helperArjun: { en: 'Helper: {name}', ta: 'உதவியாளர்: {name}', hi: 'सहायक: {name}' },
   offSuffix: { en: ' · off', ta: ' · நிறுத்தம்', hi: ' · बंद' },
   voiceFirst: { en: 'Voice-first', ta: 'குரல்-முதன்மை', hi: 'आवाज़-पहले' },
   helper: { en: 'Helper', ta: 'உதவியாளர்', hi: 'सहायक' },
   manageElder: { en: 'Manage elder mode', ta: 'முதியோர் பயன்முறையை நிர்வகிக்கவும்', hi: 'बुज़ुर्ग मोड सँभालें' },
   daughterMinor: { en: 'Daughter · 15 · minor', ta: 'மகள் · 15 · சிறுமி', hi: 'बेटी · 15 · नाबालिग' },
-  minorDetail: { en: 'Never scored. Joins household rituals only. Verifiable parental consent given by Kavya on 12 Jan 2027 (DPDP Act); no tracking, no profiling, no advertising.', ta: 'ஒருபோதும் மதிப்பிடப்படுவதில்லை. குடும்பச் சடங்குகளில் மட்டும் பங்கேற்பார். 12 Jan 2027 அன்று Kavya சரிபார்க்கக்கூடிய பெற்றோர் ஒப்புதல் அளித்தார் (DPDP சட்டம்); கண்காணிப்பு இல்லை, விவரக்குறிப்பு இல்லை, விளம்பரம் இல்லை.', hi: 'कभी स्कोर नहीं होता। सिर्फ़ परिवार की रस्मों में शामिल। Kavya ने 12 Jan 2027 को पुष्टि-योग्य अभिभावक सहमति दी (DPDP क़ानून); न ट्रैकिंग, न प्रोफ़ाइलिंग, न विज्ञापन।' },
+  minorDetail: { en: 'Never scored. Joins household rituals only. Verifiable parental consent given by Kavya on {date} (DPDP Act); no tracking, no profiling, no advertising.', ta: 'ஒருபோதும் மதிப்பிடப்படுவதில்லை. குடும்பச் சடங்குகளில் மட்டும் பங்கேற்பார். {date} அன்று Kavya சரிபார்க்கக்கூடிய பெற்றோர் ஒப்புதல் அளித்தார் (DPDP சட்டம்); கண்காணிப்பு இல்லை, விவரக்குறிப்பு இல்லை, விளம்பரம் இல்லை.', hi: 'कभी स्कोर नहीं होता। सिर्फ़ परिवार की रस्मों में शामिल। Kavya ने {date} को पुष्टि-योग्य अभिभावक सहमति दी (DPDP क़ानून); न ट्रैकिंग, न प्रोफ़ाइलिंग, न विज्ञापन।' },
   notScored: { en: 'Not scored', ta: 'மதிப்பிடப்படுவதில்லை', hi: 'स्कोर नहीं होता' },
   parentalConsent: { en: 'Parental consent', ta: 'பெற்றோர் ஒப்புதல்', hi: 'अभिभावक सहमति' },
   invitedRole: { en: '{role} · invited', ta: '{role} · அழைக்கப்பட்டார்', hi: '{role} · बुलाया गया' },
@@ -1033,7 +1094,7 @@ export const HH = {
   voiceOff: { en: 'Voice-first off for Lakshmi.', ta: 'Lakshmi-க்குக் குரல்-முதன்மை நிறுத்தப்பட்டது.', hi: 'Lakshmi के लिए आवाज़-पहले बंद।' },
   voiceDesc: { en: 'Prompts are read aloud in Tamil; she answers by speaking.', ta: 'கேள்விகள் தமிழில் உரக்க வாசிக்கப்படும்; அவர் பேசியே பதில் சொல்வார்.', hi: 'सवाल तमिल में पढ़कर सुनाए जाते हैं; वे बोलकर जवाब देती हैं।' },
   familyHelper: { en: 'Family helper', ta: 'குடும்ப உதவியாளர்', hi: 'परिवार-सहायक' },
-  helperConsent: { en: 'Helper: Arjun · consent {date}', ta: 'உதவியாளர்: Arjun · ஒப்புதல் {date}', hi: 'सहायक: Arjun · सहमति {date}' },
+  helperConsent: { en: 'Helper: {name} · consent {date}', ta: 'உதவியாளர்: {name} · ஒப்புதல் {date}', hi: 'सहायक: {name} · सहमति {date}' },
   helperBody: { en: 'You can help her answer and read her reminders. You cannot see her answers unless she shares them, and you are never shown a score for her.', ta: 'அவர் பதிலளிக்கவும், நினைவூட்டல்களைப் படிக்கவும் நீங்கள் உதவலாம். அவர் பகிராத வரை அவரது பதில்களைப் பார்க்க முடியாது; அவருக்கான மதிப்பெண் உங்களுக்கு ஒருபோதும் காட்டப்படாது.', hi: 'आप उन्हें जवाब देने और रिमाइंडर पढ़ने में मदद कर सकते हैं। जब तक वे साझा न करें, आप उनके जवाब नहीं देख सकते, और उनका कोई स्कोर आपको कभी नहीं दिखाया जाता।' },
   onlyLakshmiTitle: { en: 'Only Lakshmi can withdraw this consent', ta: 'இந்த ஒப்புதலை Lakshmi மட்டுமே திரும்பப் பெற முடியும்', hi: 'यह सहमति सिर्फ़ Lakshmi वापस ले सकती हैं' },
   onlyLakshmi: { en: 'Only Lakshmi can withdraw — on her phone, or by telling Priya.', ta: 'Lakshmi மட்டுமே திரும்பப் பெற முடியும் — அவரது போனில், அல்லது Priya-விடம் சொல்லி.', hi: 'सिर्फ़ Lakshmi वापस ले सकती हैं — अपने फ़ोन पर, या Priya को बताकर।' },
@@ -1097,24 +1158,24 @@ export const HH = {
   pvLedgerQ: { en: 'Anything good today?', ta: 'இன்று ஏதாவது நல்லது நடந்ததா?', hi: 'आज कुछ अच्छा हुआ?' },
   pvSaved: { en: 'Kept for Lakshmi · {tag}', ta: 'Lakshmi-க்காக வைக்கப்பட்டது · {tag}', hi: 'Lakshmi के लिए रखा गया · {tag}' },
   pvHear: { en: 'Hear today', ta: 'இன்றைக் கேளுங்கள்', hi: 'आज का सुनिए' },
-  pvHelper: { en: 'Arjun can help you', ta: 'Arjun உங்களுக்கு உதவுவார்', hi: 'Arjun आपकी मदद कर सकते हैं' },
-  pvCallHelper: { en: 'Call Arjun', ta: 'Arjun-ஐ அழைக்கவும்', hi: 'Arjun को फ़ोन करें' },
-  pvCalling: { en: 'Calling Arjun · preview, no call is made', ta: 'Arjun-ஐ அழைக்கிறது · முன்னோட்டம், அழைப்பு செய்யப்படாது', hi: 'Arjun को फ़ोन · झलक, कोई कॉल नहीं होती' },
+  pvHelper: { en: '{name} can help you', ta: '{name} உங்களுக்கு உதவுவார்', hi: '{name} आपकी मदद कर सकते हैं' },
+  pvCallHelper: { en: 'Call {name}', ta: '{name}-ஐ அழைக்கவும்', hi: '{name} को फ़ोन करें' },
+  pvCalling: { en: 'Calling {name} · preview, no call is made', ta: '{name}-ஐ அழைக்கிறது · முன்னோட்டம், அழைப்பு செய்யப்படாது', hi: '{name} को फ़ोन · झलक, कोई कॉल नहीं होती' },
   pvNoHelper: { en: 'No family helper. Priya, your coach, is a message away.', ta: 'குடும்ப உதவியாளர் இல்லை. உங்கள் பயிற்சியாளர் Priya ஒரு செய்தி தூரத்தில் இருக்கிறார்.', hi: 'कोई परिवार-सहायक नहीं। आपकी कोच Priya एक संदेश की दूरी पर हैं।' },
   pvSpoken: { en: 'Lakshmi said: “{text}”', ta: 'Lakshmi சொன்னது: “{text}”', hi: 'Lakshmi ने कहा: “{text}”' },
   elNoHelper: { en: 'No family helper', ta: 'குடும்ப உதவியாளர் இல்லை', hi: 'कोई परिवार-सहायक नहीं' },
   elDetailNone: { en: '{modes}. Lakshmi has no family helper at the moment. Her settings are hers alone.', ta: '{modes}. தற்போது Lakshmi-க்குக் குடும்ப உதவியாளர் இல்லை. அவரது அமைப்புகள் அவருக்கு மட்டுமே.', hi: '{modes}। अभी Lakshmi का कोई परिवार-सहायक नहीं है। उनकी सेटिंग्स सिर्फ़ उनकी हैं।' },
   elWithdrawDemo: { en: 'Withdraw, as Lakshmi', ta: 'Lakshmi-யாக, திரும்பப் பெறவும்', hi: 'Lakshmi के रूप में वापस लें' },
-  elWithdrawQ: { en: 'Arjun will no longer help her answer or read her reminders. Her own settings stay as they are.', ta: 'அவர் பதிலளிக்கவோ நினைவூட்டல்களைப் படிக்கவோ Arjun இனி உதவ மாட்டார். அவரது அமைப்புகள் அப்படியே இருக்கும்.', hi: 'Arjun अब उन्हें जवाब देने या रिमाइंडर पढ़ने में मदद नहीं करेंगे। उनकी अपनी सेटिंग्स वैसी ही रहेंगी।' },
+  elWithdrawQ: { en: '{name} will no longer help her answer or read her reminders. Her own settings stay as they are.', ta: 'அவர் பதிலளிக்கவோ நினைவூட்டல்களைப் படிக்கவோ {name} இனி உதவ மாட்டார். அவரது அமைப்புகள் அப்படியே இருக்கும்.', hi: '{name} अब उन्हें जवाब देने या रिमाइंडर पढ़ने में मदद नहीं करेंगे। उनकी अपनी सेटिंग्स वैसी ही रहेंगी।' },
   elWithdrawConfirm: { en: 'Yes, withdraw', ta: 'ஆம், திரும்பப் பெறவும்', hi: 'हाँ, वापस लें' },
-  elWithdrawn: { en: 'Lakshmi withdrew Arjun as her helper.', ta: 'Lakshmi, Arjun-ஐ உதவியாளர் பொறுப்பிலிருந்து நீக்கினார்.', hi: 'Lakshmi ने Arjun को सहायक से हटा दिया।' },
+  elWithdrawn: { en: 'Lakshmi withdrew {name} as her helper.', ta: 'Lakshmi, {name}-ஐ உதவியாளர் பொறுப்பிலிருந்து நீக்கினார்.', hi: 'Lakshmi ने {name} को सहायक से हटा दिया।' },
   elDemoNote: { en: 'In this demo you act as Lakshmi. In real life only she can withdraw — on her phone, or by telling Priya.', ta: 'இந்த டெமோவில் நீங்கள் Lakshmi-யாகச் செயல்படுகிறீர்கள். உண்மையில் அவர் மட்டுமே திரும்பப் பெற முடியும் — அவரது போனில், அல்லது Priya-விடம் சொல்லி.', hi: 'इस डेमो में आप Lakshmi की जगह हैं। असल में सिर्फ़ वही वापस ले सकती हैं — अपने फ़ोन पर, या Priya को बताकर।' },
   elNone: { en: 'Lakshmi has no family helper.', ta: 'Lakshmi-க்குக் குடும்ப உதவியாளர் இல்லை.', hi: 'Lakshmi का कोई परिवार-सहायक नहीं है।' },
   elAsk: { en: 'Ask Lakshmi to add you again', ta: 'உங்களை மீண்டும் சேர்க்க Lakshmi-யிடம் கேட்கவும்', hi: 'Lakshmi से फिर जोड़ने को कहें' },
   elAsked: { en: 'Asked. Lakshmi decides on her phone.', ta: 'கேட்கப்பட்டது. Lakshmi தன் போனில் முடிவு செய்வார்.', hi: 'पूछ लिया। Lakshmi अपने फ़ोन पर तय करेंगी।' },
   elAskedToast: { en: 'Lakshmi has been asked. Nothing changes until she agrees.', ta: 'Lakshmi-யிடம் கேட்கப்பட்டது. அவர் ஒப்புக்கொள்ளும் வரை எதுவும் மாறாது.', hi: 'Lakshmi से पूछ लिया गया। उनकी सहमति तक कुछ नहीं बदलेगा।' },
   elAgreeDemo: { en: 'Demo: Lakshmi agrees', ta: 'டெமோ: Lakshmi ஒப்புக்கொள்கிறார்', hi: 'डेमो: Lakshmi सहमत हैं' },
-  elAdded: { en: 'Lakshmi added Arjun as her helper again.', ta: 'Lakshmi மீண்டும் Arjun-ஐ உதவியாளராகச் சேர்த்தார்.', hi: 'Lakshmi ने Arjun को फिर से सहायक बनाया।' },
+  elAdded: { en: 'Lakshmi added {name} as her helper again.', ta: 'Lakshmi மீண்டும் {name}-ஐ உதவியாளராகச் சேர்த்தார்.', hi: 'Lakshmi ने {name} को फिर से सहायक बनाया।' },
   elHelperOnly: { en: 'Only her helper can change these here. Lakshmi can still change them on her phone.', ta: 'இங்கே அவரது உதவியாளர் மட்டுமே இவற்றை மாற்ற முடியும். Lakshmi தன் போனில் மாற்றலாம்.', hi: 'यहाँ इन्हें सिर्फ़ उनका सहायक बदल सकता है। Lakshmi अपने फ़ोन पर अब भी बदल सकती हैं।' },
   fromSetup: { en: 'From your setup', ta: 'உங்கள் அமைப்பிலிருந்து', hi: 'आपके सेटअप से' },
 } satisfies Dict
@@ -1152,7 +1213,7 @@ export const MEM = {
   cancelChange: { en: 'Cancel change', ta: 'மாற்றத்தை ரத்துசெய்யவும்', hi: 'बदलाव रद्द करें' },
   changeCancelledStays: { en: 'Change cancelled. Your plan stays as it is.', ta: 'மாற்றம் ரத்துசெய்யப்பட்டது. உங்கள் திட்டம் அப்படியே இருக்கும்.', hi: 'बदलाव रद्द। आपका प्लान जैसा है वैसा रहेगा।' },
   changePlan: { en: 'Change plan', ta: 'திட்டத்தை மாற்றவும்', hi: 'प्लान बदलें' },
-  resumedToast: { en: 'Plus resumed. Next charge 01 Feb 2027 by UPI autopay.', ta: 'Plus மீண்டும் தொடங்கியது. அடுத்த கட்டணம் 01 Feb 2027, UPI தானியங்கிக் கட்டணம் மூலம்.', hi: 'Plus फिर शुरू। अगला भुगतान 01 Feb 2027, UPI ऑटोपे से।' },
+  resumedToast: { en: 'Plus resumed. Next charge {date} by UPI autopay.', ta: 'Plus மீண்டும் தொடங்கியது. அடுத்த கட்டணம் {date}, UPI தானியங்கிக் கட்டணம் மூலம்.', hi: 'Plus फिर शुरू। अगला भुगतान {date}, UPI ऑटोपे से।' },
   resumePlus: { en: 'Resume Plus', ta: 'Plus-ஐ மீண்டும் தொடங்கவும்', hi: 'Plus फिर शुरू करें' },
   pausePlus: { en: 'Pause Plus', ta: 'Plus-ஐ இடைநிறுத்தவும்', hi: 'Plus रोकें' },
   includedNow: { en: 'Included now', ta: 'இப்போது சேர்ந்துள்ளவை', hi: 'अभी शामिल' },
@@ -1227,6 +1288,9 @@ export const MEM = {
   saveInvoice: { en: 'Save invoice', ta: 'விலைப்பட்டியலைச் சேமிக்கவும்', hi: 'इनवॉइस सहेजें' },
   print: { en: 'Print', ta: 'அச்சிடவும்', hi: 'प्रिंट करें' },
   savedAs: { en: 'Saved as a self-contained page you can open or print to PDF. Specimen — not a real member.', ta: 'தனியாகத் திறக்கவோ PDF-ஆக அச்சிடவோ கூடிய பக்கமாகச் சேமிக்கப்படும். மாதிரி — உண்மையான உறுப்பினர் அல்ல.', hi: 'एक अलग पेज के रूप में सहेजा जाता है जिसे आप खोल सकते हैं या PDF में प्रिंट कर सकते हैं। नमूना — असली सदस्य नहीं।' },
+  placeOfSupply: { en: 'Place of supply', ta: 'வழங்கல் இடம்', hi: 'आपूर्ति का स्थान' },
+  intraState: { en: 'Intra-state supply · CGST + SGST', ta: 'மாநிலத்துக்குள் வழங்கல் · CGST + SGST', hi: 'राज्य के भीतर आपूर्ति · CGST + SGST' },
+  interState: { en: 'Inter-state supply · IGST', ta: 'மாநிலங்களுக்கு இடையிலான வழங்கல் · IGST', hi: 'अंतर-राज्यीय आपूर्ति · IGST' },
 } satisfies Dict
 
 export const PROF = {
@@ -1520,6 +1584,12 @@ export const TRUST = {
   suExportTitle: { en: 'Before we prepare your copy', ta: 'உங்கள் நகலைத் தயாரிக்கும் முன்', hi: 'आपकी कॉपी तैयार करने से पहले' },
   exportVerified: { en: 'Confirmed. Your export is requested.', ta: 'உறுதிசெய்யப்பட்டது. உங்கள் ஏற்றுமதி கோரப்பட்டது.', hi: 'पुष्टि हो गई। आपके निर्यात का अनुरोध हो गया।' },
   stepUpDone: { en: 'Confirmed with step-up', ta: 'கூடுதல் சரிபார்ப்புடன் உறுதிசெய்யப்பட்டது', hi: 'अतिरिक्त जाँच से पुष्टि हुई' },
+  accessSession: { en: ' · {n} from a console this session', ta: ' · இந்த அமர்வில் கன்சோலிலிருந்து {n}', hi: ' · इस सत्र में कंसोल से {n}' },
+  deviceOff: { en: '{name} withdrawn. The device is disconnected and stops syncing.', ta: '{name} திரும்பப் பெறப்பட்டது. சாதனம் துண்டிக்கப்பட்டு, ஒத்திசைப்பது நின்றுவிடும்.', hi: '{name} वापस ली गई। डिवाइस हटा दिया गया है और सिंक बंद हो जाता है।' },
+  chosenFor: { en: 'Chosen for: {spaces}', ta: 'தேர்ந்தெடுத்த நோக்கம்: {spaces}', hi: 'चुना गया उद्देश्य: {spaces}' },
+  deviceGive: { en: 'To give it, connect the device: you choose its purposes there.', ta: 'இதை அளிக்க, சாதனத்தை இணைக்கவும்: அதன் நோக்கங்களை அங்கே தேர்ந்தெடுப்பீர்கள்.', hi: 'देने के लिए डिवाइस जोड़ें: उसके उद्देश्य आप वहीं चुनेंगे।' },
+  wDevice: { en: '{name} will be disconnected and stop syncing. Nothing new is read from it; what was already read stays in your record unless you delete it.', ta: '{name} துண்டிக்கப்பட்டு ஒத்திசைப்பது நின்றுவிடும். அதிலிருந்து புதிதாக எதுவும் படிக்கப்படாது; ஏற்கெனவே படித்தவை நீங்கள் நீக்கும் வரை உங்கள் பதிவில் இருக்கும்.', hi: '{name} हटा दिया जाएगा और सिंक बंद हो जाएगा। उससे कुछ नया नहीं पढ़ा जाएगा; जो पहले पढ़ा जा चुका है, वह आपके रिकॉर्ड में रहेगा जब तक आप उसे न हटाएँ।' },
+  viaDevices: { en: 'Devices', ta: 'சாதனங்கள்', hi: 'डिवाइस' },
 } satisfies Dict
 
 export const WA = {
@@ -1561,7 +1631,7 @@ export const WA = {
   rCant: { en: 'Can’t make it', ta: 'வர முடியாது', hi: 'नहीं आ पाऊँगा' },
   r1: { en: 'Added. I’ll remind you an hour before.', ta: 'சேர்க்கப்பட்டது. ஒரு மணி நேரம் முன் நினைவூட்டுகிறேன்.', hi: 'जोड़ दिया। एक घंटा पहले याद दिला दूँगा।' },
   r2: { en: 'Thanks for letting us know. Priya will share the notes. Nothing is counted against you.', ta: 'தெரிவித்ததற்கு நன்றி. Priya குறிப்புகளைப் பகிர்வார். எதுவும் உங்களுக்கு எதிராகக் கணக்கிடப்படாது.', hi: 'बताने के लिए शुक्रिया। Priya नोट साझा करेंगी। कुछ भी आपके ख़िलाफ़ नहीं गिना जाता।' },
-  r3: { en: 'One more: your Day 45 review with Priya is on Friday 19 Feb, 18:00, by video. Reply 1 to confirm, 2 for another time.', ta: 'இன்னொன்று: Priya-வுடன் உங்கள் 45-ஆம் நாள் மதிப்பாய்வு வெள்ளி 19 Feb, 18:00, வீடியோவில். உறுதிசெய்ய 1, வேறு நேரத்துக்கு 2 என்று பதில் அனுப்புங்கள்.', hi: 'एक और बात: Priya के साथ आपकी दिन 45 की समीक्षा शुक्रवार 19 Feb, 18:00, वीडियो पर है। पक्का करने के लिए 1, दूसरे समय के लिए 2 लिखें।' },
+  r3: { en: 'One more: your Day 45 review with Priya is on {d0}, 18:00, by video. Reply 1 to confirm, 2 for another time.', ta: 'இன்னொன்று: Priya-வுடன் உங்கள் 45-ஆம் நாள் மதிப்பாய்வு {d0}, 18:00, வீடியோவில். உறுதிசெய்ய 1, வேறு நேரத்துக்கு 2 என்று பதில் அனுப்புங்கள்.', hi: 'एक और बात: Priya के साथ आपकी दिन 45 की समीक्षा {d0}, 18:00, वीडियो पर है। पक्का करने के लिए 1, दूसरे समय के लिए 2 लिखें।' },
   r4: { en: 'Confirmed. See you then.', ta: 'உறுதிசெய்யப்பட்டது. அப்போது சந்திப்போம்.', hi: 'पक्का। तब मिलते हैं।' },
   r5: { en: 'Ravi will offer three other times in the app.', ta: 'செயலியில் Ravi மூன்று வேறு நேரங்களைத் தருவார்.', hi: 'Ravi ऐप में तीन दूसरे समय देंगे।' },
   crisisA: { en: 'You don’t have to hold this alone. A person is being told now and will reach you within 15 minutes.', ta: 'இதை நீங்கள் தனியாகச் சுமக்க வேண்டியதில்லை. இப்போதே ஒருவருக்குத் தெரிவிக்கப்படுகிறது; 15 நிமிடங்களுக்குள் அவர் உங்களைத் தொடர்புகொள்வார்.', hi: 'आपको यह सब अकेले नहीं झेलना है। अभी एक इंसान को बताया जा रहा है, जो 15 मिनट में आपसे संपर्क करेगा।' },
@@ -1585,7 +1655,7 @@ export const WA = {
   titleEm: { en: 'already', ta: 'ஏற்கெனவே', hi: 'पहले से' },
   lead: { en: 'The Check, Joy Ledger prompts and gentle reminders — on WhatsApp if you want them. Never anything clinical, never more than three a day.', ta: 'Check, ஜாய் லெட்ஜர் கேள்விகள், மென்மையான நினைவூட்டல்கள் — விரும்பினால் WhatsApp-இல். மருத்துவம் சார்ந்தது எதுவும் ஒருபோதும் இல்லை, நாளுக்கு மூன்றுக்கு மேல் ஒருபோதும் இல்லை.', hi: 'Check, जॉय लेजर के सवाल और हल्के रिमाइंडर — चाहें तो WhatsApp पर। कुछ भी क्लिनिकल कभी नहीं, दिन में तीन से ज़्यादा कभी नहीं।' },
   tabLedger: { en: 'Ledger', ta: 'லெட்ஜர்', hi: 'लेजर' },
-  tabCheck: { en: 'The Check', ta: 'The Check', hi: 'The Check' },
+  tabCheck: { en: 'The Check', ta: 'செக்', hi: 'चेक' },
   tabReminders: { en: 'Reminders', ta: 'நினைவூட்டல்கள்', hi: 'रिमाइंडर' },
   simAria: { en: 'Simulated WhatsApp conversation', ta: 'உருவகப்படுத்தப்பட்ட WhatsApp உரையாடல்', hi: 'नक़ली WhatsApp बातचीत' },
   verified: { en: 'Verified business', ta: 'சரிபார்க்கப்பட்ட நிறுவனம்', hi: 'प्रमाणित बिज़नेस' },
@@ -1643,6 +1713,8 @@ export const WA = {
   wtTitle: { en: 'The Ledger, one tap from your wrist', ta: 'லெட்ஜர், உங்கள் மணிக்கட்டிலிருந்து ஒரு தட்டில்', hi: 'लेजर, आपकी कलाई से एक टैप पर' },
   wtLead: { en: 'The same Joy Ledger without opening a chat. Try the watch face: it adds a real entry.', ta: 'அரட்டையைத் திறக்காமலேயே அதே ஜாய் லெட்ஜர். கடிகார முகப்பை முயன்று பாருங்கள்: அது உண்மையான பதிவைச் சேர்க்கும்.', hi: 'चैट खोले बिना वही जॉय लेजर। घड़ी का चेहरा आज़माइए: यह असली एंट्री जोड़ता है।' },
   wtManage: { en: 'Watch settings in Devices', ta: 'சாதனங்களில் கடிகார அமைப்புகள்', hi: 'डिवाइस में घड़ी की सेटिंग्स' },
+  previewNotSaved: { en: 'Preview only: with prompts on, this moment would be saved to your Joy Ledger.', ta: 'முன்னோட்டம் மட்டும்: கேள்விகள் இயக்கத்தில் இருந்தால், இந்தத் தருணம் உங்கள் ஜாய் லெட்ஜரில் சேமிக்கப்படும்.', hi: 'सिर्फ़ झलक: सवाल चालू होने पर यह पल आपके जॉय लेजर में सहेजा जाता।' },
+  ledgerToast: { en: 'Kept in your Joy Ledger, from WhatsApp.', ta: 'WhatsApp-இலிருந்து, உங்கள் ஜாய் லெட்ஜரில் சேமிக்கப்பட்டது.', hi: 'WhatsApp से, आपके जॉय लेजर में सहेजा गया।' },
 } satisfies Dict
 
 /** Voice-first controls (read aloud, answer by speaking) shared by the account screens. */

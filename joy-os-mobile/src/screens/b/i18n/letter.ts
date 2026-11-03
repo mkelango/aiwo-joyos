@@ -9,6 +9,9 @@ export const LETTER = {
   titleB: { en: '.', ta: '.', hi: '।' },
   lead: { en: 'Once a month from the Mentor: what moved in his own number, what did not, and one thing he is changing. Published when it goes down, too.', ta: 'மாதம் ஒருமுறை வழிகாட்டியிடமிருந்து: அவரது சொந்த எண்ணில் என்ன மாறியது, எது மாறவில்லை, அவர் மாற்றும் ஒன்று. எண் குறைந்தாலும் வெளியிடப்படும்.', hi: 'महीने में एक बार मार्गदर्शक से: उनके अपने नंबर में क्या बदला, क्या नहीं, और एक चीज़ जो वे बदल रहे हैं। नंबर नीचे जाए तब भी छपता है।' },
   asWritten: { en: '', ta: 'கடிதம் வழிகாட்டியின் சொந்த வார்த்தைகளில், எழுதியபடியே உள்ளது.', hi: 'ख़त मार्गदर्शक के अपने शब्दों में है, जैसा लिखा गया।' },
+  letterOn: { en: 'The Joyspan Letter · {date}', ta: 'ஜாய்ஸ்பான் கடிதம் · {date}', hi: 'जॉयस्पैन लेटर · {date}' },
+  // His role under his name; Joyspiration is a brand name and stays as it is.
+  authorRole: { en: 'Mentor, AIWO Limited · creator of Joyspiration', ta: 'வழிகாட்டி, AIWO Limited · Joyspiration-ஐ உருவாக்கியவர்', hi: 'मार्गदर्शक, AIWO Limited · Joyspiration के रचयिता' },
   issues: { en: 'Issues', ta: 'இதழ்கள்', hi: 'अंक' },
   issueNo: { en: 'Letter No. {n}', ta: 'கடிதம் எண் {n}', hi: 'लेटर नं. {n}' },
   latest: { en: 'Latest', ta: 'சமீபத்தியது', hi: 'नवीनतम' },

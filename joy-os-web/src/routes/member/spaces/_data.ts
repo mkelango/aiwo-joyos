@@ -364,9 +364,9 @@ export const COUPLES_OPTIONS = ['Not true', 'A little true', 'Mostly true', 'Com
 export const STATE_OF_US_PAST = ['2027-01-17', '2027-01-10', '2027-01-03']
 
 export const CONNECTIONS = [
-  { id: 'cx1', title: 'Connections salon · Food & memory', when: 'Thu 4 Mar · 19:30', where: 'Adyar, Chennai', who: 'Twelve members · hosted by Ravi Shankar', kind: 'Salon' },
-  { id: 'cx2', title: 'Sunrise walk · Elliot’s Beach', when: 'Sun 7 Feb · 06:15', where: 'Besant Nagar', who: 'Eight members of the Fairmont cohort', kind: 'Walk' },
-  { id: 'cx3', title: 'Couples supper · Lovecation alumni', when: 'Sat 20 Feb · 20:00', where: 'Joyspan House Chennai', who: 'Six couples', kind: 'Supper' },
+  { id: 'cx1', title: 'Connections salon · Food & memory', on: '2027-03-04', at: '19:30', where: 'Adyar, Chennai', who: 'Twelve members · hosted by Ravi Shankar', kind: 'Salon' },
+  { id: 'cx2', title: 'Sunrise walk · Elliot’s Beach', on: '2027-02-07', at: '06:15', where: 'Besant Nagar', who: 'Eight members of the Fairmont cohort', kind: 'Walk' },
+  { id: 'cx3', title: 'Couples supper · Lovecation alumni', on: '2027-02-20', at: '20:00', where: 'Joyspan House Chennai', who: 'Six couples', kind: 'Supper' },
 ]
 
 // ─── Freedom ───────────────────────────────────────────────────────────────
@@ -404,12 +404,12 @@ export const PLANNED_START = [
 ]
 
 export const SAVOURING_PROMPTS = [
-  { kind: 'Sensory sharpening', text: 'At your next meal, close your eyes for the first mouthful. Name three flavours before you open them.' },
-  { kind: 'Sharing with others', text: 'Tell someone tonight about one good moment from today, in more detail than feels necessary.' },
-  { kind: 'Memory building', text: 'Take a mental photograph: pause for ten seconds and tell yourself “I want to remember this.”' },
-  { kind: 'Absorption', text: 'Choose one song you love. Listen to the whole of it doing nothing else.' },
-  { kind: 'Counting blessings', text: 'Before sleep, name one thing from today that you would be sorry to have missed.' },
-  { kind: 'Temporal awareness', text: 'Notice something that will not last: the light at 18:10, a grandchild’s height. Stay with it a moment longer.' },
+  { id: 'sv-sensory', kind: 'Sensory sharpening', text: 'At your next meal, close your eyes for the first mouthful. Name three flavours before you open them.' },
+  { id: 'sv-sharing', kind: 'Sharing with others', text: 'Tell someone tonight about one good moment from today, in more detail than feels necessary.' },
+  { id: 'sv-memory', kind: 'Memory building', text: 'Take a mental photograph: pause for ten seconds and tell yourself “I want to remember this.”' },
+  { id: 'sv-absorption', kind: 'Absorption', text: 'Choose one song you love. Listen to the whole of it doing nothing else.' },
+  { id: 'sv-blessings', kind: 'Counting blessings', text: 'Before sleep, name one thing from today that you would be sorry to have missed.' },
+  { id: 'sv-temporal', kind: 'Temporal awareness', text: 'Notice something that will not last: the light at 18:10, a grandchild’s height. Stay with it a moment longer.' },
 ]
 
 export const FILMS = [

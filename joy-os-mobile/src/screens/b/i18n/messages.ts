@@ -60,3 +60,10 @@ export const REPLIES_TEXT: Record<string, L3> = {
   p_sanjay: { en: 'Within 48 h of a referral', ta: 'பரிந்துரைக்குப் பின் 48 மணிநேரத்துக்குள்', hi: 'रेफ़रल के 48 घंटे के अंदर' },
   p_ravi: { en: 'Replies the same day, 08:00–20:00', ta: 'அதே நாளில் பதிலளிப்பார், 08:00–20:00', hi: 'उसी दिन जवाब, 08:00–20:00' },
 }
+
+/** Subjects of the specimen threads (our wording; a subject the member typed stays as typed). {d} is a date in the member's language. */
+export const SUBJECT_T: Record<string, L3 & { date?: string }> = {
+  t_priya: { en: 'Day 15 review and this week', ta: 'நாள் 15 மதிப்பாய்வும் இந்த வாரமும்', hi: 'दिन 15 की समीक्षा और यह हफ़्ता' },
+  t_meera: { en: 'January panel · signed', ta: 'ஜனவரி பரிசோதனை · கையொப்பமிடப்பட்டது', hi: 'जनवरी की जाँच · हस्ताक्षरित' },
+  t_ravi: { en: 'Joyspan Session · Chennai, {d}', ta: 'ஜாய்ஸ்பான் Session · சென்னை, {d}', hi: 'जॉयस्पैन Session · चेन्नई, {d}', date: '2027-02-20' },
+}

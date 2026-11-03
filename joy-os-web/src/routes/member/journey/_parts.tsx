@@ -4,7 +4,8 @@ import { ArrowRight, Bed, ChevronDown, Download, Pause, PartyPopper, Play, Rotat
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { Link } from 'react-router-dom'
 import { Eyebrow, TermChip, TermDot } from '@/components/joy/primitives'
-import { Card, Toggle } from '@/components/ui'
+import { EmptyIllustration } from '@/components/joy/EmptyIllustration'
+import { Card, EmptyState, Toggle } from '@/components/ui'
 import type { TermKey } from '@/domain/types'
 import type { ItemKind } from './_data'
 import { useJ } from './_i18n'
@@ -208,8 +209,49 @@ export function AudioPlayer({ week, title, seconds, transcript, term }: { week: 
   )
 }
 
+/**
+ * An empty state with its editorial illustration (Playbook p51): a single-weight
+ * Ink line drawing with one Daybreak or term-colour fill, above the title.
+ */
+export function JourneyEmpty({ kind, title, body, action }: { kind: 'ledger' | 'cation' | 'occasions' | 'letter' | 'circle' | 'generic'; title: ReactNode; body?: ReactNode; action?: ReactNode }) {
+  return (
+    <EmptyState
+      title={<span className="flex flex-col items-center gap-4"><span aria-hidden className="block"><EmptyIllustration kind={kind} /></span><span>{title}</span></span>}
+      body={body}
+      action={action}
+    />
+  )
+}
+
+/** Print only the element with this id (and nothing marked data-noprint inside it). */
+export function PrintOnly({ id }: { id: string }) {
+  // Scoped to printOnly(id): an ordinary browser print of the page prints the whole page.
+  const on = `html[data-print-only="${id}"]`
+  return (
+    <style>{`@media print {
+  ${on} body * { visibility: hidden !important; }
+  ${on} #${id}, ${on} #${id} * { visibility: visible !important; }
+  ${on} #${id} { position: absolute; left: 0; top: 0; width: 100%; box-shadow: none !important; }
+  ${on} #${id} [data-noprint] { display: none !important; }
+}
+@page { margin: 14mm; }`}</style>
+  )
+}
+
+/** Print only the element PrintOnly names; the scope is lifted again after printing. */
+export function printOnly(id: string) {
+  const root = document.documentElement
+  root.dataset.printOnly = id
+  const clear = () => {
+    if (root.dataset.printOnly === id) delete root.dataset.printOnly
+    window.removeEventListener('afterprint', clear)
+  }
+  window.addEventListener('afterprint', clear)
+  window.print()
+}
+
 /** A thin horizontal "you are here" marker for a phase timeline. */
-export function HereMarker({ label }: { label: string }) {
+export function HereMarker({ label }: { label: ReactNode }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-daybreak-soft px-2.5 py-1 text-[12px] font-medium text-daybreak-ink">
       <span className="h-1.5 w-1.5 rounded-full bg-daybreak" aria-hidden /> {label}
@@ -277,7 +319,7 @@ export function useAfterIndex() {
     const v = value(k)
     return v === null ? '—' : k === 'B' ? `−${v}` : String(v)
   }
-  return { measured: m, ji: m ? String(m.value) : '—', value, cell }
+  return { measured: m, ji: m?.value != null ? String(m.value) : '—', value, cell }
 }
 
 /** Joyspan Occasions, linked from the ’Cation tab and Events: the family templates on the same engine. */

@@ -194,6 +194,11 @@ export const DEMO_ACCOUNTS: DemoAccount[] = [
 // Control plane console.
 export const OPS_ACCOUNT: DemoAccount = { key: 'ops', role: 'ops', email: 'sre.oncall@specimen.aiwo', title: 'Engineering & ops', to: '/console/ops', who: 'SRE on call · DPO', short: 'ops' }
 
+// Concierge: its own 'concierge' role, which acts at the concierge desk of the coach &
+// concierge console (bookings, draws, arrivals), where the coach can only look. Kept
+// apart from DEMO_ACCOUNTS for the same reason as OPS_ACCOUNT.
+export const CONCIERGE_ACCOUNT: DemoAccount = { key: 'concierge', role: 'concierge', email: 'ravi.shankar@specimen.aiwo', title: 'Concierge', to: '/console/coach?desk=concierge', who: 'Ravi Shankar', short: 'concierge' }
+
 // ─── Phone numbers (sign-in and account creation) ───────────────────────────
 
 export const COUNTRIES = [

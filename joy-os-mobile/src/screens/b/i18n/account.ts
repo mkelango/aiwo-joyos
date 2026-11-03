@@ -135,6 +135,7 @@ export const PROFILE = {
   details: { en: 'Personal details', ta: 'தனிப்பட்ட விவரங்கள்', hi: 'निजी जानकारी' },
   mobile: { en: 'Mobile', ta: 'மொபைல்', hi: 'मोबाइल' },
   emergency: { en: 'Emergency contact', ta: 'அவசரத் தொடர்பு', hi: 'आपात संपर्क' },
+  emergencyNone: { en: 'None added yet. Add someone your clinician can call if you cannot be reached.', ta: 'இன்னும் யாரும் சேர்க்கப்படவில்லை. உங்களைத் தொடர்புகொள்ள முடியாதபோது உங்கள் மருத்துவர் அழைக்கக்கூடிய ஒருவரைச் சேர்க்கவும்.', hi: 'अभी कोई नहीं जोड़ा गया। किसी ऐसे व्यक्ति को जोड़ें जिसे आपसे संपर्क न हो पाने पर आपके डॉक्टर फ़ोन कर सकें।' },
   calledOnly: { en: 'Called only by your on-call clinician if you cannot be reached in a crisis.', ta: 'நெருக்கடியில் உங்களைத் தொடர்புகொள்ள முடியாவிட்டால் மட்டுமே, பணியில் இருக்கும் மருத்துவர் இவரை அழைப்பார்.', hi: 'सिर्फ़ तब, जब संकट में आपसे संपर्क न हो पाए, ड्यूटी पर मौजूद डॉक्टर इन्हें फ़ोन करेंगे।' },
   account: { en: 'Account', ta: 'கணக்கு', hi: 'खाता' },
   trustSub: { en: 'Consents, who has seen my data, export', ta: 'ஒப்புதல்கள், என் தரவை யார் பார்த்தார்கள், ஏற்றுமதி', hi: 'सहमतियाँ, मेरा डेटा किसने देखा, निर्यात' },
@@ -157,6 +158,10 @@ export const PROFILE = {
   relationPh: { en: 'e.g. Partner, Son, Friend', ta: 'எ.கா. துணை, மகன், நண்பர்', hi: 'जैसे जीवनसाथी, बेटा, दोस्त' },
   outBody: { en: 'Your Ledger, reflections and anything not yet synced stay on this phone, and are sent when you sign back in with your AIWO ID.', ta: 'உங்கள் லெட்ஜர், சிந்தனைகள், இன்னும் ஒத்திசைக்கப்படாத எதுவும் இந்தத் தொலைபேசியிலேயே இருக்கும்; உங்கள் AIWO ID மூலம் மீண்டும் உள்நுழையும்போது அனுப்பப்படும்.', hi: 'आपका लेजर, विचार और जो अभी सिंक नहीं हुआ, वह इसी फ़ोन पर रहता है, और AIWO ID से फिर साइन इन करने पर भेजा जाता है।' },
   city: { en: 'Chennai', ta: 'சென்னை', hi: 'चेन्नई' },
+  elderLine: { en: 'Elder mode · helper: Arjun', ta: 'மூத்தோர் பயன்முறை · உதவியாளர்: Arjun', hi: 'बुज़ुर्ग मोड · सहायक: Arjun' },
+  elderLineNoHelper: { en: 'Elder mode · no family helper', ta: 'மூத்தோர் பயன்முறை · குடும்ப உதவியாளர் இல்லை', hi: 'बुज़ुर्ग मोड · कोई परिवार-सहायक नहीं' },
+  newLine: { en: 'Member since today', ta: 'இன்று முதல் உறுப்பினர்', hi: 'आज से सदस्य' },
+  errContact: { en: 'Keep a mobile number or an email, so we can reach you.', ta: 'உங்களைத் தொடர்புகொள்ள, ஒரு மொபைல் எண் அல்லது மின்னஞ்சலை வைத்திருங்கள்.', hi: 'हम आप तक पहुँच सकें, इसलिए मोबाइल नंबर या ईमेल रखें।' },
 } satisfies Dict
 
 /** Relations as the member typed them are their own words; these are the common ones we know. */

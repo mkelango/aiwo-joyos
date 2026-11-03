@@ -544,14 +544,14 @@ function CircleOfEight() {
 
 function Connections() {
   const [rsvp, setRsvp] = useSpaceState<Record<string, 'yes' | 'no'>>('people.connections.v1', {})
-  const { t, d } = useSpaceText()
+  const { t, d, wdm } = useSpaceText()
   return (
     <ToolCard className="w-full" eyebrow={t('ppl.cx.eyebrow')} title={t('ppl.cx.title')} sub={t('ppl.cx.sub')}>
       <ul className="space-y-3">
         {CONNECTIONS.map((c) => (
           <li key={c.id} className="rounded-2xl border border-line p-3.5">
             <p className="text-[15px] text-ink">{d(c.title)}</p>
-            <p className="mt-0.5 text-[13px] text-ink-3">{d(c.when)} · {c.where}</p>
+            <p className="mt-0.5 text-[13px] text-ink-3">{wdm(c.on)} · <span className="num">{c.at}</span> · {c.where}</p>
             <p className="text-[13px] text-ink-3">{d(c.who)}</p>
             <div className="mt-2.5 flex flex-wrap gap-2">
               {rsvp[c.id] ? (

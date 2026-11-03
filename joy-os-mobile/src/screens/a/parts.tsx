@@ -314,3 +314,23 @@ function ScrollPad({ children, bottom }: { children: ReactNode; bottom: number }
 
 /** Ink-ground palette (the dark palette's lines and grounds), for borders on InkScreen. */
 export const INK = palettes.dark
+
+/**
+ * The calm note shown where a score, band, delta or Wheel value would be for a member under 18
+ * (Architecture, minors: no scoring). Never an error, never a lock: the rest of the screen stays.
+ */
+export function NotScored({ body, children }: { body: string; children?: ReactNode }) {
+  const { c, space } = useTheme()
+  const { t } = useA()
+  return (
+    <View style={{ gap: space.s1 }} accessibilityLiveRegion="polite">
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Icon name="shield" size={16} color={c.ink2} />
+        <Eyebrow tone="ink2" style={{ flexShrink: 1 }}>{t('Under 18 · not scored')}</Eyebrow>
+      </View>
+      <Body size={22} weight="medium">{t('Not scored while under 18.')}</Body>
+      <Body tone="ink2">{body}</Body>
+      {children}
+    </View>
+  )
+}

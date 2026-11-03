@@ -2,7 +2,8 @@ import { Check } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button, Sheet } from '@/components/ui'
 import type { Role } from '@/domain/types'
-import { DURATIONS, PURPOSES, SCOPES, STRUCTURE_ONLY, access } from './_accessStore'
+import { AGGREGATES_ONLY, DURATIONS, NAMED_MEMBER, PURPOSES, SCOPES, STRUCTURE_ONLY, access, scopeLabel } from './_accessStore'
+import { CLINICAL_RECORDS, COACH_CASELOAD, MEMBER_IDS } from './_data'
 import { areaCls, fieldCls, labelCls } from './_parts'
 
 // Access request for a console the signed-in role cannot open. There is no override,
@@ -10,29 +11,51 @@ import { areaCls, fieldCls, labelCls } from './_parts'
 
 type ConsoleRef = { to: string; label: string }
 
+/** Every specimen member a console knows by id, for naming the one member a grant covers. */
+const KNOWN_MEMBERS: { id: string; name: string }[] = (() => {
+  const byId = new Map<string, string>()
+  for (const [name, id] of Object.entries(MEMBER_IDS)) byId.set(id, name)
+  for (const m of COACH_CASELOAD) if (!byId.has(m.id)) byId.set(m.id, m.name)
+  for (const r of Object.values(CLINICAL_RECORDS)) if (!byId.has(r.id)) byId.set(r.id, r.name)
+  return [...byId].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+})()
+
+/** "m_0001", "Arjun Rao" or "Arjun Rao · m_0001" → the member, or null. */
+function resolveMember(raw: string) {
+  const v = raw.trim().toLowerCase()
+  if (!v) return null
+  const id = v.match(/m_\d{4}/)?.[0]
+  return KNOWN_MEMBERS.find((m) => m.id === id) ?? KNOWN_MEMBERS.find((m) => m.name.toLowerCase() === v) ?? null
+}
+
 export function AccessRequestSheet({ console: c, role, roleLabel, person, onClose }: { console: ConsoleRef | null; role: Role; roleLabel: string; person: string; onClose: () => void }) {
   const jit = c?.to === '/console/ops'
   const [purpose, setPurpose] = useState('')
   const [scope, setScope] = useState(SCOPES[0])
   const [duration, setDuration] = useState(DURATIONS[0])
   const [why, setWhy] = useState('')
-  const [errors, setErrors] = useState<{ purpose?: string; why?: string; form?: string }>({})
+  const [member, setMember] = useState('')
+  const [errors, setErrors] = useState<{ purpose?: string; why?: string; member?: string; form?: string }>({})
   const [sent, setSent] = useState<string | null>(null)
+  const named = scope === NAMED_MEMBER
+  const resolved = named ? resolveMember(member) : null
 
   useEffect(() => {
     if (c) {
-      setPurpose(''); setScope(SCOPES[0]); setDuration(DURATIONS[0]); setWhy(''); setErrors({}); setSent(null)
+      setPurpose(''); setScope(SCOPES[0]); setDuration(DURATIONS[0]); setWhy(''); setMember(''); setErrors({}); setSent(null)
     }
   }, [c])
 
   const submit = () => {
     const e: typeof errors = {}
     if (!purpose) e.purpose = 'Choose the purpose. Access is granted for a purpose, not a person.'
+    if (named && !member.trim()) e.member = 'Name the member: their member id (m_0001) or full name.'
+    else if (named && !resolved) e.member = 'No member by that id or name. Pick one from the list.'
     if (why.trim().length < 15) e.why = 'Write at least a sentence (15 characters) saying why you need it.'
     setErrors(e)
     if (Object.keys(e).length || !c) return
     // The store refuses a second request while one already stands for this console and role.
-    const req = access.request({ to: c.to, label: c.label, role, roleLabel, person, purpose, scope, duration, why: why.trim() })
+    const req = access.request({ to: c.to, label: c.label, role, roleLabel, person, purpose, scope, ...(resolved ? { memberId: resolved.id, memberName: resolved.name } : {}), duration, why: why.trim() })
     if (!req) return setErrors({ form: 'A request for this console is already waiting or granted for your role. See Your access requests.' })
     setSent(req.ref)
   }
@@ -46,11 +69,11 @@ export function AccessRequestSheet({ console: c, role, roleLabel, person, onClos
             <dt className="text-ink-3">Reference</dt><dd className="num text-ink">{sent}</dd>
             <dt className="text-ink-3">Requested by</dt><dd className="text-ink">{person} · {roleLabel}</dd>
             <dt className="text-ink-3">Purpose</dt><dd className="text-ink">{purpose}</dd>
-            <dt className="text-ink-3">Scope</dt><dd className="text-ink">{scope}</dd>
+            <dt className="text-ink-3">Scope</dt><dd className="text-ink">{scopeLabel({ scope, memberId: resolved?.id, memberName: resolved?.name })}</dd>
             <dt className="text-ink-3">Duration</dt><dd className="text-ink">{duration}</dd>
           </dl>
           <p className="text-[15px] text-ink-2">{jit ? 'A second engineer approves or declines within 30 minutes. The grant expires on its own; every action under it is audited.' : 'You will be told within 24 h. Nothing opens until it is approved, and the request itself is written to the audit.'}</p>
-          <p className="text-[13px] text-ink-3">It now waits under Your access requests on All consoles, where this specimen lets you play {jit ? 'the second engineer' : 'the DPO'} and decide it.{scope === STRUCTURE_ONLY ? ' A structure-only grant lets you look, never act on a member.' : ''}</p>
+          <p className="text-[13px] text-ink-3">It now waits under Your access requests on All consoles, where this specimen lets you play {jit ? 'the second engineer' : 'the DPO'} and decide it.{scope === STRUCTURE_ONLY ? ' A structure-only grant lets you look, never act on a member.' : scope === AGGREGATES_ONLY ? ' An aggregates-only grant never acts on a member’s record.' : named && resolved ? ` A one-member grant acts on ${resolved.name}’s record only.` : ''}</p>
           <div className="flex justify-end"><Button variant="ink" onClick={onClose}>Done</Button></div>
         </div>
       ) : (
@@ -67,7 +90,7 @@ export function AccessRequestSheet({ console: c, role, roleLabel, person, onClos
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label htmlFor="acc-scope" className={labelCls}>Member scope</label>
-              <select id="acc-scope" className={fieldCls} value={scope} onChange={(e) => setScope(e.target.value)}>
+              <select id="acc-scope" className={fieldCls} value={scope} onChange={(e) => { setScope(e.target.value); setErrors((x) => ({ ...x, member: undefined })) }}>
                 {SCOPES.map((p) => <option key={p}>{p}</option>)}
               </select>
             </div>
@@ -78,6 +101,18 @@ export function AccessRequestSheet({ console: c, role, roleLabel, person, onClos
               </select>
             </div>
           </div>
+          {named && (
+            <div>
+              <label htmlFor="acc-member" className={labelCls}>The named member</label>
+              <input id="acc-member" list="acc-member-list" className={fieldCls} value={member} onChange={(e) => { setMember(e.target.value); setErrors((x) => ({ ...x, member: undefined })) }} placeholder="Member id or full name, e.g. m_0001" autoComplete="off" aria-invalid={!!errors.member} aria-describedby={errors.member ? 'acc-member-err' : 'acc-member-help'} />
+              <datalist id="acc-member-list">
+                {KNOWN_MEMBERS.map((m) => <option key={m.id} value={`${m.name} · ${m.id}`} />)}
+              </datalist>
+              {errors.member
+                ? <p id="acc-member-err" className="mt-1.5 text-[13px] text-error">{errors.member}</p>
+                : <p id="acc-member-help" className="mt-1.5 text-[13px] text-ink-3">{resolved ? <>The grant covers <span className="text-ink">{resolved.name}</span> (<span className="num">{resolved.id}</span>) and nobody else.</> : 'The grant acts on this one record; every other member stays view only.'}</p>}
+            </div>
+          )}
           <div>
             <label htmlFor="acc-why" className={labelCls}>Justification</label>
             <textarea id="acc-why" rows={3} className={areaCls} value={why} onChange={(e) => { setWhy(e.target.value); setErrors((x) => ({ ...x, why: undefined })) }} placeholder="What you need to do, for whom, and why now." aria-invalid={!!errors.why} aria-describedby={errors.why ? 'acc-why-err' : 'acc-why-help'} />

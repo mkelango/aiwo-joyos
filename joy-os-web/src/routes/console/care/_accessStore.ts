@@ -9,7 +9,16 @@ import { consoleNowMs, fmtClock } from './_parts'
 export const PURPOSES = ['Care continuity · covering a colleague', 'Clinical escalation', 'Quality review', 'Incident investigation', 'Audit or DPO request']
 /** A structure-only grant opens the console for viewing, as the preview already does; it never acts on a member. */
 export const STRUCTURE_ONLY = 'No member data · console structure only'
-export const SCOPES = [STRUCTURE_ONLY, 'One named member', 'My assigned members only', 'Aggregates only (k ≥ 10)']
+export const NAMED_MEMBER = 'One named member'
+export const ASSIGNED_MEMBERS = 'My assigned members only'
+export const AGGREGATES_ONLY = 'Aggregates only (k ≥ 10)'
+export const SCOPES = [STRUCTURE_ONLY, NAMED_MEMBER, ASSIGNED_MEMBERS, AGGREGATES_ONLY]
+/**
+ * Consoles whose every action lands on one member's record. There an aggregates-only grant
+ * looks but never acts; on the platform consoles (tenant, science, ops, exec) it may act,
+ * since the work there is on aggregates.
+ */
+export const MEMBER_CONSOLES = ['/console/coach', '/console/clinical', '/console/partner']
 export const DURATIONS = ['1 hour', '4 hours', '24 hours', '7 days']
 const DURATION_MS: Record<string, number> = { '1 hour': 3600_000, '4 hours': 4 * 3600_000, '24 hours': 24 * 3600_000, '7 days': 7 * 24 * 3600_000 }
 
@@ -25,6 +34,9 @@ export type AccessRequest = {
   person: string
   purpose: string
   scope: string
+  /** For a one-named-member grant: the member it covers, and only that member. */
+  memberId?: string
+  memberName?: string
   duration: string
   why: string
   /** Console clock (ms) when sent, decided and when a grant ends. */
@@ -75,8 +87,22 @@ export function useAccessRequests() {
 
 /** Whether a grant is still running on the console clock. */
 export const isLive = (r: AccessRequest, now: number) => r.status === 'granted' && (r.expiresAt ?? 0) > now
-/** Whether a live grant lets the holder act, not only look. */
-export const grantActs = (r: AccessRequest) => r.scope !== STRUCTURE_ONLY
+/**
+ * Whether a live grant lets the holder act, not only look: on the console as a whole (no
+ * member given) or on one member's record. Fails closed. Structure only never acts; aggregates
+ * only never acts on a member (nor anywhere on a member console); one named member acts on
+ * that member's record and nowhere else; assigned members acts as the console's own role does.
+ */
+export function grantActs(r: AccessRequest, memberId?: string | null) {
+  if (r.scope === STRUCTURE_ONLY) return false
+  if (r.scope === AGGREGATES_ONLY) return !memberId && !MEMBER_CONSOLES.includes(r.to)
+  if (r.scope === NAMED_MEMBER) return !!memberId && !!r.memberId && memberId === r.memberId
+  return true
+}
+
+/** The scope as written on a request or grant: "One named member · Arjun Rao (m_0001)". */
+export const scopeLabel = (r: Pick<AccessRequest, 'scope' | 'memberId' | 'memberName'>) =>
+  r.scope === NAMED_MEMBER && r.memberId ? `${r.scope} · ${r.memberName ?? r.memberId} (${r.memberId})` : r.scope
 
 /** The request that currently stands for this console and role: pending, or a grant still running. */
 export function standingRequest(list: AccessRequest[], to: string, role: Role, now: number) {
@@ -135,3 +161,8 @@ export const access = {
     emit({ requests: [], seq: 4127 })
   },
 }
+
+/** Send an access request (any console, including the control plane's JIT). Null while one already stands. */
+export const addAccessRequest = (r: Omit<AccessRequest, 'ref' | 'sentAt' | 'status'>) => access.request(r)
+/** The DPO (or, for the control plane, the second engineer) grants or declines a pending request. */
+export const decideAccessRequest = (ref: string, decision: 'granted' | 'declined', reason?: string) => access.decide(ref, decision, reason)

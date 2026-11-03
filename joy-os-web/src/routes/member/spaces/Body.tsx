@@ -13,6 +13,7 @@ import { BIOMARKERS, CAPACITY, CAPACITY_HISTORY_START, LE8, LE8_HEIGHT_CM, LE8_K
 import { ChartTip, SpaceShell, ToolCard, axisTick, Toggle } from './_SpaceShell'
 import { useSpaceText, type SpKey } from './_i18n'
 import { useSpaceState } from './_state'
+import { useIsMinor } from '@/lib/minor'
 
 // BODY · Healthspan (Memo p.19): device link, Life's Essential 8, biomarker vault
 // (from LifeOS, physician-signed), capacity battery at home, signal trends as
@@ -40,6 +41,9 @@ export default function Body() {
 
 // ─── Device link ──────────────────────────────────────────────────────────
 
+/** The day the device consents (Oura, Apple Health) were given in setup (data/member CONSENTS). */
+const DEVICE_CONSENT_ON = '2026-07-07'
+
 // The device record /app/devices keeps (joyos:acct:devices) is the one source of truth:
 // a link or disconnect here shows there, and the reverse. Same key, same shape.
 type DeviceOverride = { state: DeviceState; lastSync?: string; freshness?: 'fresh' | 'stale' }
@@ -63,7 +67,7 @@ function DeviceLink() {
   const [note, setNote] = useState('')
   const timer = useRef<number | undefined>(undefined)
   useEffect(() => () => window.clearTimeout(timer.current), [])
-  const { t, r } = useSpaceText()
+  const { t, r, lang } = useSpaceText()
   const dx = useAccountData()
   const link = (dv: AcctDevice) => {
     setLinking(dv.id); setNote('')
@@ -123,7 +127,7 @@ function DeviceLink() {
       </ul>
       {note && <p role="status" className="mt-3 flex items-center gap-2 text-[14px] text-ink-2"><Check size={14} className="shrink-0" aria-hidden /> {note}</p>}
       <Link to="/app/devices" className="mt-4 inline-flex items-center gap-1.5 self-start rounded text-[15px] text-ink underline-offset-4 hover:underline focus-ring">{t('body.dev.manage')} <ArrowRight size={15} /></Link>
-      <p className="mt-4 flex items-start gap-2 text-[13px] text-ink-3"><ShieldCheck size={15} className="mt-0.5 shrink-0" aria-hidden /> <span>{r('body.dev.consent', { link: <Link to="/app/trust" className="rounded underline underline-offset-4 focus-ring">{t('c.trust')}</Link> })}</span></p>
+      <p className="mt-4 flex items-start gap-2 text-[13px] text-ink-3"><ShieldCheck size={15} className="mt-0.5 shrink-0" aria-hidden /> <span>{r('body.dev.consent', { d: <span className="num">{fmtDate(DEVICE_CONSENT_ON, lang)}</span>, link: <Link to="/app/trust" className="rounded underline underline-offset-4 focus-ring">{t('c.trust')}</Link> })}</span></p>
       <Sheet open={!!confirm} onClose={() => setConfirm(null)} title={t('body.dev.disconnectQ', { name: confirm?.name ?? '' })} side="center">
         {confirm && (
           <>
@@ -179,8 +183,12 @@ function Le8Tracker() {
   const [store, setStore] = useSpaceState<{ log: Le8Reading[] }>(LE8_KEY, { log: LE8_LOG_START })
   const [logging, setLogging] = useState<Le8Key | null>(null)
   const [savedNote, setSavedNote] = useState('')
-  const { t, d, dm } = useSpaceText()
+  const { t, d, dm, mon } = useSpaceText()
+  // Under 18 nothing is scored: the readings stay, the composite, per-metric scores and bands do not.
+  const minor = useIsMinor()
   const reading = useLe8Reading()
+  // 'Panel · Jan' (the specimen panel, also in saved logs): the month comes from the panel date, in the member's language.
+  const source = (src: string) => (src.startsWith('Panel · ') ? `${d('Panel')} · ${mon(PANEL_META.drawn)}` : d(src))
   const latest = useMemo(() => le8Latest(store.log), [store.log])
   const series = useMemo(() => le8Series(store.log), [store.log])
   const rows = LE8.map((m) => {
@@ -195,7 +203,8 @@ function Le8Tracker() {
     // One reading a day per metric: a second one today replaces the first you logged.
     setStore((s) => ({ log: [...s.log.filter((x) => !(x.mine && x.key === key && x.on === SPACE_TODAY)), entry] }))
     setLogging(null)
-    setSavedNote(t('body.le8.saved', { name: d(LE8.find((m) => m.key === key)!.name), score: le8Score(key, v) }))
+    const name = d(LE8.find((m) => m.key === key)!.name)
+    setSavedNote(minor ? t('mn.le8Saved', { name }) : t('body.le8.saved', { name, score: le8Score(key, v) }))
   }
   const remove = (id: string) => setStore((s) => ({ log: s.log.filter((x) => x.id !== id) }))
   return (
@@ -203,10 +212,10 @@ function Le8Tracker() {
       className="w-full"
       eyebrow="Life’s Essential 8 · AHA"
       title={<>{t('body.le8.title')}</>}
-      sub={t('body.le8.sub')}
-      aside={<div className="text-right"><span className="num block text-[2.25rem] font-light leading-none text-ink">{composite}</span><span className="eyebrow text-ink-3">{t('body.le8.composite')}</span></div>}
+      sub={minor ? t('mn.le8') : t('body.le8.sub')}
+      aside={minor ? undefined : <div className="text-right"><span className="num block text-[2.25rem] font-light leading-none text-ink">{composite}</span><span className="eyebrow text-ink-3">{t('body.le8.composite')}</span></div>}
     >
-      {series.length > 1 && (
+      {series.length > 1 && !minor && (
         <div className="mb-4 rounded-xl bg-paper-sunk p-3">
           <p className="eyebrow text-ink-3">{t('body.le8.trend')}</p>
           <div className="mt-2 h-[88px]" aria-hidden>
@@ -230,14 +239,18 @@ function Le8Tracker() {
             <li key={m.key}>
               <button onClick={() => { setOpen(open === m.key ? null : m.key); setLogging(null) }} aria-expanded={open === m.key} className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 py-3 text-left focus-ring rounded sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)_auto]">
                 <span className="min-w-0 break-words text-[15px] text-ink">{d(m.name)}</span>
-                <span className="order-3 col-span-2 flex items-center gap-3 sm:order-none sm:col-span-1">
-                  <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-paper-sunk" aria-hidden>
-                    <span className="block h-full rounded-full bg-term-h" style={{ width: `${m.score}%`, opacity: m.status === 'watch' ? 0.55 : 1 }} />
+                {minor ? (
+                  <span className="order-3 col-span-2 min-w-0 break-words text-[13px] text-ink-3 sm:order-none sm:col-span-1">{m.r ? reading(m.r) : d(m.reading)}</span>
+                ) : (
+                  <span className="order-3 col-span-2 flex items-center gap-3 sm:order-none sm:col-span-1">
+                    <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-paper-sunk" aria-hidden>
+                      <span className="block h-full rounded-full bg-term-h" style={{ width: `${m.score}%`, opacity: m.status === 'watch' ? 0.55 : 1 }} />
+                    </span>
+                    <span className="num w-8 text-right text-[14px] text-ink">{m.score}</span>
                   </span>
-                  <span className="num w-8 text-right text-[14px] text-ink">{m.score}</span>
-                </span>
+                )}
                 <span className="flex items-center gap-2">
-                  <span className={clsx('text-right text-[12px]', m.status === 'watch' ? 'text-ink' : 'text-ink-3')}>{label[m.status]}</span>
+                  {!minor && <span className={clsx('text-right text-[12px]', m.status === 'watch' ? 'text-ink' : 'text-ink-3')}>{label[m.status]}</span>}
                   <ChevronDown size={15} className={clsx('text-ink-3 transition-transform', open === m.key && 'rotate-180')} aria-hidden />
                 </span>
               </button>
@@ -249,7 +262,7 @@ function Le8Tracker() {
                         <div>
                           <span className="eyebrow block text-ink-3">{t('body.reading')}</span>
                           <span className="num text-ink">{m.r ? reading(m.r) : d(m.reading)}</span>
-                          <span className="block text-[12px] text-ink-3">{d(m.r?.source ?? m.source)}{m.r ? <> · <span className="num">{dm(m.r.on)}</span></> : null}</span>
+                          <span className="block text-[12px] text-ink-3">{source(m.r?.source ?? m.source)}{m.r ? <> · <span className="num">{dm(m.r.on)}</span></> : null}</span>
                         </div>
                         <p className="text-ink-2 sm:border-l sm:border-line sm:pl-4">{d(LE8_IDEAL[m.key])}</p>
                       </div>
@@ -260,9 +273,9 @@ function Le8Tracker() {
                             {hist.map((x) => (
                               <li key={x.id} className="grid grid-cols-[4.25rem_minmax(0,1fr)_auto] items-center gap-2 text-[13px]">
                                 <span className="num text-ink-3">{dm(x.on)}</span>
-                                <span className="min-w-0 break-words text-ink">{reading(x)} <span className="text-ink-3">· {d(x.source)}</span></span>
+                                <span className="min-w-0 break-words text-ink">{reading(x)} <span className="text-ink-3">· {source(x.source)}</span></span>
                                 <span className="flex items-center gap-1.5">
-                                  <span className="num text-ink-2" aria-label={t('body.le8.score', { n: le8Score(x.key, x.v) })}>{le8Score(x.key, x.v)}</span>
+                                  {!minor && <span className="num text-ink-2" aria-label={t('body.le8.score', { n: le8Score(x.key, x.v) })}>{le8Score(x.key, x.v)}</span>}
                                   {x.mine && <button type="button" onClick={() => remove(x.id)} aria-label={t('body.le8.removeReading', { d: dm(x.on) })} className="rounded-full p-1 text-ink-3 hover:bg-paper-raised focus-ring"><Trash2 size={13} /></button>}
                                 </span>
                               </li>
@@ -803,24 +816,55 @@ function CapacityHistory({ history }: { history: { on: string; values: number[] 
 
 // ─── Biological age ───────────────────────────────────────────────────────
 
+// The estimate as the physician signs it at Day 45 (specimen): a range, never a single number to chase.
+const BIO_AGE = { low: 49, high: 52 }
+
 function BiologicalAge() {
   const [asked, setAsked] = useSpaceState('body.bioAge.asked.v1', false)
-  const { t } = useSpaceText()
+  // A specimen switch shows the card as it reads once the physician has signed the estimate.
+  const [signedView, setSignedView] = useSpaceState('body.bioAge.signedView.v1', false)
+  const { t, dm } = useSpaceText()
+  const doc = PANEL_META.signedBy
   return (
-    <ToolCard className="w-full" tone="sunk" eyebrow={t('body.ba.eyebrow')} aside={<Lock size={16} className="text-ink-3" aria-hidden />}>
+    <ToolCard className="w-full" tone="sunk" eyebrow={t('body.ba.eyebrow')} aside={signedView ? <ShieldCheck size={16} className="text-ink-3" aria-hidden /> : <Lock size={16} className="text-ink-3" aria-hidden />}>
       <div className="flex flex-1 flex-col">
-        <div className="flex h-28 items-center justify-center rounded-2xl border border-dashed border-line-strong">
-          <span className="num text-[3rem] font-light text-ink-3" aria-label={t('body.ba.locked')}>— —</span>
-        </div>
-        <p className="mt-5 text-[17px] text-ink">{t('body.ba.t')}</p>
-        <p className="mt-1.5 text-[15px] text-ink-2">{t('body.ba.b')}</p>
+        <AnimatePresence mode="wait" initial={false}>
+          {signedView ? (
+            <motion.div key="signed" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }}>
+              <div className="flex h-28 flex-col items-center justify-center rounded-2xl border border-line bg-paper-raised" role="img" aria-label={t('body.ba.signedAria', { a: BIO_AGE.low, b: BIO_AGE.high, name: doc })}>
+                <span className="num text-[3rem] font-light leading-none text-ink" aria-hidden>{BIO_AGE.low} – {BIO_AGE.high}</span>
+                <span className="mt-1.5 text-[13px] text-ink-3" aria-hidden>{t('body.ba.years')}</span>
+              </div>
+              <p className="mt-5 text-[17px] text-ink">{t('body.ba.signedBy', { name: doc })}</p>
+              <p className="mt-1.5 text-[15px] text-ink-2">{t('body.ba.signedB', { name: doc })}</p>
+            </motion.div>
+          ) : (
+            <motion.div key="locked" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }}>
+              <div className="flex h-28 items-center justify-center rounded-2xl border border-dashed border-line-strong">
+                <span className="num text-[3rem] font-light text-ink-3" aria-label={t('body.ba.locked')}>— —</span>
+              </div>
+              <p className="mt-5 text-[17px] text-ink">{t('body.ba.t')}</p>
+              <p className="mt-1.5 text-[15px] text-ink-2">{t('body.ba.b')}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <ol className="mt-5 space-y-2 text-[14px]">
-          <li className="flex items-center gap-2 text-ink"><Check size={15} className="shrink-0" aria-hidden /> {t('body.ba.s1')}</li>
-          <li className="flex items-center gap-2 text-ink"><Check size={15} className="shrink-0" aria-hidden /> {t('body.ba.s2')}</li>
-          <li className="flex items-center gap-2 text-ink-3"><span className="ml-[3px] h-2 w-2 shrink-0 rounded-full border border-line-strong" aria-hidden /> <span className="ml-0.5">{t('body.ba.s3')}</span></li>
+          <li className="flex items-center gap-2 text-ink"><Check size={15} className="shrink-0" aria-hidden /> {t('body.ba.s1', { d: dm(PANEL_META.drawn) })}</li>
+          <li className="flex items-center gap-2 text-ink"><Check size={15} className="shrink-0" aria-hidden /> {t('body.ba.s2', { d: dm(PANEL_META.signed) })}</li>
+          {signedView
+            ? <li className="flex items-center gap-2 text-ink"><Check size={15} className="shrink-0" aria-hidden /> {t('body.ba.s3')}</li>
+            : <li className="flex items-center gap-2 text-ink-3"><span className="ml-[3px] h-2 w-2 shrink-0 rounded-full border border-line-strong" aria-hidden /> <span className="ml-0.5">{t('body.ba.s3')}</span></li>}
         </ol>
+        {!signedView && (
+          <div className="pt-5">
+            {asked ? <p className="text-[14px] text-ink-2" role="status">{t('body.ba.added')}</p> : <Button size="sm" onClick={() => setAsked(true)}>{t('body.ba.add')}</Button>}
+          </div>
+        )}
         <div className="mt-auto pt-5">
-          {asked ? <p className="text-[14px] text-ink-2" role="status">{t('body.ba.added')}</p> : <Button size="sm" onClick={() => setAsked(true)}>{t('body.ba.add')}</Button>}
+          <div className="space-y-3 border-t border-line pt-4">
+            <SpecimenTag className="inline-flex" />
+            <Toggle checked={signedView} onChange={setSignedView} label={t('body.ba.view', { name: doc })} description={t('body.ba.viewDesc')} />
+          </div>
         </div>
       </div>
     </ToolCard>

@@ -5,10 +5,11 @@ import { Link } from 'react-router-dom'
 import { DaybreakButton, Eyebrow, SpecimenTag } from '@/components/joy/primitives'
 import { Avatar, Button, Card, PageHeader, Pill } from '@/components/ui'
 import {
-  CLINICAL_RECORDS, COACH_CASELOAD, CONCIERGE_ARRIVALS, CONCIERGE_BOOKINGS, CONCIERGE_DRAWS, CONFIRMED_AT_START, DAY_N, DRAWS_AT_START, DRAW_SLOTS, NEXT_BY_TERM,
-  PHLEBOTOMISTS, PRE_ARRIVAL_STEPS, RAVI, TALK_OUTCOMES, TALK_SLOTS, digestFor, type ConciergeBooking, type ConciergeDraw,
+  ARRIVALS, CLINICAL_RECORDS, COACH_CASELOAD, CONCIERGE_ARRIVALS, CONCIERGE_BOOKINGS, CONCIERGE_DRAWS, CONFIRMED_AT_START, DAY_N, DRAWS_AT_START, DRAW_SLOTS, NEXT_BY_TERM,
+  PHLEBOTOMISTS, PRE_ARRIVAL_STEPS, RAVI, TALK_OUTCOMES, TALK_SLOTS, digestFor, type ConciergeArrival, type ConciergeBooking, type ConciergeDraw,
 } from './_data'
-import { clinical, useClinicalState } from './_clinicalStore'
+import { usePartnerPublished, usePartnerSaved, type GuestPublished } from './_partnerStore'
+import { REDRAW, clinical, useClinicalState } from './_clinicalStore'
 import { PreviewBanner, useConsoleAccess } from './_gate'
 import { coach, useCoachState, type BookingWork, type DrawWork } from './_store'
 import { AccessNote, AuditList, CardHead, ConsoleTermChip, Kpi, areaCls, fieldCls, fmtClock, labelCls, useConsoleNow } from './_parts'
@@ -27,7 +28,10 @@ const orderKey = (memberId: string, o: { when: string; test: string }) => `rx|${
 
 export function ConciergeDesk({ deskSwitch }: { deskSwitch: ReactNode }) {
   const now = useConsoleNow()
-  const { canAct } = useConsoleAccess('/console/coach#concierge')
+  const access = useConsoleAccess('/console/coach#concierge')
+  const { canAct } = access
+  // The desk log names whoever acted (the signed-in demo person), not always the desk's concierge.
+  const actor = access.chosen ? access.person : RAVI.name
   const { concierge: w } = useCoachState()
   const { records } = useClinicalState()
   const clock = fmtClock(now)
@@ -43,29 +47,37 @@ export function ConciergeDesk({ deskSwitch }: { deskSwitch: ReactNode }) {
   const [talkNote, setTalkNote] = useState<Record<string, string>>({})
   const [talkErr, setTalkErr] = useState<Record<string, string>>({})
 
-  const log = (what: string, purpose: string) => coach.updateConcierge((c) => ({ ...c, log: [{ at: clock, who: RAVI.name, what, purpose }, ...c.log] }))
+  const log = (what: string, purpose: string) => coach.updateConcierge((c) => ({ ...c, log: [{ at: clock, who: actor, what, purpose }, ...c.log] }))
 
-  // ── Home draws: those already on the desk, plus STAT draws the clinical portal ordered tonight.
+  // ── Home draws: those already on the desk, plus STAT draws the clinical portal ordered tonight
+  // and redraws for a Clinical-grade draft the physician returned to the lab and concierge.
   const liveDraws: ConciergeDraw[] = Object.entries(records).flatMap(([memberId, rw]) =>
-    rw.orders.filter((o) => o.when.includes('STAT')).map((o) => ({
-      id: orderKey(memberId, o),
-      memberId,
-      member: CLINICAL_RECORDS[memberId]?.name ?? memberId,
-      city: digestFor(memberId)?.city ?? 'Address on file',
-      reason: 'Repeat sample · clinical order (the test stays with the clinician)',
-      fasting: false,
-      requested: `${o.when.replace(/^Ordered /, '').split(' · ')[0]} · STAT tonight`,
-      by: 'Clinical portal',
-    })),
+    rw.orders.filter((o) => o.when.includes('STAT') || o.when.includes(REDRAW)).map((o) => {
+      const redraw = o.when.includes(REDRAW)
+      const at = o.when.replace(/^Ordered /, '').split(' · ')[0]
+      return {
+        id: orderKey(memberId, o),
+        memberId,
+        member: CLINICAL_RECORDS[memberId]?.name ?? digestFor(memberId)?.name ?? memberId,
+        city: digestFor(memberId)?.city ?? 'Address on file',
+        reason: redraw ? 'Redraw · the physician returned a sample to the lab (the test stays with the clinician)' : 'Repeat sample · clinical order (the test stays with the clinician)',
+        fasting: redraw && o.when.endsWith('fasting'),
+        requested: redraw ? `${at} · redraw, next morning slot` : `${at} · STAT tonight`,
+        by: redraw ? 'Clinical portal · sign-off returned' : 'Clinical portal',
+      }
+    }),
   )
   const drawOf = (d: ConciergeDraw): DrawWork => w.draws[d.id] ?? DRAWS_AT_START[d.id] ?? { status: 'to-dispatch' }
   // Open draws first (STAT ahead), those already with the lab last.
   const draws = [...liveDraws, ...CONCIERGE_DRAWS].sort((a, b) => Number(drawOf(a).status === 'at-lab') - Number(drawOf(b).status === 'at-lab'))
-  const isStat = (d: ConciergeDraw) => d.id.startsWith('rx|')
+  /** Ordered from the clinical portal (a STAT draw or a redraw), so its status is written back there. */
+  const isOrdered = (d: ConciergeDraw) => d.id.startsWith('rx|')
+  const isRedraw = (d: ConciergeDraw) => isOrdered(d) && d.by.endsWith('sign-off returned')
+  const isStat = (d: ConciergeDraw) => isOrdered(d) && !isRedraw(d)
   const setDraw = (d: ConciergeDraw, next: DrawWork, orderStatus: string) => {
     coach.updateConcierge((c) => ({ ...c, draws: { ...c.draws, [d.id]: next } }))
     // A clinical order's status follows the draw, so the clinician sees where the sample is.
-    if (isStat(d)) clinical.updateRecord(d.memberId, (rw) => ({ ...rw, orders: rw.orders.map((o) => (orderKey(d.memberId, o) === d.id ? { ...o, status: orderStatus } : o)) }))
+    if (isOrdered(d)) clinical.updateRecord(d.memberId, (rw) => ({ ...rw, orders: rw.orders.map((o) => (orderKey(d.memberId, o) === d.id ? { ...o, status: orderStatus } : o)) }))
   }
   const openDispatch = (d: ConciergeDraw) => {
     setDispatching(d.id)
@@ -104,8 +116,36 @@ export function ConciergeDesk({ deskSwitch }: { deskSwitch: ReactNode }) {
     log(what, 'Booking')
   }
 
-  // ── Pre-arrival
-  const arrivalOf = (id: string) => w.arrivals[id] ?? { done: CONCIERGE_ARRIVALS.find((a) => a.id === id)?.done ?? [], briefAt: null }
+  // ── Pre-arrival: the desk's own arrivals, plus every guest whose itinerary the venue has
+  // published in the partner console (the same schedule the guest's app shows).
+  const published = usePartnerPublished()
+  const venueArrivals = usePartnerSaved<typeof ARRIVALS>('arrivals') ?? ARRIVALS
+  const pubFor = (guest: string) => Object.values(published).find((p) => p.guest === guest)
+  // A published schedule is already shared with the guest (step 4 of the checklist).
+  const SHARED_STEP = 3
+  const preArrivals: (ConciergeArrival & { itinerary?: GuestPublished })[] = [
+    ...Object.values(published)
+      .filter((p) => !CONCIERGE_ARRIVALS.some((a) => a.guest === p.guest))
+      .map((p) => {
+        const g = venueArrivals.find((x) => x.id === p.guestId)
+        return {
+          id: `pub-${p.guestId}`,
+          guest: p.guest,
+          cation: g ? `${g.cation} · ${g.nights} nights` : p.cation,
+          where: p.venue,
+          when: g ? `Today · ${g.eta}${g.status === 'arrived' ? ' · checked in' : g.status === 'delayed' ? ' (delayed)' : ''}` : 'Arriving',
+          transfer: 'Not on file · ask the guest',
+          dietary: g?.dietary ?? 'No preference noted',
+          done: [SHARED_STEP],
+          itinerary: p,
+        }
+      }),
+    ...CONCIERGE_ARRIVALS.map((a) => {
+      const itinerary = pubFor(a.guest)
+      return { ...a, itinerary, done: itinerary && !a.done.includes(SHARED_STEP) ? [...a.done, SHARED_STEP].sort() : a.done }
+    }),
+  ]
+  const arrivalOf = (id: string) => w.arrivals[id] ?? { done: preArrivals.find((a) => a.id === id)?.done ?? [], briefAt: null }
   const toggleStep = (id: string, i: number) => {
     if (!canAct) return
     const cur = arrivalOf(id)
@@ -114,7 +154,7 @@ export function ConciergeDesk({ deskSwitch }: { deskSwitch: ReactNode }) {
   }
   const sendBrief = (id: string) => {
     if (!canAct) return
-    const a = CONCIERGE_ARRIVALS.find((x) => x.id === id)!
+    const a = preArrivals.find((x) => x.id === id)!
     coach.updateConcierge((c) => ({ ...c, arrivals: { ...c.arrivals, [id]: { ...arrivalOf(id), briefAt: clock } } }))
     log(`Sent the pre-arrival brief for ${a.guest} to ${a.where} · name, room, dietary, schedule`, 'Pre-arrival')
   }
@@ -150,7 +190,7 @@ export function ConciergeDesk({ deskSwitch }: { deskSwitch: ReactNode }) {
   const statDue = draws.find((d) => isStat(d) && drawOf(d).status === 'to-dispatch')
   const drawDue = statDue ?? draws.find((d) => drawOf(d).status === 'to-dispatch')
   const bookingDue = bookings.find((b) => bookingOf(b).status === 'requested')
-  const arrivalDue = CONCIERGE_ARRIVALS.find((a) => !arrivalOf(a.id).briefAt)
+  const arrivalDue = preArrivals.find((a) => !arrivalOf(a.id).briefAt)
   const talkDue = talks.find((m) => !talkOf(m.id).slot)
   const next = drawDue
     ? { id: domId(drawDue.id), label: statDue ? 'Dispatch tonight’s home draw' : 'Dispatch the next home draw', what: `${drawDue.member} · ${drawDue.city} · ${drawDue.requested}`, run: () => openDispatch(drawDue) }
@@ -171,7 +211,7 @@ export function ConciergeDesk({ deskSwitch }: { deskSwitch: ReactNode }) {
 
   const openDraws = draws.filter((d) => drawOf(d).status !== 'at-lab').length
   const toConfirm = bookings.filter((b) => ['requested', 'offered'].includes(bookingOf(b).status)).length
-  const briefsDue = CONCIERGE_ARRIVALS.filter((a) => !arrivalOf(a.id).briefAt).length
+  const briefsDue = preArrivals.filter((a) => !arrivalOf(a.id).briefAt).length
   const talksDue = talks.filter((m) => !talkOf(m.id).outcome).length
 
   return (
@@ -229,7 +269,7 @@ export function ConciergeDesk({ deskSwitch }: { deskSwitch: ReactNode }) {
                       <p className="mt-0.5 text-[14px] text-ink-2">{d.reason}{d.fasting ? ' · fasting' : ''}</p>
                       <p className="mt-0.5 text-[13px] text-ink-3">Needed {d.requested} · from {d.by}</p>
                     </div>
-                    <Pill tone={isStat(d) && st.status === 'to-dispatch' ? 'ink' : undefined}>{isStat(d) ? 'STAT · ' : ''}{DRAW_LABEL[st.status]}</Pill>
+                    <Pill tone={isStat(d) && st.status === 'to-dispatch' ? 'ink' : undefined}>{isStat(d) ? 'STAT · ' : isRedraw(d) ? 'Redraw · ' : ''}{DRAW_LABEL[st.status]}</Pill>
                   </div>
                   {st.phleb && <p className="mt-2 text-[14px] text-ink-2">{st.phleb} · {st.slot}{st.at ? <> · updated <span className="num">{st.at}</span></> : null}</p>}
                   {st.status === 'to-dispatch' && dispatching !== d.id && (
@@ -336,7 +376,7 @@ export function ConciergeDesk({ deskSwitch }: { deskSwitch: ReactNode }) {
         <Card className="min-w-0">
           <CardHead eyebrow="Pre-arrival · next 72 h" title="Before the guest walks in" aside={<BedDouble size={18} className="text-ink-3" aria-hidden />} />
           <ul className="space-y-5">
-            {CONCIERGE_ARRIVALS.map((a) => {
+            {preArrivals.map((a) => {
               const st = arrivalOf(a.id)
               const ready = st.done.length === PRE_ARRIVAL_STEPS.length
               return (
@@ -350,6 +390,14 @@ export function ConciergeDesk({ deskSwitch }: { deskSwitch: ReactNode }) {
                     {st.briefAt ? <Pill tone="ink"><Check size={12} aria-hidden /> Brief sent {st.briefAt}</Pill> : <Pill><span className="num">{st.done.length}/{PRE_ARRIVAL_STEPS.length}</span></Pill>}
                   </div>
                   <p className="mt-2 text-[13px] text-ink-3">Transfer · {a.transfer} · Dietary · {a.dietary}</p>
+                  {a.itinerary && (
+                    <div className="mt-2 rounded-lg bg-paper-sunk px-3 py-2 text-[13px] text-ink-2">
+                      <p className="text-ink">Itinerary from {a.itinerary.venue} · v<span className="num">{a.itinerary.v}</span> published <span className="num">{a.itinerary.clock}</span></p>
+                      {a.itinerary.days.filter((d) => d.items.length).slice(0, 2).map((d) => (
+                        <p key={d.day} className="mt-0.5">Day <span className="num">{d.day}</span> · {d.items.map((x, i) => <span key={i}>{i > 0 && ' · '}<span className="num">{x.time}</span> {x.title}</span>)}</p>
+                      ))}
+                    </div>
+                  )}
                   <fieldset className="mt-3">
                     <legend className="sr-only">Pre-arrival checklist for {a.guest}</legend>
                     <ul className="space-y-1.5">

@@ -46,6 +46,8 @@ export interface IndexScore {
   band: Band
   lowestTerm: TermKey
   signedBy?: string // clinical grade only
+  /** Scored from the answers alone: no device signal was read for this measure (signals down). */
+  surveyOnly?: boolean
 }
 
 export interface Action {

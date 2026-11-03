@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, Check, Lock, PenLine, SearchX, ShieldAlert, Sparkles } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
@@ -12,7 +12,8 @@ import { termByKey } from '@/data/terms'
 import { lowestTerm } from '@/domain/indexEngine'
 import type { TermKey } from '@/domain/types'
 import { COACH_CASELOAD, CURATED_ACTIONS, DAY_N, OVERRIDE_REASONS, PRIYA, digestFor, type CoachDigest } from './_data'
-import { PreviewBanner, useConsoleAccess } from './_gate'
+import { PreviewBanner, actorOf, useConsoleAccess } from './_gate'
+import { APP_MEMBER_ID, clearNbaOverride, recordSessionRead, useNbaOverride, writeNbaOverride } from './_memberShare'
 import { AccessNote, AuditList, CardHead, ConsoleTermChip, SlaChip, areaCls, fieldCls, fmtClock, labelCls, parseIst, useConsoleNow, type AuditEvent } from './_parts'
 import { useClinicalState } from './_clinicalStore'
 import { RaiseConcernSheet, type ConcernTarget } from './_concern'
@@ -25,6 +26,9 @@ import { coach, isClinicalTask, taskLabel, useCoachState } from './_store'
 
 const CALL_OUTCOMES = ['Reached', 'Left a message', 'Rescheduled by member', 'Not reached']
 const TODAY = '28 Jan 2027'
+
+/** The person on an audit line, with their role when it is not the coach's own desk. */
+const auditWho = (a: { who: string; role: string }) => (a.role === 'Coach' || a.role === 'Preview' ? a.who : `${a.who} · ${a.role.toLowerCase()}`)
 
 /** Every claims-gated action a coach may choose, member library first. */
 const ALL_ACTIONS = [
@@ -53,12 +57,15 @@ export default function CoachMember() {
 function ReasonedDigest({ d }: { d: CoachDigest }) {
   const navigate = useNavigate()
   const now = useConsoleNow()
+  const actor = actorOf(useConsoleAccess('/console/coach', d.id))
   const [params] = useSearchParams()
   const [reason, setReason] = useState<string | null>(null)
   if (reason) return <Digest d={d} reason={reason} onChangeReason={() => setReason(null)} />
   const suggested = params.get('task') ? 'Drift task follow-up' : DAY_N.some((x) => d.day >= x.window[0] && d.day <= x.window[1]) ? 'Day-N review or call preparation' : 'Weekly digest review'
   const open = (purpose: string) => {
-    coach.updateMember(d.id, (w) => ({ ...w, audit: [{ at: `${TODAY} · ${fmtClock(now)}`, who: PRIYA.name, what: 'Opened member digest (term scores, bands, Ledger counts)', purpose: `coach_digest · ${purpose} · Care consent v3 (granted ${d.consentGranted})` }, ...(w.audit ?? [])] }))
+    coach.updateMember(d.id, (w) => ({ ...w, audit: [{ at: `${TODAY} · ${fmtClock(now)}`, who: auditWho(actor), what: 'Opened member digest (term scores, bands, Ledger counts)', purpose: `coach_digest · ${purpose} · Care consent v3 (granted ${d.consentGranted})` }, ...(w.audit ?? [])] }))
+    // The read and its reason reach the member's "Who has seen my data".
+    recordSessionRead({ who: actor.who, role: actor.role, console: 'coach', reason: purpose, memberId: d.id })
     setReason(purpose)
   }
   return (
@@ -67,7 +74,7 @@ function ReasonedDigest({ d }: { d: CoachDigest }) {
         <ArrowLeft size={15} aria-hidden /> Caseload
       </Link>
       <PageHeader eyebrow={<>Member digest · {d.id}</>} title={<>{d.name}</>} lead="Say why you are opening this digest. It is the first line of the audit for this visit." actions={<SpecimenTag />} />
-      <PreviewBanner path="/console/coach" />
+      <PreviewBanner path="/console/coach" memberId={d.id} />
       <ReasonGate
         who={d.name}
         recordLabel="coach_digest"
@@ -84,6 +91,23 @@ function ReasonedDigest({ d }: { d: CoachDigest }) {
 
 function NotInCaseload({ id }: { id?: string }) {
   const navigate = useNavigate()
+  const now = useConsoleNow()
+  const actor = actorOf(useConsoleAccess('/console/coach'))
+  const key = id ?? 'unknown'
+  const [at, setAt] = useState<string | null>(null)
+  // The refused attempt is written to the audit at once, with the signed-in role. Nothing was read,
+  // so it is not a read the member is shown; it is an attempt the DPO reviews.
+  useEffect(() => {
+    const stamp = `${TODAY} · ${fmtClock(now)}`
+    const what = `Tried to open the member digest for ${key} · refused, not in caseload · nothing read`
+    coach.updateMember(key, (w) => {
+      const last = w.audit?.[0]
+      if (last && last.what === what && last.who === auditWho(actor) && last.at === stamp) return w
+      return { ...w, audit: [{ at: stamp, who: auditWho(actor), what, purpose: 'Relationship check · fail closed' }, ...(w.audit ?? [])] }
+    })
+    setAt(fmtClock(now))
+  }, [key, actor.who]) // eslint-disable-line react-hooks/exhaustive-deps
+  const attempts = (useCoachState().members[key]?.audit ?? []).filter((e) => e.what.startsWith('Tried to open'))
   return (
     <div>
       <Link to="/console/coach" className="mb-5 inline-flex items-center gap-1.5 text-[14px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring">
@@ -95,7 +119,7 @@ function NotInCaseload({ id }: { id?: string }) {
           <SearchX size={22} className="mt-1 shrink-0 text-ink-3" aria-hidden />
           <div>
             <p className="text-[17px] text-ink">If this member has been handed to you, their coach or the care lead adds you first. Then the digest opens here.</p>
-            <p className="mt-2 text-[15px] text-ink-2">The attempt is written to the audit with your role, as every read is.</p>
+            <p className="mt-2 text-[15px] text-ink-2" role="status">The attempt was written to the audit{at && <> at <span className="num">{at}</span></>} as {actor.who} · {actor.role.toLowerCase()}, as every read is.</p>
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <DaybreakButton onClick={() => navigate('/console/coach')}>Back to your caseload</DaybreakButton>
               <span className="text-[14px] text-ink-3"><span className="num">{COACH_CASELOAD.length}</span> members are assigned to you</span>
@@ -103,23 +127,35 @@ function NotInCaseload({ id }: { id?: string }) {
           </div>
         </div>
       </Card>
+      {attempts.length > 0 && (
+        <Card className="mt-6 max-w-2xl">
+          <CardHead eyebrow={<>Audit · attempts on <span className="num">{key}</span></>} aside={<span className="text-[13px] text-ink-3">Reviewed by the DPO</span>} />
+          <AuditList events={attempts} />
+        </Card>
+      )}
     </div>
   )
 }
 
 function Digest({ d, reason, onChangeReason }: { d: CoachDigest; reason: string; onChangeReason: () => void }) {
   const now = useConsoleNow()
-  const { canAct } = useConsoleAccess('/console/coach')
+  // A one-named-member grant acts on this digest only if it names this member.
+  const acc = useConsoleAccess('/console/coach', d.id)
+  const { canAct } = acc
+  const actor = actorOf(acc)
   const [params] = useSearchParams()
   const { tasks, members } = useCoachState()
   const work = members[d.id] ?? {}
   const lowest = lowestTerm(d.terms)
   const stamp = () => `${TODAY} · ${fmtClock(now)}`
-  const addAudit = (e: Omit<AuditEvent, 'at'>) => coach.updateMember(d.id, (w) => ({ ...w, audit: [{ at: stamp(), ...e }, ...(w.audit ?? [])] }))
+  // Every line names the signed-in role's person, never the coach by default.
+  const addAudit = (e: Omit<AuditEvent, 'at' | 'who'>) => coach.updateMember(d.id, (w) => ({ ...w, audit: [{ at: stamp(), who: auditWho(actor), ...e }, ...(w.audit ?? [])] }))
+  // The override the member app shows (Today), kept in step with the one on this digest.
+  const shared = useNbaOverride(d.id)
 
   // Persisted per-member work (survives returning to the queue).
   const calls = work.calls ?? d.calls
-  const override = work.override ?? null
+  const override = work.override ?? (shared?.term ? { title: shared.action, term: shared.term, reason: shared.reason, until: shared.until ?? d.day + 7 } : null)
   const reviewed = work.reviewed ?? true
   const reviewedAt = work.reviewedAt ?? '27 Jan 18:02'
   const summary = work.summary ?? d.summary.join('\n\n')
@@ -171,11 +207,11 @@ function Digest({ d, reason, onChangeReason }: { d: CoachDigest; reason: string;
     if (Object.keys(e).length) return
     const note = callNote.trim() + (adjust === 'adjust' ? ' (Action to be adjusted.)' : '')
     coach.updateMember(d.id, (w) => ({ ...w, calls: [{ at: `28 Jan · ${fmtClock(now)} · Day ${d.day} call`, outcome: callOutcome, note }, ...(w.calls ?? d.calls)] }))
-    addAudit({ who: PRIYA.name, what: `Logged call outcome · ${callOutcome.toLowerCase()}`, purpose: `Day ${d.day} contact` })
+    addAudit({ what: `Logged call outcome · ${callOutcome.toLowerCase()}`, purpose: `Day ${d.day} contact` })
     const shouldClose = !!coachTask && coachTask.status !== 'done' && closeTask
     if (shouldClose && coachTask) {
       coach.setStatus(coachTask.id, 'done', { outcome: `${callOutcome} — ${callNote.trim()}`, closedAt: fmtClock(now) })
-      addAudit({ who: PRIYA.name, what: `Closed drift task ${coachTask.id.toUpperCase()} with the call outcome`, purpose: 'Drift follow-up' })
+      addAudit({ what: `Closed drift task ${coachTask.id.toUpperCase()} with the call outcome`, purpose: 'Drift follow-up' })
     }
     setLogged({ closed: shouldClose, at: fmtClock(now) })
     setCallOutcome('')
@@ -188,7 +224,9 @@ function Digest({ d, reason, onChangeReason }: { d: CoachDigest; reason: string;
     if (!chosen) return setOvErr('Choose an action from the curated library.')
     if (!ovReason) return setOvErr('Choose a reason. Every override is logged with one.')
     coach.updateMember(d.id, (w) => ({ ...w, override: { title: chosen.title, term: chosen.term, reason: ovReason, until: d.day + 7 } }))
-    addAudit({ who: PRIYA.name, what: `Overrode next-best action → “${chosen.title}”`, purpose: ovReason })
+    // Today in the member app reads this and shows it as chosen by the coach.
+    writeNbaOverride({ memberId: d.id, action: chosen.title, reason: ovReason, by: actor.who, term: chosen.term, until: d.day + 7 })
+    addAudit({ what: `Overrode next-best action → “${chosen.title}”`, purpose: ovReason })
     setOvErr('')
     setOvAction('')
     setOvReason('')
@@ -197,7 +235,7 @@ function Digest({ d, reason, onChangeReason }: { d: CoachDigest; reason: string;
 
   const saveReviewed = (text?: string) => {
     coach.updateMember(d.id, (w) => ({ ...w, reviewed: true, reviewedAt: `28 Jan ${fmtClock(now)}`, ...(text !== undefined ? { summary: text } : {}) }))
-    addAudit({ who: PRIYA.name, what: text !== undefined ? 'Edited and approved the VIVA summary' : 'Marked the VIVA summary reviewed', purpose: 'coach_digest review' })
+    addAudit({ what: text !== undefined ? 'Edited and approved the VIVA summary' : 'Marked the VIVA summary reviewed', purpose: 'coach_digest review' })
   }
 
   return (
@@ -217,7 +255,7 @@ function Digest({ d, reason, onChangeReason }: { d: CoachDigest; reason: string;
         }
       />
 
-      <PreviewBanner path="/console/coach" />
+      <PreviewBanner path="/console/coach" memberId={d.id} />
 
       <AccessNote className="mb-8" icon="shield">
         Opened for purpose <span className="num text-ink">coach_digest</span> · <span className="text-ink">{reason}</span>, under Care consent v3 (granted <span className="num">{d.consentGranted}</span>). This read is logged and {d.firstName} sees it in the trust centre. Raw biomarkers, Ease screen answers and Ledger words are not available here.{' '}
@@ -285,7 +323,7 @@ function Digest({ d, reason, onChangeReason }: { d: CoachDigest; reason: string;
               {!editing && (
                 <div className="flex gap-2">
                   <Button variant="ghost" size="sm" disabled={!canAct} onClick={() => { setDraft(summary); setEditing(true) }}><PenLine size={14} aria-hidden /> Edit</Button>
-                  <Button variant="secondary" size="sm" disabled={!canAct} onClick={() => { if (reviewed) { coach.updateMember(d.id, (w) => ({ ...w, reviewed: false })); addAudit({ who: PRIYA.name, what: 'Marked the VIVA summary unreviewed', purpose: 'coach_digest review' }) } else saveReviewed() }}>{reviewed ? 'Mark unreviewed' : 'Mark reviewed'}</Button>
+                  <Button variant="secondary" size="sm" disabled={!canAct} onClick={() => { if (reviewed) { coach.updateMember(d.id, (w) => ({ ...w, reviewed: false })); addAudit({ what: 'Marked the VIVA summary unreviewed', purpose: 'coach_digest review' }) } else saveReviewed() }}>{reviewed ? 'Mark unreviewed' : 'Mark reviewed'}</Button>
                 </div>
               )}
             </div>
@@ -410,7 +448,7 @@ function Digest({ d, reason, onChangeReason }: { d: CoachDigest; reason: string;
               <p className="mt-1.5 text-[15px] text-ink">{taskLabel(coachTask)}</p>
               <p className="mt-0.5 text-[14px] text-ink-2">{coachTask.detail}</p>
               <p className="mt-2 text-[13px] text-ink-3">Owner · {coachTask.owner} · {coachTask.status === 'in-progress' ? 'in progress' : 'open'}</p>
-              {coachTask.status === 'open' && <Button size="sm" variant="secondary" className="mt-3" disabled={!canAct} onClick={() => { coach.setStatus(coachTask.id, 'in-progress'); addAudit({ who: PRIYA.name, what: `Took drift task ${coachTask.id.toUpperCase()}`, purpose: 'Drift follow-up' }) }}>Take this task</Button>}
+              {coachTask.status === 'open' && <Button size="sm" variant="secondary" className="mt-3" disabled={!canAct} onClick={() => { coach.setStatus(coachTask.id, 'in-progress'); addAudit({ what: `Took drift task ${coachTask.id.toUpperCase()}`, purpose: 'Drift follow-up' }) }}>Take this task</Button>}
             </div>
           )}
           {clinicalTask && (
@@ -488,8 +526,8 @@ function Digest({ d, reason, onChangeReason }: { d: CoachDigest; reason: string;
               <ConsoleTermChip term={override ? override.term : d.currentAction.term} />
               {override && <span className="text-[13px] text-ink-2">Reason · {override.reason}</span>}
             </div>
-            {override && <Button variant="link" className="mt-2 text-[14px]" disabled={!canAct} onClick={() => { coach.updateMember(d.id, (w) => ({ ...w, override: null })); addAudit({ who: PRIYA.name, what: 'Removed action override; engine resumes', purpose: 'Coach judgement' }); setOvDone(false) }}>Return to the engine’s choice</Button>}
-            {ovDone && override && <p role="status" className="mt-2 flex items-center gap-1.5 text-[14px] text-ink"><Check size={14} aria-hidden /> {d.firstName} sees the new action tomorrow morning. Logged with your reason.</p>}
+            {override && <Button variant="link" className="mt-2 text-[14px]" disabled={!canAct} onClick={() => { coach.updateMember(d.id, (w) => ({ ...w, override: null })); clearNbaOverride(d.id); addAudit({ what: 'Removed action override; engine resumes', purpose: 'Coach judgement' }); setOvDone(false) }}>Return to the engine’s choice</Button>}
+            {ovDone && override && <p role="status" className="mt-2 flex items-center gap-1.5 text-[14px] text-ink"><Check size={14} aria-hidden /> {d.firstName} {d.id === APP_MEMBER_ID ? 'now sees' : 'sees'} it on Today, marked as chosen by their coach. Logged with your reason.</p>}
           </div>
           <div className="mt-5 space-y-4">
             <div>

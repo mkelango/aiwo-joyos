@@ -1,4 +1,6 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
+import { CONSENTS } from '@/data/member'
+import { ACCT_CHANGED } from '@/routes/member/account/_prefs'
 
 // What a member saves in a Space stays saved across navigation and reloads.
 // Front end only: it lives in this browser's localStorage (per viewer), and
@@ -53,3 +55,77 @@ export function readSpaceState<T>(key: string, initial: T): T {
     return initial
   }
 }
+
+// ─── Trust centre consents (read-only) ────────────────────────────────────
+// The purpose-level consents live in the Trust centre (joyos:acct:consents, keyed by
+// consent id, { on }); a Space only reads them, so a withdrawal there turns the matching
+// tool off here. With nothing saved, the specimen consent (data/member CONSENTS) stands.
+
+export type TrustConsent = { on: boolean; withdrawnAt?: string }
+
+export function readTrustConsent(id: string): TrustConsent {
+  let on = CONSENTS.find((c) => c.id === id)?.granted ?? false
+  try {
+    const raw = localStorage.getItem('joyos:acct:consents')
+    const v = raw ? (JSON.parse(raw) as Record<string, { on?: unknown }>) : null
+    if (v && typeof v[id]?.on === 'boolean') on = v[id].on as boolean
+  } catch {
+    /* storage unavailable: the specimen consent stands */
+  }
+  if (on) return { on }
+  // The Trust centre's consent history carries the date of the withdrawal, when there is one.
+  try {
+    const raw = localStorage.getItem('joyos:acct:consent-history')
+    const h = raw ? (JSON.parse(raw) as { events?: { ref: string; action: string; at: string }[] }) : null
+    const last = (h?.events ?? []).filter((e) => e.ref === id).sort((a, b) => a.at.localeCompare(b.at)).pop()
+    return { on, withdrawnAt: last?.action === 'withdrawn' ? last.at.slice(0, 10) : undefined }
+  } catch {
+    return { on }
+  }
+}
+
+/** One Trust centre consent, read-only, following changes made there or in another tab. */
+export function useTrustConsent(id: string): TrustConsent {
+  const [c, setC] = useState(() => readTrustConsent(id))
+  useEffect(() => {
+    const sync = () => setC((cur) => {
+      const next = readTrustConsent(id)
+      return cur.on === next.on && cur.withdrawnAt === next.withdrawnAt ? cur : next
+    })
+    sync()
+    window.addEventListener(ACCT_CHANGED, sync)
+    window.addEventListener('storage', sync)
+    window.addEventListener('focus', sync)
+    return () => {
+      window.removeEventListener(ACCT_CHANGED, sync)
+      window.removeEventListener('storage', sync)
+      window.removeEventListener('focus', sync)
+    }
+  }, [id])
+  return c
+}
+
+// ─── The calendar connection Freedom keeps ────────────────────────────────
+// Freedom's time audit connects one calendar (Google or Microsoft, read-only) and saves
+// it as 'freedom.calendar.v1'. Pleasure reads the same record to say where a planned
+// pleasure goes, so both screens always name the same provider.
+
+export type CalProvider = 'google' | 'microsoft'
+export const CAL_PROVIDERS: readonly CalProvider[] = ['google', 'microsoft']
+export const CAL_NAME: Record<CalProvider, string> = { google: 'Google Calendar', microsoft: 'Microsoft Outlook' }
+export type CalConnection = { provider: CalProvider | null }
+export const CAL_KEY = 'freedom.calendar.v1'
+
+/** The connected provider, or null; read when a screen renders (Freedom writes it on another page). */
+export function readCalendarProvider(): CalProvider | null {
+  const p = readSpaceState<CalConnection>(CAL_KEY, { provider: null }).provider
+  return p && CAL_PROVIDERS.includes(p) ? p : null
+}
+
+// ─── Savouring prompts kept for today ─────────────────────────────────────
+// Pleasure saves each kept prompt here; the Ledger reads it to ask "How was it?" in the
+// evening. Shape is shared with the Ledger: { date: 'YYYY-MM-DD', id, text } (text in English,
+// the prompt as written); `note` is only on the specimen history (what the member wrote then).
+
+export type KeptPrompt = { date: string; id: string; text: string; note?: string }
+export const KEPT_KEY = 'pleasure.kept.v1'

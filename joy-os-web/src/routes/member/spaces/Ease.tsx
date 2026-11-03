@@ -11,6 +11,7 @@ import { SpaceShell, ToolCard, useCrisisGuard } from './_SpaceShell'
 import { useSpaceText, type SpKey } from './_i18n'
 import { useSpaceState } from './_state'
 import { INSTRUMENT_NOTE } from '@/lib/i18n'
+import { useIsMinor } from '@/lib/minor'
 
 // EASE · Preventable Suffering (Memo p.19, p.24): the Second Arrow journal, sleep
 // plan and wind-down (CBT-I informed), the “keep meaning to” list, PHQ-4 / ISI /
@@ -89,6 +90,8 @@ const inputCls = 'w-full rounded-xl border border-line-strong bg-paper px-4 py-3
 
 function LowerIsBetter() {
   const { t, d, r, tt } = useSpaceText()
+  // Under 18 nothing is scored: the loads and their weights stay, their values do not.
+  const minor = useIsMinor()
   return (
     <ToolCard eyebrow={t('ease.lb.eyebrow')} title={<>{r('ease.lb.title', { e: <em>{t('ease.lb.titleE')}</em> })}</>} sub={t('ease.lb.sub', { bname: tt.name('B') })}>
       <ul className="grid gap-4 sm:grid-cols-5">
@@ -99,9 +102,13 @@ function LowerIsBetter() {
               <span className="num text-[13px] text-ink-3">×{p.weight.toFixed(2)}</span>
             </div>
             <div className="mt-2 flex h-20 flex-col justify-end overflow-hidden rounded-xl bg-paper-sunk" aria-hidden>
-              <div className="hatch-b w-full rounded-xl" style={{ height: `${p.value}%` }} />
+              {!minor && <div className="hatch-b w-full rounded-xl" style={{ height: `${p.value}%` }} />}
             </div>
-            <span className="num mt-1.5 block text-[1.3rem] font-light text-ink" aria-label={t('ease.lb.aria', { k: d(p.key), v: p.value })}>−{p.value}</span>
+            {minor ? (
+              <span className="mt-1.5 block text-[13px] text-ink-3">{t('mn.room')}</span>
+            ) : (
+              <span className="num mt-1.5 block text-[1.3rem] font-light text-ink" aria-label={t('ease.lb.aria', { k: d(p.key), v: p.value })}>−{p.value}</span>
+            )}
           </li>
         ))}
       </ul>

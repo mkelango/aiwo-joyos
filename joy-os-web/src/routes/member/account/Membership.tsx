@@ -7,7 +7,7 @@ import { DaybreakButton, SpecimenTag, fmtDate } from '@/components/joy/primitive
 import { Button, Card, DataTable, PageHeader, Pill, Sheet } from '@/components/ui'
 import { MEMBER, PAYMENTS_GRACE } from '@/data/member'
 import { MEMBERSHIPS } from '@/data/platform'
-import { ENTITLEMENTS, GSTIN_AIWO, GST_RATE, INVOICES } from './_data'
+import { ENTITLEMENTS, GSTIN_AIWO, GST_RATE, INVOICES, SUPPLIER_STATE, placeOfSupply } from './_data'
 import { Section, Segmented, Toggle } from './_parts'
 import { inr, rich, useMemberProfile, usePersisted, useToast } from './_util'
 import { useDict, useLang } from '@/lib/i18n'
@@ -173,7 +173,7 @@ export default function Membership() {
               <DaybreakButton onClick={toLadder}>{t('changePlan')}</DaybreakButton>
             )}
             {paused ? (
-              <Button variant="ghost" onClick={() => { setPaused(null); showToast(t('resumedToast')) }}><Play size={15} /> {t('resumePlus')}</Button>
+              <Button variant="ghost" onClick={() => { setPaused(null); showToast(t('resumedToast', { date: fmtDate(PLUS_NEXT) })) }}><Play size={15} /> {t('resumePlus')}</Button>
             ) : (
               <Button variant="ghost" onClick={() => setPauseOpen(true)}><Pause size={15} /> {t('pausePlus')}</Button>
             )}
@@ -397,15 +397,22 @@ function InvoiceView({ inv, onSaved }: { inv: Invoice; onSaved: (m: string) => v
   const gst = gstOf(inv.total)
   const taxable = Math.round((inv.total - gst) * 100) / 100
   const half = Math.round((gst / 2) * 100) / 100
+  // Place of supply is the member's state (from the Profile city). AIWO is registered in Tamil
+  // Nadu, so only a Tamil Nadu address splits CGST + SGST; any other state is inter-state, IGST.
+  const pos = placeOfSupply(profile.city)
+  const intra = pos.state === SUPPLIER_STATE.state
+  const pct = `${(GST_RATE * 100) / (intra ? 2 : 1)}%`
+  const taxLines: [string, number][] = intra ? [[`CGST ${pct}`, half], [`SGST ${pct}`, Math.round((gst - half) * 100) / 100]] : [[`IGST ${pct}`, gst]]
   const buildHtml = () => {
     const esc = (x: string) => x.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] as string)
     const row = (k: string, v: string, strong = false) => `<tr><td style="padding:6px 0">${strong ? `<strong>${esc(k)}</strong>` : esc(k)}</td><td style="padding:6px 0;text-align:right;font-family:monospace">${esc(v)}</td></tr>`
     const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${inv.id}</title></head><body style="font-family:system-ui,sans-serif;max-width:640px;margin:40px auto;padding:0 16px">`
       + `<p style="font-size:12px;letter-spacing:.1em;text-transform:uppercase">Tax invoice · Specimen, not a real member</p>`
-      + `<h1 style="font-weight:300">${inv.id}</h1><p>AIWO Joyspan Pvt Ltd · Chennai, Tamil Nadu · GSTIN ${GSTIN_AIWO}</p>`
-      + `<p>Billed to ${esc(`${profile.firstName} ${profile.lastName}`)}, ${esc(profile.city)}, Tamil Nadu · ${MEMBER.aiwoId}</p>`
-      + `<p>Date ${fmtDate(inv.date)} · SAC 999723 · Paid by ${inv.method} via Razorpay · ${inv.status}</p>`
-      + `<table style="width:100%;border-collapse:collapse;margin-top:24px">${row(inv.item, inr(taxable, 2))}${row('CGST 9%', inr(half, 2))}${row('SGST 9%', inr(gst - half, 2))}${row('Total', inr(inv.total, 2), true)}</table>`
+      + `<h1 style="font-weight:300">${inv.id}</h1><p>AIWO Joyspan Pvt Ltd · Chennai, ${SUPPLIER_STATE.state} · GSTIN ${GSTIN_AIWO}</p>`
+      + `<p>Billed to ${esc(`${profile.firstName} ${profile.lastName}`)}, ${esc(profile.city)}, ${esc(pos.state)} · ${MEMBER.aiwoId}</p>`
+      + `<p>Place of supply ${esc(pos.state)} (${pos.code}) · ${intra ? 'Intra-state supply' : 'Inter-state supply'}</p>`
+      + `<p>Date ${fmtDate(inv.date, 'en')} · SAC 999723 · Paid by ${inv.method} via Razorpay · ${inv.status}</p>`
+      + `<table style="width:100%;border-collapse:collapse;margin-top:24px">${row(inv.item, inr(taxable, 2))}${taxLines.map(([k, v]) => row(k, inr(v, 2))).join('')}${row('Total', inr(inv.total, 2), true)}</table>`
       + `</body></html>`
     return html
   }
@@ -439,22 +446,25 @@ function InvoiceView({ inv, onSaved }: { inv: Invoice; onSaved: (m: string) => v
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-[17px] text-ink">AIWO Joyspan Pvt Ltd</p>
-          <p className="text-[14px] text-ink-2">Chennai, Tamil Nadu · GSTIN <span className="num">{GSTIN_AIWO}</span></p>
+          <p className="text-[14px] text-ink-2">{dx('Chennai')}, {dx(SUPPLIER_STATE.state)} · GSTIN <span className="num">{GSTIN_AIWO}</span></p>
         </div>
         <Pill tone={inv.status === 'Paid' ? 'positive' : 'caution'}>{dx(inv.status)}</Pill>
       </div>
       <dl className="mt-5 grid grid-cols-2 gap-3 text-[14px]">
-        <div><dt className="eyebrow text-ink-3">{t('billedTo')}</dt><dd className="mt-1 text-ink">{profile.firstName} {profile.lastName}<span className="block text-ink-2">{profile.city}, Tamil Nadu</span></dd></div>
+        <div><dt className="eyebrow text-ink-3">{t('billedTo')}</dt><dd className="mt-1 text-ink">{profile.firstName} {profile.lastName}<span className="block text-ink-2">{dx(profile.city)}, {dx(pos.state)}</span></dd></div>
         <div><dt className="eyebrow text-ink-3">{t('date')}</dt><dd className="num mt-1 text-ink">{fmtDate(inv.date)}</dd></div>
         <div><dt className="eyebrow text-ink-3">SAC</dt><dd className="num mt-1 text-ink">999723</dd></div>
         <div><dt className="eyebrow text-ink-3">{inv.status === 'Paid' ? t('paidBy') : t('charging')}</dt><dd className="mt-1 text-ink">{dx(inv.method)} · Razorpay</dd></div>
+        <div className="col-span-2"><dt className="eyebrow text-ink-3">{t('placeOfSupply')}</dt><dd className="mt-1 text-ink">{dx(pos.state)} <span className="num text-ink-2">({pos.code})</span><span className="block text-[13px] text-ink-2">{intra ? t('intraState') : t('interState')}</span></dd></div>
       </dl>
       <table className="mt-6 w-full text-[15px]">
         <caption className="sr-only">{t('invoiceLines')}</caption>
         <tbody>
           <tr className="border-b border-line"><th scope="row" className="py-2.5 text-left font-normal text-ink">{dx(inv.item)}</th><td className="num py-2.5 text-right text-ink">{inr(taxable, 2)}</td></tr>
-          <tr><th scope="row" className="py-2 text-left font-normal text-ink-2">CGST <span className="num">9%</span></th><td className="num py-2 text-right text-ink-2">{inr(half, 2)}</td></tr>
-          <tr className="border-b border-line"><th scope="row" className="py-2 text-left font-normal text-ink-2">SGST <span className="num">9%</span></th><td className="num py-2 text-right text-ink-2">{inr(gst - half, 2)}</td></tr>
+          {taxLines.map(([k, v], i) => {
+            const [name, rate] = k.split(' ')
+            return <tr key={k} className={clsx(i === taxLines.length - 1 && 'border-b border-line')}><th scope="row" className="py-2 text-left font-normal text-ink-2">{name} <span className="num">{rate}</span></th><td className="num py-2 text-right text-ink-2">{inr(v, 2)}</td></tr>
+          })}
           <tr><th scope="row" className="py-3 text-left font-medium text-ink">{t('total')}</th><td className="num py-3 text-right text-[1.3rem] text-ink">{inr(inv.total, 2)}</td></tr>
         </tbody>
       </table>

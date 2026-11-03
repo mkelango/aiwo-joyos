@@ -1,7 +1,7 @@
 import { router } from 'expo-router'
 import { useState } from 'react'
 import { View } from 'react-native'
-import { BandLabel, Body, Card, DaybreakButton, Divider, Eyebrow, Icon, Meta, Mono, Numeral, Pill, Screen, ScreenHeader, SectionTitle, Serif, SpecimenTag, TermDot, Title } from '@/components'
+import { BandLabel, Body, Card, CountUp, DaybreakButton, Divider, Eyebrow, Icon, JoyspanEquation, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Serif, SpecimenTag, TermDot, Title } from '@/components'
 import { METHODS, bandFor, joyspanIndex, lowestTerm } from '@/shared/indexEngine'
 import { INSTRUMENTS } from '@/shared/platform'
 import { TERMS, termByKey } from '@/shared/terms'
@@ -47,6 +47,8 @@ export default function Method() {
   const lang = useLang()
   const instr = (i: string) => (lang === 'en' ? i : INSTR_TEXT[i]?.[lang] ?? i)
   const partName = (p: string) => (lang === 'en' ? p : PART_TEXT[p]?.[lang] ?? p)
+  // The term formula with its plain-word parts in the member's language; codes stay as written.
+  const formulaText = (f: string) => (lang === 'en' ? f : f.replace(/·(\(?)([^+]+?)(\)?)(?= \+ |$)/g, (_, a: string, p: string, b: string) => `·${a}${partName(p)}${b}`))
   const bandWord = (b: ReturnType<typeof bandFor>) => (b === 'not-yet-measured' ? b : tx(BAND[b], b))
   const step = (k: TermKey, d: number) => setVals((v) => ({ ...v, [k]: Math.max(0, Math.min(100, v[k] + d)) }))
 
@@ -62,6 +64,16 @@ export default function Method() {
         }
         lead={t('lead')}
       />
+
+      {/* Where Joyspan is defined: the word equation, verbatim, and the credit for the word. */}
+      <Card tone="raised" style={{ gap: space.s2 }}>
+        <Eyebrow>{t('equation')}</Eyebrow>
+        <JoyspanEquation />
+        <View style={{ gap: 4 }}>
+          {lang !== 'en' ? <Meta size={14} tone="ink3">{t('equationNote')}</Meta> : null}
+          <Meta size={14}>{t('credit')}</Meta>
+        </View>
+      </Card>
 
       <Card tone="ink" style={{ gap: space.s1 }}>
         <Eyebrow>{t('formula')}</Eyebrow>
@@ -102,7 +114,7 @@ export default function Method() {
         </Card>
         <Card tone="sunk" style={{ gap: space.s1 }} >
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.s2, flexWrap: 'wrap' }} accessible accessibilityLabel={t('specIdxA11y', { v: res.value, band: bandWord(bandFor(res.value)) })} accessibilityLiveRegion="polite">
-            <Numeral size={72}>{String(res.value)}</Numeral>
+            <CountUp value={res.value} size={72} />
             <View style={{ paddingBottom: 8, gap: 6 }}>
               <BandLabel band={bandFor(res.value)} />
               <Meta size={14}>{t('specIdx')}</Meta>
@@ -147,7 +159,7 @@ export default function Method() {
               </View>
               <Meta>{lang === 'en' ? x.framework : t(`fw_${x.key}` as 'fw_H')}</Meta>
               <View style={{ backgroundColor: c.paperSunk, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10 }}>
-                <Mono size={14} tone="ink">{x.formula}</Mono>
+                <Mono size={14} tone="ink">{formulaText(x.formula)}</Mono>
               </View>
               <View style={{ gap: 6 }}>
                 <Eyebrow>{t('tmWeights')}</Eyebrow>

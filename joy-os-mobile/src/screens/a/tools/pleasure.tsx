@@ -1,7 +1,7 @@
 import { router } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Pressable, View } from 'react-native'
-import { ArrowLink, Body, Button, Divider, Eyebrow, Icon, Meta, Mono, Progress, Segmented, Sheet, Toggle } from '@/components'
+import { ArrowLink, Body, Button, Divider, EmptyIllustration, Eyebrow, Icon, Meta, Mono, Progress, Segmented, Sheet, Toggle } from '@/components'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { ledgerStamp, ledgerWhen, madeHere, useLocal } from '@/screens/a/local'
 import { trustStore, useStore } from '@/screens/b/bStore'
@@ -341,7 +341,12 @@ function MyMomentOfJoy() {
           <View style={{ gap: space.s1 }}>
             <Meta>{t('Under your Publishing consent. Nothing is shared until you pick a moment below and press share on it.')}</Meta>
             <Eyebrow>{t('Your three latest Ledger moments')}</Eyebrow>
-            {recent.length === 0 ? <Meta tone="ink2">{t('No Ledger moments this week yet.')}</Meta> : null}
+            {recent.length === 0 ? (
+              <View style={{ gap: 6 }}>
+                <EmptyIllustration kind="ledger" fill="D" width={128} />
+                <Meta tone="ink2" align="center">{t('No Ledger moments this week yet.')}</Meta>
+              </View>
+            ) : null}
             {recent.map((e) => {
               const on = live.includes(e.id)
               const what = e.word ?? e.tags.map((x) => tx(x)).join(lang === 'en' ? ' & ' : ', ')

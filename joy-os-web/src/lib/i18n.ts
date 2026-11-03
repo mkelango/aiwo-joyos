@@ -25,7 +25,7 @@ export type StringKey = keyof typeof STRINGS
 export function useT() {
   const lang = useLang()
   return (key: StringKey, vars?: Record<string, string | number>) => {
-    let s: string = STRINGS[key][lang] ?? STRINGS[key].en
+    const s: string = STRINGS[key][lang] ?? STRINGS[key].en
     return fill(s, vars)
   }
 }

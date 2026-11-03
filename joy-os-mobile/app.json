@@ -8,7 +8,11 @@
     "scheme": "joyos",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": {
+        "light": "./assets/images/icon.png",
+        "dark": "./assets/images/icon-dark.png",
+        "tinted": "./assets/images/icon-tinted.png"
+      },
       "bundleIdentifier": "ai.aiwo.joyos",
       "supportsTablet": true,
       "infoPlist": {
@@ -46,7 +50,7 @@
         {
           "backgroundColor": "#FDFBF8",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76,
+          "imageWidth": 96,
           "dark": {
             "backgroundColor": "#1C1314",
             "image": "./assets/images/splash-icon.png"

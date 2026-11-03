@@ -10,8 +10,10 @@ import { devicesStore, useStore } from '@/screens/b/bStore'
 import { DEV, DEVICE_NOTE, SIGNAL_TEXT } from '@/screens/b/i18n/devices'
 import type { L3 } from '@/screens/b/i18n/common'
 import { useTheme } from '@/theme/ThemeProvider'
+import { useIsMinor } from '@/lib/minor'
 import { Rich, useA } from '../i18n'
 import { H3, useLocal } from '../local'
+import { VivaExchange, useVivaRun } from '../vivaParts'
 import { ToolCard, ToolsHeading, shortDate } from './common'
 
 // BODY: device status, signal trends, Life's Essential 8, the biomarker vault, the protocol and
@@ -19,6 +21,7 @@ import { ToolCard, ToolsHeading, shortDate } from './common'
 // only after physician sign-off (Memo p.19).
 // Devices read the same record /devices writes (Lane B devicesStore), so a link or unlink there
 // shows here at once. LE8 readings and capacity results the member adds are kept on the phone.
+// VIVA's explain_biomarker runs inside the vault: open a marker, ask, and read the plain words.
 
 export function BodyTools() {
   const { t } = useA()
@@ -231,6 +234,8 @@ function series<T extends Point>(base: readonly Point[], mine: T[] | undefined):
 function Le8() {
   const { c, term } = useTheme()
   const { t, tx, lang } = useA()
+  // Under 18 nothing is scored (the minors gate): the readings are kept, with no score or average.
+  const minor = useIsMinor()
   const [mine, setMine] = useLocal<Partial<Record<Le8Key, MyPoint[]>>>('le8Readings', {})
   const [open, setOpen] = useState<Le8Key | null>(null)
   const rows = LE8.map((x) => {
@@ -248,9 +253,11 @@ function Le8() {
   return (
     <ToolCard
       title="Life’s Essential 8"
-      aside={<Mono tone="ink">{`${total} / 100`}</Mono>}
+      aside={minor ? undefined : <Mono tone="ink">{`${total} / 100`}</Mono>}
       lead={
-        watch.length
+        minor
+          ? t('Eight readings the heart cares about. They are kept as you log them; nothing is scored while you are under 18.')
+          : watch.length
           ? t('Eight readings the heart cares about, each scored 0 to 100. Your average is {n}; {watch} are worth watching.', { n: total, watch: watch.join(t(' and ')) })
           : t('Eight readings the heart cares about, each scored 0 to 100. Your average is {n}; none is worth watching just now.', { n: total })
       }
@@ -260,13 +267,20 @@ function Le8() {
           const isOpen = open === x.key
           return (
             <View key={x.key} style={{ gap: 4 }}>
-              <BarRow
-                label={tx(x.name)}
-                value={x.score}
-                max={100}
-                color={x.status === 'watch' ? c.lineStrong : col.main}
-                note={`${le8Reading(x.key, x.last, t)} · ${x.last.mine ? t('Entered by you') : lang === 'en' ? x.source : tx(x.source)}${x.status === 'watch' ? t(' · worth watching') : x.status === 'ideal' ? t(' · ideal') : ''}`}
-              />
+              {minor ? (
+                <View style={{ gap: 2 }}>
+                  <Body>{tx(x.name)}</Body>
+                  <Meta size={14}>{`${le8Reading(x.key, x.last, t)} · ${x.last.mine ? t('Entered by you') : lang === 'en' ? x.source : tx(x.source)}`}</Meta>
+                </View>
+              ) : (
+                <BarRow
+                  label={tx(x.name)}
+                  value={x.score}
+                  max={100}
+                  color={x.status === 'watch' ? c.lineStrong : col.main}
+                  note={`${le8Reading(x.key, x.last, t)} · ${x.last.mine ? t('Entered by you') : lang === 'en' ? x.source : tx(x.source)}${x.status === 'watch' ? t(' · worth watching') : x.status === 'ideal' ? t(' · ideal') : ''}`}
+                />
+              )}
               <Pressable
                 onPress={() => setOpen(isOpen ? null : x.key)}
                 accessibilityRole="button"
@@ -344,6 +358,7 @@ function Le8Detail({ k, name, pts, onSave, onRemove }: { k: Le8Key; name: string
   const [saved, setSaved] = useState<string | null>(null)
   const scores = pts.map((p) => le8Score(k, p.v, p.v2))
   const newestFirst = [...pts].reverse()
+  const minor = useIsMinor()
 
   const submit = () => {
     setSaved(null)
@@ -366,13 +381,13 @@ function Le8Detail({ k, name, pts, onSave, onRemove }: { k: Le8Key; name: string
     onSave(p)
     setDraft(fields.map((f) => f.initial ?? ''))
     setNic(null)
-    setSaved(t('Saved for {date}: score {s}.', { date: shortDate(SPACE_TODAY, lang), s: le8Score(k, p.v, p.v2) }))
+    setSaved(minor ? t('Saved for {date}.', { date: shortDate(SPACE_TODAY, lang) }) : t('Saved for {date}: score {s}.', { date: shortDate(SPACE_TODAY, lang), s: le8Score(k, p.v, p.v2) }))
   }
 
   return (
     <View style={{ gap: space.s2, backgroundColor: c.paperSunk, borderRadius: 12, padding: 14 }}>
       <Meta tone="ink2">{tx(LE8_IDEAL[k])}</Meta>
-      {pts.length > 1 ? (
+      {pts.length > 1 && !minor ? (
         <Sparkline
           values={scores}
           labels={[shortDate(pts[0].at, lang), shortDate(pts[pts.length - 1].at, lang)]}
@@ -390,13 +405,13 @@ function Le8Detail({ k, name, pts, onSave, onRemove }: { k: Le8Key; name: string
           const reading = le8Reading(k, p, t)
           return (
             <View key={p.id ?? p.at} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: c.line, paddingVertical: 8 }}>
-              <View style={{ flex: 1, gap: 2 }} accessible accessibilityLabel={t('{date}: {reading}, score {s}', { date: shortDate(p.at, lang), reading, s })}>
+              <View style={{ flex: 1, gap: 2 }} accessible accessibilityLabel={minor ? `${shortDate(p.at, lang)}: ${reading}` : t('{date}: {reading}, score {s}', { date: shortDate(p.at, lang), reading, s })}>
                 <Mono size={12} tone="ink3">
                   {`${shortDate(p.at, lang)}${p.mine ? ` · ${t('Entered by you')}` : ''}`}
                 </Mono>
                 <Meta tone="ink">{reading}</Meta>
               </View>
-              <Mono tone="ink">{String(s)}</Mono>
+              {minor ? null : <Mono tone="ink">{String(s)}</Mono>}
               {p.mine && p.id ? (
                 <Button variant="link" size="sm" onPress={() => onRemove(p.id!)} accessibilityLabel={t('Remove today’s reading')}>
                   {t('Remove')}
@@ -500,21 +515,38 @@ function Vault() {
 function MarkerRow({ m, first, open, onToggle }: { m: Marker; first: boolean; open: boolean; onToggle: () => void }) {
   const { c } = useTheme()
   const { t, tx } = useA()
+  const viva = useVivaRun()
   const delta = m.prev === null ? null : Math.round((m.value - m.prev) * 100) / 100
   // Status is told in words on neutral grounds; a Spectrum colour never stands in for it.
   const statusTone = m.status === 'outside range' ? 'ink' : 'neutral'
+  const name = tx(m.name)
+  // explain_biomarker, run here in the room: plain words from the signed panel, never a diagnosis.
+  const explain = () =>
+    viva.run({
+      ask: t('What is {name}, in plain words?', { name }),
+      text: t('{name} is {value} {unit}; the lab range is {range}. {plain} {status} Your physician reads it with the rest of your panel. VIVA explains; it never diagnoses.', {
+        name,
+        value: m.value,
+        unit: m.unit,
+        range: m.range,
+        plain: tx(m.plain),
+        status: m.status === 'in range' ? t('It sits within its range.') : m.status === 'worth watching' ? t('It is near the edge of its range: worth watching, not worrying about.') : t('It is outside its range; Dr Meera has seen it and will talk it through with you.'),
+      }),
+      tool: 'explain_biomarker',
+      reviewer: tx('Reviewed by Dr Meera Iyer'),
+    })
   return (
-    <Pressable
-      onPress={onToggle}
-      accessibilityRole="button"
-      accessibilityState={{ expanded: open }}
-      aria-expanded={open}
-      accessibilityLabel={t('{name}, {value} {unit}, range {range}, {status}{prev}', { name: m.name, value: m.value, unit: m.unit, range: m.range, status: tx(m.status), prev: m.prev !== null ? t(', previously {p}', { p: m.prev }) : '' })}
-      style={({ pressed }) => ({ borderTopWidth: first ? 0 : 1, borderTopColor: c.line, paddingVertical: 12, gap: 6, opacity: pressed ? 0.7 : 1 })}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+    <View style={{ borderTopWidth: first ? 0 : 1, borderTopColor: c.line, paddingVertical: 12, gap: 8 }}>
+      <Pressable
+        onPress={onToggle}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        aria-expanded={open}
+        accessibilityLabel={t('{name}, {value} {unit}, range {range}, {status}{prev}', { name, value: m.value, unit: m.unit, range: m.range, status: tx(m.status), prev: m.prev !== null ? t(', previously {p}', { p: m.prev }) : '' })}
+        style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, opacity: pressed ? 0.7 : 1 })}
+      >
         <View style={{ flex: 1, gap: 2 }}>
-          <Body weight="medium">{m.name}</Body>
+          <Body weight="medium">{name}</Body>
           <Meta size={14} tone="ink3">
             {t('{panel} · range {range}', { panel: tx(m.panel), range: m.range })}
           </Meta>
@@ -531,14 +563,24 @@ function MarkerRow({ m, first, open, onToggle }: { m: Marker; first: boolean; op
           <Pill tone={statusTone}>{tx(m.status)}</Pill>
         </View>
         <Icon name={open ? 'chevron-up' : 'chevron-down'} size={16} color={c.ink3} />
-      </View>
+      </Pressable>
       {open ? (
-        <View style={{ gap: 4 }}>
+        <View style={{ gap: 8 }}>
           <Body tone="ink2">{tx(m.plain)}</Body>
           <Meta size={14}>{m.prev === null ? t('Measured once; no earlier reading.') : t('Last panel {p} {unit}; {change}.', { p: m.prev, unit: m.unit, change: delta! === 0 ? t('unchanged') : t(delta! > 0 ? 'up {n}' : 'down {n}', { n: Math.abs(delta!) }) })}</Meta>
+          <VivaExchange state={viva.state} turn={viva.turn} />
+          {viva.state === 'idle' ? (
+            <Button size="sm" variant="ghost" icon="message-circle" onPress={explain} style={{ alignSelf: 'flex-start' }}>
+              {t('Ask VIVA to explain {name}', { name })}
+            </Button>
+          ) : viva.state === 'shown' ? (
+            <Button size="sm" variant="ghost" onPress={viva.reset} style={{ alignSelf: 'flex-start' }}>
+              {t('Close the explanation')}
+            </Button>
+          ) : null}
         </View>
       ) : null}
-    </Pressable>
+    </View>
   )
 }
 

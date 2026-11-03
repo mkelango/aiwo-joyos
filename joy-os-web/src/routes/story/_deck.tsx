@@ -4,6 +4,7 @@ import { createContext, useContext, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AiwoMark } from '@/components/joy/Brand'
 import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
+import { JoyspanEquation } from '@/components/joy/JoyspanEquation'
 import { BandLabel, Delta, MethodLine, TermDot, fmtDate } from '@/components/joy/primitives'
 import { DEMO_ROLES } from '@/layouts/DemoBar'
 import { useApp } from '@/lib/store'
@@ -235,15 +236,9 @@ function Equation() {
       <H2>One number that can go <em>down</em>.</H2>
       <div className="mt-[28px] grid flex-1 grid-cols-[1fr_520px] gap-[56px]">
         <div className="flex flex-col">
-          <p className="text-[25px] font-light leading-[1.7] text-ink">
-            <span className="text-ink-2">Joyspan =</span>{' '}
-            {TERMS.map((t, i) => (
-              <span key={t.key}>
-                {i > 0 && <span className="text-ink-3">{t.key === 'B' ? ' − ' : ' + '}</span>}
-                <span className="inline-flex items-center gap-2 whitespace-nowrap"><TermDot term={t.key} size={14} />{t.name}</span>
-              </span>
-            ))}
-          </p>
+          {/* Set verbatim in Newsreader; the Amber minus is the only colour in the line (Playbook p44). */}
+          <JoyspanEquation className="text-[31px] leading-[1.45]" />
+          <p className="mt-2 text-[15px] text-ink-3">The word Joyspan is credited to Dr Kerry Burnight. AIWO owns the equation, the Index and the programmes.</p>
           <p className="num mt-5 text-[34px] font-light text-ink">JI = GM(H, P, R, F, D) − <span className="text-ink">0.25</span>·B</p>
           <div className="mt-6 grid grid-cols-[1fr_1fr] gap-[32px] border-t border-line pt-5">
             <div>
@@ -1116,7 +1111,7 @@ const OUTLINES: Record<string, string[]> = {
   cover: ['The operating system for a joyful life.', 'Span is what you gain. ’Cation is how you get it. Joy OS is how it lasts.', 'Prepared for C. Sivasankaran, Mentor, AIWO Limited.'],
   problem: [...MARKET.map(([k, has, miss]) => `${termByKey(k).name}: ${has} exist; missing: ${miss.toLowerCase()}.`), 'No competitor fully covers more than one of five whole-life rows; the best reach three, only partly.'],
   category: ['Longevity medicine, wellness travel, mental wellbeing and the experience economy, given one number and one loop: Joyspan management.', ...SIX_ONLY.map(([h, b]) => `${h}: ${b}`)],
-  equation: ['Joyspan = Healthspan + Purpose + Relationships + Freedom + Daily Pleasure − Preventable Suffering.', `JI = GM(H, P, R, F, D) − ${METHODS['v1.0'].lambda}·B, method ${latest.method}.`, `Specimen member: ${latest.terms.map((t) => `${termByKey(t.key).name} ${t.key === 'B' ? '−' : ''}${t.value}`).join(', ')} → Index ${latest.value} (${indexDelta >= 0 ? 'up' : 'down'} ${Math.abs(indexDelta)}).`, 'A geometric mean rewards balance: the thin term is not hidden by the strong ones.'],
+  equation: ['Joyspan = Healthspan + Purpose + Relationships + Freedom + Daily Pleasure − Preventable Suffering.', 'The word Joyspan is credited to Dr Kerry Burnight; AIWO owns the equation, the Index and the programmes.', `JI = GM(H, P, R, F, D) − ${METHODS['v1.0'].lambda}·B, method ${latest.method}.`, `Specimen member: ${latest.terms.map((t) => `${termByKey(t.key).name} ${t.key === 'B' ? '−' : ''}${t.value}`).join(', ')} → Index ${latest.value} (${indexDelta >= 0 ? 'up' : 'down'} ${Math.abs(indexDelta)}).`, 'A geometric mean rewards balance: the thin term is not hidden by the strong ones.'],
   grades: ['Check: free, no login, 18 statements in 5 minutes, bands only.', `Index: about 60 items in two sittings, re-measured every 90 days (specimen ${latest.value}).`, `Clinical: physician-signed, LONGEVIS and SIIS from the shared core (specimen ${clinical.value}, ${fmtDate(clinical.takenOn, 'en')}).`],
   loop: LOOP_STATIONS.map((st) => `${st.when}: ${st.does}`),
   product: [...TABS.map(([t, d]) => `${t}: ${d}`), 'Six spaces, one per term: the equation is the information architecture.'],
@@ -1139,7 +1134,7 @@ export const SLIDES: SlideDef[] = [
   { id: 'cover', title: 'Joy OS — the operating system for a joyful life', section: 'Cover', ground: 'ink', accent: true, bare: true, Body: Cover, notes: 'Joy OS is the operating system for a joyful life: it measures a person’s Joyspan on six terms, names the one term to raise next, delivers the ’cation, practice or habit that raises it, and holds the gain ninety days at a time, on the phone, the web and WhatsApp.', outline: OUTLINES['cover'] },
   { id: 'problem', title: 'The problem', section: 'The problem', ground: 'paper', accent: true, Body: Problem, notes: 'Wearables count sleep and strain. Meditation apps calm the mind. Lab subscriptions read the blood. Each sells one term of the equation as if it were the whole. Across fifteen competitors and 59 screenshots, none fully covers more than one of the five whole-life rows (the best reach three, and only partly), and the market has converged on wearable + blood test + an “age” number + an AI companion, all body-only.', outline: OUTLINES['problem'] },
   { id: 'category', title: 'The category', section: 'The category', ground: 'sunk', accent: true, Body: Category, notes: 'Joy OS takes four markets and gives them one number and one loop. That is a new category, Joyspan management, and the first company to define its unit owns it.', outline: OUTLINES['category'] },
-  { id: 'equation', title: 'The equation and the Index', section: 'The equation and the Index', ground: 'paper', accent: true, Body: Equation, notes: 'JI = GM(H, P, R, F, D) − 0.25·B, method v1.0, pinned on every score. Hover, focus or click a term (or a petal) to light it on the Wheel; click again to clear. The geometric mean rewards balance; the burden term subtracts. Movements are shown both ways.', outline: OUTLINES['equation'] },
+  { id: 'equation', title: 'The equation and the Index', section: 'The equation and the Index', ground: 'paper', accent: true, Body: Equation, notes: 'The word Joyspan is credited to Dr Kerry Burnight; AIWO owns the equation, the Index and the programmes. JI = GM(H, P, R, F, D) − 0.25·B, method v1.0, pinned on every score. Hover, focus or click a term (or a petal) to light it on the Wheel; click again to clear. The geometric mean rewards balance; the burden term subtracts. Movements are shown both ways.', outline: OUTLINES['equation'] },
   { id: 'grades', title: 'Three grades, one method', section: 'Three grades', ground: 'paper', accent: true, Body: Grades, notes: 'The Check is free and shows bands only, never a number. The Index is about sixty items in two sittings, re-measured every ninety days. The Clinical grade is physician-signed, using the shared clinical core. One engine scores all three.', outline: OUTLINES['grades'] },
   { id: 'loop', title: 'The 90-day loop', section: 'The ninety-day loop', ground: 'paper', accent: false, Body: Loop, notes: 'Measure, raise, hold, re-measure. Day 0 names the lowest term; the coach owns the reviews at Day 15 and 45; Day 60 is the next-step talk; Day 76–90 is the like-for-like re-measure with a signed delta; then cohort deltas are published up and down.', outline: OUTLINES['loop'] },
   { id: 'product', title: 'The product: five tabs and six spaces', section: 'The product', ground: 'paper', accent: true, Body: Product, notes: 'The equation is the information architecture: six term services become six spaces, plus Today. A member’s day takes about two minutes: one action, three ten-second Ledger prompts, a weekly circle and a quarterly re-measure.', outline: OUTLINES['product'] },

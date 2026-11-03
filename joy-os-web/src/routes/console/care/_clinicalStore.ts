@@ -9,11 +9,11 @@ import { consoleNowMs } from './_parts'
 
 export type SignItem = (typeof SIGNOFF_QUEUE)[number] & { signed: string | null; returned: { reason: string; note: string; at: string } | null }
 export type Screen = (typeof SCREEN_QUEUE)[number] & { routedAt?: string; alertId?: string }
-export type Draft = (typeof HITL_QUEUE)[number] & { state: 'pending' | 'approved' | 'rejected'; edited: boolean; flagged?: string }
+export type Draft = (typeof HITL_QUEUE)[number] & { state: 'pending' | 'approved' | 'rejected'; edited: boolean; flagged?: string; reviewer?: string }
 /** The Medical Director's active, signed threshold set. Every tab reads the same version. */
 export type MdActive = { version: string; signedOn: string; signers: string[]; hash: string; values: Record<string, number> }
 export type MdHistory = (typeof MD_CONFIG.history)[number]
-export type Sent = { rx: string; drug: string; dose: string; freq: string; sentAt: number; reason?: string }
+export type Sent = { rx: string; drug: string; dose: string; freq: string; sentAt: number; reason?: string; by?: string }
 export type Order = { test: string; when: string; status: string }
 /** A signed SOAP note is never edited: it is amended, each amendment signed and kept beside it. */
 export type SoapAmendment = { id: string; ms: number; by: string; reason: string; text: string }
@@ -31,6 +31,8 @@ export type SoapNote = {
   amendments: SoapAmendment[]
   specimen?: boolean
 }
+/** The marker on an order raised when a Clinical-grade draft is returned: the concierge desk dispatches it as a home redraw. */
+export const REDRAW = 'Redraw · home draw'
 export type RecordWork = { sent: Sent[]; adjusted: Record<string, string>; orders: Order[]; soap?: SoapNote[] }
 /** The clinician's work on the member's own Clinical-grade re-measure (the record itself lives with the member). */
 export type RemeasureWork = { notes: string[]; returned: { reason: string; note: string; at: string } | null }

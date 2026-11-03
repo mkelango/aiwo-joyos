@@ -3,20 +3,22 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowDown, ArrowLeft, ArrowRight, Check, CreditCard, Info, MapPin, MessageCircle, Minus, Moon, Plus, ShieldCheck, Stethoscope } from 'lucide-react'
 import { useEffect, useId, useMemo, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { DaybreakButton, Eyebrow, TermChip, TermDot } from '@/components/joy/primitives'
-import { Button, Card, EmptyState, PageHeader, Pill, SectionTitle } from '@/components/ui'
+import { DaybreakButton, Eyebrow, TermChip, TermDot, useFmtDate } from '@/components/joy/primitives'
+import { Button, Card, PageHeader, Pill, SectionTitle, Tabs } from '@/components/ui'
 import { CATIONS, CATION_PHASES } from '@/data/platform'
 import { INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
-import { CATION_DETAIL, buildItinerary } from './_data'
-import { PrimaryChip, fade, kindIcon } from './_parts'
+import { CATION_DETAIL, buildItinerary, type ItinDay } from './_data'
+import { JourneyEmpty, PrimaryChip, fade, kindIcon } from './_parts'
 // One shared emergency intercept for every member free-text field (Memo p.24).
 import { useCrisisGuard } from '@/routes/member/spaces/_SpaceShell'
-import { addCationRequest, useJourney, withdrawCationRequest, type CationRequest } from './_store'
+import { addCationRequest, isoDate, useJourney, useVenueItinerary, withdrawCationRequest, type CationRequest } from './_store'
 import { useJ, type JourneyKey } from './_i18n'
 
 // ’CATION DETAIL (Memo p.20): one template per ’cation — promise, primary and
 // secondary terms, Day-90 measure, itinerary, before/after, named clinician
 // present, and a booking request. One Daybreak: “Request this ’cation”.
+// Once the venue publishes a guest's itinerary from the partner console (C11),
+// it shows here in place of the template, labelled as the venue's.
 // Note: the 40% hotel-cost rule is enforced in commerce and the partner console;
 // it is never shown to the member.
 
@@ -24,8 +26,17 @@ export default function CationDetail() {
   const { slug = '' } = useParams()
   const c = CATIONS.find((x) => x.slug === slug)
   const d = CATION_DETAIL[slug]
-  const itinerary = useMemo(() => buildItinerary(slug), [slug])
+  const template = useMemo(() => buildItinerary(slug), [slug])
+  const venueItin = useVenueItinerary(slug, c?.name ?? '')
+  const [source, setSource] = useState<'venue' | 'template'>('venue')
+  const fromVenue = !!venueItin && source === 'venue'
+  // The venue's schedule has times and titles only; it keeps the template's shape so one panel shows either.
+  const itinerary: ItinDay[] = useMemo(
+    () => (fromVenue && venueItin ? venueItin.days.map((d) => ({ day: d.day, title: '', items: d.items.map((i) => ({ time: i.time, title: i.title, where: '', kind: 'Room' as const })) })) : template),
+    [fromVenue, venueItin, template],
+  )
   const [day, setDay] = useState(1)
+  const fmtDate = useFmtDate()
   const tabId = useId()
   const { hash } = useLocation()
   const { t, r, tx, term, termLabel, status } = useJ()
@@ -50,7 +61,7 @@ export default function CationDetail() {
     return (
       <div>
         <PageHeader eyebrow={t('cation')} title={t('nfTitle')} lead={t('nfLead')} />
-        <EmptyState title={t('nfEmpty')} body={t('nfBody')} action={<Link to="/app/cation" className="btn-daybreak">{t('seeAllTen')}</Link>} />
+        <JourneyEmpty kind="cation" title={t('nfEmpty')} body={t('nfBody')} action={<Link to="/app/cation" className="btn-daybreak">{t('seeAllTen')}</Link>} />
       </div>
     )
   }
@@ -59,6 +70,7 @@ export default function CationDetail() {
   const isLowest = c.primary === latest.lowestTerm
   const primaryScore = c.primary === 'ALL' ? latest.value : latest.terms.find((t) => t.key === c.primary)?.value
   const current = itinerary.find((x) => x.day === day) ?? itinerary[0]
+  const pickSource = (v: 'venue' | 'template') => { setSource(v); setDay(1) }
   const coach = TEAM.find((p) => p.role === 'Coach')!
 
   return (
@@ -113,6 +125,14 @@ export default function CationDetail() {
           {/* Itinerary */}
           <section aria-labelledby="itin">
             <SectionTitle aside={<span className="text-[13px] text-ink-3">{t('roomSchedule')}</span>}><span id="itin">{t('itinTitle')}</span></SectionTitle>
+            {venueItin && (
+              <div className="mb-4 space-y-2">
+                <div role="group" aria-label={t('itinSourceAria')}>
+                  <Tabs value={source} onChange={pickSource} items={[{ value: 'venue', label: t('itinFromVenue', { venue: tx(venueItin.venue) }) }, { value: 'template', label: t('itinTemplate') }]} />
+                </div>
+                {fromVenue && <p className="text-[13px] text-ink-2">{r('itinVenueNote', { venue: tx(venueItin.venue), d: { n: fmtDate(isoDate(new Date(venueItin.at))) }, time: { n: new Date(venueItin.at).toTimeString().slice(0, 5) } })}</p>}
+              </div>
+            )}
             <div className="mb-4">
               {/* Wraps rather than scrolls, so the last day is never hidden off the edge. */}
               <div role="tablist" aria-label={t('itinDays')} className="inline-flex flex-wrap gap-1 rounded-[1.4rem] bg-paper-sunk p-1" onKeyDown={onDaysKey}>
@@ -126,11 +146,22 @@ export default function CationDetail() {
             <AnimatePresence mode="wait">
               <motion.div key={current.day} id={`${tabId}-panel`} role="tabpanel" aria-labelledby={`${tabId}-t${current.day}`} {...fade} exit={{ opacity: 0 }}>
                 <Card tone="outline">
-                  <p className="eyebrow text-ink-3">{r('dayNofM', { n: current.day, m: itinerary.length })}</p>
-                  <p className="mt-1 text-[1.3rem] font-light text-ink">{current.titleFrom ? tx(current.titleFrom).split(':')[0].split(',')[0] : tx(current.title)}</p>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="eyebrow text-ink-3">{r('dayNofM', { n: current.day, m: itinerary.length })}</p>
+                    {fromVenue && <Pill tone="neutral"><MapPin size={12} /> {t('itinVenueTag')}</Pill>}
+                  </div>
+                  {current.title && <p className="mt-1 text-[1.3rem] font-light text-ink">{current.titleFrom ? tx(current.titleFrom).split(':')[0].split(',')[0] : tx(current.title)}</p>}
                   <ol className="mt-5 divide-y divide-line">
                     {current.items.map((it, i) => {
                       const Icon = kindIcon[it.kind]
+                      if (fromVenue) {
+                        return (
+                          <li key={i} className="grid grid-cols-[3.5rem_1fr] gap-3 py-3.5 sm:grid-cols-[4rem_1fr] sm:items-center">
+                            <span className="num text-[15px] text-ink-2">{it.time}</span>
+                            <p className="min-w-0 text-[16px] text-ink">{tx(it.title)}</p>
+                          </li>
+                        )
+                      }
                       return (
                         <li key={i} className="grid grid-cols-[3.5rem_1fr] gap-3 py-3.5 sm:grid-cols-[4rem_2rem_1fr_auto] sm:items-center">
                           <span className="num text-[15px] text-ink-2">{it.time}</span>

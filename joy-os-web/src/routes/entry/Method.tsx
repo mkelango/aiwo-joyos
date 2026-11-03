@@ -3,6 +3,7 @@ import { ArrowRight, Check, FileText, Lock, RotateCcw, Search, ShieldCheck, X } 
 import { useId, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
+import { JoyspanEquation } from '@/components/joy/JoyspanEquation'
 import { DaybreakButton, Delta, Eyebrow, TermDot } from '@/components/joy/primitives'
 import { Button, Card, DataTable, PageHeader, Pill } from '@/components/ui'
 import { INDEX_HISTORY } from '@/data/member'
@@ -13,7 +14,7 @@ import type { MethodVersion, TermKey, TermScore } from '@/domain/types'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
 import { COHORT_TERMS } from './_data'
 import { E, MT, regTx } from './_i18n'
-import { LMethodLine, LSpecimenTag, LTermChip, Section, rich, useBand, useFmtDate } from './_parts'
+import { JoyspanCredit, LMethodLine, LSpecimenTag, LTermChip, Section, rich, useBand, useFmtDate } from './_parts'
 
 // THE METHOD (Memo p.10–11, Playbook): the formula, the worked example computed live
 // by the engine, three grades, six terms, the instrument registry with licences,
@@ -38,7 +39,7 @@ export default function Method() {
       <PageHeader
         eyebrow={t('eyebrow', { label: t('ml_v1.0'), date: fmt(METHODS['v1.0'].published) })}
         title={<>{rich(t('title'), { em: <em>{t('titleEm')}</em> })}</>}
-        lead={t('lead')}
+        lead={<>{t('lead')}<JoyspanCredit className="mt-2" /></>}
         actions={
           <>
             <a href="#results" className="inline-flex h-11 items-center gap-2 rounded-full border border-line-strong bg-paper-raised px-4 text-[15px] font-medium text-ink hover:bg-paper-sunk focus-ring">
@@ -99,6 +100,8 @@ function FormulaSection() {
 
   return (
     <Section id="formula" eyebrow={t('fEyebrow')} title={<>{rich(t('fTitle'), { em: <em>{t('fTitleEm')}</em> })}</>}>
+      {/* The word equation, verbatim (Playbook p44, p47), above the Index that measures it. */}
+      <JoyspanEquation className="mb-8 max-w-4xl text-[1.5rem] md:text-[2rem]" />
       <div className="grid gap-6 xl:grid-cols-[1fr_1.1fr] xl:items-start xl:gap-8">
         <div className="flex min-w-0 flex-col rounded-card bg-ink p-5 text-paper md:p-8">
           <div>

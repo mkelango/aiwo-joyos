@@ -9,7 +9,7 @@ import { useApp } from '@/lib/store'
 import { isSpecimenToday } from '@/screens/a/local'
 import { LEDGER_TAG } from '@/screens/b/i18n/common'
 import { DEVICES, HEALTHKIT_TYPES, WEAR_NIGHTS, type DeviceState } from '@/screens/b/accountData'
-import { devicesStore, useStore } from '@/screens/b/bStore'
+import { devicesStore, signalsDownIn, useStore } from '@/screens/b/bStore'
 import { CheckLine, memberOnly } from '@/screens/b/parts'
 import { useDict } from '@/lib/i18n'
 import { DEV, DEVICE_NOTE, SIGNAL_TEXT, HK_TEXT } from '@/screens/b/i18n/devices'
@@ -58,6 +58,16 @@ function Devices() {
   const toastAfterSheet = (msg: string) => later(() => setToast(msg), 350)
 
   const connected = devices.filter((d) => d.state === 'connected')
+  // Signals down (M3): no device connected, or all stale. The Index then takes answers only.
+  const sigDown = signalsDownIn(stored)
+  const markStale = () => {
+    setStored((st) => {
+      const states = { ...st.states }
+      DEVICES.filter((d) => (st.states[d.id]?.state ?? d.state) === 'connected').forEach((d) => (states[d.id] = { ...(st.states[d.id] ?? { state: 'connected', lastSync: d.lastSync }), state: 'connected', freshness: 'stale' }))
+      return { ...st, states }
+    })
+    setToast(t('markedStale'))
+  }
   const others = devices.filter((d) => d.state !== 'connected')
   const wornNights = WEAR_NIGHTS.filter((n) => n.h >= 4).length
   const gaps = WEAR_NIGHTS.filter((n) => n.h === 0)
@@ -109,6 +119,21 @@ function Devices() {
       <DaybreakButton icon="refresh-cw" onPress={sync} disabled={syncing}>
         {syncing ? t('syncing') : t('syncNow')}
       </DaybreakButton>
+
+      {sigDown ? (
+        <Card tone="outline" style={{ gap: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} accessibilityLiveRegion="polite">
+            <Icon name="wifi-off" size={18} color={c.ink2} />
+            <Body weight="medium">{t('sigDownTitle')}</Body>
+          </View>
+          <Meta>{connected.length === 0 ? t('sigDownNone') : t('sigDownStale')}</Meta>
+          <Meta size={14} tone="ink3">{t('sigDownNoFall')}</Meta>
+        </Card>
+      ) : connected.length ? (
+        <Button variant="link" onPress={markStale} style={{ alignSelf: 'flex-start' }}>
+          {t('markStale')}
+        </Button>
+      ) : null}
 
       <Card tone="sunk" style={{ flexDirection: 'row', gap: 12 }}>
         <Icon name="shield-off" size={20} color={c.ink2} />
@@ -429,7 +454,7 @@ function WatchComplication() {
                     onPress={() => setMode('pick')}
                     accessibilityRole="button"
                     accessibilityLabel={`${t('watchOpen')}. ${t('watchLedger')}, ${countLabel}`}
-                    style={({ pressed }) => ({ width: 92, height: 92, borderRadius: 46, borderWidth: 3, borderColor: c.termD, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? FACE.paperRaised : FACE.paper, gap: 2 })}
+                    style={({ pressed }) => ({ width: 92, height: 92, borderRadius: 46, borderWidth: 3, borderColor: FACE.ink2, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? FACE.paperRaised : FACE.paper, gap: 2 })}
                   >
                     <Mono size={22} color={FACE.ink}>{String(today)}</Mono>
                     <Meta size={11} color={FACE.ink2} align="center" numberOfLines={1}>

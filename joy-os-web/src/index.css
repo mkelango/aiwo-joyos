@@ -57,6 +57,9 @@
     font-weight: 700;
     letter-spacing: 0.005em;
   }
+  /* The primary label steps up with the Indic type scale (19 → 20 px, Playbook p40); a size
+     utility on the button still wins, and the Indic size table below re-steps that one. */
+  :where(:lang(ta), :lang(hi)) .btn-daybreak { font-size: 20px; }
   .btn-daybreak:hover { filter: brightness(0.96); }
   .btn-daybreak:active { transform: scale(0.985); }
   .btn-daybreak:disabled { opacity: 0.5; }
@@ -66,6 +69,9 @@
   .wheel-petal:focus-visible { outline: none; }
   .wheel-petal-ring { stroke: transparent; stroke-width: 2.5; pointer-events: none; }
   .wheel-petal:focus-visible .wheel-petal-ring { stroke: var(--daybreak); }
+  /* Icons are 1.5 px on a 24 px grid with round ends (Playbook p51). lucide draws 2 px by
+     default; this thins every default icon app-wide, while an explicit strokeWidth still wins. */
+  svg.lucide[stroke-width='2'] { stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
   .hatch-b {
     background: repeating-linear-gradient(45deg, var(--term-b) 0 2px, var(--term-b-soft) 2px 4.5px);
   }
@@ -90,4 +96,125 @@
 }
 @media (min-width: 768px) {
   #root .md\:min-h-0 { min-height: 0; }
+}
+
+/* Tamil and Hindi are set one step larger than Latin at the same role, with +10% leading
+   (Playbook p40 type table). Body 17 → 18 px and 1.53 → 1.68; every text size the app uses
+   steps up once (+1 px to 18 px, then about 6%); tight, snug and relaxed leading open by 10%.
+   Mono (numbers, labels) stays Latin-sized, and display type over 48 px stays as drawn (kept
+   here at its own size so a smaller base rule can never override it at a breakpoint).
+   Generated from the sizes in src; a new arbitrary size needs a line here. */
+:root:is(:lang(ta), :lang(hi)) body { font-size: 18px; line-height: 1.68; }
+:root:is(:lang(ta), :lang(hi)) .leading-tight:not(.font-mono):not(.num) { line-height: 1.375; }
+:root:is(:lang(ta), :lang(hi)) .leading-snug:not(.font-mono):not(.num) { line-height: 1.5125; }
+:root:is(:lang(ta), :lang(hi)) .leading-relaxed:not(.font-mono):not(.num) { line-height: 1.7875; }
+:root:is(:lang(ta), :lang(hi)) .text-\[1\.05rem\]:not(.font-mono):not(.num) { font-size: 17.8px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[1\.15rem\]:not(.font-mono):not(.num) { font-size: 19.5px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[1\.1rem\]:not(.font-mono):not(.num) { font-size: 18.6px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[1\.25rem\]:not(.font-mono):not(.num) { font-size: 21px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[1\.2rem\]:not(.font-mono):not(.num) { font-size: 20.5px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[1\.35rem\]:not(.font-mono):not(.num) { font-size: 23px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[1\.3rem\]:not(.font-mono):not(.num) { font-size: 22px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[1\.45rem\]:not(.font-mono):not(.num) { font-size: 24.5px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[1\.4rem\]:not(.font-mono):not(.num) { font-size: 24px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[1\.55rem\]:not(.font-mono):not(.num) { font-size: 26.5px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[1\.5rem\]:not(.font-mono):not(.num) { font-size: 25.5px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[1\.65rem\]:not(.font-mono):not(.num) { font-size: 28px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[1\.6rem\]:not(.font-mono):not(.num) { font-size: 27px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[1\.75rem\]:not(.font-mono):not(.num) { font-size: 30px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[1\.7rem\]:not(.font-mono):not(.num) { font-size: 29px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[1\.8rem\]:not(.font-mono):not(.num) { font-size: 30.5px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[1\.9rem\]:not(.font-mono):not(.num) { font-size: 32.5px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[10px\]:not(.font-mono):not(.num) { font-size: 11px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[11px\]:not(.font-mono):not(.num) { font-size: 12px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[12\.5px\]:not(.font-mono):not(.num) { font-size: 13.5px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[12px\]:not(.font-mono):not(.num) { font-size: 13px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[13px\]:not(.font-mono):not(.num) { font-size: 14px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[14\.5px\]:not(.font-mono):not(.num) { font-size: 15.5px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[14px\]:not(.font-mono):not(.num) { font-size: 15px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[15px\]:not(.font-mono):not(.num) { font-size: 16px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[16px\]:not(.font-mono):not(.num) { font-size: 17px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[17px\]:not(.font-mono):not(.num) { font-size: 18px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[18px\]:not(.font-mono):not(.num) { font-size: 19px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[19px\]:not(.font-mono):not(.num) { font-size: 20px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[1rem\]:not(.font-mono):not(.num) { font-size: 17px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[2\.1rem\]:not(.font-mono):not(.num) { font-size: 35.5px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[2\.25rem\]:not(.font-mono):not(.num) { font-size: 38px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[2\.2rem\]:not(.font-mono):not(.num) { font-size: 37.5px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[2\.4rem\]:not(.font-mono):not(.num) { font-size: 41px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[2\.6rem\]:not(.font-mono):not(.num) { font-size: 44px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[20px\]:not(.font-mono):not(.num) { font-size: 21px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[21px\]:not(.font-mono):not(.num) { font-size: 22.5px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[22px\]:not(.font-mono):not(.num) { font-size: 23.5px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[23px\]:not(.font-mono):not(.num) { font-size: 24.5px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[24px\]:not(.font-mono):not(.num) { font-size: 25.5px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[25px\]:not(.font-mono):not(.num) { font-size: 26.5px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[26px\]:not(.font-mono):not(.num) { font-size: 27.5px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[28px\]:not(.font-mono):not(.num) { font-size: 30px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[2rem\]:not(.font-mono):not(.num) { font-size: 34px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[3\.2rem\]:not(.font-mono):not(.num) { font-size: 51.2px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[3\.4rem\]:not(.font-mono):not(.num) { font-size: 54.4px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[3\.5rem\]:not(.font-mono):not(.num) { font-size: 56px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[3\.6rem\]:not(.font-mono):not(.num) { font-size: 57.6px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[30px\]:not(.font-mono):not(.num) { font-size: 32px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[34px\]:not(.font-mono):not(.num) { font-size: 36px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[3rem\]:not(.font-mono):not(.num) { font-size: 51px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[4\.5rem\]:not(.font-mono):not(.num) { font-size: 72px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[40px\]:not(.font-mono):not(.num) { font-size: 42.5px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[44px\]:not(.font-mono):not(.num) { font-size: 47px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[46px\]:not(.font-mono):not(.num) { font-size: 49px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[48px\]:not(.font-mono):not(.num) { font-size: 51px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[4rem\]:not(.font-mono):not(.num) { font-size: 64px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[5\.25rem\]:not(.font-mono):not(.num) { font-size: 84px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[50px\]:not(.font-mono):not(.num) { font-size: 50px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[56px\]:not(.font-mono):not(.num) { font-size: 56px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[5rem\]:not(.font-mono):not(.num) { font-size: 80px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[6\.5rem\]:not(.font-mono):not(.num) { font-size: 104px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[64px\]:not(.font-mono):not(.num) { font-size: 64px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[7\.5rem\]:not(.font-mono):not(.num) { font-size: 120px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[72px\]:not(.font-mono):not(.num) { font-size: 72px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[7rem\]:not(.font-mono):not(.num) { font-size: 112px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[80px\]:not(.font-mono):not(.num) { font-size: 80px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[88px\]:not(.font-mono):not(.num) { font-size: 88px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[9\.5px\]:not(.font-mono):not(.num) { font-size: 10.5px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[96px\]:not(.font-mono):not(.num) { font-size: 96px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[9px\]:not(.font-mono):not(.num) { font-size: 10px; }
+:root:is(:lang(ta), :lang(hi)) .text-\[9rem\]:not(.font-mono):not(.num) { font-size: 144px; }
+@media (min-width: 640px) {
+  :root:is(:lang(ta), :lang(hi)) .sm\:text-\[1\.8rem\]:not(.font-mono):not(.num) { font-size: 30.5px; }
+  :root:is(:lang(ta), :lang(hi)) .sm\:text-\[11px\]:not(.font-mono):not(.num) { font-size: 12px; }
+  :root:is(:lang(ta), :lang(hi)) .sm\:text-\[13px\]:not(.font-mono):not(.num) { font-size: 14px; }
+  :root:is(:lang(ta), :lang(hi)) .sm\:text-\[15px\]:not(.font-mono):not(.num) { font-size: 16px; }
+  :root:is(:lang(ta), :lang(hi)) .sm\:text-\[4\.5rem\]:not(.font-mono):not(.num) { font-size: 72px; }
+  :root:is(:lang(ta), :lang(hi)) .sm\:text-\[5rem\]:not(.font-mono):not(.num) { font-size: 80px; }
+}
+@media (min-width: 768px) {
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[1\.5rem\]:not(.font-mono):not(.num) { font-size: 25.5px; }
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[1\.6rem\]:not(.font-mono):not(.num) { font-size: 27px; }
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[1\.75rem\]:not(.font-mono):not(.num) { font-size: 30px; }
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[1\.7rem\]:not(.font-mono):not(.num) { font-size: 29px; }
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[1\.9rem\]:not(.font-mono):not(.num) { font-size: 32.5px; }
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[11rem\]:not(.font-mono):not(.num) { font-size: 176px; }
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[16px\]:not(.font-mono):not(.num) { font-size: 17px; }
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[19px\]:not(.font-mono):not(.num) { font-size: 20px; }
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[2\.25rem\]:not(.font-mono):not(.num) { font-size: 38px; }
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[2\.2rem\]:not(.font-mono):not(.num) { font-size: 37.5px; }
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[2\.4rem\]:not(.font-mono):not(.num) { font-size: 41px; }
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[2\.5rem\]:not(.font-mono):not(.num) { font-size: 42.5px; }
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[2\.6rem\]:not(.font-mono):not(.num) { font-size: 44px; }
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[2\.8rem\]:not(.font-mono):not(.num) { font-size: 47.5px; }
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[2\.9rem\]:not(.font-mono):not(.num) { font-size: 49.5px; }
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[2rem\]:not(.font-mono):not(.num) { font-size: 34px; }
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[3\.4rem\]:not(.font-mono):not(.num) { font-size: 54.4px; }
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[4\.5rem\]:not(.font-mono):not(.num) { font-size: 72px; }
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[4rem\]:not(.font-mono):not(.num) { font-size: 64px; }
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[6\.5rem\]:not(.font-mono):not(.num) { font-size: 104px; }
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[7\.5rem\]:not(.font-mono):not(.num) { font-size: 120px; }
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[8rem\]:not(.font-mono):not(.num) { font-size: 128px; }
+  :root:is(:lang(ta), :lang(hi)) .md\:text-\[9\.5rem\]:not(.font-mono):not(.num) { font-size: 152px; }
+}
+@media (min-width: 1280px) {
+  :root:is(:lang(ta), :lang(hi)) .xl\:text-\[1\.45rem\]:not(.font-mono):not(.num) { font-size: 24.5px; }
+  :root:is(:lang(ta), :lang(hi)) .xl\:text-\[1\.6rem\]:not(.font-mono):not(.num) { font-size: 27px; }
+  :root:is(:lang(ta), :lang(hi)) .xl\:text-\[3rem\]:not(.font-mono):not(.num) { font-size: 51px; }
 }

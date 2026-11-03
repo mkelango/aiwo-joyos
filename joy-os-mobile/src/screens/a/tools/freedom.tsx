@@ -10,10 +10,12 @@ import { Chip, IconButton, TextField } from '@/screens/a/parts'
 import { NO_SUGGESTIONS, PEACE_OF_MIND, TIME_AUDIT, TIME_KINDS } from '@/screens/a/spacesData'
 import { useTheme } from '@/theme/ThemeProvider'
 import { useA } from '../i18n'
+import { VivaExchange, useVivaRun } from '../vivaParts'
 import { ToolCard, ToolsHeading } from './common'
 
 // FREEDOM: the time audit (a consented calendar, summarised, then discarded), the No list, the weekly
-// sabbath, and the peace-of-mind list. Never financial advice.
+// sabbath, and the peace-of-mind list. Never financial advice. VIVA's time_audit_summary runs on the
+// audit card itself, from the totals only.
 
 export function FreedomTools() {
   const { t } = useA()
@@ -234,6 +236,14 @@ function AuditView({ provider, rerun, onRerun, onDisconnect }: { provider: CalPr
   const maxDay = Math.max(...TIME_AUDIT.map((d) => d.mine + d.chosenWork + d.asked + d.admin))
   const yours = totals.find((t) => t.key === 'mine')!
   const asked = totals.find((t) => t.key === 'asked')!
+  const viva = useVivaRun()
+  const summarise = () =>
+    viva.run({
+      ask: tx('Summarise my time audit.'),
+      text: t('Over two weeks, {a}% of your planned hours were yours and {b}% were asked of you by others, mostly in Tuesday and Wednesday meetings. Weekends were largely your own. One protected hour a week is a good place to start.', { a: pct(yours.hours), b: pct(asked.hours) }),
+      tool: 'time_audit_summary',
+      reviewer: tx('Calendar entries discarded · totals only · never financial advice'),
+    })
   return (
     <ToolCard
       title={t('Time audit · two weeks')}
@@ -278,6 +288,16 @@ function AuditView({ provider, rerun, onRerun, onDisconnect }: { provider: CalPr
           {t('{p} · entries summarised, then discarded. Priya sees totals only.', { p: CAL_NAME[provider] })}
         </Meta>
       </View>
+      <VivaExchange state={viva.state} turn={viva.turn} />
+      {viva.state === 'idle' ? (
+        <Button size="sm" variant="ghost" icon="message-circle" onPress={summarise} style={{ alignSelf: 'flex-start' }}>
+          {t('Ask VIVA to summarise it')}
+        </Button>
+      ) : viva.state === 'shown' ? (
+        <Button size="sm" variant="ghost" onPress={viva.reset} style={{ alignSelf: 'flex-start' }}>
+          {t('Close the summary')}
+        </Button>
+      ) : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.s1 }}>
         {rerun ? (
           <Meta tone="ink2" accessibilityLiveRegion="polite" style={{ flexBasis: '100%' }}>

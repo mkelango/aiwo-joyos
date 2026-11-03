@@ -219,6 +219,8 @@ export default function Settings() {
               )}
               <p className="rounded-card bg-paper-sunk px-4 py-3 text-[14px] text-ink-2" aria-live="polite">
                 {prefs.biometric ? (prefs.lockAfter === '0' ? t('secNow') : rich(t(prefs.lockAfter === '1' ? 'secAfter1' : 'secAfterN'), { n: <span className="num">{prefs.lockAfter}</span> })) : t('secNone')}{rich(t('secSessions'), { n: <span className="num">15</span> })}
+                {/* The member app reads these two prefs (useA11yPrefs) for its lock screen. */}
+                {prefs.biometric && <span className="mt-1 block text-[13px] text-ink-3">{prefs.lockAfter === '0' ? t('secWebNow') : t('secWeb')}</span>}
               </p>
               <div className="border-t border-line pt-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">

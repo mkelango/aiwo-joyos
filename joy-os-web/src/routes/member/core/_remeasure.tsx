@@ -8,6 +8,7 @@ import { DAY90_DATES } from './_data'
 import { rich, useCore } from './_i18n'
 import { useX } from './_i18nX'
 import { REMEASURE_OPENS, useRemeasure, type ClinicalRemeasure } from './_store'
+import { useMemberName } from '@/lib/memberName'
 
 // THE RE-MEASURE CHAIN, member side (Architecture 8b-14; Memo p19 "Day 76 · 90").
 // Day-76 invite → the Clinical-grade assessment (/app/index/take?grade=clinical) →
@@ -21,12 +22,12 @@ export const CLINICAL_TAKE = '/app/index/take?grade=clinical'
 export const SIGNER = TEAM.find((p) => p.id === 'p_meera')!
 
 /** A fresh invite record: Day 76 on the specimen clock. */
-export function newInvite(): ClinicalRemeasure {
+export function newInvite(member: string = `${MEMBER.firstName} ${MEMBER.lastName}`): ClinicalRemeasure {
   const day0 = INDEX_HISTORY[0]
   return {
     status: 'invited',
     memberId: MEMBER.id,
-    member: `${MEMBER.firstName} ${MEMBER.lastName}`,
+    member,
     aiwoId: MEMBER.aiwoId,
     grade: 'clinical',
     method: day0.method,
@@ -45,6 +46,8 @@ export function RemeasureCard({ className, compact = false }: { className?: stri
   const x = useX()
   const { t: c } = useCore()
   const fmtDate = useFmtDate()
+  // The name given at setup (falls back to the specimen member).
+  const who = useMemberName()
   const status = rec?.status ?? null
 
   const reset = (
@@ -62,11 +65,11 @@ export function RemeasureCard({ className, compact = false }: { className?: stri
             <p className="mt-2 max-w-2xl text-[17px] text-ink">{x('rmUpcomingBody')}</p>
             {!compact && (
               <p className="mt-2 max-w-2xl rounded-card border border-dashed border-line-strong px-3 py-2 text-[13px] text-ink-2">
-                {rich(x('rmSpecimenClock'), { d: <span className="num">{MEMBER.dayOfLoop}</span>, date: <span className="num">{fmtDate(REMEASURE_OPENS)}</span> })}
+                {rich(x('rmSpecimenClock'), { name: who.firstName, d: <span className="num">{MEMBER.dayOfLoop}</span>, date: <span className="num">{fmtDate(REMEASURE_OPENS)}</span> })}
               </p>
             )}
           </div>
-          <Button variant="secondary" className="shrink-0 self-start md:self-center" onClick={() => setRec(newInvite())}>
+          <Button variant="secondary" className="shrink-0 self-start md:self-center" onClick={() => setRec(newInvite(who.fullName))}>
             <CalendarClock size={16} /> {x('rmOpenInvite')}
           </Button>
         </div>

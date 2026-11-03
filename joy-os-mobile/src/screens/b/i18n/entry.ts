@@ -14,6 +14,14 @@ export const WELCOME = {
   signInHint: { en: 'Signs in with your AIWO ID: passkey, phone code or email link (specimen)', ta: 'உங்கள் AIWO ID மூலம் உள்நுழைகிறது: பாஸ்கீ, தொலைபேசிக் குறியீடு அல்லது மின்னஞ்சல் இணைப்பு (மாதிரி)', hi: 'आपकी AIWO ID से साइन इन: पासकी, फ़ोन कोड या ईमेल लिंक (नमूना)' },
   signIn: { en: 'Sign in', ta: 'உள்நுழை', hi: 'साइन इन करें' },
   notReady: { en: 'Not ready? Take the free Check', ta: 'இன்னும் தயாரில்லையா? இலவச செக்கை எடுங்கள்', hi: 'अभी तैयार नहीं? मुफ़्त चेक करें' },
+  // Settings › Start again › See the welcome screen (/welcome?preview=1): a signed-in member looks.
+  previewNote: { en: 'Preview: this is the first screen a new member sees. You are still signed in.', ta: 'முன்னோட்டம்: புதிய உறுப்பினர் முதலில் பார்க்கும் திரை இது. நீங்கள் இன்னும் உள்நுழைந்தே இருக்கிறீர்கள்.', hi: 'पूर्वावलोकन: नया सदस्य सबसे पहले यही स्क्रीन देखता है। आप अब भी साइन इन हैं।' },
+  previewClose: { en: 'Close the preview', ta: 'முன்னோட்டத்தை மூடு', hi: 'पूर्वावलोकन बंद करें' },
+  // The specimen door: a reviewer on a fresh install goes straight in as the demo member.
+  specimenEyebrow: { en: 'Specimen app', ta: 'மாதிரிச் செயலி', hi: 'नमूना ऐप' },
+  specimenBody: { en: 'Look around as Arjun Rao, the demo member, on day 23 of 90. Nothing is real and nothing leaves this phone.', ta: 'டெமோ உறுப்பினர் Arjun Rao-வாக, 90 இல் நாள் 23 இல், சுற்றிப் பாருங்கள். எதுவும் உண்மையல்ல, எதுவும் இந்தத் தொலைபேசியை விட்டு வெளியேறாது.', hi: 'डेमो सदस्य Arjun Rao के रूप में, 90 में से दिन 23 पर, घूमकर देखिए। कुछ भी असली नहीं है और कुछ भी इस फ़ोन से बाहर नहीं जाता।' },
+  specimenGo: { en: 'Explore as the demo member', ta: 'டெமோ உறுப்பினராகப் பாருங்கள்', hi: 'डेमो सदस्य के रूप में देखें' },
+  specimenHint: { en: 'Signs in with the specimen account and opens Today', ta: 'மாதிரிக் கணக்கில் உள்நுழைந்து இன்றைத் திறக்கும்', hi: 'नमूना खाते से साइन इन करके आज खोलता है' },
   bandsNote: { en: 'Bands, never a number, until you choose the full Index. Your data stays yours.', ta: 'முழு குறியீட்டைத் தேர்ந்தெடுக்கும் வரை நிலைகள் மட்டுமே, எண் இல்லை. உங்கள் தரவு உங்களுடையதே.', hi: 'जब तक आप पूरा इंडेक्स न चुनें, सिर्फ़ स्तर दिखते हैं, नंबर नहीं। आपका डेटा आपका ही रहता है।' },
 } satisfies Dict
 

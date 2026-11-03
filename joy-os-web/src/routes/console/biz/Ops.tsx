@@ -1,12 +1,16 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Bell, Check, ChevronRight, Database, FileText, Globe2, KeyRound, Link2, Plus, Power, RefreshCw, Search, ShieldCheck, Stethoscope, Timer, Undo2 } from 'lucide-react'
+import { Bell, Check, ChevronRight, Database, FileText, Globe2, KeyRound, Link2, Plus, Power, RefreshCw, Search, ShieldCheck, SlidersHorizontal, Stethoscope, Timer, Undo2 } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Bar, BarChart, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { DaybreakButton, Eyebrow, SpecimenTag, TermChip } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill, Sheet, Tabs, Toggle } from '@/components/ui'
-import { AI_TOOLS, AUDIT, CELLS, CHECK_PHONE_KEY, COSTS, JIT_REQUESTS, RED_TEAM, RELEASE_FLAGS, RIGHTS_JOBS, RIGHTS_STORES, SIGNAL_SOURCES, SLOS, TENANTS, TRACES, TRACE_GUARD, TRACE_REVIEWERS, type Trace, type TraceFinding, type TraceGuard } from './_data'
-import { AccessNote, CardHead, ChartLead, Field, Kpi, Legend, Meter, Row, ScrollTabs, StatusTag, Swatch, areaCls, fieldCls, pct, readStored, tabPanelProps, tick, tipLabel, tipStyle, useTabParam, writeStored, type StatusTone } from './_parts'
+import type { Role } from '@/domain/types'
+import { PreviewBanner, useConsoleAccess, useConsoleRole } from '../care/_gate'
+import { DURATIONS, PURPOSES, access, addAccessRequest, decideAccessRequest, isLive, standingRequest, statusLabel, useAccessRequests, type AccessRequest } from '../care/_accessStore'
+import { fmtClock, fmtDuration } from '../care/_parts'
+import { AI_TOOLS, AUDIT, CELLS, CHECK_PHONE_KEY, COSTS, FLAG_COHORTS, FLAG_RELEASES, FLAG_ROLLOUTS, JIT_REQUESTS, RED_TEAM, RELEASE_FLAGS, RELEASE_FLAGS_KEY, RIGHTS_JOBS, RIGHTS_STORES, SIGNAL_SOURCES, SLOS, TENANTS, TRACES, TRACE_GUARD, TRACE_REVIEWERS, type FlagTarget, type Trace, type TraceFinding, type TraceGuard } from './_data'
+import { AccessNote, CanActProvider, CardHead, ChartLead, Field, Kpi, Legend, Meter, Row, ScrollTabs, StatusTag, Swatch, Writes, areaCls, fieldCls, pct, readStored, tabPanelProps, tick, tipLabel, tipStyle, useCanAct, useStored, useTabParam, writeStored, type StatusTone } from './_parts'
 import { AccessReview, CheckVariantCard, DriftDashboard, LiveSample, OnCall, ToolRegistrySheet, UnusualReads, type Log } from './_opsExtras'
 
 // CONTROL PLANE (Architecture p.20, p.24–27; Memo p.15): flags and kill switches on every AI tool,
@@ -28,11 +32,13 @@ const LANG_NAME: Record<string, string> = { EN: 'English', TA: 'Tamil', HI: 'Hin
 const SIGNAL_FLAG: Record<string, string> = { healthkit: 'healthkit_background', health_connect: 'health_connect_v2', terra: 'oura_via_terra' }
 
 type JitStatus = 'pending' | 'active' | 'expired' | 'denied' | 'withdrawn'
+type FlagState = { on: boolean; target: FlagTarget }
+type Flag = (typeof RELEASE_FLAGS)[number]
 type Jit = { id: string; who: string; role: string; scope: string; duration: string; reason: string; status: JitStatus; approver: string; expires: string }
 type Change = { day: string; at: string; what: string; reason: string }
 type Stamp = { day: string; at: string }
 type ToolState = { on: boolean; killedFor: string[]; signoff: 'none' | 'requested' | 'signed' }
-type Pending = { kind: 'tool' | 'flag' | 'signoff'; key: string; to: boolean; nonce: number }
+type Pending = { kind: 'tool' | 'flag' | 'target' | 'signoff'; key: string; to: boolean; nonce: number }
 type Job = { id: string; kind: 'export' | 'erase' | 'withdraw'; opened: string; elapsedH: number; stores: number; done: number; status: 'running' | 'delivered'; note: string; escalated: boolean; retrying: boolean; notices: { at: string; text: string }[] }
 type RunState = 'idle' | 'running' | 'done'
 /** A human review asked for from the traces viewer this session; the reviewer answers a few seconds later. */
@@ -40,6 +46,29 @@ type TraceReview = { status: 'requested' | 'done'; reviewer: string; note: strin
 
 const SLA = { export: 72, erase: 24, withdraw: 24 } as const
 const KIND_LABEL = { export: 'Export', erase: 'Erase', withdraw: 'Withdraw consent' } as const
+// Just-in-time access to the control plane goes through the consoles' access store (care/_accessStore), so a grant
+// approved here opens this console under the gate, and a JIT request sent from All consoles lands in this list.
+const OPS = '/console/ops'
+const JIT_SCOPES = ['prod read · ledger write path traces', 'prod read · signals-ingest logs', 'prod read · research registry schema', 'prod write · feature flags and kill switches']
+/** Production access is never long: an hour, or four for an incident that runs. */
+const JIT_DURATIONS = DURATIONS.slice(0, 2)
+const JIT_DECLINE = ['No incident or change ticket covers this', 'A read-only scope would do; ask again for that', 'The on-call engineer already has it in hand']
+
+/** Release flags as they stand: stored on/off and targeting over the defaults. The Check flag reads the key the Check shares. */
+function flagStatesOf(stored: Record<string, Partial<FlagState>>): Record<string, FlagState> {
+  return Object.fromEntries(RELEASE_FLAGS.map((f) => {
+    const s = stored[f.key] ?? {}
+    const on = f.key === 'check_asks_phone' ? readStored<boolean>(CHECK_PHONE_KEY, false) === true : s.on ?? f.on
+    return [f.key, { on, target: { ...f.target, ...s.target } }]
+  }))
+}
+const tenantLabel = (id: string) => (id === 'all' ? 'All tenants' : TENANTS.find((t) => t.id === id)?.name ?? id)
+/** "Northwind Capital · Joyspan@Work · India · Mumbai · Beta cohort · Every release · 25%" */
+function flagScope(f: Flag, t: FlagTarget) {
+  return f.fixed ?? [tenantLabel(t.tenant), t.region, t.cohort, t.release, `${t.rollout}%`].join(' · ')
+}
+const sameTarget = (a: FlagTarget, b: FlagTarget) => a.tenant === b.tenant && a.region === b.region && a.cohort === b.cohort && a.release === b.release && a.rollout === b.rollout
+
 /** 'Email to the DPO' → 'email to the DPO': lower-case the sentence start, keep acronyms. */
 const lcFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1)
 
@@ -55,14 +84,21 @@ function initialNotices(r: (typeof RIGHTS_JOBS)[number]): Job['notices'] {
 
 export default function Ops() {
   const [tab, setTab] = useTabParam(TABS, 'flags')
+  // JIT only: GATE gives no role standing access here, so nobody acts without a live grant from a second engineer.
+  const { canAct, chosen, role, roleLabel, person, now } = useConsoleAccess(OPS)
+  const { setRole } = useConsoleRole()
+  const requests = useAccessRequests()
+  const jitRequests = requests.filter((r) => r.to === OPS)
+  const myJit = chosen ? standingRequest(requests, OPS, role, now) : null
+  // Other engineers' specimen requests, for the signed-in engineer to decide once they hold a grant.
   const [jit, setJit] = useState<Jit[]>(() => JIT_REQUESTS.map((j) => ({ ...j })))
-  const jitRef = useRef(jit)
-  jitRef.current = jit
   const [jitOpen, setJitOpen] = useState(false)
   const [changes, setChanges] = useState<Change[]>([])
   const [tools, setTools] = useState<Record<string, ToolState>>(() => Object.fromEntries(AI_TOOLS.map((t) => [t.key, { on: t.on, killedFor: [], signoff: 'none' as const }])))
-  // The public Check variant is shared with the Check itself through localStorage (default: anonymous).
-  const [flags, setFlags] = useState<Record<string, boolean>>(() => Object.fromEntries(RELEASE_FLAGS.map((f) => [f.key, f.key === 'check_asks_phone' ? readStored<boolean>(CHECK_PHONE_KEY, false) === true : f.on])))
+  // Release flags and their targeting persist; the public Check variant is shared with the Check itself (default: anonymous).
+  const [storedFlags, setStoredFlags] = useStored<Record<string, Partial<FlagState>>>(RELEASE_FLAGS_KEY, {})
+  const flagStates = flagStatesOf(storedFlags)
+  const flags = Object.fromEntries(RELEASE_FLAGS.map((f) => [f.key, flagStates[f.key].on])) as Record<string, boolean>
   const [jobs, setJobs] = useState<Job[]>(() => RIGHTS_JOBS.map((r) => ({ ...r, escalated: false, retrying: false, notices: initialNotices(r) })))
   const [evalRun, setEvalRun] = useState<{ state: RunState; at?: string }>({ state: 'idle' })
   const [replay, setReplay] = useState<Record<string, RunState>>({})
@@ -88,7 +124,7 @@ export default function Ops() {
     setChanges((c) => [{ ...s, what, reason }, ...c])
     return s
   }
-  const ask = (kind: Pending['kind'], key: string, to: boolean) => setPending({ kind, key, to, nonce: ++nonce.current })
+  const ask = (kind: Pending['kind'], key: string, to: boolean) => { if (canAct) setPending({ kind, key, to, nonce: ++nonce.current }) }
 
   // Derived from live state, so every tab and the header agree.
   const liveTools = AI_TOOLS.filter((t) => tools[t.key].on)
@@ -102,12 +138,15 @@ export default function Ops() {
   const sloOk = SLOS.filter((s) => s.budgetLeft > 0).length
   const openRights = jobs.filter((r) => r.status === 'running').length
 
-  const applyChange = (p: Pending, scope: string, reason: string) => {
-    if (p.kind === 'flag') {
+  const applyChange = (p: Pending, scope: string, reason: string, target?: FlagTarget) => {
+    if (!canAct) return setPending(null)
+    if (p.kind === 'flag' || p.kind === 'target') {
       const f = RELEASE_FLAGS.find((x) => x.key === p.key)!
-      setFlags((fs) => ({ ...fs, [p.key]: p.to }))
-      if (p.key === 'check_asks_phone') writeStored(CHECK_PHONE_KEY, p.to)
-      log(`${p.key} ${p.to ? 'on' : 'off'} · ${f.scope}`, reason)
+      const cur = flagStates[p.key]
+      const next: FlagState = { on: p.kind === 'flag' ? p.to : cur.on, target: target ?? cur.target }
+      setStoredFlags((fs) => ({ ...fs, [p.key]: next }))
+      if (p.key === 'check_asks_phone' && p.kind === 'flag') writeStored(CHECK_PHONE_KEY, p.to)
+      log(p.kind === 'flag' ? `${p.key} ${p.to ? 'on' : 'off'} · ${flagScope(f, next.target)}` : `${p.key} targeting · ${flagScope(f, next.target)}`, reason)
     } else if (p.kind === 'signoff') {
       setTools((ts) => ({ ...ts, [p.key]: { ...ts[p.key], signoff: 'requested' } }))
       log(`${p.key} · physician sign-off requested`, reason)
@@ -130,27 +169,34 @@ export default function Ops() {
     setPending(null)
   }
 
-  const submitJit = (r: Jit) => {
-    setJit((j) => [r, ...j])
-    log(`${r.id} requested · ${r.scope} · ${r.duration}`, r.reason)
-    // A second person on call picks it up; the requester can never approve their own.
-    window.setTimeout(() => {
-      if (jitRef.current.find((j) => j.id === r.id)?.status !== 'pending') return
-      setJit((js) => js.map((j) => (j.id === r.id ? { ...j, status: 'active', approver: 'Kiran Desai · SRE on call', expires: `in ${j.duration}` } : j)))
-      log(`${r.id} approved by Kiran Desai · SRE on call`, 'Second approver')
-    }, 6000)
+  // Your own JIT request: written to the access store, decided by a second engineer (played here, as on All consoles).
+  const requestJit = (scope: string, duration: string, purpose: string, why: string) => {
+    if (!chosen) return null
+    const req = addAccessRequest({ to: OPS, label: 'Control plane', role, roleLabel, person, purpose, scope, duration, why })
+    if (req) log(`${req.ref} requested · ${scope} · ${duration}`, why)
+    return req
+  }
+  const decideJit = (r: AccessRequest, approve: boolean, reason?: string) => {
+    decideAccessRequest(r.ref, approve ? 'granted' : 'declined', reason)
+    log(`${r.ref} ${approve ? 'approved' : 'declined'} by the second engineer on call`, approve ? `Just-in-time access for ${r.person} · ${r.duration}` : reason ?? 'Just-in-time access decision')
+  }
+  const withdrawJit = (r: AccessRequest) => {
+    access.withdraw(r.ref)
+    log(`${r.ref} withdrawn by the requester`, 'Request no longer needed')
+  }
+  const revokeJit = (r: AccessRequest) => {
+    access.revoke(r.ref)
+    log(`${r.ref} revoked`, 'Access no longer needed; ended before expiry')
   }
   const decide = (id: string, approve: boolean) => {
+    if (!canAct) return
     setJit((js) => js.map((j) => (j.id === id ? { ...j, status: approve ? 'active' : 'denied', approver: ME, expires: approve ? 'in ' + j.duration : '—' } : j)))
     log(`${id} ${approve ? 'approved' : 'declined'}`, 'Just-in-time access decision')
   }
   const revoke = (id: string) => {
+    if (!canAct) return
     const { at } = log(`${id} revoked`, 'Access no longer needed; revoked before expiry')
     setJit((js) => js.map((j) => (j.id === id ? { ...j, status: 'expired', approver: ME, expires: `revoked ${at}` } : j)))
-  }
-  const withdraw = (id: string) => {
-    setJit((js) => js.map((j) => (j.id === id ? { ...j, status: 'withdrawn', expires: '—' } : j)))
-    log(`${id} withdrawn by the requester`, 'Request no longer needed')
   }
 
   const runEvals = () => {
@@ -186,10 +232,12 @@ export default function Ops() {
         actions={
           <div className="flex flex-wrap items-center gap-3">
             <SpecimenTag />
-            <DaybreakButton onClick={() => setJitOpen(true)}>Request JIT access</DaybreakButton>
+            <DaybreakButton onClick={() => setJitOpen(true)}>{myJit ? (myJit.status === 'pending' ? 'JIT request pending' : 'JIT access active') : 'Request JIT access'}</DaybreakButton>
           </div>
         }
       />
+
+      <PreviewBanner path={OPS} />
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi
@@ -215,30 +263,32 @@ export default function Ops() {
           { value: 'oncall', label: 'On-call & escalation' },
           { value: 'cost', label: 'Cost' },
           { value: 'cells', label: 'Tenants & cells' },
-          { value: 'audit', label: 'Audit & JIT', count: jit.filter((j) => j.status === 'pending').length },
+          { value: 'audit', label: 'Audit & JIT', count: jit.filter((j) => j.status === 'pending').length + jitRequests.filter((r) => r.status === 'pending').length },
           { value: 'signals', label: 'Signals ingest' },
           { value: 'rights', label: 'Rights requests', count: openRights },
         ]}
       />
 
+      <CanActProvider value={canAct}>
       <AnimatePresence mode="wait">
         <motion.div key={tab} {...tabPanelProps('ops', tab)} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
-          {tab === 'flags' && <Flags tools={tools} flags={flags} changes={changes} ask={ask} />}
+          {tab === 'flags' && <Flags tools={tools} flags={flagStates} changes={changes} ask={ask} />}
           {tab === 'evals' && <Evals tools={tools} run={evalRun} onRun={runEvals} reviews={traceReviews} onRequestReview={requestTraceReview} log={log} />}
           {tab === 'slos' && <Slos />}
           {tab === 'oncall' && <OnCall log={log} />}
           {tab === 'cost' && <Cost total={totalCost} costs={costs} offTools={killed} />}
           {tab === 'cells' && <Cells tools={tools} />}
-          {tab === 'audit' && <Audit jit={jit} changes={changes} onDecide={decide} onRevoke={revoke} onWithdraw={withdraw} log={log} />}
+          {tab === 'audit' && <Audit jit={jit} requests={jitRequests} role={chosen ? role : null} now={now} changes={changes} onDecide={decide} onRevoke={revoke} onDecideReq={decideJit} onWithdrawReq={withdrawJit} onRevokeReq={revokeJit} log={log} />}
           {tab === 'signals' && <Signals flags={flags} replay={replay} onReplay={runReplay} />}
           {tab === 'rights' && <Rights jobs={jobs} setJobs={setJobs} log={log} stamp={stamp} />}
         </motion.div>
       </AnimatePresence>
 
       <Sheet open={!!pending} onClose={() => setPending(null)} title={pending ? sheetTitle(pending) : ''} side="center">
-        {pending && <ChangeForm key={pending.nonce} p={pending} tool={tools[pending.key]} onApply={applyChange} onCancel={() => setPending(null)} />}
+        {pending && <ChangeForm key={pending.nonce} p={pending} tool={tools[pending.key]} flag={flagStates[pending.key]} onApply={applyChange} onCancel={() => setPending(null)} />}
       </Sheet>
-      <JitSheet open={jitOpen} onClose={() => setJitOpen(false)} onSubmit={submitJit} nextId={`JIT-0${391 + jit.length - JIT_REQUESTS.length}`} />
+      </CanActProvider>
+      <JitSheet open={jitOpen} onClose={() => setJitOpen(false)} chosen={chosen} roleLabel={roleLabel} person={person} standing={myJit} now={now} onSignIn={() => setRole('ops')} onSubmit={requestJit} onSeeAudit={() => { setJitOpen(false); setTab('audit') }} />
     </div>
   )
 }
@@ -246,15 +296,19 @@ export default function Ops() {
 function sheetTitle(p: Pending) {
   if (p.kind === 'signoff') return `Request physician sign-off · ${p.key}`
   if (p.kind === 'flag') return `Turn ${RELEASE_FLAGS.find((f) => f.key === p.key)?.label ?? p.key} ${p.to ? 'on' : 'off'}`
+  if (p.kind === 'target') return `Targeting · ${RELEASE_FLAGS.find((f) => f.key === p.key)?.label ?? p.key}`
   return `${p.to ? 'Switch on' : 'Kill'} ${p.key}`
 }
 
-function ChangeForm({ p, tool, onApply, onCancel }: { p: Pending; tool?: ToolState; onApply: (p: Pending, scope: string, reason: string) => void; onCancel: () => void }) {
+function ChangeForm({ p, tool, flag, onApply, onCancel }: { p: Pending; tool?: ToolState; flag?: FlagState; onApply: (p: Pending, scope: string, reason: string, target?: FlagTarget) => void; onCancel: () => void }) {
   const [reason, setReason] = useState('')
   const [scope, setScope] = useState('all')
   const [err, setErr] = useState<string | null>(null)
   const t = AI_TOOLS.find((x) => x.key === p.key)
   const f = RELEASE_FLAGS.find((x) => x.key === p.key)
+  const [target, setTarget] = useState<FlagTarget>(() => flag?.target ?? f?.target ?? RELEASE_FLAGS[0].target)
+  // Targeting is set when a flag is retargeted or turned on; turning one off needs only the reason.
+  const targeting = !!f && !f.fixed && (p.kind === 'target' || (p.kind === 'flag' && p.to))
 
   const scopes: string[] =
     p.kind !== 'tool' || !tool ? [] : p.to ? (tool.on ? ['all', ...tool.killedFor] : ['all']) : ['all', ...TENANT_SCOPES.map((x) => x.id).filter((id) => !tool.killedFor.includes(id))]
@@ -262,8 +316,10 @@ function ChangeForm({ p, tool, onApply, onCancel }: { p: Pending; tool?: ToolSta
   const body =
     p.kind === 'signoff' && t
       ? <>This tool explains a lab value, so a physician signs its eval pack before it can go live: English <span className="num">{pct(t.langs.EN)}</span>, Tamil <span className="num">{pct(t.langs.TA)}</span>, Hindi <span className="num">{pct(t.langs.HI)}</span>. Tamil and Hindi sit below the <span className="num">{pct(EVAL_BAR)}</span> floor and would route to physician review. The request goes to {t.hold}.</>
+      : p.kind === 'target' && f
+        ? <>{f.label} reaches members who match all four below, then the share you set. {flag?.on ? 'Members see the change on their next sync; nothing they wrote is lost.' : 'It is off now; this targeting applies when it is turned on.'}</>
       : p.kind === 'flag' && f
-        ? <>{f.label} turns {p.to ? 'on' : 'off'} for {f.scope.toLowerCase()} in production. Members see the change on their next sync; nothing they wrote is lost.</>
+        ? <>{f.label} turns {p.to ? 'on' : 'off'} for {flagScope(f, p.to ? target : flag?.target ?? f.target)} in production. Members see the change on their next sync; nothing they wrote is lost.</>
         : p.to
           ? scope === 'all'
             ? 'The tool returns for every tenant within a minute. It must hold its eval floor in every language it serves.'
@@ -273,10 +329,11 @@ function ChangeForm({ p, tool, onApply, onCancel }: { p: Pending; tool?: ToolSta
             : <>The tool stops for {scopeLabel(scope)} only, within a minute. Their members get the rules-based version and sealed copy; other tenants are untouched.</>
 
   const confirm = () => {
+    if (p.kind === 'target' && flag && sameTarget(target, flag.target)) return setErr('Change the tenant, region, cohort, release or share first.')
     if (reason.trim().length < 12) return setErr(p.kind === 'signoff' ? 'Say what changed since the last eval pack, in a sentence.' : 'Say why in a sentence. It is written to the audit trail.')
-    onApply(p, scope, reason.trim())
+    onApply(p, scope, reason.trim(), targeting ? target : undefined)
   }
-  const cta = p.kind === 'signoff' ? 'Send for sign-off' : p.kind === 'flag' ? `Turn ${p.to ? 'on' : 'off'}` : p.to ? 'Switch on' : 'Kill now'
+  const cta = p.kind === 'signoff' ? 'Send for sign-off' : p.kind === 'target' ? 'Save targeting' : p.kind === 'flag' ? `Turn ${p.to ? 'on' : 'off'}` : p.to ? 'Switch on' : 'Kill now'
 
   return (
     <div>
@@ -288,6 +345,7 @@ function ChangeForm({ p, tool, onApply, onCancel }: { p: Pending; tool?: ToolSta
           </select>
         </Field>
       )}
+      {targeting && <TargetFields value={target} onChange={(v) => { setTarget(v); setErr(null) }} />}
       <Field label={p.kind === 'signoff' ? 'Note to the physician' : 'Reason'} htmlFor="kill-reason" error={err} className="mt-5">
         <textarea
           id="kill-reason"
@@ -295,13 +353,13 @@ function ChangeForm({ p, tool, onApply, onCancel }: { p: Pending; tool?: ToolSta
           className={areaCls}
           value={reason}
           onChange={(e) => { setReason(e.target.value); setErr(null) }}
-          placeholder={p.kind === 'signoff' ? 'e.g. Hindi re-run after glossary fix; 40 new HbA1c cases written with Clinical' : p.kind === 'flag' ? 'e.g. OEM background-work fix verified on two devices; rolling forward' : 'e.g. Red-team found a couples-leakage path in Hindi; holding until re-run'}
+          placeholder={p.kind === 'signoff' ? 'e.g. Hindi re-run after glossary fix; 40 new HbA1c cases written with Clinical' : p.kind === 'target' ? 'e.g. Crash-free 99.8% at 5% for a week; widening to 25%' : p.kind === 'flag' ? 'e.g. OEM background-work fix verified on two devices; rolling forward' : 'e.g. Red-team found a couples-leakage path in Hindi; holding until re-run'}
           aria-invalid={!!err}
           aria-describedby={err ? 'kill-reason-err' : undefined}
         />
       </Field>
       <div className="mt-5 flex flex-wrap gap-2">
-        <Button variant="ink" onClick={confirm}>{p.kind === 'signoff' ? <Stethoscope size={15} aria-hidden /> : <Power size={15} aria-hidden />} {cta}</Button>
+        <Button variant="ink" onClick={confirm}>{p.kind === 'signoff' ? <Stethoscope size={15} aria-hidden /> : p.kind === 'target' ? <SlidersHorizontal size={15} aria-hidden /> : <Power size={15} aria-hidden />} {cta}</Button>
         <Button variant="ghost" onClick={onCancel}>Cancel</Button>
       </div>
       <p className="mt-4 text-[13px] text-ink-3">Signed in as {ME}. Written to the audit trail with your reason.</p>
@@ -309,10 +367,49 @@ function ChangeForm({ p, tool, onApply, onCancel }: { p: Pending; tool?: ToolSta
   )
 }
 
+/** Who a release flag reaches: tenant, region cell, cohort and release, then a staged share of them. */
+function TargetFields({ value, onChange }: { value: FlagTarget; onChange: (v: FlagTarget) => void }) {
+  const set = <K extends keyof FlagTarget>(k: K, v: FlagTarget[K]) => onChange({ ...value, [k]: v })
+  return (
+    <fieldset className="mt-5 min-w-0">
+      <legend className="eyebrow mb-3 text-ink-3">Targeting</legend>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Tenant" htmlFor="ft-tenant">
+          <select id="ft-tenant" className={fieldCls} value={value.tenant} onChange={(e) => set('tenant', e.target.value)}>
+            <option value="all">All tenants</option>
+            {TENANTS.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </Field>
+        <Field label="Region" htmlFor="ft-region" hint="Only a live cell can be targeted.">
+          <select id="ft-region" className={fieldCls} value={value.region} onChange={(e) => set('region', e.target.value)}>
+            {CELLS.map((c) => <option key={c.name} value={c.name} disabled={c.status !== 'Live'}>{c.name}{c.status !== 'Live' ? ` · ${c.status.toLowerCase()}, ${c.when}` : ''}</option>)}
+          </select>
+        </Field>
+        <Field label="Cohort" htmlFor="ft-cohort">
+          <select id="ft-cohort" className={fieldCls} value={value.cohort} onChange={(e) => set('cohort', e.target.value)}>
+            {FLAG_COHORTS.map((c) => <option key={c}>{c}</option>)}
+          </select>
+        </Field>
+        <Field label="Release" htmlFor="ft-release">
+          <select id="ft-release" className={fieldCls} value={value.release} onChange={(e) => set('release', e.target.value)}>
+            {FLAG_RELEASES.map((r) => <option key={r}>{r}</option>)}
+          </select>
+        </Field>
+        <Field label="Rollout" htmlFor="ft-rollout" hint="Staged 5 → 25 → 100% of those who match." className="sm:col-span-2">
+          <select id="ft-rollout" className={clsx(fieldCls, 'font-mono')} value={value.rollout} onChange={(e) => set('rollout', Number(e.target.value))}>
+            {FLAG_ROLLOUTS.map((r) => <option key={r} value={r}>{r}%</option>)}
+          </select>
+        </Field>
+      </div>
+    </fieldset>
+  )
+}
+
 // ─── Flags & kill switches ───────────────────────────────────────────────
 
-function Flags({ tools, flags, changes, ask }: { tools: Record<string, ToolState>; flags: Record<string, boolean>; changes: Change[]; ask: (kind: Pending['kind'], key: string, to: boolean) => void }) {
+function Flags({ tools, flags, changes, ask }: { tools: Record<string, ToolState>; flags: Record<string, FlagState>; changes: Change[]; ask: (kind: Pending['kind'], key: string, to: boolean) => void }) {
   const [registry, setRegistry] = useState<string | null>(null)
+  const canAct = useCanAct()
   return (
     <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
       <Card className="lg:col-span-8">
@@ -341,12 +438,12 @@ function Flags({ tools, flags, changes, ask }: { tools: Record<string, ToolState
                   <p className="mt-1 text-[14px] text-ink-2">{t.what}</p>
                   <p className="mt-0.5 text-[13px] text-ink-3"><button className="underline decoration-line-strong underline-offset-2 hover:text-ink focus-ring" onClick={() => setRegistry(t.key)} aria-label={`Schema and scopes for ${t.key}`}>Schema &amp; scopes</button> · {t.owner} · eval floor <span className="num">{pct(min)}</span> across {offered.map(([l]) => l).join(', ')} · <span className="num">{t.calls.toLocaleString('en-IN')}</span> calls in 7 days</p>
                   {on && below.length > 0 && <p className="mt-1 text-[13px] text-ink-2">{below.map((l) => LANG_NAME[l]).join(' and ')} answers route to physician review until a re-run passes the <span className="num">{pct(EVAL_BAR)}</span> floor.</p>}
-                  {on && st.killedFor.length > 0 && <p className="mt-1 text-[13px] text-ink-2">Off for {st.killedFor.map(scopeLabel).join(', ')}. <button className="underline decoration-line-strong underline-offset-2 hover:text-ink focus-ring" onClick={() => ask('tool', t.key, true)}>Restore</button></p>}
+                  {on && st.killedFor.length > 0 && <p className="mt-1 text-[13px] text-ink-2">Off for {st.killedFor.map(scopeLabel).join(', ')}. <button className="underline decoration-line-strong underline-offset-2 hover:text-ink focus-ring disabled:no-underline disabled:opacity-50" disabled={!canAct} onClick={() => ask('tool', t.key, true)}>Restore</button></p>}
                   {signedOff && <p className="mt-1 text-[13px] text-ink-2">Signed by {t.hold}. English can answer once switched on; Tamil and Hindi route to physician review until a re-run passes the <span className="num">{pct(EVAL_BAR)}</span> floor.</p>}
                   {isHeld && <p className="mt-1 text-[13px] text-ink-2">{st.signoff === 'requested' ? <>With {t.hold}. It can be switched on here once the eval pack is signed.</> : <>Cannot be switched on without a physician’s signature on its eval pack ({t.hold}).</>}</p>}
                 </div>
                 {isHeld ? (
-                  <Button variant="secondary" size="sm" className="shrink-0 self-start sm:self-center" disabled={st.signoff === 'requested'} onClick={() => ask('signoff', t.key, true)}>
+                  <Button variant="secondary" size="sm" className="shrink-0 self-start sm:self-center" disabled={st.signoff === 'requested' || !canAct} onClick={() => ask('signoff', t.key, true)}>
                     <Stethoscope size={14} aria-hidden /> {st.signoff === 'requested' ? 'Awaiting sign-off' : 'Request sign-off'}
                   </Button>
                 ) : (
@@ -355,7 +452,8 @@ function Flags({ tools, flags, changes, ask }: { tools: Record<string, ToolState
                     aria-checked={on}
                     aria-label={`${t.key} ${on ? 'live' : signedOff ? 'off, signed' : 'killed'}; ${on ? 'kill' : 'switch on'}`}
                     onClick={() => ask('tool', t.key, !on)}
-                    className={clsx('inline-flex h-9 shrink-0 items-center gap-2 self-start rounded-full border px-3 text-[13px] font-medium transition-colors focus-ring sm:self-center', on ? 'border-ink bg-ink text-paper' : 'border-line-strong text-ink-2 hover:text-ink')}
+                    disabled={!canAct}
+                    className={clsx('inline-flex h-9 shrink-0 items-center gap-2 self-start rounded-full border px-3 text-[13px] font-medium transition-colors focus-ring disabled:opacity-50 sm:self-center', on ? 'border-ink bg-ink text-paper' : 'border-line-strong text-ink-2 hover:text-ink')}
                   >
                     <Power size={14} aria-hidden /> {on ? 'Live' : signedOff ? 'Off' : 'Killed'}
                   </button>
@@ -368,24 +466,38 @@ function Flags({ tools, flags, changes, ask }: { tools: Record<string, ToolState
 
       <div className="grid content-start gap-6 lg:col-span-4">
         <Card>
-          <CardHead eyebrow="Release flags" title="By tenant, region, cohort, release" lead="Production flags ask for a reason, like a kill switch." />
-          <ul className="space-y-4">
-            {RELEASE_FLAGS.map((f) => {
-              const on = flags[f.key]
-              return (
-                <li key={f.key}>
-                  <Toggle
-                    checked={on}
-                    onChange={(v) => ask('flag', f.key, v)}
-                    label={f.label}
-                    description={<span><code className="font-mono text-[12px]">{f.key}</code> · {f.scope} · {on ? (f.state === 'Off' ? 'On' : f.state) : 'Off'}</span>}
-                  />
-                </li>
-              )
-            })}
-          </ul>
+          <CardHead eyebrow="Release flags" title="By tenant, region, cohort, release" lead="A flag reaches the tenant, region, cohort and release it targets, then a staged share of them. Every change asks for a reason, like a kill switch." />
+          <Writes>
+            <ul className="space-y-5">
+              {RELEASE_FLAGS.map((f) => {
+                const { on, target } = flags[f.key]
+                return (
+                  <li key={f.key}>
+                    <Toggle
+                      checked={on}
+                      onChange={(v) => ask('flag', f.key, v)}
+                      label={f.label}
+                      description={<span><code className="font-mono text-[12px]">{f.key}</code> · {on ? 'On' : 'Off'}</span>}
+                    />
+                    {f.fixed ? (
+                      <p className="mt-1.5 text-[13px] text-ink-3">{f.fixed} · no tenant or cohort targeting</p>
+                    ) : (
+                      <div className="mt-1.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        <p className="min-w-0 text-[13px] text-ink-2">
+                          {tenantLabel(target.tenant)} · {target.region} · {target.cohort} · {target.release} · <span className="num">{target.rollout}%</span>
+                        </p>
+                        <button type="button" onClick={() => ask('target', f.key, on)} aria-label={`Edit targeting for ${f.label}`} className="inline-flex items-center gap-1 text-[13px] text-ink-2 underline decoration-line-strong underline-offset-2 hover:text-ink focus-ring disabled:no-underline disabled:opacity-50">
+                          <SlidersHorizontal size={12} aria-hidden /> Edit targeting
+                        </button>
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </Writes>
         </Card>
-        <CheckVariantCard asksPhone={!!flags.check_asks_phone} onChange={() => ask('flag', 'check_asks_phone', !flags.check_asks_phone)} />
+        <CheckVariantCard asksPhone={flags.check_asks_phone.on} onChange={() => ask('flag', 'check_asks_phone', !flags.check_asks_phone.on)} />
         <Card tone="sunk">
           <Eyebrow>Changes this session</Eyebrow>
           {changes.length === 0 ? (
@@ -407,6 +519,7 @@ function Flags({ tools, flags, changes, ask }: { tools: Record<string, ToolState
 // ─── Evaluation plane ────────────────────────────────────────────────────
 
 function Evals({ tools, run, onRun, reviews, onRequestReview, log }: { tools: Record<string, ToolState>; run: { state: RunState; at?: string }; onRun: () => void; reviews: Record<string, TraceReview>; onRequestReview: (id: string, reviewer: string, note: string) => void; log: Log }) {
+  const canAct = useCanAct()
   const live = AI_TOOLS.filter((t) => tools[t.key].on)
   const data = live.map((t) => ({ name: t.key, EN: t.langs.EN * 100, TA: t.langs.TA ? t.langs.TA * 100 : null, HI: t.langs.HI ? t.langs.HI * 100 : null }))
   const below = live.flatMap((t) => (Object.entries(t.langs) as [string, number][]).filter(([, v]) => v > 0 && v < EVAL_BAR).map(([l, v]) => ({ tool: t.key, lang: l, v })))
@@ -420,7 +533,7 @@ function Evals({ tools, run, onRun, reviews, onRequestReview, log }: { tools: Re
           aside={
             <>
               <Pill>Floor {pct(EVAL_BAR)}</Pill>
-              <Button variant="secondary" size="sm" onClick={onRun} disabled={run.state === 'running'}><RefreshCw size={14} aria-hidden className={run.state === 'running' ? 'animate-spin motion-reduce:animate-none' : undefined} /> {run.state === 'running' ? 'Running evals…' : 'Re-run evals'}</Button>
+              <Button variant="secondary" size="sm" onClick={onRun} disabled={run.state === 'running' || !canAct}><RefreshCw size={14} aria-hidden className={run.state === 'running' ? 'animate-spin motion-reduce:animate-none' : undefined} /> {run.state === 'running' ? 'Running evals…' : 'Re-run evals'}</Button>
             </>
           }
         />
@@ -689,7 +802,7 @@ function TraceDetail({ t, tool, review, onRequestReview }: { t: Trace; tool?: To
           <p className="mt-1 text-[13px] text-ink-3">Asked: {review.note}</p>
         </div>
       ) : (
-        <div className="mt-2">
+        <Writes className="mt-2">
           <p className="text-[14px] text-ink-2">Not in this week’s sample yet. Ask a reviewer to read it against the eval rubric.</p>
           <Field label="Reviewer" htmlFor="tr-reviewer" className="mt-4">
             <select id="tr-reviewer" className={fieldCls} value={reviewer} onChange={(e) => setReviewer(e.target.value)}>
@@ -701,7 +814,7 @@ function TraceDetail({ t, tool, review, onRequestReview }: { t: Trace; tool?: To
           </Field>
           <Button variant="ink" className="mt-4" onClick={send}><Stethoscope size={15} aria-hidden /> Request review</Button>
           <p className="mt-3 text-[13px] text-ink-3">Signed in as {ME}. Written to the audit trail with your note.</p>
-        </div>
+        </Writes>
       )}
     </div>
   )
@@ -888,52 +1001,105 @@ function Cells({ tools }: { tools: Record<string, ToolState> }) {
 
 // ─── Audit & JIT ─────────────────────────────────────────────────────────
 
-function Audit({ jit, changes, onDecide, onRevoke, onWithdraw, log }: { jit: Jit[]; changes: Change[]; onDecide: (id: string, approve: boolean) => void; onRevoke: (id: string) => void; onWithdraw: (id: string) => void; log: Log }) {
+function Audit({ jit, requests, role, now, changes, onDecide, onRevoke, onDecideReq, onWithdrawReq, onRevokeReq, log }: {
+  jit: Jit[]
+  requests: AccessRequest[]
+  role: Role | null
+  now: number
+  changes: Change[]
+  onDecide: (id: string, approve: boolean) => void
+  onRevoke: (id: string) => void
+  onDecideReq: (r: AccessRequest, approve: boolean, reason?: string) => void
+  onWithdrawReq: (r: AccessRequest) => void
+  onRevokeReq: (r: AccessRequest) => void
+  log: Log
+}) {
+  const canAct = useCanAct()
   const [verify, setVerify] = useState<'idle' | 'running' | 'ok'>('idle')
-  const [role, setRole] = useState<'all' | 'system' | 'people'>('all')
-  const rows = AUDIT.filter((a) => role === 'all' || (role === 'system' ? a.role === 'system' : a.role !== 'system'))
-  const session = role === 'system' ? [] : changes
+  const [view, setView] = useState<'all' | 'system' | 'people'>('all')
+  const [declining, setDeclining] = useState<string | null>(null)
+  const [declineWhy, setDeclineWhy] = useState(JIT_DECLINE[0])
+  const rows = AUDIT.filter((a) => view === 'all' || (view === 'system' ? a.role === 'system' : a.role !== 'system'))
+  const session = view === 'system' ? [] : changes
   const tone = (st: JitStatus) => (st === 'active' ? 'ok' : st === 'pending' ? 'watch' : 'off') as 'ok' | 'watch' | 'off'
+  const reqTone = (r: AccessRequest) => (r.status === 'pending' ? 'watch' : isLive(r, now) ? 'ok' : 'off') as 'ok' | 'watch' | 'off'
 
   return (
     <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
       <Card className="lg:col-span-5">
-        <CardHead eyebrow="Just-in-time access" title="Production by approval only" lead={`You are signed in as ${ME}. You cannot approve your own request.`} />
+        <CardHead eyebrow="Just-in-time access" title="Production by approval only" lead="Requests to open the control plane, from this page or from All consoles, land here. Nobody approves their own: a second engineer decides, and this specimen lets you play them." />
         <ul className="space-y-3">
-          {jit.map((j) => {
-            const mine = j.who === ME_NAME
+          {requests.map((r) => {
+            const live = isLive(r, now)
+            const mine = r.role === role
             return (
-              <li key={j.id} className={clsx('rounded-card border p-4', j.status === 'pending' ? 'border-ink' : 'border-line')}>
+              <li key={r.ref} className={clsx('rounded-card border p-4', r.status === 'pending' ? 'border-ink' : 'border-line')}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="num text-[12px] text-ink-3">{j.id}</span>
-                  <StatusTag tone={tone(j.status)}>{j.status}{j.status === 'active' || (j.status === 'expired' && j.expires.startsWith('revoked')) ? ` · ${j.expires}` : ''}</StatusTag>
+                  <span className="num text-[12px] text-ink-3">{r.ref}</span>
+                  <StatusTag tone={reqTone(r)}>{statusLabel(r, now)}{live && <> · <span className="num">{fmtDuration((r.expiresAt ?? now) - now)}</span> left</>}</StatusTag>
                 </div>
-                <p className="mt-2 text-[15px] text-ink">{j.who} <span className="text-ink-3">· {j.role}</span></p>
-                <p className="text-[14px] text-ink-2"><code className="font-mono text-[13px]">{j.scope}</code> · {j.duration}</p>
-                <p className="mt-1 text-[14px] text-ink-2">{j.reason}</p>
-                {j.status === 'pending' && !mine && (
+                <p className="mt-2 text-[15px] text-ink">{r.person} <span className="text-ink-3">· {r.roleLabel}{mine && ' · you'}</span></p>
+                <p className="text-[14px] text-ink-2"><code className="font-mono text-[13px]">{r.scope}</code> · {r.duration}</p>
+                <p className="mt-1 text-[14px] text-ink-2">{r.purpose} · {r.why}</p>
+                <p className="mt-1 text-[13px] text-ink-3">
+                  Sent <span className="num">{fmtClock(r.sentAt)}</span>
+                  {r.decidedAt !== undefined && r.status !== 'pending' && <> · {r.status === 'withdrawn' ? 'withdrawn' : r.status === 'revoked' ? 'revoked' : `${r.status} by ${r.decidedBy}`} <span className="num">{fmtClock(r.decidedAt)}</span></>}
+                </p>
+                {r.status === 'declined' && r.reason && <p className="mt-1 text-[13px] text-ink-2">Reason: {r.reason}</p>}
+                {r.status === 'pending' && declining !== r.ref && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <Button variant="ink" size="sm" onClick={() => onDecide(j.id, true)}><Check size={14} aria-hidden /> Approve</Button>
-                    <Button variant="ghost" size="sm" onClick={() => onDecide(j.id, false)}>Decline</Button>
+                    <Button variant="ink" size="sm" onClick={() => onDecideReq(r, true)}><Check size={14} aria-hidden /> Approve as second engineer (specimen)</Button>
+                    <Button variant="ghost" size="sm" onClick={() => { setDeclining(r.ref); setDeclineWhy(JIT_DECLINE[0]) }}>Decline</Button>
+                    {mine && <Button variant="ghost" size="sm" onClick={() => onWithdrawReq(r)}><Undo2 size={14} aria-hidden /> Withdraw</Button>}
                   </div>
                 )}
-                {j.status === 'pending' && mine && (
+                {r.status === 'pending' && declining === r.ref && (
+                  <form onSubmit={(e) => { e.preventDefault(); onDecideReq(r, false, declineWhy); setDeclining(null) }} className="mt-3 space-y-2">
+                    <Field label="Reason the second engineer gives" htmlFor={`jit-dec-${r.ref}`}>
+                      <select id={`jit-dec-${r.ref}`} className={fieldCls} value={declineWhy} onChange={(e) => setDeclineWhy(e.target.value)}>
+                        {JIT_DECLINE.map((x) => <option key={x}>{x}</option>)}
+                      </select>
+                    </Field>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="submit" variant="ink" size="sm">Decline</Button>
+                      <Button variant="ghost" size="sm" onClick={() => setDeclining(null)}>Cancel</Button>
+                    </div>
+                  </form>
+                )}
+                {live && (
                   <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-[13px] text-ink-3">Waiting for a second approver.</p>
-                    <Button variant="ghost" size="sm" onClick={() => onWithdraw(j.id)}><Undo2 size={14} aria-hidden /> Withdraw</Button>
+                    <p className="text-[13px] text-ink-3">Ends <span className="num">{fmtClock(r.expiresAt ?? now)}</span> · every action under it carries <span className="num">{r.ref}</span></p>
+                    <Button variant="ghost" size="sm" onClick={() => onRevokeReq(r)} aria-label={`Revoke ${r.ref} now`}>Revoke now</Button>
                   </div>
                 )}
-                {j.status === 'active' && (
-                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-[13px] text-ink-3">Approved by {j.approver}</p>
-                    <Button variant="ghost" size="sm" onClick={() => onRevoke(j.id)} aria-label={`Revoke ${j.id} now`}>Revoke now</Button>
-                  </div>
-                )}
-                {j.status === 'withdrawn' && <p className="mt-2 text-[13px] text-ink-3">Withdrawn by the requester.</p>}
-                {(j.status === 'expired' || j.status === 'denied') && j.approver !== '—' && <p className="mt-2 text-[13px] text-ink-3">{j.expires.startsWith('revoked') ? 'Revoked' : 'Decided'} by {j.approver}</p>}
               </li>
             )
           })}
+          {jit.map((j) => (
+            <li key={j.id} className={clsx('rounded-card border p-4', j.status === 'pending' ? 'border-ink' : 'border-line')}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="num text-[12px] text-ink-3">{j.id}</span>
+                <StatusTag tone={tone(j.status)}>{j.status}{j.status === 'active' || (j.status === 'expired' && j.expires.startsWith('revoked')) ? ` · ${j.expires}` : ''}</StatusTag>
+              </div>
+              <p className="mt-2 text-[15px] text-ink">{j.who} <span className="text-ink-3">· {j.role}</span></p>
+              <p className="text-[14px] text-ink-2"><code className="font-mono text-[13px]">{j.scope}</code> · {j.duration}</p>
+              <p className="mt-1 text-[14px] text-ink-2">{j.reason}</p>
+              {j.status === 'pending' && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button variant="ink" size="sm" disabled={!canAct} onClick={() => onDecide(j.id, true)}><Check size={14} aria-hidden /> Approve</Button>
+                  <Button variant="ghost" size="sm" disabled={!canAct} onClick={() => onDecide(j.id, false)}>Decline</Button>
+                  {!canAct && <p className="basis-full text-[13px] text-ink-3">You approve other engineers’ requests once you hold a grant yourself.</p>}
+                </div>
+              )}
+              {j.status === 'active' && (
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[13px] text-ink-3">Approved by {j.approver}</p>
+                  <Button variant="ghost" size="sm" disabled={!canAct} onClick={() => onRevoke(j.id)} aria-label={`Revoke ${j.id} now`}>Revoke now</Button>
+                </div>
+              )}
+              {(j.status === 'expired' || j.status === 'denied') && j.approver !== '—' && <p className="mt-2 text-[13px] text-ink-3">{j.expires.startsWith('revoked') ? 'Revoked' : 'Decided'} by {j.approver}</p>}
+            </li>
+          ))}
         </ul>
       </Card>
 
@@ -941,7 +1107,7 @@ function Audit({ jit, changes, onDecide, onRevoke, onWithdraw, log }: { jit: Jit
         <CardHead
           eyebrow="Audit trail · hash-chained"
           title="Who did what, and why"
-          aside={<Tabs value={role} onChange={setRole} items={[{ value: 'all', label: 'All' }, { value: 'people', label: 'People' }, { value: 'system', label: 'Services' }]} />}
+          aside={<Tabs value={view} onChange={setView} items={[{ value: 'all', label: 'All' }, { value: 'people', label: 'People' }, { value: 'system', label: 'Services' }]} />}
         />
         <ol className="space-y-0">
           {session.map((c, i) => (
@@ -973,14 +1139,24 @@ function Audit({ jit, changes, onDecide, onRevoke, onWithdraw, log }: { jit: Jit
   )
 }
 
-function JitSheet({ open, onClose, onSubmit, nextId }: { open: boolean; onClose: () => void; onSubmit: (r: Jit) => void; nextId: string }) {
-  const [scope, setScope] = useState('prod read · ledger write path traces')
-  const [duration, setDuration] = useState('1 h')
+function JitSheet({ open, onClose, chosen, roleLabel, person, standing, now, onSignIn, onSubmit, onSeeAudit }: {
+  open: boolean
+  onClose: () => void
+  chosen: boolean
+  roleLabel: string
+  person: string
+  standing: AccessRequest | null
+  now: number
+  onSignIn: () => void
+  onSubmit: (scope: string, duration: string, purpose: string, why: string) => AccessRequest | null
+  onSeeAudit: () => void
+}) {
+  const [scope, setScope] = useState(JIT_SCOPES[0])
+  const [duration, setDuration] = useState(JIT_DURATIONS[0])
+  const [purpose, setPurpose] = useState('Incident investigation')
   const [ticket, setTicket] = useState('')
   const [reason, setReason] = useState('')
-  const [errs, setErrs] = useState<{ ticket?: string; reason?: string }>({})
-  // The id this request was sent under; nextId moves on as soon as the request joins the list.
-  const [done, setDone] = useState<string | null>(null)
+  const [errs, setErrs] = useState<{ ticket?: string; reason?: string; form?: string }>({})
 
   const submit = () => {
     const e: typeof errs = {}
@@ -988,42 +1164,64 @@ function JitSheet({ open, onClose, onSubmit, nextId }: { open: boolean; onClose:
     if (reason.trim().length < 20) e.reason = 'Describe what you will look at and why, in at least 20 characters.'
     setErrs(e)
     if (Object.keys(e).length) return
-    onSubmit({ id: nextId, who: ME_NAME, role: 'DPO', scope, duration, reason: `${ticket.trim().toUpperCase()} · ${reason.trim()}`, status: 'pending', approver: '—', expires: '—' })
-    setDone(nextId)
+    // The store refuses a second request while one already stands for this console and role.
+    if (!onSubmit(scope, duration, purpose, `${ticket.trim().toUpperCase()} · ${reason.trim()}`)) setErrs({ form: 'A request for the control plane already stands for your role. See Audit & JIT.' })
   }
-  const close = () => { onClose(); window.setTimeout(() => { setDone(null); setTicket(''); setReason(''); setErrs({}) }, 250) }
+  const close = () => { onClose(); window.setTimeout(() => { setTicket(''); setReason(''); setErrs({}) }, 250) }
+  const live = standing && isLive(standing, now) ? standing : null
 
   return (
     <Sheet open={open} onClose={close} title="Request just-in-time access">
-      {done ? (
+      {!chosen ? (
+        <div className="space-y-4">
+          <p className="text-[15px] text-ink-2">A request comes from a named person, never from nobody. No console role is chosen yet, so sign in as the control plane’s specimen engineer first. Signing in grants nothing: the console stays view only until a second engineer approves your request.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="ink" onClick={onSignIn}>Sign in as control plane (specimen)</Button>
+            <Button variant="ghost" onClick={close}>Cancel</Button>
+          </div>
+        </div>
+      ) : standing ? (
         <div role="status">
-          <Timer size={22} className="text-ink-3" aria-hidden />
-          <p className="mt-3 text-[1.35rem] font-light leading-snug text-ink">Requested. A second person must approve it.</p>
-          <p className="mt-2 text-[15px] text-ink-2"><span className="num">{done}</span> · {scope} · {duration}. The SRE on call is paged to review it. Access expires on its own, and you can withdraw the request or revoke the grant early from Audit &amp; JIT.</p>
-          <Button variant="secondary" className="mt-6" onClick={close}>Close</Button>
+          {live ? <KeyRound size={22} className="text-ink-3" aria-hidden /> : <Timer size={22} className="text-ink-3" aria-hidden />}
+          <p className="mt-3 text-[1.35rem] font-light leading-snug text-ink">{live ? 'Access granted. Every action is audited.' : 'Requested. A second engineer must approve it.'}</p>
+          <p className="mt-2 text-[15px] text-ink-2">
+            <span className="num">{standing.ref}</span> · {standing.scope} · {standing.duration}.{' '}
+            {live
+              ? <>Approved by {standing.decidedBy}; it ends on its own in <span className="num">{fmtDuration((standing.expiresAt ?? now) - now)}</span>, and you can revoke it sooner from Audit &amp; JIT.</>
+              : <>It waits under Audit &amp; JIT, where this specimen lets you play the second engineer. You can withdraw it there.</>}
+          </p>
+          <div className="mt-6 flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={onSeeAudit}>Go to Audit &amp; JIT</Button>
+            <Button variant="ghost" onClick={close}>Close</Button>
+          </div>
         </div>
       ) : (
         <div className="space-y-5">
-          <p className="text-[15px] text-ink-2">Least privilege, time-boxed and audited. Health data stays masked in logs whatever you request; raw clinical values are never in scope here.</p>
+          <p className="text-[15px] text-ink-2">Least privilege, time-boxed and audited. Health data stays masked in logs whatever you request; raw clinical values are never in scope here. Requesting as {person} · {roleLabel}.</p>
           <Field label="Scope" htmlFor="jit-scope">
             <select id="jit-scope" className={fieldCls} value={scope} onChange={(e) => setScope(e.target.value)}>
-              <option>prod read · ledger write path traces</option>
-              <option>prod read · signals-ingest logs</option>
-              <option>prod read · research registry schema</option>
-              <option>prod write · feature flags</option>
+              {JIT_SCOPES.map((x) => <option key={x}>{x}</option>)}
             </select>
           </Field>
-          <Field label="Duration" htmlFor="jit-dur">
-            <select id="jit-dur" className={fieldCls} value={duration} onChange={(e) => setDuration(e.target.value)}>
-              {['30 m', '1 h', '2 h', '4 h'].map((d) => <option key={d}>{d}</option>)}
-            </select>
-          </Field>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field label="Purpose" htmlFor="jit-purpose">
+              <select id="jit-purpose" className={fieldCls} value={purpose} onChange={(e) => setPurpose(e.target.value)}>
+                {PURPOSES.map((x) => <option key={x}>{x}</option>)}
+              </select>
+            </Field>
+            <Field label="Duration" htmlFor="jit-dur">
+              <select id="jit-dur" className={fieldCls} value={duration} onChange={(e) => setDuration(e.target.value)}>
+                {JIT_DURATIONS.map((d) => <option key={d}>{d}</option>)}
+              </select>
+            </Field>
+          </div>
           <Field label="Incident or change" htmlFor="jit-ticket" error={errs.ticket}>
-            <input id="jit-ticket" className={clsx(fieldCls, 'font-mono')} value={ticket} onChange={(e) => { setTicket(e.target.value); setErrs((x) => ({ ...x, ticket: undefined })) }} placeholder="INC-0415" aria-invalid={!!errs.ticket} aria-describedby={errs.ticket ? 'jit-ticket-err' : undefined} />
+            <input id="jit-ticket" className={clsx(fieldCls, 'font-mono')} value={ticket} onChange={(e) => { setTicket(e.target.value); setErrs((x) => ({ ...x, ticket: undefined, form: undefined })) }} placeholder="INC-0415" aria-invalid={!!errs.ticket} aria-describedby={errs.ticket ? 'jit-ticket-err' : undefined} />
           </Field>
           <Field label="Reason" htmlFor="jit-reason" error={errs.reason}>
-            <textarea id="jit-reason" rows={3} className={areaCls} value={reason} onChange={(e) => { setReason(e.target.value); setErrs((x) => ({ ...x, reason: undefined })) }} placeholder="e.g. Root-cause the Ledger retry storm in the write-path traces" aria-invalid={!!errs.reason} aria-describedby={errs.reason ? 'jit-reason-err' : undefined} />
+            <textarea id="jit-reason" rows={3} className={areaCls} value={reason} onChange={(e) => { setReason(e.target.value); setErrs((x) => ({ ...x, reason: undefined, form: undefined })) }} placeholder="e.g. Root-cause the Ledger retry storm in the write-path traces" aria-invalid={!!errs.reason} aria-describedby={errs.reason ? 'jit-reason-err' : undefined} />
           </Field>
+          {errs.form && <p className="text-[13px] text-error" role="alert">{errs.form}</p>}
           <div className="flex flex-wrap gap-2">
             <Button variant="ink" onClick={submit}>Send for approval</Button>
             <Button variant="ghost" onClick={close}>Cancel</Button>
@@ -1037,6 +1235,7 @@ function JitSheet({ open, onClose, onSubmit, nextId }: { open: boolean; onClose:
 // ─── Signals ingest ──────────────────────────────────────────────────────
 
 function Signals({ flags, replay, onReplay }: { flags: Record<string, boolean>; replay: Record<string, RunState>; onReplay: (key: string, name: string) => void }) {
+  const canAct = useCanAct()
   return (
     <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
       <p className="text-[15px] text-ink-2 lg:col-span-12">Freshness is the time from a reading on the device to a feature in the record, p95 over the last twelve hours. The objective is 95% within fifteen minutes; vendor readiness or strain scores are kept as signals and never enter the Index.</p>
@@ -1078,7 +1277,7 @@ function Signals({ flags, replay, onReplay }: { flags: Record<string, boolean>; 
             </p>
             {!batch && !paused && (
               <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-line pt-4">
-                <Button variant="ghost" size="sm" onClick={() => onReplay(s.key, s.name)} disabled={rp === 'running'}>
+                <Button variant="ghost" size="sm" onClick={() => onReplay(s.key, s.name)} disabled={rp === 'running' || !canAct}>
                   <RefreshCw size={14} aria-hidden className={rp === 'running' ? 'animate-spin motion-reduce:animate-none' : undefined} /> {rp === 'running' ? 'Replaying…' : rp === 'done' ? 'Replay again' : 'Replay last 12 h'}
                 </Button>
                 <span className="text-[13px] text-ink-3">Idempotent: a replayed batch is never counted twice.</span>
@@ -1097,6 +1296,7 @@ function Rights({ jobs, setJobs, log, stamp }: { jobs: Job[]; setJobs: React.Dis
   const [filter, setFilter] = useState<'all' | 'running' | 'delivered'>('all')
   const [openId, setOpenId] = useState<string | null>(null)
   const [newOpen, setNewOpen] = useState(false)
+  const canAct = useCanAct()
   const rows = jobs.filter((r) => filter === 'all' || r.status === filter)
   const job = jobs.find((j) => j.id === openId) ?? null
 
@@ -1155,7 +1355,7 @@ function Rights({ jobs, setJobs, log, stamp }: { jobs: Job[]; setJobs: React.Dis
           aside={
             <>
               <Tabs value={filter} onChange={setFilter} items={[{ value: 'all', label: 'All' }, { value: 'running', label: 'Running' }, { value: 'delivered', label: 'Delivered' }]} />
-              <Button variant="secondary" size="sm" onClick={() => setNewOpen(true)}><Plus size={14} aria-hidden /> Log a request</Button>
+              <Button variant="secondary" size="sm" onClick={() => setNewOpen(true)} disabled={!canAct}><Plus size={14} aria-hidden /> Log a request</Button>
             </>
           }
         />
@@ -1239,11 +1439,11 @@ function JobDetail({ job, onRetry, onPage, onNotify }: { job: Job; onRetry: () =
       </div>
 
       {running && (
-        <div className="flex flex-wrap gap-2">
+        <Writes className="flex flex-wrap gap-2">
           <Button variant="ink" size="sm" onClick={onRetry} disabled={job.retrying || !stalled}><RefreshCw size={14} aria-hidden className={job.retrying ? 'animate-spin motion-reduce:animate-none' : undefined} /> {job.retrying ? 'Retrying…' : 'Retry stalled store'}</Button>
           <Button variant="ghost" size="sm" onClick={onPage} disabled={job.escalated}>{job.escalated ? 'On-call paged' : 'Page the on-call engineer'}</Button>
           <Button variant="ghost" size="sm" onClick={onNotify}><Bell size={14} aria-hidden /> Send the member an update</Button>
-        </div>
+        </Writes>
       )}
       {!running && <p className="flex items-center gap-2 text-[15px] text-ink" role="status"><Check size={16} aria-hidden /> Delivered and verified per store. The member has been told.</p>}
 

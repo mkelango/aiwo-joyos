@@ -5,7 +5,7 @@ import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
 import { DaybreakButton } from '@/components/joy/primitives'
 import type { Role, TermKey, TermScore } from '@/domain/types'
 import { useDict, useLang, useT, useTermText } from '@/lib/i18n'
-import { useApp } from '@/lib/store'
+import { useConsoleRole } from '@/routes/console/care/_gate'
 import { E, NF } from './_i18n'
 import { FlowTopBar, rich } from './_parts'
 
@@ -105,8 +105,12 @@ export default function NotFound() {
 }
 
 function Body({ path, lead, primary, secondary, links, linksTitle }: { path: string; lead: string; primary: ReactNode; secondary?: ReactNode; links: Dest[]; linksTitle: string }) {
-  const { setRole } = useApp()
+  const { chosen, setRole } = useConsoleRole()
   const t = useDict(NF)
+  // ConsoleLayout's rule: a console link takes its role only while no console role is chosen.
+  // Once one is, the link opens that console as a read-only preview; "Sign in as another role"
+  // or the Demo switcher is the only way to change role.
+  const enter = (r?: Role) => (r && !chosen ? () => setRole(r) : undefined)
   return (
     <div className="grid gap-10 lg:grid-cols-[1.2fr_1fr] lg:items-start lg:gap-16">
       <div className="min-w-0">
@@ -134,7 +138,7 @@ function Body({ path, lead, primary, secondary, links, linksTitle }: { path: str
         <ul className="divide-y divide-line overflow-hidden rounded-card border border-line bg-paper-raised">
           {links.map((l) => (
             <li key={l.to}>
-              <Link to={l.to} onClick={l.role ? () => setRole(l.role!) : undefined} className="group flex items-center gap-4 px-4 py-3.5 hover:bg-paper-sunk focus-ring">
+              <Link to={l.to} onClick={enter(l.role)} className="group flex items-center gap-4 px-4 py-3.5 hover:bg-paper-sunk focus-ring">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-paper-sunk text-ink-2 group-hover:bg-paper">{l.icon}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block break-words text-[16px] text-ink">{l.label}</span>

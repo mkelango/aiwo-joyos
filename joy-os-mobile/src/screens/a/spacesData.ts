@@ -92,6 +92,33 @@ export const VIVA_DRAFT: Record<TermKey, { tool: string; ask: string; draft: str
   B: null,
 }
 
+/**
+ * The second named VIVA tool of each space (terms.ts lists two per space), each with a canned
+ * specimen prompt and draft, as on the web. le8_coach is drafted at ask time from the LE8 readings.
+ */
+export const VIVA_MORE: Record<TermKey, { tool: string; ask: string; draft: string; reviewer: string }[]> = {
+  H: [{ tool: 'le8_coach', ask: 'Which of my Essential 8 should I work on first?', draft: '', reviewer: 'Reviewed by Dr Meera Iyer' }],
+  P: [{ tool: 'tomorrow_question', ask: 'Ask me this week’s Tomorrow question.', draft: 'What is one thing tomorrow that you would be sorry to miss? Write it down tonight, next to your earlier answers. Only you can read it.', reviewer: 'Coach Priya sees this in your digest' }],
+  R: [{ tool: 'repair_conversation', ask: 'Help me start a repair after an argument.', draft: 'Start with your own part, in one sentence: “I was short with you, and I am sorry.” Then ask one question and only listen. A repair is not about who was right; it is about coming back.', reviewer: 'Never reveals one partner to the other' }],
+  F: [{ tool: 'no_list_coach', ask: 'Help me say no to one thing this week.', draft: 'The Tuesday reviews take more of your week than anything else asked of you. You could try: “I will join the first fifteen minutes and read the notes after.” A smaller yes is still a no to the rest.', reviewer: 'Calendar entries discarded · totals only · never financial advice' }],
+  D: [{ tool: 'savour_prompt', ask: 'Give me a savouring prompt for this evening.', draft: 'When the tea is poured tonight, wait ten seconds before the first sip. Notice the smell and the warmth of the cup. Then tell Kavya one thing from today you would be sorry to have missed.', reviewer: 'From the savouring library · no advice' }],
+  B: [],
+}
+
+/** Words that send a question typed in a room's VIVA card to one of its tools (specimen matching). */
+export const VIVA_MATCH: Record<string, RegExp> = {
+  explain_biomarker: /apob|ldl|hdl|hba1c|marker|cholesterol|vitamin|biomarker|\blab\b|panel|ferritin|crp/i,
+  le8_coach: /le8|essential|heart|blood pressure|\bbp\b|sleep|diet|bmi|weight|activity|walk|first/i,
+  ikigai_coach: /ikigai|anchor|purpose|direction|meaning|contribut/i,
+  tomorrow_question: /tomorrow|question/i,
+  couples_prompt: /state of us|kavya|partner|couple|wife|husband|marriage/i,
+  repair_conversation: /argu|fight|repair|sorry|apolog|upset|quarrel/i,
+  time_audit_summary: /audit|hours|calendar|meeting|where.*time|my time/i,
+  no_list_coach: /\bno\b|say no|declin|refus|boundar|too many/i,
+  ledger_weekly_story: /ledger|where did joy|joy come|this week/i,
+  savour_prompt: /savou?r|enjoy|evening|tea|meal|slow down/i,
+}
+
 // ─── Body ──────────────────────────────────────────────────────────────────
 
 export const DEVICES = [

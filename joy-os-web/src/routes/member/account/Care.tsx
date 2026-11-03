@@ -81,7 +81,7 @@ export default function Care() {
                 <dl className="mt-4 space-y-2 border-t border-line pt-4 text-[14px]">
                   <div className="flex justify-between gap-3"><dt className="text-ink-3">{t('next')}</dt><dd className="text-right text-ink"><span className="num">{dx(d.next)}</span><span className="block text-[13px] text-ink-2">{dx(d.nextKind)}</span></dd></div>
                   <div className="flex justify-between gap-3"><dt className="text-ink-3">{t('speaks')}</dt><dd className="text-right text-ink-2">{dx(d.languages)}</dd></div>
-                  <div className="flex justify-between gap-3"><dt className="text-ink-3">{t('since')}</dt><dd className="num text-right text-ink-2">{d.since}</dd></div>
+                  <div className="flex justify-between gap-3"><dt className="text-ink-3">{t('since')}</dt><dd className="num text-right text-ink-2">{dx(d.since)}</dd></div>
                 </dl>
                 <div className="mt-auto pt-5">
                   <LinkButton to={`/app/care/messages?p=${p.id}`} size="sm" className="w-full">
@@ -119,7 +119,7 @@ export default function Care() {
                     <Pill tone={c.status === 'confirmed' ? 'positive' : 'neutral'}>{c.status === 'confirmed' ? t('confirmed') : t('requested')}</Pill>
                   </div>
                   <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[15px] text-ink">
-                    <span className="flex items-center gap-1.5"><CalendarClock size={16} className="text-ink-3" /> <span className="num">{c.when} · {c.time}</span></span>
+                    <span className="flex items-center gap-1.5"><CalendarClock size={16} className="text-ink-3" /> <span className="num">{dx(c.when)} · {c.time}</span></span>
                     <span className="flex items-center gap-1.5 text-ink-2"><Video size={16} className="text-ink-3" /> {dx(c.mode)} · {rich(t('minutes'), { n: <span className="num">{c.minutes}</span> })}</span>
                   </p>
                   <p className="mt-3 text-[14px] text-ink-2">{dx(c.prep)}</p>
@@ -155,7 +155,7 @@ export default function Care() {
               {PAST_CONSULTS.map((c) => (
                 <li key={c.id} className="flex flex-wrap items-baseline justify-between gap-2 py-3">
                   <span className="text-[15px] text-ink">{dx(c.title)} <span className="text-ink-3">· {person(c.with).name}</span></span>
-                  <span className="text-[13px] text-ink-3"><span className="num">{c.when}</span> · {dx(c.note)}</span>
+                  <span className="text-[13px] text-ink-3"><span className="num">{dx(c.when)}</span> · {dx(c.note)}</span>
                 </li>
               ))}
             </ul>
@@ -198,7 +198,7 @@ export default function Care() {
           const [day, time] = slot.split(' · ')
           setConsults((cs) => [...cs, { id: `cs${Date.now()}`, who: { name: c.name, initials: c.initials, tone: c.tone, reg: REG[c.name] }, title: reason.length > 60 ? `${reason.slice(0, 57)}…` : reason, mode: 'Video', when: `${day} 2027`, time, minutes: 45, status: 'requested', prep: t('prepNew', { name: c.name.split(' ').slice(0, 2).join(' ') }) }])
           setBookFor(null)
-          showToast(t('bookedToast', { slot, name: c.name }))
+          showToast(t('bookedToast', { slot: dx(slot), name: c.name }))
           window.setTimeout(() => document.getElementById('consults')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120)
         }}
       />
@@ -211,7 +211,7 @@ export default function Care() {
           const [day, time] = slot.split(' · ')
           setConsults((cs) => cs.map((x) => (x.id === c.id ? { ...x, when: `${day} 2027`, time, status: 'requested', prep: t('prepResched', { name: c.who.name.split(' ').slice(0, 2).join(' ') }) } : x)))
           setResched(null)
-          showToast(t('reschedToast', { slot }))
+          showToast(t('reschedToast', { slot: dx(slot) }))
         }}
         onCancel={() => {
           const c = resched!
@@ -511,7 +511,7 @@ function Matching({ onBook, role, setRole }: { onBook: (c: (typeof CLINICIANS)[n
                   <Pill><MapPin size={11} /> {c.city === 'Video' ? t('videoOnly') : dx(c.city)}</Pill>
                 </div>
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                  <span className="text-[14px] text-ink-2">{rich(t('nextAt'), { when: <span className="num text-ink">{c.next}</span> })}</span>
+                  <span className="text-[14px] text-ink-2">{rich(t('nextAt'), { when: <span className="num text-ink">{dx(c.next)}</span> })}</span>
                   <Button size="sm" variant="ink" onClick={() => onBook(c)}>{t('book')}</Button>
                 </div>
               </div>
@@ -565,7 +565,7 @@ function BookingSheet({ clinician, onClose, onBooked }: { clinician: (typeof CLI
             <div className="mt-2 grid gap-2" role="radiogroup">
               {slots.map((s) => (
                 <button type="button" role="radio" aria-checked={slot === s} key={s} onClick={() => setSlot(s)} className={clsx('num flex items-center justify-between rounded-lg border px-4 py-3 text-left text-[15px] focus-ring', slot === s ? 'border-ink bg-paper-raised text-ink' : 'border-line text-ink-2 hover:border-line-strong')}>
-                  {s} <span className="text-[13px] text-ink-3">{rich(t('minutes'), { n: <span className="num">45</span> })}</span>
+                  {dx(s)} <span className="text-[13px] text-ink-3">{rich(t('minutes'), { n: <span className="num">45</span> })}</span>
                 </button>
               ))}
             </div>
@@ -597,6 +597,7 @@ function BookingSheet({ clinician, onClose, onBooked }: { clinician: (typeof CLI
 
 function RescheduleSheet({ consult, onClose, onRequest, onCancel }: { consult: Consult | null; onClose: () => void; onRequest: (slot: string) => void; onCancel: () => void }) {
   const t = useDict(CARE)
+  const dx = useData()
   const [slot, setSlot] = useState('')
   const [tried, setTried] = useState(false)
   const [cancelling, setCancelling] = useState(false)
@@ -605,13 +606,13 @@ function RescheduleSheet({ consult, onClose, onRequest, onCancel }: { consult: C
     <Sheet open={!!consult} onClose={close} title={consult ? t('reschedWith', { name: consult.who.name }) : t('reschedule')} side="center">
       {consult && !cancelling && (
         <form noValidate className="space-y-5" onSubmit={(e) => { e.preventDefault(); setTried(true); if (slot) { onRequest(slot); setSlot(''); setTried(false) } }}>
-          <p className="text-[17px] text-ink-2">{rich(t('nowLine'), { when: <span className="num text-ink">{consult.when} · {consult.time}</span> })}</p>
+          <p className="text-[17px] text-ink-2">{rich(t('nowLine'), { when: <span className="num text-ink">{dx(consult.when)} · {consult.time}</span> })}</p>
           <fieldset>
             <legend className="text-[15px] text-ink">{t('otherTimes')}</legend>
             <div className="mt-2 grid gap-2" role="radiogroup">
               {ALT_SLOTS.map((s) => (
                 <button type="button" role="radio" aria-checked={slot === s} key={s} onClick={() => setSlot(s)} className={clsx('num flex items-center justify-between rounded-lg border px-4 py-3 text-left text-[15px] focus-ring', slot === s ? 'border-ink bg-paper-raised text-ink' : 'border-line text-ink-2 hover:border-line-strong')}>
-                  {s} <span className="text-[13px] text-ink-3">{rich(t('minutes'), { n: <span className="num">{consult.minutes}</span> })}</span>
+                  {dx(s)} <span className="text-[13px] text-ink-3">{rich(t('minutes'), { n: <span className="num">{consult.minutes}</span> })}</span>
                 </button>
               ))}
             </div>
@@ -628,7 +629,7 @@ function RescheduleSheet({ consult, onClose, onRequest, onCancel }: { consult: C
       )}
       {consult && cancelling && (
         <div className="space-y-4">
-          <p className="text-[17px] text-ink-2">{rich(t('cancelQ', { name: consult.who.name }), { when: <span className="num">{consult.when}</span> })}</p>
+          <p className="text-[17px] text-ink-2">{rich(t('cancelQ', { name: consult.who.name }), { when: <span className="num">{dx(consult.when)}</span> })}</p>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setCancelling(false)}>{t('back')}</Button>
             <Button variant="ink" onClick={() => { setCancelling(false); onCancel() }}>{t('cancelConsult')}</Button>
@@ -642,6 +643,7 @@ function RescheduleSheet({ consult, onClose, onRequest, onCancel }: { consult: C
 /** Pre-consult screen under TPG 2020: clinician identity, member identity, consent — then the call. */
 function WaitingRoom({ consult, onClose, onEnded }: { consult: Consult | null; onClose: () => void; onEnded: () => void }) {
   const t = useDict(CARE)
+  const dx = useData()
   const profile = useMemberProfile()
   const [me, setMe] = useState(false)
   const [consent, setConsent] = useState(false)
@@ -666,7 +668,7 @@ function WaitingRoom({ consult, onClose, onEnded }: { consult: Consult | null; o
             <div>
               <p className="text-[17px] text-ink">{consult.who.name}</p>
               <p className="text-[14px] text-ink-2">{consult.who.reg?.startsWith('RCI') ? t('regPsych') : t('regDoc')} · {t('reg')} <span className="num">{consult.who.reg ?? t('onFile')}</span></p>
-              <p className="text-[13px] text-ink-3"><span className="num">{consult.when} · {consult.time}</span> · {rich(t('minutes'), { n: <span className="num">{consult.minutes}</span> })} · {t('video')}</p>
+              <p className="text-[13px] text-ink-3"><span className="num">{dx(consult.when)} · {consult.time}</span> · {rich(t('minutes'), { n: <span className="num">{consult.minutes}</span> })} · {t('video')}</p>
             </div>
           </div>
           <div className="space-y-3">

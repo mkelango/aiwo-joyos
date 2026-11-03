@@ -188,7 +188,8 @@ export interface ScheduleRow {
 // ─── Index result from a sitting ────────────────────────────────────────────
 export interface MeasuredIndex {
   takenOn: string
-  value: number
+  /** null while a term is not yet measured: the Index is withheld, never guessed. */
+  value: number | null
   gm: number
   burden: number
   terms: TermScore[]
@@ -200,8 +201,10 @@ export interface MeasuredIndex {
   /** The answers as scored, kept so a later correction can be appended and re-scored. */
   answers?: Record<string, number>
   signalsOff?: string[]
+  /** Terms the member chose to skip for now: shown as not yet measured, never imputed. */
+  skipped?: TermKey[]
   /** The score as first issued, before any amendment (never overwritten). */
-  original?: { value: number; terms: TermScore[]; lowestTerm: TermKey }
+  original?: { value: number | null; terms: TermScore[]; lowestTerm: TermKey }
   /** Append-only corrections after scoring (Architecture p26, "Correct"). */
   amendments?: Amendment[]
 }
@@ -216,14 +219,15 @@ export function useMeasured() {
 export interface Amendment {
   id: string
   itemId: string
-  /** The answer value it replaces (the latest value for that item at the time). */
-  from: number
+  /** The answer value it replaces (the latest value for that item at the time); null when
+   *  the item was skipped and is answered for the first time (a term measured later). */
+  from: number | null
   to: number
   reason: string
   at: string
-  /** The Index before and after this amendment. */
-  before: number
-  after: number
+  /** The Index before and after this amendment (null while a term is not yet measured). */
+  before: number | null
+  after: number | null
 }
 
 /** The answers as amended: the original answers with every amendment applied in order. */
@@ -259,14 +263,21 @@ export interface ClinicalRemeasure {
   // Set on submission:
   submittedAt?: string
   takenOn?: string
-  value?: number
+  /** null while a term is not yet measured (the Index is withheld). */
+  value?: number | null
   gm?: number
   burden?: number
   terms?: TermScore[]
   lowestTerm?: TermKey
   answers?: Record<string, number>
   signalsOff?: string[]
+  /** Terms skipped for now in the Clinical-grade sitting. */
+  skipped?: TermKey[]
+  /** The submission as first scored, kept when a correction is appended. */
+  original?: { value: number | null; terms: TermScore[]; lowestTerm: TermKey }
   amendments?: Amendment[]
+  /** Signatures withdrawn by a correction after sign-off: the physician signs the amended record again. */
+  priorSignatures?: { by: string; at: string; index?: number }[]
   // Set by the clinical portal on sign-off:
   signed?: boolean
   signedBy?: string
@@ -309,4 +320,99 @@ export function connectedDevices(raw: string | null): string[] {
 export function useSignalsDown() {
   const raw = useSyncExternalStore(subscribeStorage, readDevicesRaw, () => null)
   return connectedDevices(raw).length === 0
+}
+
+// ─── The coach's override of the next-best action ───────────────────────────
+// Written by the coach console (joyos:coach:nba-override, { memberId, action, reason, by, at });
+// Today shows it for this member as today's action, marked as chosen by the coach.
+const OVERRIDE_KEY = 'joyos:coach:nba-override'
+export interface CoachOverride {
+  memberId: string
+  action: string
+  reason: string
+  by: string
+  at: string
+  term?: TermKey
+}
+function readOverrideRaw(): string | null {
+  try {
+    return localStorage.getItem(OVERRIDE_KEY)
+  } catch {
+    return null
+  }
+}
+function subscribeAny(cb: () => void) {
+  window.addEventListener('storage', cb)
+  window.addEventListener(EVT, cb)
+  window.addEventListener('focus', cb)
+  return () => {
+    window.removeEventListener('storage', cb)
+    window.removeEventListener(EVT, cb)
+    window.removeEventListener('focus', cb)
+  }
+}
+let overrideCache: { raw: string | null; value: CoachOverride | null } = { raw: null, value: null }
+/** The coach's override for this member, or null (another member's override is not ours). */
+export function useCoachOverride(): CoachOverride | null {
+  const raw = useSyncExternalStore(subscribeAny, readOverrideRaw, () => null)
+  if (overrideCache.raw === raw) return overrideCache.value
+  let value: CoachOverride | null = null
+  try {
+    const v = raw ? (JSON.parse(raw) as Partial<CoachOverride>) : null
+    if (v && v.memberId === MEMBER.id && typeof v.action === 'string' && v.action.trim())
+      value = { memberId: v.memberId, action: v.action, reason: typeof v.reason === 'string' ? v.reason : '', by: typeof v.by === 'string' ? v.by : '', at: typeof v.at === 'string' ? v.at : '', term: v.term }
+  } catch {
+    value = null
+  }
+  overrideCache = { raw, value }
+  return value
+}
+
+// ─── Pleasure follow-ups (the Pleasure space's records, read-only here) ─────
+// Kept savouring prompts: joyos:spaces:pleasure.kept.v1, [{ date, id, text }].
+// Planned pleasures: joyos:spaces:pleasure.planned.v1, [{ id, day: 'Mon'…'Sun', time, what, minutes, with }].
+export interface KeptPrompt {
+  date: string
+  id: string
+  text: string
+}
+export interface PlannedPleasureRow {
+  id: string
+  day: string
+  time: string
+  what: string
+  minutes: number
+  with?: string
+}
+function readSpacesRaw(key: string): string | null {
+  try {
+    return localStorage.getItem(`joyos:spaces:${key}`)
+  } catch {
+    return null
+  }
+}
+const arrayCache = new Map<string, { raw: string | null; value: unknown[] }>()
+function parseArray(key: string, raw: string | null): unknown[] {
+  const hit = arrayCache.get(key)
+  if (hit && hit.raw === raw) return hit.value
+  let value: unknown[] = []
+  try {
+    const v: unknown = raw ? JSON.parse(raw) : []
+    value = Array.isArray(v) ? v : []
+  } catch {
+    value = []
+  }
+  arrayCache.set(key, { raw, value })
+  return value
+}
+/** Savouring prompts the member kept in the Pleasure space. */
+export function useKeptPrompts(): KeptPrompt[] {
+  const raw = useSyncExternalStore(subscribeAny, () => readSpacesRaw('pleasure.kept.v1'), () => null)
+  return (parseArray('kept', raw) as KeptPrompt[]).filter((k) => k && typeof k.date === 'string' && typeof k.id === 'string' && typeof k.text === 'string')
+}
+/** The member's planned pleasures, or null when the Pleasure space has not saved any yet. */
+export function usePlannedPleasures(): PlannedPleasureRow[] | null {
+  const raw = useSyncExternalStore(subscribeAny, () => readSpacesRaw('pleasure.planned.v1'), () => null)
+  if (raw === null) return null
+  return (parseArray('planned', raw) as PlannedPleasureRow[]).filter((p) => p && typeof p.id === 'string' && typeof p.day === 'string' && /^\d{2}:\d{2}$/.test(String(p.time)) && typeof p.what === 'string')
 }

@@ -6,6 +6,7 @@ import { Bar, BarChart, CartesianGrid, LabelList, Line, LineChart, ReferenceLine
 import { DaybreakButton, Delta, Eyebrow, SpecimenTag } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill, Sheet } from '@/components/ui'
 import { RELEASES, SCOREBOARD } from '@/data/platform'
+import { PreviewBanner, useConsoleAccess } from '../care/_gate'
 import { COST_CURVE, DECISIONS, FLYWHEEL, MOATS, NORTH_STAR, NS_TREND, REVENUE, RISKS, SCOREBOARD_STATUS, THREE_NUMBERS } from './_data'
 import { CardHead, ChartLead, Legend, StatusTag, Swatch, downloadHtml, esc, tick, tipLabel, tipStyle } from './_parts'
 
@@ -21,6 +22,8 @@ export default function Exec() {
   const [ready, setReady] = useState(false)
   const [preview, setPreview] = useState(false)
   const [saved, setSaved] = useState(false)
+  // Leadership acts here; every other role sees a read-only preview (the care gate).
+  const { canAct } = useConsoleAccess('/console/exec')
   const perLakh = NORTH_STAR.records / (NORTH_STAR.spendCr * 100)
 
   return (
@@ -36,6 +39,8 @@ export default function Exec() {
           </div>
         }
       />
+
+      <PreviewBanner path="/console/exec" />
 
       {/* North star */}
       <Card tone="ink" className="mb-6 overflow-hidden">
@@ -110,7 +115,10 @@ export default function Exec() {
               {saved && <p className="text-[14px] text-ink-2" role="status">Saved as joy-os-board-pack-q3-fy27.html. Print it to PDF for the board portal.</p>}
             </div>
           ) : (
-            <Button variant="ink" onClick={() => setReady(true)}>Mark ready for sign-off</Button>
+            <div className="space-y-2">
+              <Button variant="ink" onClick={() => setReady(true)} disabled={!canAct}>Mark ready for sign-off</Button>
+              {!canAct && <p className="text-[13px] text-ink-3">View only. Leadership marks the report ready; your role can read it, not move it on.</p>}
+            </div>
           )}
         </div>
         {ready && preview && <BoardPack perLakh={perLakh} />}

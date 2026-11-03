@@ -436,6 +436,18 @@ export const FLAGSHIP_RECAP = {
   sessionsAttended: ['The Summit: the Mentor’s address', 'Experience Zone: Pleasure', 'Capacity battery', 'The Ikigai map', 'The slow dinner'],
 }
 
+/**
+ * New Year's Eve at AIWO Joyspan 2027 (Playbook p61): the evening ends with the Declaration at
+ * 23:50, then the sun rises on the stage at midnight. Display text in i18n/journey NYE_TEXT.
+ */
+export const NYE_PROGRAMME: { time: string; title: string; where: string; term?: TermKey; declaration?: boolean }[] = [
+  { time: '19:30', title: 'The slow dinner at the Long Table', where: 'The Long Table', term: 'D' },
+  { time: '21:30', title: 'The Summit: the Mentor’s address', where: 'Main hall', term: 'P' },
+  { time: '23:00', title: 'The quiet hour: the Wardrobe and the Quiet Pods', where: 'Pavilion' },
+  { time: '23:50', title: 'The Declaration', where: 'Main hall', declaration: true },
+  { time: '00:00', title: 'Begin {y} with joy: the sun rises on the stage', where: 'Main hall' },
+]
+
 /** The next flagship edition, open for requests (specimen). */
 export const FLAGSHIP_NEXT = {
   id: 'ev7',

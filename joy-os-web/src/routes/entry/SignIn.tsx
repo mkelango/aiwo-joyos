@@ -11,16 +11,18 @@ import { TERMS } from '@/data/terms'
 import { METHODS } from '@/domain/indexEngine'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
 import { useApp } from '@/lib/store'
-import { COUNTRIES, DEMO_ACCOUNTS, EMAIL_RE, OPS_ACCOUNT, countryName, phoneError, type CountryCode, type DemoAccount } from './_data'
+import { CONCIERGE_ACCOUNT, COUNTRIES, DEMO_ACCOUNTS, EMAIL_RE, OPS_ACCOUNT, countryName, phoneError, type CountryCode, type DemoAccount } from './_data'
 import { E, SI } from './_i18n'
-import { FlowTopBar, enterCodeDigits, rich } from './_parts'
+import { FlowTopBar, JoyspanCredit, enterCodeDigits, rich } from './_parts'
 
 // AIWO ID SIGN IN (Architecture: one identity across LifeOS and Joy OS).
 // Passkey first, then phone OTP, then email link. No real authentication:
 // every path is a faithful UI that lands in the specimen member app.
 
 type Method = 'passkey' | 'phone' | 'email'
-const ACCOUNTS: DemoAccount[] = [...DEMO_ACCOUNTS, OPS_ACCOUNT]
+// Every demo role has its own account: the concierge sits right after the coach, whose
+// console it shares (a desk of its own there).
+const ACCOUNTS: DemoAccount[] = DEMO_ACCOUNTS.flatMap((a) => (a.key === 'coach' ? [a, CONCIERGE_ACCOUNT] : [a])).concat(OPS_ACCOUNT)
 const MEMBER_ACCOUNT = DEMO_ACCOUNTS.find((a) => a.key === 'member')!
 const SPECIMEN = INDEX_HISTORY[0]
 
@@ -124,6 +126,7 @@ function ProductPromise() {
         <p className="mt-5 max-w-2xl text-[18px] leading-relaxed text-ink-2 md:text-[19px]">
           {t('promise')}
         </p>
+        <JoyspanCredit className="mt-3" />
         <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
           <p className="num rounded-full bg-paper-sunk px-4 py-2 text-[15px] text-ink md:text-[16px]" aria-label={t('formulaAria', { l: lambda })}>
             JI = GM(H,P,R,F,D) − {lambda}·B
@@ -389,7 +392,7 @@ function DemoAccounts({ onEnter }: { onEnter: (a: DemoAccount) => void }) {
         <ul className="mt-6 divide-y divide-line overflow-hidden rounded-card border border-line bg-paper-raised">
           {ACCOUNTS.map((a) => {
             const current = role === a.role
-            const k = a.key as 'member' | 'coach' | 'clinician' | 'partner' | 'tenant' | 'science' | 'exec' | 'ops'
+            const k = a.key as 'member' | 'coach' | 'concierge' | 'clinician' | 'partner' | 'tenant' | 'science' | 'exec' | 'ops'
             const title = t(`acc_${k}_title`)
             const who = t(`acc_${k}_who`)
             return (

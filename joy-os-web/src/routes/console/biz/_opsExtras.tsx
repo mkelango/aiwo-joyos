@@ -9,7 +9,7 @@ import {
   ACCESS_REVIEW, AI_TOOLS, DRIFT_METRICS, DRIFT_WEEKS, HUMAN_REVIEW, LIVE_SAMPLE_QUEUE, LIVE_SAMPLE_WEEK, PAGE_HISTORY, ROTAS, ROTA_DAYS, TOOL_REGISTRY, TRACE_FINDINGS, TRACE_REVIEWERS, UNUSUAL_READS,
   driftSeries, type AccessDecision, type DriftMetric, type RotaKey, type TraceFinding, type UnusualRead,
 } from './_data'
-import { CardHead, ChartLead, Field, Meter, Row, StatusTag, areaCls, fieldCls, tick, tipLabel, tipStyle, useStored } from './_parts'
+import { CardHead, ChartLead, Field, Meter, Row, StatusTag, Writes, areaCls, fieldCls, tick, tipLabel, tipStyle, useCanAct, useStored } from './_parts'
 
 // Control plane extras (Architecture p.20, p.25, p.27, p.34): the on-call rota with escalation, the tool registry,
 // the weekly live-sample queue, AI drift dashboards, unusual-read alerts, the quarterly access review and the public
@@ -52,6 +52,8 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).
 const minSec = (s: number) => (s < 60 ? `${s} s` : `${Math.floor(s / 60)} m ${String(s % 60).padStart(2, '0')} s`)
 
 export function OnCall({ log }: { log: Log }) {
+  // Drills, page closes and rota swaps are writes: off unless the role holds a live grant.
+  const canAct = useCanAct()
   const [overrides, setOverrides] = useStored<Record<string, string>>('joyos:ops:oncall-overrides', {})
   const [history, setHistory] = useStored<PageEntry[]>('joyos:ops:oncall-pages', PAGE_HISTORY)
   const [rotaKey, setRotaKey] = useState<RotaKey>('clinical')
@@ -141,9 +143,9 @@ export function OnCall({ log }: { log: Log }) {
                 )
               })}
             </ol>
-            {!mine && <Button variant="secondary" size="sm" className="mt-4" onClick={() => start(r.key)} disabled={!!drill}><PhoneCall size={14} aria-hidden /> Run an escalation drill</Button>}
+            {!mine && <Button variant="secondary" size="sm" className="mt-4" onClick={() => start(r.key)} disabled={!!drill || !canAct}><PhoneCall size={14} aria-hidden /> Run an escalation drill</Button>}
             {mine && drill && (
-              <div className="mt-4 space-y-3">
+              <Writes className="mt-4 space-y-3">
                 {!drill.acked && !drill.exhausted && (
                   <div className="flex flex-wrap gap-2">
                     <Button variant="ink" size="sm" onClick={ack}><UserCheck size={14} aria-hidden /> Acknowledge as {nameOf(chain[drill.step].person)}</Button>
@@ -162,7 +164,7 @@ export function OnCall({ log }: { log: Log }) {
                   </select>
                 </Field>
                 <Button variant="secondary" size="sm" onClick={close}><Check size={14} aria-hidden /> Close the page</Button>
-              </div>
+              </Writes>
             )}
             <p className="mt-3 text-[12px] text-ink-3">Drill clock runs {DRILL_SPEED}× faster than real time.</p>
           </Card>
@@ -196,7 +198,7 @@ export function OnCall({ log }: { log: Log }) {
                       <td className="py-3 text-right">
                         <span className="inline-flex items-center gap-2">
                           {swapped && <StatusTag tone="info">Swapped</StatusTag>}
-                          <Button variant="ghost" size="sm" onClick={() => setSwap(swap?.day === i ? null : { day: i, slot: 'primary' })} aria-label={`Swap a shift on ${d}`}>Swap</Button>
+                          <Button variant="ghost" size="sm" disabled={!canAct} onClick={() => setSwap(swap?.day === i ? null : { day: i, slot: 'primary' })} aria-label={`Swap a shift on ${d}`}>Swap</Button>
                         </span>
                       </td>
                     </tr>
@@ -352,6 +354,7 @@ export function ToolRegistrySheet({ toolKey, onClose }: { toolKey: string | null
 // ─── Public Check variant ────────────────────────────────────────────────
 
 export function CheckVariantCard({ asksPhone, onChange }: { asksPhone: boolean; onChange: () => void }) {
+  const canAct = useCanAct()
   return (
     <Card>
       <CardHead eyebrow="Public Check · an open question" title={asksPhone ? 'Asks for an optional phone number' : 'Anonymous'} aside={<StatusTag tone={asksPhone ? 'info' : 'ok'}>{asksPhone ? 'Variant · phone' : 'Default · anonymous'}</StatusTag>} />
@@ -361,7 +364,7 @@ export function CheckVariantCard({ asksPhone, onChange }: { asksPhone: boolean; 
         <li className={clsx(asksPhone && 'text-ink')}><span className="font-medium">Phone:</span> before the result, an optional number with plain consent copy. Skipping it keeps the Check anonymous.</li>
       </ul>
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <Button variant="secondary" size="sm" onClick={onChange}>{asksPhone ? 'Return to anonymous' : 'Try the phone variant'}</Button>
+        <Button variant="secondary" size="sm" onClick={onChange} disabled={!canAct}>{asksPhone ? 'Return to anonymous' : 'Try the phone variant'}</Button>
         <Link to="/check" className="text-[14px] text-ink-2 underline decoration-line-strong underline-offset-2 hover:text-ink focus-ring rounded">Open the public Check</Link>
       </div>
       <p className="mt-3 text-[12px] text-ink-3"><code className="font-mono">check_asks_phone</code> · default off · the change asks for a reason and is logged.</p>
@@ -377,6 +380,7 @@ type Lang = 'all' | 'EN' | 'TA' | 'HI'
 export function LiveSample({ log }: { log: Log }) {
   const [reviews, setReviews] = useStored<Record<string, SampleReview>>('joyos:ops:live-sample', {})
   const [reviewer, setReviewer] = useState<string>(TRACE_REVIEWERS[0])
+  const canAct = useCanAct()
   const [lang, setLang] = useState<Lang>('all')
   const done = Object.keys(reviews).length
   const reviewed = LIVE_SAMPLE_WEEK.reviewedBefore + done
@@ -419,16 +423,18 @@ export function LiveSample({ log }: { log: Log }) {
           lead="Drawn at random from every live tool and language. Read each one against the eval rubric and record a finding; a safety finding pages the clinical on call."
         />
         <Field label="Reviewing as" htmlFor={rid} className="mb-5 max-w-sm">
-          <select id={rid} className={fieldCls} value={reviewer} onChange={(e) => setReviewer(e.target.value)}>
+          <select id={rid} className={fieldCls} value={reviewer} onChange={(e) => setReviewer(e.target.value)} disabled={!canAct}>
             {TRACE_REVIEWERS.map((r) => <option key={r}>{r}</option>)}
           </select>
         </Field>
         {open.length === 0 ? (
           <p className="flex items-center gap-2 text-[15px] text-ink-2"><Check size={15} aria-hidden /> {lang === 'all' ? 'Nothing left in the queue. The next sample is drawn on Monday.' : `Nothing left in ${lang}.`}</p>
         ) : (
-          <ul className="divide-y divide-line">
-            {open.map((q) => <SampleItem key={q.id} q={q} onRecord={record} />)}
-          </ul>
+          <Writes>
+            <ul className="divide-y divide-line">
+              {open.map((q) => <SampleItem key={q.id} q={q} onRecord={record} />)}
+            </ul>
+          </Writes>
         )}
         {recorded.length > 0 && (
           <div className="mt-6 border-t border-line pt-4">
@@ -439,7 +445,7 @@ export function LiveSample({ log }: { log: Log }) {
                 return (
                   <li key={q.id} className="flex flex-wrap items-center justify-between gap-2 text-[14px]">
                     <span className="min-w-0 text-ink-2"><span className="num text-ink-3">{q.id}</span> · <code className="font-mono text-ink">{q.tool}</code> {q.lang} · {nameOf(r.reviewer)} · <span className="num">{r.at}</span>{r.note ? ` · ${r.note}` : ''}</span>
-                    <span className="flex items-center gap-2"><StatusTag tone={r.finding === 'No issue' ? 'ok' : r.finding === 'Safety' ? 'act' : 'watch'}>{r.finding}</StatusTag><Button variant="ghost" size="sm" onClick={() => reopen(q.id)} aria-label={`Reopen ${q.id}`}><Undo2 size={14} aria-hidden /></Button></span>
+                    <span className="flex items-center gap-2"><StatusTag tone={r.finding === 'No issue' ? 'ok' : r.finding === 'Safety' ? 'act' : 'watch'}>{r.finding}</StatusTag><Button variant="ghost" size="sm" disabled={!canAct} onClick={() => reopen(q.id)} aria-label={`Reopen ${q.id}`}><Undo2 size={14} aria-hidden /></Button></span>
                   </li>
                 )
               })}
@@ -512,6 +518,7 @@ export function DriftDashboard({ tools, log }: { tools: Record<string, { on: boo
   const live = AI_TOOLS.filter((t) => tools[t.key]?.on)
   const [tool, setTool] = useState<string>('second_arrow_reflection')
   const [opened, setOpened] = useStored<Record<string, string>>('joyos:ops:drift-reviews', {})
+  const canAct = useCanAct()
   const m = DRIFT_METRICS[metric]
   const toolNow = live.some((t) => t.key === tool) ? tool : live[0]?.key ?? tool
   const series = driftSeries(toolNow, metric)
@@ -544,7 +551,7 @@ export function DriftDashboard({ tools, log }: { tools: Record<string, { on: boo
             return (
               <li key={key} className="flex flex-col gap-2 rounded-card border border-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="flex items-start gap-2 text-[14px] text-ink"><AlertCircle size={15} className="mt-0.5 shrink-0 text-ink-2" aria-hidden /><span><code className="font-mono">{w.tool}</code> · {DRIFT_METRICS[w.metric].label} <span className="num">{fmt(w.metric, driftSeries(w.tool, w.metric).slice(-1)[0])}</span> <span className="text-ink-3">(watch {fmt(w.metric, DRIFT_METRICS[w.metric].watch)}) · {w.owner}</span></span></p>
-                {opened[key] ? <StatusTag tone="info" className="self-start sm:self-center">Review opened · {opened[key]}</StatusTag> : <Button variant="secondary" size="sm" className="self-start sm:self-center" onClick={() => openReview(w.tool, w.metric, w.owner)}>Open a drift review</Button>}
+                {opened[key] ? <StatusTag tone="info" className="self-start sm:self-center">Review opened · {opened[key]}</StatusTag> : <Button variant="secondary" size="sm" className="self-start sm:self-center" disabled={!canAct} onClick={() => openReview(w.tool, w.metric, w.owner)}>Open a drift review</Button>}
               </li>
             )
           })}
@@ -600,6 +607,7 @@ export function UnusualReads({ log }: { log: Log }) {
   const [items, setItems] = useStored<UnusualRead[]>('joyos:ops:unusual-reads', UNUSUAL_READS)
   const [show, setShow] = useState<'open' | 'all'>('open')
   const [acting, setActing] = useState<{ id: string; to: 'cleared' | 'escalated' } | null>(null)
+  const canAct = useCanAct()
   const list = items.filter((i) => show === 'all' || i.status === 'open')
   const openN = items.filter((i) => i.status === 'open').length
   const resolve = (id: string, to: 'cleared' | 'escalated', reason: string) => {
@@ -633,11 +641,11 @@ export function UnusualReads({ log }: { log: Log }) {
               </div>
               {a.status === 'open' && acting?.id !== a.id && (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Button variant="secondary" size="sm" onClick={() => setActing({ id: a.id, to: 'cleared' })}><Check size={14} aria-hidden /> Clear</Button>
-                  <Button variant="ghost" size="sm" onClick={() => setActing({ id: a.id, to: 'escalated' })}><Eye size={14} aria-hidden /> Escalate to an investigation</Button>
+                  <Button variant="secondary" size="sm" disabled={!canAct} onClick={() => setActing({ id: a.id, to: 'cleared' })}><Check size={14} aria-hidden /> Clear</Button>
+                  <Button variant="ghost" size="sm" disabled={!canAct} onClick={() => setActing({ id: a.id, to: 'escalated' })}><Eye size={14} aria-hidden /> Escalate to an investigation</Button>
                 </div>
               )}
-              {acting?.id === a.id && (
+              {acting?.id === a.id && canAct && (
                 <ReasonForm
                   id={`ur-${a.id}`}
                   label={acting.to === 'cleared' ? 'Why this read was expected' : 'What the investigation should look at'}
@@ -662,6 +670,7 @@ const DECISION_LABEL: Record<AccessDecision, string> = { keep: 'Keep', reduce: '
 
 export function AccessReview({ log }: { log: Log }) {
   const [state, setState] = useStored<ReviewState>('joyos:ops:access-review', { decisions: {}, signed: null })
+  const canAct = useCanAct()
   const grants = ACCESS_REVIEW.grants
   const decided = grants.filter((g) => g.self || state.decisions[g.id]).length
   const all = decided === grants.length
@@ -722,13 +731,13 @@ export function AccessReview({ log }: { log: Log }) {
                       <div className="inline-flex flex-col items-end gap-2">
                         <div className="inline-flex gap-1 rounded-full bg-paper-sunk p-1" role="group" aria-label={`Decision for ${g.who}`}>
                           {(['keep', 'reduce', 'revoke'] as AccessDecision[]).map((d) => (
-                            <button key={d} type="button" aria-pressed={dec?.d === d} onClick={() => decide(g.id, d)} className={clsx('rounded-full px-3 py-1 text-[13px] transition-colors focus-ring', dec?.d === d ? 'bg-paper-raised text-ink shadow-card' : 'text-ink-2 hover:text-ink')}>{DECISION_LABEL[d]}</button>
+                            <button key={d} type="button" aria-pressed={dec?.d === d} disabled={!canAct} onClick={() => decide(g.id, d)} className={clsx('rounded-full px-3 py-1 text-[13px] transition-colors focus-ring disabled:opacity-50', dec?.d === d ? 'bg-paper-raised text-ink shadow-card' : 'text-ink-2 hover:text-ink')}>{DECISION_LABEL[d]}</button>
                           ))}
                         </div>
                         {dec && dec.d !== 'keep' && (
                           <>
                             <label className="sr-only" htmlFor={`ar-${g.id}`}>Reason for {g.who}</label>
-                            <input id={`ar-${g.id}`} className={clsx(fieldCls, 'h-9 w-64 text-[14px]')} value={dec.note} onChange={(e) => setNote(g.id, e.target.value)} placeholder="Reason" />
+                            <input id={`ar-${g.id}`} disabled={!canAct} className={clsx(fieldCls, 'h-9 w-64 text-[14px]')} value={dec.note} onChange={(e) => setNote(g.id, e.target.value)} placeholder="Reason" />
                           </>
                         )}
                       </div>
@@ -744,11 +753,11 @@ export function AccessReview({ log }: { log: Log }) {
         {state.signed ? (
           <>
             <p className="flex items-center gap-2 text-[15px] text-ink" role="status"><ShieldCheck size={16} aria-hidden /> Signed by {ME_NAME}, with Aditya Rao for the DPO’s own access. {counts.map((c) => `${c.n} ${DECISION_LABEL[c.d].toLowerCase()}`).join(' · ')}. The next review opens on 1 Apr 2027.</p>
-            <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setState({ decisions: {}, signed: null })}><RefreshCw size={14} aria-hidden /> Reset specimen</Button>
+            <Button variant="ghost" size="sm" className="ml-auto" disabled={!canAct} onClick={() => setState({ decisions: {}, signed: null })}><RefreshCw size={14} aria-hidden /> Reset specimen</Button>
           </>
         ) : (
           <>
-            <Button variant="ink" onClick={sign} disabled={!all}><ClipboardCheck size={15} aria-hidden /> Sign the review</Button>
+            <Button variant="ink" onClick={sign} disabled={!all || !canAct}><ClipboardCheck size={15} aria-hidden /> Sign the review</Button>
             <span className="text-[14px] text-ink-2" aria-live="polite">{err ?? (all ? 'Every grant decided. Reduce and revoke take effect when you sign.' : `${grants.length - decided} left to decide.`)}</span>
           </>
         )}

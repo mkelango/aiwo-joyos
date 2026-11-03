@@ -107,6 +107,23 @@ export const SP = {
   'hub.yourIndex': { en: 'Your Index', ta: 'உங்கள் குறியீடு', hi: 'आपका इंडेक्स' },
   'hub.firstStep': { en: 'A first step', ta: 'முதல் அடி', hi: 'पहला क़दम' },
   'hub.open': { en: 'Open {space}', ta: '{space} திற', hi: '{space} खोलें' },
+  // Under 18 (the minors gate): tools stay open, nothing is scored.
+  'mn.title': { en: 'Not scored while under 18', ta: '18 வயதுக்குக் கீழ் மதிப்பெண் இல்லை', hi: '18 से कम उम्र में कोई स्कोर नहीं' },
+  'mn.body': { en: 'Nothing about you is scored until you turn 18: no Index, no bands, no changes to compare. Every tool in this room is still yours to use.', ta: 'உங்களுக்கு 18 வயது ஆகும் வரை உங்களைப் பற்றி எதற்கும் மதிப்பெண் இல்லை: குறியீடு இல்லை, நிலைகள் இல்லை, ஒப்பிட மாற்றங்கள் இல்லை. இந்த அறையின் ஒவ்வொரு கருவியும் இன்னும் உங்களுக்கே.', hi: '18 का होने तक आपके बारे में कुछ भी स्कोर नहीं होता: न इंडेक्स, न बैंड, न तुलना के लिए बदलाव। इस कमरे का हर औज़ार फिर भी आपके इस्तेमाल के लिए है।' },
+  'mn.hub': { en: 'Your Index · not scored while under 18', ta: 'உங்கள் குறியீடு · 18 வயதுக்குக் கீழ் மதிப்பெண் இல்லை', hi: 'आपका इंडेक्स · 18 से कम उम्र में कोई स्कोर नहीं' },
+  'mn.hubLead': { en: 'Every term of the Joyspan equation has a room of its own, with its own tools and its own people. Nothing here is scored while you are under 18; visit any.', ta: 'ஜாய்ஸ்பான் சமன்பாட்டின் ஒவ்வொரு கூறுக்கும் தனி அறை உண்டு: அதன் சொந்தக் கருவிகள், சொந்த மனிதர்கள். 18 வயதுக்குக் கீழ் இங்கே எதற்கும் மதிப்பெண் இல்லை; எதற்கும் செல்லலாம்.', hi: 'जॉयस्पैन समीकरण के हर पहलू का अपना कमरा है, अपने साधन और अपने लोग। 18 से कम उम्र में यहाँ कुछ भी स्कोर नहीं होता; किसी में भी जाएँ।' },
+  'mn.wheel': { en: 'The Wheel stays empty until you turn 18. Tap a petal to see its room here.', ta: 'உங்களுக்கு 18 வயது ஆகும் வரை சக்கரம் காலியாக இருக்கும். அதன் அறையை இங்கே பார்க்க ஒரு இதழைத் தட்டுங்கள்.', hi: '18 का होने तक व्हील खाली रहता है। उसका कमरा यहाँ देखने के लिए एक पंखुड़ी पर टैप करें।' },
+  'mn.room': { en: 'No score under 18', ta: '18 வயதுக்குக் கீழ் மதிப்பெண் இல்லை', hi: '18 से कम में स्कोर नहीं' },
+  'mn.le8': { en: 'Your readings are kept as you log them. Nothing is scored while you are under 18.', ta: 'நீங்கள் பதிவு செய்யும் அளவீடுகள் சேமிக்கப்படும். 18 வயதுக்குக் கீழ் எதற்கும் மதிப்பெண் இல்லை.', hi: 'आप जो रीडिंग दर्ज करते हैं, वे सहेजी जाती हैं। 18 से कम उम्र में कुछ भी स्कोर नहीं होता।' },
+  'mn.le8Saved': { en: 'Saved: {name}.', ta: 'சேமிக்கப்பட்டது: {name}.', hi: 'सहेजा गया: {name}।' },
+  // The room's lead line for a minor: what the room is for, never how it is going.
+  'mn.lead.H': { en: 'Sleep, movement, food and the checks that keep you well. Pick one small thing to look after this week.', ta: 'தூக்கம், உடற்பயிற்சி, உணவு, உங்களை நலமாக வைக்கும் பரிசோதனைகள். இந்த வாரம் கவனிக்க ஒரு சிறிய விஷயத்தைத் தேர்ந்தெடுங்கள்.', hi: 'नींद, चलना-फिरना, खाना और वे जाँचें जो आपको ठीक रखती हैं। इस हफ़्ते ध्यान रखने के लिए एक छोटी चीज़ चुनिए।' },
+  'mn.lead.P': { en: 'What you get up for. Keep the anchors small and daily.', ta: 'நீங்கள் எதற்காக எழுகிறீர்கள். நங்கூரங்களைச் சிறியதாகவும் தினசரியாகவும் வையுங்கள்.', hi: 'आप किसलिए उठते हैं। लंगर छोटे और रोज़ के रखिए।' },
+  'mn.lead.R': { en: 'Who you would call, and who would call you. A message this week is a good start.', ta: 'நீங்கள் யாரை அழைப்பீர்கள், யார் உங்களை அழைப்பார்கள். இந்த வாரம் ஒரு செய்தி நல்ல தொடக்கம்.', hi: 'आप किसे फ़ोन करेंगे, और कौन आपको करेगा। इस हफ़्ते एक संदेश अच्छी शुरुआत है।' },
+  'mn.lead.F': { en: 'Time that is yours to choose. See where your week goes, then keep one hour for yourself.', ta: 'நீங்களே தேர்ந்தெடுக்கும் நேரம். உங்கள் வாரம் எங்கே போகிறது என்று பாருங்கள், பிறகு ஒரு மணி நேரத்தை உங்களுக்காக வையுங்கள்.', hi: 'वह समय जो चुनना आपका है। देखिए आपका हफ़्ता कहाँ जाता है, फिर एक घंटा अपने लिए रखिए।' },
+  'mn.lead.D': { en: 'What you notice, and keep. One small pleasure a day is enough.', ta: 'நீங்கள் கவனிப்பதும் வைத்துக்கொள்வதும். ஒரு நாளுக்கு ஒரு சிறிய இன்பம் போதும்.', hi: 'जो आप देखते हैं, और सहेजते हैं। दिन में एक छोटी ख़ुशी काफ़ी है।' },
+  'mn.lead.B': { en: 'What you can put down, a little at a time. Name one thing that weighs on you.', ta: 'நீங்கள் கீழே வைக்கக்கூடியது, கொஞ்சம் கொஞ்சமாக. உங்களை அழுத்தும் ஒரு விஷயத்தைச் சொல்லுங்கள்.', hi: 'जो आप थोड़ा-थोड़ा करके नीचे रख सकते हैं। एक ऐसी चीज़ का नाम लीजिए जो आप पर भारी है।' },
+  'mn.vivaLe8': { en: 'Your Essential 8 readings are kept as you log them, and none of them is scored while you are under 18. Pick the one of the eight you would most like to look after this week; one small habit is enough to start. Dr Meera looks at all eight at your Day 45 review. VIVA does not diagnose.', ta: 'நீங்கள் பதிவு செய்யும் Essential 8 அளவீடுகள் சேமிக்கப்படும்; 18 வயதுக்குக் கீழ் அவற்றில் எதற்கும் மதிப்பெண் இல்லை. இந்த வாரம் நீங்கள் மிகவும் கவனிக்க விரும்பும் ஒன்றை எட்டிலிருந்து தேர்ந்தெடுங்கள்; தொடங்க ஒரு சிறிய பழக்கம் போதும். நாள் 45 மதிப்பாய்வில் Dr Meera எட்டையும் பார்ப்பார். VIVA நோயறிதல் செய்வதில்லை.', hi: 'आप जो Essential 8 रीडिंग दर्ज करते हैं, वे सहेजी जाती हैं, और 18 से कम उम्र में उनमें से किसी का स्कोर नहीं होता। आठों में से वह चुनिए जिसका आप इस हफ़्ते सबसे ज़्यादा ध्यान रखना चाहें; शुरुआत के लिए एक छोटी आदत काफ़ी है। दिन 45 की समीक्षा में Dr Meera आठों को देखेंगी। VIVA निदान नहीं करता।' },
   'hub.rooms': { en: 'The six rooms', ta: 'ஆறு அறைகள்', hi: 'छह कमरे' },
   'hub.enter': { en: 'Enter {space}', ta: '{space} அறைக்குள் செல்லுங்கள்', hi: '{space} में जाएँ' },
   'hub.how': { en: 'How the spaces work', ta: 'இடங்கள் எப்படி வேலை செய்கின்றன', hi: 'स्पेस कैसे काम करते हैं' },
@@ -133,7 +150,7 @@ export const SP = {
   'body.dev.share': { en: 'Share {name}', ta: '{name} பகிர்', hi: '{name} साझा करें' },
   'body.dev.linkingBtn': { en: 'Linking', ta: 'இணைக்கிறது', hi: 'लिंक हो रहा है' },
   'body.dev.link': { en: 'Link', ta: 'இணை', hi: 'लिंक करें' },
-  'body.dev.consent': { en: 'Consented 7 Jul 2026. Withdraw any time in the {link}; sync stops within 24 hours.', ta: '7 Jul 2026 அன்று ஒப்புதல் அளித்தீர்கள். எப்போது வேண்டுமானாலும் {link} திரும்பப் பெறலாம்; 24 மணி நேரத்துக்குள் ஒத்திசைவு நின்றுவிடும்.', hi: '7 Jul 2026 को सहमति दी। कभी भी {link} में वापस लें; 24 घंटे में सिंक रुक जाएगा।' },
+  'body.dev.consent': { en: 'Consented {d}. Withdraw any time in the {link}; sync stops within 24 hours.', ta: '{d} அன்று ஒப்புதல் அளித்தீர்கள். எப்போது வேண்டுமானாலும் {link} திரும்பப் பெறலாம்; 24 மணி நேரத்துக்குள் ஒத்திசைவு நின்றுவிடும்.', hi: '{d} को सहमति दी। कभी भी {link} में वापस लें; 24 घंटे में सिंक रुक जाएगा।' },
   'body.le8.title': { en: 'Eight things the heart cares about', ta: 'இதயம் கவனிக்கும் எட்டு விஷயங்கள்', hi: 'आठ चीज़ें जिनकी दिल को परवाह है' },
   'body.le8.sub': { en: 'Half of your Body score. Each is scored 0–100; together they make your LE8.', ta: 'உங்கள் உடல் மதிப்பெண்ணில் பாதி. ஒவ்வொன்றும் 0–100; எல்லாம் சேர்ந்து உங்கள் LE8.', hi: 'आपके शरीर स्कोर का आधा। हर एक 0–100 पर; सब मिलकर आपका LE8 बनाते हैं।' },
   'body.le8.composite': { en: 'LE8 composite', ta: 'LE8 கூட்டு', hi: 'LE8 कुल' },
@@ -205,11 +222,17 @@ export const SP = {
   'body.ba.locked': { en: 'Locked', ta: 'பூட்டப்பட்டுள்ளது', hi: 'लॉक है' },
   'body.ba.t': { en: 'Shown only after a physician signs it.', ta: 'மருத்துவர் கையொப்பமிட்ட பிறகே காட்டப்படும்.', hi: 'डॉक्टर के हस्ताक्षर के बाद ही दिखाया जाता है।' },
   'body.ba.b': { en: 'An estimate from your panel and capacity, never a promise or a target. It waits for Dr Meera’s review, so a number never reaches you without a person who can explain it.', ta: 'உங்கள் பேனலும் திறனும் அடிப்படையிலான மதிப்பீடு; வாக்குறுதியோ இலக்கோ அல்ல. இது Dr Meera-வின் மதிப்பாய்வுக்காகக் காத்திருக்கிறது, அதனால் விளக்கக்கூடிய ஒருவர் இல்லாமல் எந்த எண்ணும் உங்களை வந்தடையாது.', hi: 'आपके पैनल और क्षमता से निकाला गया अनुमान, कोई वादा या लक्ष्य नहीं। यह Dr Meera की समीक्षा का इंतज़ार करता है, ताकि कोई भी संख्या बिना समझाने वाले व्यक्ति के आप तक न पहुँचे।' },
-  'body.ba.s1': { en: 'Clinical panel drawn · 22 Jan', ta: 'கிளினிக்கல் பேனல் எடுக்கப்பட்டது · 22 Jan', hi: 'क्लिनिकल पैनल लिया गया · 22 Jan' },
-  'body.ba.s2': { en: 'Panel signed · 24 Jan', ta: 'பேனல் கையொப்பமிடப்பட்டது · 24 Jan', hi: 'पैनल पर हस्ताक्षर · 24 Jan' },
+  'body.ba.s1': { en: 'Clinical panel drawn · {d}', ta: 'கிளினிக்கல் பேனல் எடுக்கப்பட்டது · {d}', hi: 'क्लिनिकल पैनल लिया गया · {d}' },
+  'body.ba.s2': { en: 'Panel signed · {d}', ta: 'பேனல் கையொப்பமிடப்பட்டது · {d}', hi: 'पैनल पर हस्ताक्षर · {d}' },
   'body.ba.s3': { en: 'Biological age review · at Day 45', ta: 'உயிரியல் வயது மதிப்பாய்வு · நாள் 45-இல்', hi: 'जैविक उम्र की समीक्षा · दिन 45 पर' },
   'body.ba.added': { en: 'Added to the agenda for your Day 45 review with Dr Meera.', ta: 'Dr Meera-வுடனான நாள் 45 மதிப்பாய்வின் நிகழ்ச்சி நிரலில் சேர்க்கப்பட்டது.', hi: 'Dr Meera के साथ दिन 45 की समीक्षा के एजेंडा में जोड़ दिया गया।' },
   'body.ba.add': { en: 'Add to my Day 45 review', ta: 'என் நாள் 45 மதிப்பாய்வில் சேர்', hi: 'मेरी दिन 45 की समीक्षा में जोड़ें' },
+  'body.ba.signedAria': { en: 'Biological age estimate {a} to {b}, signed by {name}.', ta: 'உயிரியல் வயது மதிப்பீடு {a} முதல் {b} வரை, {name} கையொப்பமிட்டது.', hi: 'जैविक उम्र का अनुमान {a} से {b}, {name} के हस्ताक्षर के साथ।' },
+  'body.ba.years': { en: 'years · an estimate, with its range', ta: 'ஆண்டுகள் · வரம்புடன் கூடிய மதிப்பீடு', hi: 'साल · सीमा के साथ एक अनुमान' },
+  'body.ba.signedBy': { en: 'Signed by {name} at your Day 45 review.', ta: 'உங்கள் நாள் 45 மதிப்பாய்வில் {name} கையொப்பமிட்டது.', hi: 'आपकी दिन 45 की समीक्षा में {name} ने हस्ताक्षर किए।' },
+  'body.ba.signedB': { en: 'An estimate from your panel and capacity, never a promise or a target. {name} walks you through what moves it; the number itself is not something to chase.', ta: 'உங்கள் பேனலும் திறனும் அடிப்படையிலான மதிப்பீடு; வாக்குறுதியோ இலக்கோ அல்ல. இதை எது மாற்றுகிறது என்று {name} உங்களுக்கு விளக்குவார்; எண்ணைத் துரத்த வேண்டியதில்லை.', hi: 'आपके पैनल और क्षमता से निकाला गया अनुमान, कोई वादा या लक्ष्य नहीं। इसे क्या बदलता है, यह {name} आपको समझाती हैं; संख्या के पीछे भागने की ज़रूरत नहीं।' },
+  'body.ba.view': { en: 'Specimen view: after {name} signs', ta: 'மாதிரிப் பார்வை: {name} கையொப்பமிட்ட பிறகு', hi: 'नमूना दृश्य: {name} के हस्ताक्षर के बाद' },
+  'body.ba.viewDesc': { en: 'See this card as it reads once your physician has reviewed and signed the estimate.', ta: 'உங்கள் மருத்துவர் மதிப்பீட்டைப் பார்த்துக் கையொப்பமிட்ட பின் இந்த அட்டை எப்படித் தெரியும் என்று பாருங்கள்.', hi: 'देखिए कि डॉक्टर के अनुमान की समीक्षा और हस्ताक्षर के बाद यह कार्ड कैसा दिखता है।' },
   'body.st.eyebrow': { en: 'Protocol · AIWO Daily', ta: 'நெறிமுறை · AIWO Daily', hi: 'प्रोटोकॉल · AIWO Daily' },
   'body.st.title': { en: 'Your Body protocol, and today’s AIWO Daily stack', ta: 'உங்கள் உடல் நெறிமுறையும், இன்றைய AIWO Daily தொகுப்பும்', hi: 'आपका शरीर प्रोटोकॉल, और आज का AIWO Daily स्टैक' },
   'body.st.sub': { en: 'Signed by {name} on {date}, against your January panel. Tick what you have done today; a missed day is just a missed day.', ta: 'உங்கள் ஜனவரி பேனலின் அடிப்படையில் {name} {date} அன்று கையொப்பமிட்டது. இன்று செய்ததைக் குறியுங்கள்; தவறிய நாள் வெறும் தவறிய நாள்தான்.', hi: 'आपके जनवरी पैनल के आधार पर {name} ने {date} को हस्ताक्षर किए। आज जो किया उस पर निशान लगाइए; छूटा दिन बस एक छूटा दिन है।' },
@@ -276,7 +299,7 @@ export const SP = {
   'pur.ik.addAnchor': { en: 'Add anchor', ta: 'நங்கூரம் சேர்', hi: 'सहारा जोड़ें' },
   'pur.ik.save': { en: 'Save the map', ta: 'வரைபடத்தைச் சேமி', hi: 'नक्शा सहेजें' },
   'pur.ik.saved': { en: 'Saved. Coach Priya sees that it changed, not what it says, unless you share it.', ta: 'சேமிக்கப்பட்டது. நீங்கள் பகிராத வரை, இது மாறியது என்பது மட்டுமே பயிற்சியாளர் Priya-வுக்குத் தெரியும், அதில் என்ன இருக்கிறது என்பது அல்ல.', hi: 'सहेजा गया। जब तक आप साझा न करें, कोच Priya को सिर्फ़ इतना दिखता है कि यह बदला, यह नहीं कि इसमें क्या लिखा है।' },
-  'pur.ik.lastChanged': { en: 'Last changed 18 Jan 2027 · private to you', ta: 'கடைசியாக மாற்றியது 18 Jan 2027 · உங்களுக்கு மட்டும்', hi: 'आख़िरी बदलाव 18 Jan 2027 · सिर्फ़ आपके लिए' },
+  'pur.ik.lastChanged': { en: 'Last changed {d} · private to you', ta: 'கடைசியாக மாற்றியது {d} · உங்களுக்கு மட்டும்', hi: 'आख़िरी बदलाव {d} · सिर्फ़ आपके लिए' },
   'pur.ik.changedOn': { en: 'Last changed {d} · private to you', ta: 'கடைசியாக மாற்றியது {d} · உங்களுக்கு மட்டும்', hi: 'आख़िरी बदलाव {d} · सिर्फ़ आपके लिए' },
   'pur.tq.eyebrow': { en: 'The Tomorrow Question · week {n}', ta: 'நாளைய கேள்வி · வாரம் {n}', hi: 'कल का सवाल · हफ़्ता {n}' },
   'pur.tq.title': { en: 'What would make tomorrow {e} waking for?', ta: 'நாளையை எழுந்திருக்கத் {e} எது ஆக்கும்?', hi: 'कल को उठने {e} क्या बनाएगा?' },
@@ -465,7 +488,7 @@ export const SP = {
   // ─── Freedom ─────────────────────────────────────────────────────────────
   'fr.title': { en: 'Time, money and {e}', ta: 'நேரம், பணம், {e}', hi: 'समय, पैसा और {e}' },
   'fr.titleE': { en: 'choice', ta: 'தேர்வு', hi: 'चुनाव' },
-  'fr.ta.eyebrow': { en: 'Time audit · {p}, 11 – 24 Jan', ta: 'நேரக் கணக்கெடுப்பு · {p}, 11 – 24 Jan', hi: 'समय का हिसाब · {p}, 11 – 24 Jan' },
+  'fr.ta.eyebrow': { en: 'Time audit · {p}, {from} – {to}', ta: 'நேரக் கணக்கெடுப்பு · {p}, {from} – {to}', hi: 'समय का हिसाब · {p}, {from} – {to}' },
   'fr.ta.title': { en: 'Whose time is it? {p} was {e}.', ta: 'இது யாருடைய நேரம்? {p} {e}.', hi: 'यह समय किसका है? {p} {e} था।' },
   'fr.ta.titleE': { en: 'yours', ta: 'உங்களுடையது', hi: 'आपका' },
   'fr.ta.sub': { en: 'Two weeks of calendar, read once with your consent, summarised into these totals, then discarded. Of {all} planned waking hours, {mine}% were yours and {asked}% were asked of you, rising to {wk}% on weekdays.', ta: 'இரண்டு வாரக் காலண்டர், உங்கள் ஒப்புதலுடன் ஒருமுறை படிக்கப்பட்டு, இந்த மொத்தங்களாகச் சுருக்கப்பட்டு, பிறகு நீக்கப்பட்டது. திட்டமிட்ட {all} விழிப்பு மணி நேரங்களில், {mine}% உங்களுடையவை, {asked}% மற்றவர்கள் கேட்டவை; வார நாட்களில் இது {wk}% வரை உயர்கிறது.', hi: 'दो हफ़्ते का कैलेंडर, आपकी सहमति से एक बार पढ़ा गया, इन कुल जोड़ों में समेटा गया, फिर हटा दिया गया। जागने के {all} तय घंटों में से {mine}% आपके थे और {asked}% दूसरों ने माँगे, कामकाजी दिनों में यह {wk}% तक पहुँचा।' },
@@ -489,7 +512,7 @@ export const SP = {
   'fr.cal.grantEyebrow': { en: '{p} · access request', ta: '{p} · அணுகல் கோரிக்கை', hi: '{p} · ऐक्सेस का अनुरोध' },
   'fr.cal.grantTitle': { en: 'Joy OS would like to read this calendar', ta: 'Joy OS இந்தக் காலண்டரைப் படிக்க விரும்புகிறது', hi: 'Joy OS यह कैलेंडर पढ़ना चाहता है' },
   'fr.cal.can': { en: 'Joy OS can', ta: 'Joy OS செய்யக்கூடியது', hi: 'Joy OS कर सकता है' },
-  'fr.cal.can1': { en: 'See the times and titles of your events from 11 to 24 Jan, once', ta: '11 முதல் 24 Jan வரையிலான உங்கள் நிகழ்வுகளின் நேரங்களையும் தலைப்புகளையும் ஒருமுறை பார்க்கலாம்', hi: '11 से 24 Jan तक के आपके इवेंट के समय और शीर्षक एक बार देख सकता है' },
+  'fr.cal.can1': { en: 'See the times and titles of your events from {from} to {to}, once', ta: '{from} முதல் {to} வரையிலான உங்கள் நிகழ்வுகளின் நேரங்களையும் தலைப்புகளையும் ஒருமுறை பார்க்கலாம்', hi: '{from} से {to} तक के आपके इवेंट के समय और शीर्षक एक बार देख सकता है' },
   'fr.cal.cannot': { en: 'Joy OS cannot', ta: 'Joy OS செய்ய முடியாதது', hi: 'Joy OS नहीं कर सकता' },
   'fr.cal.cannot1': { en: 'Create, change or delete events', ta: 'நிகழ்வுகளை உருவாக்க, மாற்ற அல்லது நீக்க', hi: 'इवेंट बनाना, बदलना या हटाना' },
   'fr.cal.cannot2': { en: 'Invite, email or share with anyone', ta: 'யாரையும் அழைக்க, மின்னஞ்சல் அனுப்ப அல்லது பகிர', hi: 'किसी को बुलाना, ईमेल करना या शेयर करना' },
@@ -508,7 +531,7 @@ export const SP = {
   'fr.cal.turnOn': { en: 'Turn calendar back on in the Trust centre', ta: 'நம்பிக்கை மையத்தில் காலண்டரை மீண்டும் இயக்கு', hi: 'ट्रस्ट सेंटर में कैलेंडर फिर चालू करें' },
   'fr.cal.deleteSummary': { en: 'Disconnect and delete the summary', ta: 'துண்டித்துச் சுருக்கத்தை நீக்கு', hi: 'डिस्कनेक्ट करें और सारांश हटाएँ' },
   'fr.ta.rerun': { en: 'Run again in two weeks', ta: 'இரண்டு வாரங்களில் மீண்டும் செய்', hi: 'दो हफ़्ते बाद फिर चलाएँ' },
-  'fr.ta.scheduled': { en: 'Scheduled for 7 Feb. We will ask again before reading.', ta: '7 Feb-க்குத் திட்டமிடப்பட்டது. படிக்கும் முன் மீண்டும் கேட்போம்.', hi: '7 Feb के लिए तय। पढ़ने से पहले फिर पूछेंगे।' },
+  'fr.ta.scheduled': { en: 'Scheduled for {d}. We will ask again before reading.', ta: '{d}-க்குத் திட்டமிடப்பட்டது. படிக்கும் முன் மீண்டும் கேட்போம்.', hi: '{d} के लिए तय। पढ़ने से पहले फिर पूछेंगे।' },
   'fr.no.eyebrow': { en: 'The No list · this quarter', ta: '“வேண்டாம்” பட்டியல் · இந்தக் காலாண்டு', hi: '“ना” की सूची · इस तिमाही' },
   'fr.no.title': { en: 'Three things to stop', ta: 'நிறுத்த வேண்டிய மூன்று விஷயங்கள்', hi: 'छोड़ने लायक तीन चीज़ें' },
   'fr.no.sub': { en: 'Freedom grows when something goes. Write three things you will stop doing until the Day 90 re-measure. Your coach can see that you made it, not what is on it.', ta: 'ஏதாவது விலகும்போது சுதந்திரம் வளர்கிறது. நாள் 90 மறு அளவீடு வரை நீங்கள் செய்வதை நிறுத்தப்போகும் மூன்று விஷயங்களை எழுதுங்கள். நீங்கள் பட்டியல் போட்டீர்கள் என்பது மட்டுமே உங்கள் பயிற்சியாளருக்குத் தெரியும், அதில் என்ன உள்ளது என்பதல்ல.', hi: 'कुछ छूटता है तो स्वतंत्रता बढ़ती है। तीन चीज़ें लिखिए जो आप दिन 90 के दोबारा माप तक नहीं करेंगे। आपके कोच देख सकते हैं कि आपने सूची बनाई, यह नहीं कि उसमें क्या है।' },
@@ -581,13 +604,22 @@ export const SP = {
   'pl.pp.with': { en: 'With (optional)', ta: 'யாருடன் (விருப்பம்)', hi: 'किसके साथ (वैकल्पिक)' },
   'pl.pp.length': { en: 'Length', ta: 'நீளம்', hi: 'अवधि' },
   'pl.pp.schedule': { en: 'Schedule it', ta: 'நேரம் குறி', hi: 'तय करें' },
-  'pl.pp.added': { en: '{dt} added to Google Calendar, {m} minutes{with}. The {slot} Ledger prompt will ask how it was.', ta: '{dt} Google Calendar-இல் சேர்க்கப்பட்டது, {m} நிமிடங்கள்{with}. அது எப்படி இருந்தது என்று {slot} லெட்ஜர் கேள்வி கேட்கும்.', hi: '{dt} Google Calendar में जोड़ा गया, {m} मिनट{with}। {slot} का लेजर सवाल पूछेगा कि कैसा रहा।' },
+  'pl.pp.added': { en: '{dt} added to {cal}, {m} minutes{with}. The {slot} Ledger prompt will ask how it was.', ta: '{dt} {cal}-இல் சேர்க்கப்பட்டது, {m} நிமிடங்கள்{with}. அது எப்படி இருந்தது என்று {slot} லெட்ஜர் கேள்வி கேட்கும்.', hi: '{dt} {cal} में जोड़ा गया, {m} मिनट{with}। {slot} का लेजर सवाल पूछेगा कि कैसा रहा।' },
+  'pl.pp.addedApp': { en: '{dt} kept in the app, {m} minutes{with}; no calendar was told. The {slot} Ledger prompt will ask how it was.', ta: '{dt} செயலியில் வைக்கப்பட்டது, {m} நிமிடங்கள்{with}; எந்தக் காலண்டருக்கும் தெரிவிக்கப்படவில்லை. அது எப்படி இருந்தது என்று {slot} லெட்ஜர் கேள்வி கேட்கும்.', hi: '{dt} ऐप में रखा गया, {m} मिनट{with}; किसी कैलेंडर को नहीं बताया गया। {slot} का लेजर सवाल पूछेगा कि कैसा रहा।' },
   'pl.pp.withX': { en: ', with {who}', ta: ', {who}-உடன்', hi: ', {who} के साथ' },
-  'pl.pp.removed': { en: 'Removed from {day} and from your calendar.', ta: '{day}-இலிருந்தும் உங்கள் காலண்டரிலிருந்தும் நீக்கப்பட்டது.', hi: '{day} से और आपके कैलेंडर से हटाया गया।' },
+  'pl.pp.removed': { en: 'Removed from {day} and from {cal}.', ta: '{day}-இலிருந்தும் {cal}-இலிருந்தும் நீக்கப்பட்டது.', hi: '{day} से और {cal} से हटाया गया।' },
+  'pl.pp.removedApp': { en: 'Removed from {day}.', ta: '{day}-இலிருந்து நீக்கப்பட்டது.', hi: '{day} से हटाया गया।' },
   'pl.pp.errName': { en: 'Name the pleasure. Small is good.', ta: 'மகிழ்ச்சிக்கு ஒரு பெயர் வையுங்கள். சிறியதே நல்லது.', hi: 'आनंद का नाम लिखिए। छोटा भी अच्छा है।' },
   'pl.pp.errTaken': { en: '{day} already has one. One a day is the point.', ta: '{day}-இல் ஏற்கனவே ஒன்று உள்ளது. நாளுக்கு ஒன்றுதான் நோக்கம்.', hi: '{day} में पहले से एक है। रोज़ एक ही असली बात है।' },
   'pl.pp.dotWith': { en: ' · with {who}', ta: ' · {who}-உடன்', hi: ' · {who} के साथ' },
-  'pl.pp.calNote': { en: 'Planned pleasures go to Google Calendar, as you allowed. Nothing else is read.', ta: 'நீங்கள் அனுமதித்தபடி, திட்டமிட்ட மகிழ்ச்சிகள் Google Calendar-க்குச் செல்கின்றன. வேறு எதுவும் படிக்கப்படுவதில்லை.', hi: 'आपकी इजाज़त के मुताबिक़, तय किए आनंद Google Calendar में जाते हैं। और कुछ नहीं पढ़ा जाता।' },
+  'pl.pp.calNote': { en: 'Planned pleasures go to {cal}, as you allowed in the Trust centre. Nothing else is read.', ta: 'நம்பிக்கை மையத்தில் நீங்கள் அனுமதித்தபடி, திட்டமிட்ட மகிழ்ச்சிகள் {cal}-க்குச் செல்கின்றன. வேறு எதுவும் படிக்கப்படுவதில்லை.', hi: 'ट्रस्ट सेंटर में आपकी इजाज़त के मुताबिक़, तय किए आनंद {cal} में जाते हैं। और कुछ नहीं पढ़ा जाता।' },
+  'pl.pp.calNoteApp': { en: 'Planned pleasures stay in the app. No calendar is written to or read.', ta: 'திட்டமிட்ட மகிழ்ச்சிகள் செயலியிலேயே இருக்கும். எந்தக் காலண்டரிலும் எழுதப்படுவதோ படிக்கப்படுவதோ இல்லை.', hi: 'तय किए आनंद ऐप में ही रहते हैं। किसी कैलेंडर में न लिखा जाता है, न पढ़ा जाता है।' },
+  'pl.pp.noCal': { en: 'No calendar is connected, so this stays in the app. You can connect Google Calendar or Outlook in Freedom.', ta: 'எந்தக் காலண்டரும் இணைக்கப்படவில்லை, அதனால் இது செயலியிலேயே இருக்கும். சுதந்திரம் இடத்தில் Google Calendar அல்லது Outlook-ஐ இணைக்கலாம்.', hi: 'कोई कैलेंडर जुड़ा नहीं है, इसलिए यह ऐप में ही रहेगा। आप आज़ादी में Google Calendar या Outlook जोड़ सकते हैं।' },
+  'pl.pp.calOff': { en: 'Your calendar consent is off in the Trust centre, so this stays in the app. Nothing is sent to a calendar.', ta: 'நம்பிக்கை மையத்தில் உங்கள் காலண்டர் ஒப்புதல் அணைக்கப்பட்டுள்ளது, அதனால் இது செயலியிலேயே இருக்கும். எந்தக் காலண்டருக்கும் எதுவும் அனுப்பப்படாது.', hi: 'ट्रस्ट सेंटर में आपकी कैलेंडर सहमति बंद है, इसलिए यह ऐप में ही रहेगा। किसी कैलेंडर में कुछ नहीं भेजा जाता।' },
+  'pl.pp.connect': { en: 'Connect a calendar', ta: 'ஒரு காலண்டரை இணை', hi: 'कैलेंडर जोड़ें' },
+  'pl.pp.turnOn': { en: 'Turn it on in the Trust centre', ta: 'நம்பிக்கை மையத்தில் இயக்கு', hi: 'ट्रस्ट सेंटर में चालू करें' },
+  'pl.pp.appOnly': { en: 'Keep it in the app only', ta: 'செயலியில் மட்டும் வை', hi: 'सिर्फ़ ऐप में रखें' },
+  'pl.pp.appOnlyOn': { en: 'Kept in the app only', ta: 'செயலியில் மட்டும் வைக்கப்படுகிறது', hi: 'सिर्फ़ ऐप में रखा जा रहा है' },
   'pl.sv.eyebrow': { en: 'Savouring · after Bryant', ta: 'ரசித்தல் · Bryant-ஐ ஒட்டி', hi: 'रस लेना · Bryant के आधार पर' },
   'pl.sv.title': { en: 'One prompt at a time', ta: 'ஒரு நேரத்தில் ஒரு கேள்வி', hi: 'एक बार में एक सुझाव' },
   'pl.sv.sub': { en: 'Savouring is a skill: staying with a good moment a little longer than you would. These are the six ways the research names.', ta: 'ரசித்தல் ஒரு திறமை: ஒரு நல்ல தருணத்தோடு வழக்கத்தைவிடச் சற்று அதிக நேரம் இருப்பது. ஆய்வுகள் குறிப்பிடும் ஆறு வழிகள் இவை.', hi: 'रस लेना एक हुनर है: किसी अच्छे पल के साथ आम से थोड़ा ज़्यादा देर ठहरना। ये वे छह तरीक़े हैं जो शोध बताता है।' },
@@ -772,6 +804,12 @@ export const SP = {
   // ─── Pleasure · captions and the share list ─────────────────────────────
   'pl.fm.cc': { en: 'Captions', ta: 'வசனங்கள்', hi: 'कैप्शन' },
   'pl.fm.captionsOff': { en: 'Captions off', ta: 'வசனங்கள் அணைப்பில்', hi: 'कैप्शन बंद' },
+  'pl.fm.takenBackOff1': { en: '#MyMomentOfJoy is off. {n} shared moment was taken back.', ta: '#MyMomentOfJoy அணைக்கப்பட்டது. பகிர்ந்த {n} தருணம் திரும்பப் பெறப்பட்டது.', hi: '#MyMomentOfJoy बंद है। साझा किया {n} पल वापस ले लिया गया।' },
+  'pl.fm.takenBackOff': { en: '#MyMomentOfJoy is off. {n} shared moments were taken back.', ta: '#MyMomentOfJoy அணைக்கப்பட்டது. பகிர்ந்த {n} தருணங்கள் திரும்பப் பெறப்பட்டன.', hi: '#MyMomentOfJoy बंद है। साझा किए {n} पल वापस ले लिए गए।' },
+  'pl.fm.takenBackPub1': { en: 'Your Publishing consent was withdrawn, so {n} shared moment was taken back.', ta: 'உங்கள் வெளியீட்டு ஒப்புதல் திரும்பப் பெறப்பட்டதால், பகிர்ந்த {n} தருணம் திரும்பப் பெறப்பட்டது.', hi: 'आपकी प्रकाशन सहमति वापस ली गई, इसलिए साझा किया {n} पल वापस ले लिया गया।' },
+  'pl.fm.takenBackPub': { en: 'Your Publishing consent was withdrawn, so {n} shared moments were taken back.', ta: 'உங்கள் வெளியீட்டு ஒப்புதல் திரும்பப் பெறப்பட்டதால், பகிர்ந்த {n} தருணங்கள் திரும்பப் பெறப்பட்டன.', hi: 'आपकी प्रकाशन सहमति वापस ली गई, इसलिए साझा किए {n} पल वापस ले लिए गए।' },
+  'pl.fm.pubOff': { en: 'Your Publishing consent is off in the Trust centre, so nothing can be shared. Turn it on there to share a moment.', ta: 'நம்பிக்கை மையத்தில் உங்கள் வெளியீட்டு ஒப்புதல் அணைக்கப்பட்டுள்ளது, அதனால் எதையும் பகிர முடியாது. ஒரு தருணத்தைப் பகிர அங்கே அதை இயக்குங்கள்.', hi: 'ट्रस्ट सेंटर में आपकी प्रकाशन सहमति बंद है, इसलिए कुछ भी साझा नहीं हो सकता। कोई पल साझा करने के लिए उसे वहाँ चालू करें।' },
+  'pl.fm.pubTurnOn': { en: 'Open the Trust centre', ta: 'நம்பிக்கை மையத்தைத் திற', hi: 'ट्रस्ट सेंटर खोलें' },
   'pl.fm.none': { en: 'No Ledger moments this week yet.', ta: 'இந்த வாரம் இன்னும் லெட்ஜர் தருணங்கள் இல்லை.', hi: 'इस हफ़्ते अभी कोई लेजर पल नहीं।' },
 
   // ─── Ease · journal, retakes and routing tasks ──────────────────────────
@@ -1004,7 +1042,7 @@ export const DT: Record<string, T2> = {
   '6 h 40 m average': { ta: 'சராசரி 6 h 40 m', hi: 'औसत 6 h 40 m' },
   'Self-report': { ta: 'சுய அறிக்கை', hi: 'ख़ुद की जानकारी' },
   Clinic: { ta: 'கிளினிக்', hi: 'क्लिनिक' },
-  'Panel · Jan': { ta: 'பேனல் · Jan', hi: 'पैनल · Jan' },
+  Panel: { ta: 'பேனல்', hi: 'पैनल' },
   'Home cuff': { ta: 'வீட்டு BP கருவி', hi: 'घर की BP मशीन' },
   'Ideal is a MEPA score of 15–16: vegetables, fruit, whole grains, nuts, fish; little sugar and fried food.': { ta: 'சிறப்பு நிலை MEPA 15–16: காய்கறிகள், பழங்கள், முழு தானியங்கள், கொட்டைகள், மீன்; குறைவான சர்க்கரை, பொரித்த உணவு.', hi: 'आदर्श है MEPA स्कोर 15–16: सब्ज़ियाँ, फल, साबुत अनाज, मेवे, मछली; कम चीनी और कम तला हुआ।' },
   'Ideal is 150 minutes or more of moderate activity a week.': { ta: 'சிறப்பு நிலை: வாரத்துக்கு 150 நிமிடங்கள் அல்லது அதற்கு மேல் மிதமான உடற்செயல்பாடு.', hi: 'आदर्श है हफ़्ते में 150 मिनट या ज़्यादा मध्यम गतिविधि।' },
@@ -1091,13 +1129,10 @@ export const DT: Record<string, T2> = {
   // People · circle of eight and Connections
   'Monday 7 pm': { ta: 'திங்கள் இரவு 7 மணி', hi: 'सोमवार शाम 7 बजे' },
   'Connections salon · Food & memory': { ta: 'சந்திப்புக் கலந்துரையாடல் · உணவும் நினைவும்', hi: 'मुलाक़ात महफ़िल · खाना और यादें' },
-  'Thu 4 Mar · 19:30': { ta: 'வியாழன் 4 Mar · 19:30', hi: 'गुरु 4 Mar · 19:30' },
   'Twelve members · hosted by Ravi Shankar': { ta: 'பன்னிரண்டு உறுப்பினர்கள் · நடத்துபவர் Ravi Shankar', hi: 'बारह सदस्य · मेज़बान Ravi Shankar' },
   'Sunrise walk · Elliot’s Beach': { ta: 'சூரிய உதய நடை · Elliot’s Beach', hi: 'सूर्योदय की सैर · Elliot’s Beach' },
-  'Sun 7 Feb · 06:15': { ta: 'ஞாயிறு 7 Feb · 06:15', hi: 'रवि 7 Feb · 06:15' },
   'Eight members of the Fairmont cohort': { ta: 'Fairmont குழுவின் எட்டு உறுப்பினர்கள்', hi: 'Fairmont बैच के आठ सदस्य' },
   'Couples supper · Lovecation alumni': { ta: 'தம்பதியர் இரவு விருந்து · Lovecation முன்னாள் பங்கேற்பாளர்கள்', hi: 'जोड़ों का डिनर · Lovecation के पुराने साथी' },
-  'Sat 20 Feb · 20:00': { ta: 'சனி 20 Feb · 20:00', hi: 'शनि 20 Feb · 20:00' },
   'Six couples': { ta: 'ஆறு தம்பதிகள்', hi: 'छह जोड़े' },
 
   // Freedom · whose time, the No list suggestions, peace of mind
@@ -1265,6 +1300,11 @@ export function fmtDayMonth(iso: string, lang: Lang) {
   return fmtParts(iso, lang, { day: '2-digit', month: 'short' })
 }
 
+/** 'Thu 4 Mar' · 'வியா., 4 மார்.' · 'गुरु, 4 मार्च', a calendar day with its weekday. */
+export function fmtWeekdayDayMonth(iso: string, lang: Lang) {
+  return fmtParts(iso, lang, { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
 /** 'Jan 2027' in the member's language. */
 export function fmtMonthYear(iso: string, lang: Lang) {
   return fmtParts(iso, lang, { month: 'short', year: 'numeric' })
@@ -1293,5 +1333,9 @@ export function useSpaceText() {
   const dm = (iso: string) => fmtDayMonth(iso, lang)
   const my = (iso: string) => fmtMonthYear(iso, lang)
   const clock = (iso: string) => fmtClock(iso, lang)
-  return { lang, t, tt, d, r, day, dm, my, clock }
+  /** Weekday, day and month ('Thu 4 Mar') for a calendar day. */
+  const wdm = (iso: string) => fmtWeekdayDayMonth(iso, lang)
+  /** Short month alone ('Jan') for a calendar day. */
+  const mon = (iso: string) => fmtParts(iso, lang, { month: 'short' })
+  return { lang, t, tt, d, r, day, dm, my, clock, wdm, mon }
 }

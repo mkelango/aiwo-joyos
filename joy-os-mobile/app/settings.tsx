@@ -11,7 +11,7 @@ import { MEMBER } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
 import { PLANS } from '@/screens/b/_data'
 import { a11yStore, accountStore, lockStore, notifPrefsStore, onboardingStore, sessionStore, useStore, validatePrefs, type LockState } from '@/screens/b/bStore'
-import { ChoiceCard, TimeStepper, memberOnly } from '@/screens/b/parts'
+import { ChoiceCard, NumberSegmented, TimeStepper, memberOnly, useAccount } from '@/screens/b/parts'
 
 // SETTINGS: language (English · தமிழ் · हिन्दी), theme (follows the system by default),
 // text size on top of Dynamic Type, notifications with quiet hours (never more than three a
@@ -69,6 +69,7 @@ function Settings() {
     setPkNote(ts('pkAdded'))
   }
   const [acct] = useStore(accountStore)
+  const account = useAccount()
   // The same preferences onboarding and Notifications use, kept on this phone.
   const [prefs, setPrefs] = useStore(notifPrefsStore)
   const [, setSession] = useStore(sessionStore)
@@ -104,7 +105,7 @@ function Settings() {
     setSaved(true)
   }
   const signOut = () => {
-    setSession({ signedIn: false, onboarded: true })
+    setSession((s) => ({ ...s, signedIn: false, onboarded: true }))
     setOutOpen(false)
     router.replace('/welcome')
   }
@@ -321,13 +322,14 @@ function Settings() {
 
         <Card tone="raised" style={{ gap: space.s2 }}>
           <Eyebrow>{tc('remindersADay')}</Eyebrow>
-          <Segmented<string>
-            value={String(perDay)}
+          <NumberSegmented
+            value={perDay}
             onChange={(v) => {
-              setPerDay(Number(v))
+              setPerDay(v)
               touch()
             }}
-            items={['0', '1', '2', '3'].map((n) => ({ value: n, label: n }))}
+            items={[0, 1, 2, 3]}
+            label={tc('remindersADay')}
           />
           <Meta>{tc(perDayKey(perDay))}</Meta>
           <Divider />
@@ -389,7 +391,7 @@ function Settings() {
             }}
           />
           <Divider />
-          <ListRow icon="sun" title={ts('welcome')} sub={ts('welcomeSub')} onPress={() => router.push('/welcome')} />
+          <ListRow icon="sun" title={ts('welcome')} sub={ts('welcomeSub')} onPress={() => router.push('/welcome?preview=1')} />
           <Divider />
           <ListRow icon="check-circle" title={ts('check')} sub={ts('checkSub')} onPress={() => router.push('/check')} />
           <Divider />
@@ -403,7 +405,7 @@ function Settings() {
 
       <View style={{ gap: 4, alignItems: 'center' }}>
         <Meta size={13} tone="ink3">
-          AIWO ID <Mono size={13} tone="ink3">{MEMBER.aiwoId}</Mono>
+          AIWO ID <Mono size={13} tone="ink3">{account.aiwoId}</Mono>
         </Meta>
         <Meta size={13} tone="ink3">
           Joy OS <Mono size={13} tone="ink3">1.0.0</Mono>{ts('indexMethod')}<Mono size={13} tone="ink3">v1.0</Mono>

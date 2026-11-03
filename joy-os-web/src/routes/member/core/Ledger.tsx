@@ -5,14 +5,20 @@ import { useEffect, useId, useMemo, useRef, useState, type ChangeEvent } from 'r
 import { Link } from 'react-router-dom'
 import { Bar, BarChart, LabelList, ResponsiveContainer, XAxis, YAxis } from 'recharts'
 import { DaybreakButton, Eyebrow, MethodLine, SpecimenTag, TermChip } from '@/components/joy/primitives'
-import { Button, Card, EmptyState, PageHeader, Pill, SectionTitle } from '@/components/ui'
+import { Button, Card, PageHeader, Pill, SectionTitle } from '@/components/ui'
 import { INDEX_HISTORY, LEDGER, LEDGER_TAGS, MEMBER } from '@/data/member'
 import type { LedgerEntry } from '@/domain/types'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { useT } from '@/lib/i18n'
 import { LEDGER_CALENDAR, LEDGER_SCHEDULE, LEDGER_STORY } from './_data'
 import { Provenance, Switch, TICK } from './_parts'
-import { SPECIMEN_TODAY, addDays, isSeed, liveLedger, useLedgerRemoved, useLocal, weekCounts, weekEntryCount, type ScheduleRow } from './_store'
+import { SPECIMEN_TODAY, addDays, isSeed, liveLedger, localDay, useKeptPrompts, useLedgerRemoved, useLocal, usePlannedPleasures, weekCounts, weekEntryCount, type ScheduleRow } from './_store'
+import { useX } from './_i18nX'
+import { formulaText } from './_extra'
+import { EmptyIllustration } from '@/components/joy/EmptyIllustration'
+import { termByKey } from '@/data/terms'
+import { PLANNED_START } from '@/routes/member/spaces/_data'
+import { useSpaceText } from '@/routes/member/spaces/_i18n'
 import { SCHEDULE_LABEL, STORY_TEXT, fmtLocal, rich, useCore } from './_i18n'
 import type { Lang } from '@/lib/store'
 import { playSound } from '@/lib/sound'
@@ -80,7 +86,7 @@ export default function Ledger() {
   const d = latest.terms.find((t) => t.key === 'D')!
   const { active, current, next } = promptState(rows)
   const prompt: 1 | 2 | 3 = current?.prompt ?? 1
-  const { t: c, name, space } = useCore()
+  const { t: c, name, space, lang } = useCore()
 
   return (
     <div>
@@ -99,6 +105,8 @@ export default function Ledger() {
         <PromptCard prompt={prompt} time={current?.time} next={next} live={live} />
         <ScheduleCard rows={rows} setRows={setRows} />
       </div>
+
+      <FollowUps />
 
       <div className="mt-6 grid gap-6 lg:mt-8 lg:grid-cols-2 lg:gap-8">
         <WeekCard ledger={ledger} removed={removed} />
@@ -131,7 +139,7 @@ export default function Ledger() {
               <span className="num text-[2rem] font-light text-ink">{d.value}</span>
             </div>
             <p className="mt-3 text-[15px] text-ink-2">
-              {rich(c('lgFeeds'), { term: name('D'), f: <span className="num text-ink">D = 0.5·SPANE-B + 0.3·Joy moments + 0.2·Savouring</span> })}
+              {rich(c('lgFeeds'), { term: name('D'), f: <span className="num text-ink">{formulaText(termByKey('D').formula, lang)}</span> })}
             </p>
             <MethodLine className="mt-4" method={latest.method} grade={latest.grade} next={latest.nextMeasure} />
             <Link to="/app/spaces/pleasure" className="mt-3 inline-block text-[14px] text-ink underline-offset-4 hover:underline focus-ring">{c('openSpace', { space: space('D') })}</Link>
@@ -412,7 +420,7 @@ function WeekCard({ ledger, removed }: { ledger: LedgerEntry[]; removed: string[
           </ResponsiveContainer>
         </div>
       ) : (
-        <div className="mt-4"><EmptyState title={c('wkEmptyTitle')} body={c('wkEmptyBody')} /></div>
+        <div className="mt-4"><LedgerEmpty title={c('wkEmptyTitle')} body={c('wkEmptyBody')} /></div>
       )}
       <ul className="sr-only">
         {week.map((r) => <li key={r.tag}>{c('wkSr', { tag: tag(r.tag), n: r.count })}</li>)}
@@ -558,7 +566,7 @@ function EntriesCard({ live, onRemove, onRestore }: { live: LedgerEntry[]; onRem
       </p>
       {groups.length === 0 ? (
         <div className="mt-5">
-          <EmptyState
+          <LedgerEmpty
             title={filter ? c('enNoneTag', { tag: tag(filter) }) : c('enNone')}
             body={filter ? c('enNoneTagBody') : c('enNoneBody')}
           />
@@ -626,5 +634,150 @@ function PrivacyCard() {
       </ul>
       <Link to="/app/trust" className="eyebrow mt-4 inline-block text-ink-3 underline-offset-4 hover:text-ink hover:underline focus-ring">{tr('trust')}</Link>
     </Card>
+  )
+}
+
+// ─── Empty: the Playbook's editorial line drawing, one Daybreak fill (p51) ──
+function LedgerEmpty({ title, body }: { title: string; body?: string }) {
+  return (
+    <div className="rounded-card border border-dashed border-line-strong px-6 py-8 text-center">
+      <EmptyIllustration kind="ledger" width={140} />
+      <p className="mt-4 text-[17px] text-ink">{title}</p>
+      {body && <p className="mx-auto mt-2 max-w-md text-[15px] text-ink-2">{body}</p>}
+    </div>
+  )
+}
+
+// ─── The evening follow-up: "How was it?" (the Pleasure space's kept prompt and
+// planned pleasure, read from its own records). An answer is kept as a Ledger entry;
+// "It didn't happen" adds nothing. The word passes the crisis intercept first. ──────
+const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const EVENING = '18:00'
+const addMin = (hhmm: string, n: number) => {
+  const t = Math.min(23 * 60 + 59, toMin(hhmm) + n)
+  return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`
+}
+type Outcome = 'fuGood' | 'fuFine' | 'fuMissed'
+interface FollowUp {
+  key: string
+  kind: 'kept' | 'planned'
+  what: string
+  /** When the follow-up asks: the evening for a kept prompt, the end of a planned pleasure. */
+  asks: string
+  time?: string
+}
+
+function FollowUps() {
+  const kept = useKeptPrompts()
+  const planned = usePlannedPleasures() ?? PLANNED_START
+  const [done, setDone] = useLocal<Record<string, { outcome: Outcome; at: string }>>('ledger-followups', {})
+  const today = new Set([SPECIMEN_TODAY, localDay(new Date())])
+  const weekday = WEEKDAY[new Date(`${SPECIMEN_TODAY}T12:00:00`).getDay()]
+  const items: FollowUp[] = [
+    ...kept.filter((k) => today.has(k.date)).map((k) => ({ key: `kept:${k.date}:${k.id}`, kind: 'kept' as const, what: k.text, asks: EVENING })),
+    ...planned
+      .filter((p) => p.day === weekday)
+      .map((p) => ({ key: `planned:${SPECIMEN_TODAY}:${p.id}`, kind: 'planned' as const, what: p.what, time: p.time, asks: addMin(p.time, p.minutes || 0) })),
+  ]
+  const x = useX()
+  const { name } = useCore()
+  if (items.length === 0) return null
+  return (
+    <Card tone="soft" className="mt-6 lg:mt-8" aria-label={x('fuTitle')}>
+      <Eyebrow tone="daybreak">{x('fuEyebrow', { term: name('D') })}</Eyebrow>
+      <h2 className="mt-2 text-[1.8rem] font-light leading-tight text-ink">{x('fuTitle')}</h2>
+      <ul className="mt-4 divide-y divide-line">
+        {items.map((f) => (
+          <FollowUpRow key={f.key} f={f} done={done[f.key] ?? null} onDone={(outcome) => setDone((d) => ({ ...d, [f.key]: { outcome, at: new Date().toISOString() } }))} />
+        ))}
+      </ul>
+    </Card>
+  )
+}
+
+function FollowUpRow({ f, done, onDone }: { f: FollowUp; done: { outcome: Outcome } | null; onDone: (o: Outcome) => void }) {
+  const x = useX()
+  const { t: c, tag: tagText } = useCore()
+  const { addLedger, setCrisisOpen } = useApp()
+  const { d } = useSpaceText()
+  // A kept prompt is the product's own savouring copy, so it reads in the member's language;
+  // a planned pleasure is the member's own words and stays as written.
+  const what = f.kind === 'kept' ? d(f.what) : f.what
+  const due = nowHHMM() >= f.asks
+  const [open, setOpen] = useState(false)
+  const [outcome, setOutcome] = useState<Outcome | null>(null)
+  const [tags, setTags] = useState<string[]>([])
+  const [word, setWord] = useState('')
+  const [held, setHeld] = useState(false)
+  const wordId = useId()
+  const save = () => {
+    if (!outcome) return
+    if (outcome === 'fuMissed') return onDone(outcome)
+    const w = word.trim()
+    // Emergency intercept runs before anything else touches free text (Memo p.24).
+    if (w && interceptsCrisis(w)) {
+      setCrisisOpen(true)
+      setHeld(true)
+      return
+    }
+    // The member's own word, or the pleasure itself, kept as an evening moment.
+    addLedger({ prompt: 3, tags, word: (w || what).slice(0, 80) })
+    playSound('complete')
+    onDone(outcome)
+  }
+  return (
+    <li className="py-4 first:pt-0 last:pb-0">
+      <p className="eyebrow text-ink-3">{f.kind === 'kept' ? x('fuKept') : rich(x('fuPlanned'), { time: <span className="num">{f.time}</span> })}</p>
+      {/* The prompt or the pleasure as it was written. */}
+      <p className="mt-1 text-[17px] text-ink">{what}</p>
+      {done ? (
+        <p role="status" className="mt-2 flex items-center gap-1.5 text-[14px] text-ink-2"><Check size={14} aria-hidden /> {x(done.outcome)} · {done.outcome === 'fuMissed' ? x('fuMissedSaved') : x('fuSaved')}</p>
+      ) : !due && !open ? (
+        <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px] text-ink-3">
+          {rich(x('fuAsks'), { t: <span className="num">{f.asks}</span> })}
+          <Button variant="link" className="min-h-[24px] text-[14px]" onClick={() => setOpen(true)}>{x('fuNow')}</Button>
+        </p>
+      ) : (
+        <div className="mt-3">
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={x('fuAria', { what })}>
+            {(['fuGood', 'fuFine', 'fuMissed'] as const).map((o) => (
+              <button
+                key={o}
+                type="button"
+                role="radio"
+                aria-checked={outcome === o}
+                onClick={() => { setOutcome(o); setHeld(false) }}
+                className={clsx('inline-flex h-10 items-center gap-1.5 rounded-full border px-4 text-[15px] focus-ring', outcome === o ? 'border-ink bg-ink text-paper' : 'border-line-strong bg-paper-raised text-ink hover:bg-paper-sunk')}
+              >
+                {outcome === o && <Check size={14} aria-hidden />} {x(o)}
+              </button>
+            ))}
+          </div>
+          {outcome && outcome !== 'fuMissed' && (
+            <div className="mt-3">
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label={c('lgLegend')}>
+                {LEDGER_TAGS.map((t) => {
+                  const on = tags.includes(t)
+                  return (
+                    <button key={t} type="button" aria-pressed={on} onClick={() => setTags((ts) => (on ? ts.filter((v) => v !== t) : [...ts, t]))} className={clsx('rounded-full border px-3 py-1 text-[14px] focus-ring', on ? 'border-ink bg-ink text-paper' : 'border-line bg-paper-raised text-ink-2 hover:text-ink')}>
+                      {tagText(t)}
+                    </button>
+                  )
+                })}
+              </div>
+              <label htmlFor={wordId} className="mt-3 block text-[14px] text-ink-2">{x('fuWord')}</label>
+              <input id={wordId} value={word} onChange={(e) => { setWord(e.target.value); setHeld(false) }} maxLength={80} className="mt-1 h-11 w-full rounded-lg border border-line-strong bg-paper-raised px-3 text-[16px] text-ink focus-ring" />
+            </div>
+          )}
+          {held && (
+            <div role="status" className="mt-3 rounded-lg bg-paper-sunk px-3 py-2.5 text-[14px] text-ink-2">
+              <p>{c('lgHeld')}</p>
+              <Button variant="secondary" size="sm" className="mt-2" onClick={() => setCrisisOpen(true)}>{c('lgTalkNow')}</Button>
+            </div>
+          )}
+          <Button variant="ink" className="mt-3" onClick={save} disabled={!outcome}>{outcome === 'fuMissed' ? x('fuNoteIt') : x('fuSave')}</Button>
+        </div>
+      )}
+    </li>
   )
 }

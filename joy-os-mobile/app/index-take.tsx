@@ -2,17 +2,19 @@ import { router, useLocalSearchParams } from 'expo-router'
 import { useMemo, useState } from 'react'
 import { Linking, Pressable, View } from 'react-native'
 import {
+  ArrowLink,
   BandLabel,
   Body,
   Button,
   Card,
+  CountUp,
   DaybreakButton,
   Divider,
   Eyebrow,
   Icon,
   Meta,
   Mono,
-  Numeral,
+  Pill,
   Progress,
   Screen,
   ScreenHeader,
@@ -25,8 +27,9 @@ import {
 import { useApp } from '@/lib/store'
 import { playSound } from '@/lib/sound'
 import { REMEASURE_DATES, SIGN_OFF_MS, effectiveAnswers, useClinicalRemeasure, useSubmittedIndex, type Amendment } from '@/lib/indexRecord'
-import { isMinor, onboardingAccountStore } from '@/lib/onboardingAccount'
-import { useStore } from '@/screens/b/bStore'
+import { useIsMinor } from '@/lib/minor'
+import { useSignalsDown } from '@/screens/b/bStore'
+import { TERM_DETAIL } from '@/screens/a/coreData'
 import { BIOMARKERS } from '@/screens/a/spacesData'
 import { ALL_ITEMS, SITTINGS, scaleOf, type FlatItem } from '@/shared/indexItems'
 import { scoreAnswers, toMeasured, type MeasuredIndex, type SittingResult } from '@/shared/indexScoring'
@@ -38,7 +41,7 @@ import { termByKey } from '@/shared/terms'
 import { useTheme } from '@/theme/ThemeProvider'
 import { memberOnly } from '@/screens/b/parts'
 import { INSTRUMENT_NOTE, useDict, useLang, useTermText } from '@/lib/i18n'
-import { TAKE } from '@/screens/b/i18n/indexTake'
+import { LAB_TEXT, TAKE } from '@/screens/b/i18n/indexTake'
 import { useCommon } from '@/screens/b/i18n/common'
 import { txFor } from '@/screens/a/i18n'
 
@@ -55,6 +58,9 @@ import { txFor } from '@/screens/a/i18n'
 // Clinical grade (?grade=clinical, the Day-90 re-measure opened by the Day-76 invite): the same
 // two sittings, then the lab results, then it waits for the physician's sign-off (no number is
 // shown until she signs; see Day 90). A member under 18 is never scored (minors gate).
+// Signals (Arch p30): after the last answer, a signals check. With no device connected (or
+// every reading stale) the sitting is scored from the answers alone and flagged survey-only;
+// the member can also choose answers only. The flag travels with the measure to Index result.
 
 // The lab results that join Body in Clinical grade (specimen panel, marker names as written).
 const CLINICAL_LABS = ['HbA1c', 'LDL cholesterol', 'ApoB', 'hs-CRP', 'Vitamin D (25-OH)']
@@ -63,6 +69,7 @@ type Step =
   | { kind: 'intro' }
   | { kind: 'block'; i: number }
   | { kind: 'item'; i: number }
+  | { kind: 'signals' }
   | { kind: 'break' }
   | { kind: 'review' }
   | { kind: 'paused' }
@@ -78,8 +85,11 @@ interface Saved {
   seen: string[]
   /** Where the member stopped. */
   at: number | null
+  /** The member chose answers only for this sitting (survey-only). */
+  signalsOff?: boolean
 }
 const EMPTY: Saved = { answers: {}, seen: [], at: null }
+const ORDER_TERMS = ['H', 'P', 'R', 'F', 'D', 'B'] as const
 /** PHQ-4 care threshold: either two-item subscale (anxiety 24–25, mood 26–27) at 3 or more. */
 const phqOver = (a: Record<string, number>) => (a['phq-24'] ?? 0) + (a['phq-25'] ?? 0) >= 3 || (a['phq-26'] ?? 0) + (a['phq-27'] ?? 0) >= 3
 
@@ -90,7 +100,9 @@ function TakeIndex() {
   const { offline, setCrisisOpen, queueSync } = useApp()
   const params = useLocalSearchParams<{ amend?: string; grade?: string }>()
   const clinical = params.grade === 'clinical'
-  const [account] = useStore(onboardingAccountStore)
+  const minor = useIsMinor()
+  // Signals down: no device connected, or every reading stale (devices store, M3).
+  const signalsDown = useSignalsDown()
   const [submitted, setSubmitted] = useSubmittedIndex()
   const [rm, setRm] = useClinicalRemeasure()
   const [useLabs, setUseLabs] = useState(true)
@@ -114,6 +126,9 @@ function TakeIndex() {
   const [sentCare, setSentCare] = useState(false)
   const { answers, seen } = saved
   const answered = items.filter((x) => answers[x.item.id] !== undefined).length
+  // Survey-only: signals down, or the member chose answers only for this sitting.
+  const surveyOnly = signalsDown || !!saved.signalsOff
+  const labName = (n: string) => (lang === 'en' ? n : LAB_TEXT[n]?.[lang] ?? n)
   // Care threshold on the PHQ-4 answers so far.
   const phqHigh = phqOver(answers)
 
@@ -135,7 +150,7 @@ function TakeIndex() {
       keepAt(firstOf2)
       return setStep({ kind: 'break' })
     }
-    if (i + 1 >= items.length) return setStep({ kind: 'review' })
+    if (i + 1 >= items.length) return setStep({ kind: 'signals' })
     goTo(i + 1)
   }
   const resumeAt = () => {
@@ -176,7 +191,7 @@ function TakeIndex() {
   const itemText = (f: Flat) => (f.item.stem ? `${f.item.stem.replace('…', '')} ${f.item.text.replace('…', '')}` : f.item.text)
 
   // ── Minors gate: no scoring under 18 ─────────────────────────────────────
-  if (isMinor(account)) {
+  if (minor) {
     return (
       <Screen key="minor">
         <ScreenHeader
@@ -226,7 +241,7 @@ function TakeIndex() {
         const next = { ...submitted, amendments: [...submitted.amendments, a] }
         setSubmitted(next)
         // Rescored with every correction applied; the sent answers stay as they were.
-        const r = scoreAnswers(effectiveAnswers(next))
+        const r = scoreAnswers(effectiveAnswers(next), { surveyOnly: submitted.surveyOnly })
         setMeasured(toMeasured(r, submitted.at))
         queueSync({ id: `index-amend-${a.id}`, kind: 'index' })
         playSound('complete')
@@ -373,7 +388,7 @@ function TakeIndex() {
   if (step.kind === 'labs') {
     const labs = BIOMARKERS.filter((m) => CLINICAL_LABS.includes(m.name))
     const send = () => {
-      const r = scoreAnswers(answers)
+      const r = scoreAnswers(answers, { surveyOnly })
       setRm({
         stage: 'awaiting',
         submittedAt: new Date().toISOString(),
@@ -406,8 +421,8 @@ function TakeIndex() {
           {labs.map((m, j) => (
             <View key={m.name}>
               {j > 0 ? <Divider /> : null}
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, paddingVertical: 10 }} accessible accessibilityLabel={`${m.name}: ${m.value} ${m.unit}, ${t('labsRange', { r: m.range })}`}>
-                <Body style={{ flex: 1 }}>{m.name}</Body>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, paddingVertical: 10 }} accessible accessibilityLabel={`${labName(m.name)}: ${m.value} ${m.unit}, ${t('labsRange', { r: m.range })}`}>
+                <Body style={{ flex: 1 }}>{labName(m.name)}</Body>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Mono size={17} tone="ink">{`${m.value} ${m.unit}`}</Mono>
                   <Meta size={13} tone="ink3">
@@ -521,6 +536,15 @@ function TakeIndex() {
             <Icon name="heart" size={16} color={c.ink2} />
             <Meta style={{ flex: 1 }}>{t('threshold')}</Meta>
           </View>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Icon name="watch" size={16} color={c.ink2} />
+            <Meta style={{ flex: 1 }}>{signalsDown ? t('introSigDown') : t('introSigUp')}</Meta>
+          </View>
+          {signalsDown ? (
+            <ArrowLink icon="watch" onPress={() => router.push('/devices')}>
+              {t('sigDevices')}
+            </ArrowLink>
+          ) : null}
         </Card>
         <Meta tone="ink3">{t('allItems', { total: totalItems })}</Meta>
         <View style={{ gap: space.s1 }}>
@@ -681,6 +705,81 @@ function TakeIndex() {
     )
   }
 
+  // ── Signals beside the answers (Arch p30) ─────────────────────────────────
+  if (step.kind === 'signals') {
+    const toReview = () => {
+      setFromReview(false)
+      setStep({ kind: 'review' })
+    }
+    return (
+      <Screen key={stepKey}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <Pressable onPress={() => setStep({ kind: 'item', i: items.length - 1 })} accessibilityRole="button" accessibilityLabel={t('previous')} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44 }}>
+            <Icon name="chevron-left" size={18} color={c.ink3} />
+            <Eyebrow>{tc('back')}</Eyebrow>
+          </Pressable>
+          <Pressable onPress={pause} accessibilityRole="button" accessibilityLabel={t('pauseA11y')} hitSlop={8} style={{ minHeight: 44, justifyContent: 'center' }}>
+            <Eyebrow tone="ink2">{t('pause')}</Eyebrow>
+          </Pressable>
+        </View>
+        <Progress value={items.length} max={items.length} color={c.ink} label={t('answeredOf', { n: answered, total: items.length })} />
+        <ScreenHeader
+          eyebrow={t('sigEyebrow')}
+          title={
+            <>
+              {t('sigA')}<Serif>{t('sigSerif')}</Serif>{t('sigB')}
+            </>
+          }
+          lead={t('sigLead')}
+        />
+        {signalsDown ? (
+          <Card tone="sunk" style={{ gap: space.s1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <Icon name="watch" size={18} color={c.ink} />
+              <Body weight="semibold" style={{ flexShrink: 1 }}>{t('sigDownTitle')}</Body>
+              <Pill>{t('surveyOnlyTag')}</Pill>
+            </View>
+            <Meta tone="ink">{t('sigDownBody')}</Meta>
+            <ArrowLink icon="watch" onPress={() => router.push('/devices')}>
+              {t('sigDevices')}
+            </ArrowLink>
+          </Card>
+        ) : (
+          <Card tone="raised" style={{ gap: space.s1 }}>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Icon name="watch" size={18} color={c.ink} />
+              <Meta tone="ink" style={{ flex: 1 }}>{t('sigUpBody')}</Meta>
+            </View>
+            <Toggle checked={!saved.signalsOff} onChange={(on) => setSaved((x) => ({ ...x, signalsOff: !on }))} label={t('sigUse')} description={t('sigUseD')} />
+          </Card>
+        )}
+        <Card tone="raised" style={{ gap: 4 }}>
+          {ORDER_TERMS.map((k, j) => {
+            const pct = surveyOnly ? 0 : TERM_DETAIL[k].signals
+            return (
+              <View key={k}>
+                {j > 0 ? <Divider /> : null}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 }} accessible accessibilityLabel={pct ? t('sigShareA11y', { space: tt.space(k), pct }) : `${tt.space(k)}: ${t('sigNone')}`}>
+                  <TermChip term={k} />
+                  <View style={{ flex: 1 }} />
+                  {pct ? (
+                    <Meta size={14} tone="ink">
+                      <Mono size={14} tone="ink">{`${pct}%`}</Mono>
+                      {t('sigShareB')}
+                    </Meta>
+                  ) : (
+                    <Meta size={14} tone="ink3">{t('sigNone')}</Meta>
+                  )}
+                </View>
+              </View>
+            )
+          })}
+        </Card>
+        <DaybreakButton onPress={toReview}>{t('sigContinue')}</DaybreakButton>
+      </Screen>
+    )
+  }
+
   // ── Between sittings ─────────────────────────────────────────────────────
   if (step.kind === 'break') {
     return (
@@ -756,6 +855,24 @@ function TakeIndex() {
         />
         {phqHigh ? careCard : null}
         {note}
+        <Card tone="raised" style={{ gap: 4 }}>
+          <Pressable
+            onPress={() => setStep({ kind: 'signals' })}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('sigReview')}: ${surveyOnly ? t('sigReviewOff') : t('sigReviewOn')}. ${t('change')}`}
+            style={({ pressed }) => ({ gap: 4, paddingVertical: 4, opacity: pressed ? 0.7 : 1 })}
+          >
+            <Eyebrow {...H2}>{t('sigReview')}</Eyebrow>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <Meta tone="ink" weight="semibold" style={{ flexShrink: 1 }}>
+                {surveyOnly ? t('sigReviewOff') : t('sigReviewOn')}
+              </Meta>
+              <Meta size={14} tone="ink2" style={{ textDecorationLine: 'underline' }}>
+                {t('change')}
+              </Meta>
+            </View>
+          </Pressable>
+        </Card>
         {SITTINGS.map((s) => (
           <Card key={s.n} tone="raised" style={{ gap: space.s1 }}>
             <Eyebrow {...H2}>{t('sittingTitle', { n: s.n, title: ax(s.title) })}</Eyebrow>
@@ -801,10 +918,10 @@ function TakeIndex() {
               // Clinical grade: the labs come next, then it goes for sign-off unscored to the member.
               if (clinical) return setStep({ kind: 'labs' })
               // Scored here by the engine and kept on the phone: the newest entry on Index result.
-              const r = scoreAnswers(answers)
+              const r = scoreAnswers(answers, { surveyOnly })
               setMeasured(toMeasured(r, SPACE_TODAY))
               // The answers as sent, frozen with the score: corrections are appended later.
-              setSubmitted({ at: SPACE_TODAY, answers, amendments: [] })
+              setSubmitted({ at: SPACE_TODAY, answers, amendments: [], ...(r.surveyOnly ? { surveyOnly: true } : {}) })
               setResult(r)
               // Offline: the sitting waits in the sync queue (the app-wide banner counts it).
               queueSync({ id: `index-${SPACE_TODAY}`, kind: 'index' })
@@ -852,14 +969,16 @@ function TakeIndex() {
       {result ? (
         <Card tone="raised" style={{ gap: space.s1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.s2 }}>
-            <Numeral size={64} accessibilityLabel={t('resultIdxA11y', { v: result.engine.value })}>
-              {result.engine.value}
-            </Numeral>
-            <View style={{ paddingBottom: 8 }}>
+            <View accessible accessibilityLabel={t('resultIdxA11y', { v: result.engine.value })}>
+              <CountUp value={result.engine.value} size={64} />
+            </View>
+            <View style={{ paddingBottom: 8, gap: 4 }}>
               <BandLabel band={bandFor(result.engine.value)} />
+              {result.surveyOnly ? <Pill>{t('surveyOnlyTag')}</Pill> : null}
             </View>
           </View>
           <Meta>{t('resultLine', { v: result.engine.value, name: tt.name(result.lowest) })}</Meta>
+          {result.surveyOnly ? <Meta size={14}>{t('surveyOnlyDone')}</Meta> : null}
           {offline ? <Meta size={14} tone="ink3">{t('queuedOffline')}</Meta> : null}
         </Card>
       ) : null}

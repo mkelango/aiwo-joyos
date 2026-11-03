@@ -1,12 +1,13 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Check, Clock, CloudOff, Droplet, Hourglass, Pencil, ShieldCheck, Timer, Watch, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, CircleDashed, Clock, CloudOff, Droplet, Hourglass, Pencil, ShieldCheck, Timer, Watch, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { AiwoMark } from '@/components/joy/Brand'
 import { JoyspanWheel, WheelGhostKey } from '@/components/joy/JoyspanWheel'
 import { playSound } from '@/lib/sound'
-import { BandLabel, DaybreakButton, Delta, Eyebrow, MethodLine, SpecimenTag, TermChip, TermDot } from '@/components/joy/primitives'
+import { BandLabel, DaybreakButton, Delta, Eyebrow, MethodLine, SpecimenTag, TermChip, TermDot, useBandText, useFmtDate } from '@/components/joy/primitives'
+import { CountUp } from '@/components/joy/CountUp'
 import { Button, Card, Pill, Progress } from '@/components/ui'
 import { INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
 import { termByKey, termColor } from '@/data/terms'
@@ -14,8 +15,9 @@ import { bandFor } from '@/domain/indexEngine'
 import type { TermKey } from '@/domain/types'
 import { SIGNAL_READINGS, SITTINGS, TERM_DETAIL, type InstrumentBlock, type SampleItem } from './_data'
 import { HumanWritten, Switch } from './_parts'
-import { ALL_SIGNAL_IDS, ORDER, WEARABLE_SIGNAL_IDS, isWearableSignal, scaleOf, scoreAnswers, signalId, signalSources } from './_scoring'
-import { IN_REMEASURE_WINDOW, REMEASURE_OPENS, REMEASURE_TAKEN, SPECIMEN_TODAY, addDays, useMeasured, useRemeasure, useSignalsDown } from './_store'
+import { ALL_SIGNAL_IDS, ITEM_TERM, ORDER, WEARABLE_SIGNAL_IDS, isWearableSignal, scaleOf, scoreAnswers, signalId, signalSources, withoutSkipped } from './_scoring'
+import { IN_REMEASURE_WINDOW, REMEASURE_OPENS, REMEASURE_TAKEN, SPECIMEN_TODAY, addDays, amendedAnswers, useMeasured, useRemeasure, useSignalsDown, type Amendment } from './_store'
+import { specimenNow } from './_amend'
 import { DAY90_DATES } from './_data'
 import { SIGNER } from './_remeasure'
 import { useX } from './_i18nX'
@@ -79,13 +81,15 @@ interface Draft {
   confirmed: number[]
   savedAt: string
   clinical?: ClinicalParts
+  /** Terms skipped for now: their items are passed over and the term is not yet measured. */
+  skipped?: TermKey[]
 }
 function readDraft(key: string = DRAFT_KEY): Draft | null {
   try {
     const raw = localStorage.getItem(key)
     if (!raw) return null
     const d = JSON.parse(raw) as Partial<Draft>
-    return { cursor: d.cursor ?? 0, answers: d.answers ?? {}, stage: d.stage === 'review' ? 'review' : 'step', signalsOff: d.signalsOff ?? [], confirmed: d.confirmed ?? [], savedAt: d.savedAt ?? '', clinical: d.clinical ? { ...NO_CLINICAL, ...d.clinical } : undefined }
+    return { cursor: d.cursor ?? 0, answers: d.answers ?? {}, stage: d.stage === 'review' ? 'review' : 'step', signalsOff: d.signalsOff ?? [], confirmed: d.confirmed ?? [], savedAt: d.savedAt ?? '', clinical: d.clinical ? { ...NO_CLINICAL, ...d.clinical } : undefined, skipped: Array.isArray(d.skipped) ? d.skipped.filter((k) => ORDER.includes(k)) : [] }
   } catch {
     return null
   }
@@ -107,6 +111,9 @@ export default function TakeIndex() {
   // Decided on arrival only: submitting moves the record on, and the scoring screen must stay.
   const [gate] = useState<null | 'closed' | 'submitted'>(() => (!clinical ? null : !rec ? 'closed' : rec.status === 'awaiting' || rec.status === 'signed' ? 'submitted' : null))
   if (gate) return <ClinicalGate submitted={gate === 'submitted'} />
+  // A term skipped at the sitting, measured later (/app/index/take?term=F).
+  const term = params.get('term') as TermKey | null
+  if (!clinical && term && ORDER.includes(term)) return <TermFlow term={term} key={term} />
   return <TakeFlow clinical={clinical} key={clinical ? 'clinical' : 'index'} onClinicalStart={() => setRec((r) => (r && r.status === 'invited' ? { ...r, status: 'in-progress', startedAt: new Date().toISOString() } : r))} onClinicalSubmit={(patch) => setRec((r) => (r ? { ...r, ...patch } : r))} x={x} />
 }
 
@@ -149,6 +156,7 @@ function TakeFlow({ clinical, onClinicalStart, onClinicalSubmit, x }: { clinical
   const [cursor, setCursor] = useState(draft?.cursor ?? 0)
   const [answers, setAnswers] = useState<Record<string, number>>(draft?.answers ?? {})
   const [signalsOff, setSignalsOff] = useState<string[]>(draft?.signalsOff ?? [])
+  const [skipped, setSkipped] = useState<TermKey[]>(draft?.skipped ?? [])
   // Signals down (no device connected on /app/devices): no wearable can be read, so every
   // wearable signal counts as off and the result is survey-only, whatever its switch said.
   // Signals logged in the app (Ledger, calendar audit, prompts) keep the member's choice.
@@ -176,22 +184,34 @@ function TakeFlow({ clinical, onClinicalStart, onClinicalSubmit, x }: { clinical
   useEffect(() => () => window.clearTimeout(autoTimer.current), [])
 
   const { t: c, pick } = useCore()
-  const answeredCount = Object.keys(answers).filter((id) => answers[id] !== undefined).length
+  const answeredCount = Object.keys(withoutSkipped(answers, skipped)).filter((id) => answers[id] !== undefined).length
   const step = steps[cursor]
+  const termOfStep = (st: Step | undefined) => (st && (st.type === 'intro' || st.type === 'item') ? SITTINGS[st.s].blocks[st.b].term : null)
 
   useEffect(() => {
     if (stage === 'step' || stage === 'review')
-      writeDraft({ cursor, answers, stage: stage === 'review' || fromReview ? 'review' : 'step', signalsOff, confirmed, savedAt: new Date().toISOString(), clinical: clinical ? parts : undefined }, draftKey)
-    if (stage === 'clinical') writeDraft({ cursor, answers, stage: 'review', signalsOff, confirmed, savedAt: new Date().toISOString(), clinical: parts }, draftKey)
-  }, [cursor, answers, stage, fromReview, signalsOff, confirmed, parts, clinical, draftKey])
+      writeDraft({ cursor, answers, stage: stage === 'review' || fromReview ? 'review' : 'step', signalsOff, confirmed, savedAt: new Date().toISOString(), clinical: clinical ? parts : undefined, skipped }, draftKey)
+    if (stage === 'clinical') writeDraft({ cursor, answers, stage: 'review', signalsOff, confirmed, savedAt: new Date().toISOString(), clinical: parts, skipped }, draftKey)
+  }, [cursor, answers, stage, fromReview, signalsOff, confirmed, parts, clinical, draftKey, skipped])
 
   useEffect(() => {
     topRef.current?.focus({ preventScroll: true })
     window.scrollTo({ top: 0 })
   }, [cursor, stage])
 
-  const go = (n: number) => {
+  // Steps of a term skipped for now are passed over, in the direction of travel.
+  const go = (target: number, dir: 1 | -1 = 1, skip: TermKey[] = skipped) => {
     cancelAuto()
+    let n = target
+    const passed = (i: number) => {
+      const k = termOfStep(steps[i])
+      return k !== null && skip.includes(k)
+    }
+    while (n >= 0 && n < steps.length && passed(n)) n += dir
+    if (n < 0) {
+      n = 0
+      while (n < steps.length && passed(n)) n += 1
+    }
     if (n >= steps.length) {
       setCursor(steps.length - 1)
       // Clinical grade: the home draw and capacity battery come before the review.
@@ -209,9 +229,10 @@ function TakeFlow({ clinical, onClinicalStart, onClinicalSubmit, x }: { clinical
   }
   const back = () => {
     cancelAuto()
-    if (cursor !== 0) return go(cursor - 1)
+    const firstShown = steps.findIndex((st) => !skipped.includes(termOfStep(st) as TermKey))
+    if (cursor > firstShown) return go(cursor - 1, -1)
     // Refresh what the Overview says is kept from live state, not the draft read at mount.
-    setDraftSnapshot({ cursor, answers, stage: fromReview ? 'review' : 'step', signalsOff, confirmed, savedAt: new Date().toISOString() })
+    setDraftSnapshot({ cursor, answers, stage: fromReview ? 'review' : 'step', signalsOff, confirmed, savedAt: new Date().toISOString(), skipped })
     setStage('overview')
   }
   const autoAdvance = (delay: number) => {
@@ -225,7 +246,7 @@ function TakeFlow({ clinical, onClinicalStart, onClinicalSubmit, x }: { clinical
   const saveLater = () => {
     cancelAuto()
     const at: 'step' | 'review' = stage === 'review' || stage === 'clinical' || fromReview ? 'review' : 'step'
-    writeDraft({ cursor, answers, stage: at, signalsOff, confirmed, savedAt: new Date().toISOString(), clinical: clinical ? parts : undefined }, draftKey)
+    writeDraft({ cursor, answers, stage: at, signalsOff, confirmed, savedAt: new Date().toISOString(), clinical: clinical ? parts : undefined, skipped }, draftKey)
     setFromReview(false)
     setSavedStage(at)
     setStage('saved')
@@ -236,6 +257,22 @@ function TakeFlow({ clinical, onClinicalStart, onClinicalSubmit, x }: { clinical
     if (at === 'review' || cursor >= steps.length) setStage(clinical && !clinicalReady(parts) ? 'clinical' : 'review')
     else setStage('step')
   }
+
+  // "Skip this term for now": its items are passed over and the result marks it not yet
+  // measured (never imputed). At least one term keeps its items, so a sitting can be scored.
+  const canSkip = (k: TermKey) => ORDER.some((t) => t !== k && !skipped.includes(t))
+  const skipTerm = (k: TermKey) => {
+    if (!canSkip(k)) return
+    const next = [...new Set([...skipped, k])]
+    setSkipped(next)
+    if (fromReview) {
+      setFromReview(false)
+      cancelAuto()
+      return setStage('review')
+    }
+    go(cursor + 1, 1, next)
+  }
+  const unskip = (k: TermKey) => setSkipped((s) => s.filter((t) => t !== k))
 
   const sittingOf = stage === 'step' && step ? SITTINGS[step.s] : null
   const resumable = !!draft && (draft.cursor > 0 || draft.stage === 'review' || Object.keys(draft.answers).length > 0)
@@ -304,11 +341,12 @@ function TakeFlow({ clinical, onClinicalStart, onClinicalSubmit, x }: { clinical
                   setAnswers({})
                   setSignalsOff([])
                   setConfirmed([])
-                  go(0)
+                  setSkipped([])
+                  go(0, 1, [])
                 }}
               />
             )}
-            {stage === 'step' && step?.type === 'intro' && <InstrumentIntro block={SITTINGS[step.s].blocks[step.b]} index={step.b} of={SITTINGS[step.s].blocks.length} onBegin={next} onBack={back} />}
+            {stage === 'step' && step?.type === 'intro' && <InstrumentIntro block={SITTINGS[step.s].blocks[step.b]} index={step.b} of={SITTINGS[step.s].blocks.length} onBegin={next} onBack={back} onSkip={canSkip(SITTINGS[step.s].blocks[step.b].term) ? () => skipTerm(SITTINGS[step.s].blocks[step.b].term) : undefined} />}
             {stage === 'step' && step?.type === 'item' && (
               <ItemScreen
                 block={SITTINGS[step.s].blocks[step.b]}
@@ -319,6 +357,7 @@ function TakeFlow({ clinical, onClinicalStart, onClinicalSubmit, x }: { clinical
                 onNext={next}
                 onAutoAdvance={autoAdvance}
                 onBack={back}
+                onSkip={canSkip(SITTINGS[step.s].blocks[step.b].term) ? () => skipTerm(SITTINGS[step.s].blocks[step.b].term) : undefined}
               />
             )}
             {stage === 'step' && step?.type === 'signals' && (
@@ -355,6 +394,7 @@ function TakeFlow({ clinical, onClinicalStart, onClinicalSubmit, x }: { clinical
                 answered={answeredCount}
                 signalsOff={effectiveOff}
                 confirmed={confirmed}
+                skipped={skipped}
                 clinical={clinical ? parts : null}
                 onEditClinical={() => {
                   setFromReview(true)
@@ -363,8 +403,18 @@ function TakeFlow({ clinical, onClinicalStart, onClinicalSubmit, x }: { clinical
                 x={x}
                 onEdit={(id) => {
                   const i = steps.findIndex((s) => s.type === 'item' && s.item.id === id)
+                  const k = ITEM_TERM[id]
+                  // Answering an item of a skipped term brings the whole term back.
+                  const skip = skipped.filter((t) => t !== k)
+                  if (skip.length !== skipped.length) unskip(k)
                   setFromReview(true)
-                  go(i)
+                  go(i, 1, skip)
+                }}
+                onAnswerTerm={(k) => {
+                  const skip = skipped.filter((t) => t !== k)
+                  unskip(k)
+                  setFromReview(false)
+                  go(steps.findIndex((st) => termOfStep(st) === k), 1, skip)
                 }}
                 onEditSignals={(s) => {
                   const i = steps.findIndex((x) => x.type === 'signals' && x.s === s)
@@ -374,26 +424,28 @@ function TakeFlow({ clinical, onClinicalStart, onClinicalSubmit, x }: { clinical
                 onSubmit={() => {
                   // Score and keep the result before the draft is cleared, so leaving
                   // during the scoring animation never loses a finished sitting.
-                  const r = scoreAnswers(answers, effectiveOff)
+                  const r = scoreAnswers(answers, effectiveOff, skipped)
+                  const kept = withoutSkipped(answers, skipped)
                   if (clinical) {
                     // Clinical grade: drafted for the physician, never final until signed.
                     onClinicalSubmit({
                       status: 'awaiting',
                       submittedAt: new Date().toISOString(),
                       takenOn: REMEASURE_TAKEN,
-                      value: r.engine.value,
+                      value: r.value,
                       gm: r.engine.gm,
                       burden: r.engine.burden,
                       terms: r.terms,
                       lowestTerm: r.lowest,
-                      answers,
+                      answers: kept,
                       signalsOff: effectiveOff,
+                      skipped,
                       draw: { slot: parts.slot! },
                       capacity: { sitToStand: sitSeconds(parts.sitToStand)! },
                     })
                     queueSync({ id: `index:clinical:${REMEASURE_TAKEN}`, kind: 'index' })
                   } else {
-                    setMeasured({ takenOn: SPECIMEN_TODAY, value: r.engine.value, gm: r.engine.gm, burden: r.engine.burden, terms: r.terms, lowestTerm: r.lowest, preview: !IN_REMEASURE_WINDOW, phqFlag: r.phqFlag, surveyOnly: r.surveyOnly, answers, signalsOff: effectiveOff, amendments: [] })
+                    setMeasured({ takenOn: SPECIMEN_TODAY, value: r.value, gm: r.engine.gm, burden: r.engine.burden, terms: r.terms, lowestTerm: r.lowest, preview: !IN_REMEASURE_WINDOW, phqFlag: r.phqFlag, surveyOnly: r.surveyOnly, answers: kept, signalsOff: effectiveOff, skipped, amendments: [] })
                     // Offline: the result is kept here and joins the sync queue the banner counts.
                     queueSync({ id: `index:${SPECIMEN_TODAY}`, kind: 'index' })
                   }
@@ -409,6 +461,7 @@ function TakeFlow({ clinical, onClinicalStart, onClinicalSubmit, x }: { clinical
               <Scoring
                 answers={answers}
                 signalsOff={effectiveOff}
+                skipped={skipped}
                 offline={offline}
                 clinical={clinical}
                 x={x}
@@ -517,9 +570,10 @@ function Overview({ resumable, resumeLabel, answered, clinical, onStart, onResta
 }
 
 // ─── Instrument intro ───────────────────────────────────────────────────────
-function InstrumentIntro({ block, index, of, onBegin, onBack }: { block: InstrumentBlock; index: number; of: number; onBegin: () => void; onBack: () => void }) {
+function InstrumentIntro({ block, index, of, onBegin, onBack, onSkip }: { block: InstrumentBlock; index: number; of: number; onBegin: () => void; onBack: () => void; onSkip?: () => void }) {
   const term = termByKey(block.term)
   const { t: c, name, pick } = useCore()
+  const x = useX()
   const bt = BLOCK_TEXT[block.code]
   return (
     <div className="flex flex-1 flex-col">
@@ -548,17 +602,22 @@ function InstrumentIntro({ block, index, of, onBegin, onBack }: { block: Instrum
       </dl>
       <div className="mt-auto flex flex-col gap-2 pt-10">
         <DaybreakButton onClick={onBegin} className="w-full">{c('inBegin')}</DaybreakButton>
-        <Button variant="ghost" onClick={onBack} className="self-center"><ArrowLeft size={15} /> {c('back')}</Button>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button variant="ghost" onClick={onBack}><ArrowLeft size={15} /> {c('back')}</Button>
+          {onSkip && <Button variant="ghost" onClick={onSkip}><CircleDashed size={15} aria-hidden /> {x('skSkip', { term: name(block.term) })}</Button>}
+        </div>
+        {onSkip && <p className="text-center text-[13px] text-ink-3">{x('skSkipNote')}</p>}
       </div>
     </div>
   )
 }
 
 // ─── One item per screen ────────────────────────────────────────────────────
-function ItemScreen({ block, item, value, fromReview, onAnswer, onNext, onAutoAdvance, onBack }: { block: InstrumentBlock; item: SampleItem; value: number | undefined; fromReview: boolean; onAnswer: (v: number) => void; onNext: () => void; onAutoAdvance: (delay: number) => void; onBack: () => void }) {
+function ItemScreen({ block, item, value, fromReview, onAnswer, onNext, onAutoAdvance, onBack, onSkip }: { block: InstrumentBlock; item: SampleItem; value: number | undefined; fromReview: boolean; onAnswer: (v: number) => void; onNext: () => void; onAutoAdvance: (delay: number) => void; onBack: () => void; onSkip?: () => void }) {
   const reduce = useReducedMotion()
   const scale = scaleOf(block, item)
-  const { t: c, lang } = useCore()
+  const { t: c, lang, name } = useCore()
+  const x = useX()
 
   // The parent owns the auto-advance timer, so Back or "Save for later" can cancel it.
   const choose = (v: number) => {
@@ -621,6 +680,11 @@ function ItemScreen({ block, item, value, fromReview, onAnswer, onNext, onAutoAd
           {fromReview ? c('itBackReview') : c('itNext')}
         </DaybreakButton>
       </div>
+      {onSkip && (
+        <button type="button" onClick={onSkip} className="mt-4 inline-flex min-h-[24px] items-center gap-1.5 self-center py-1 text-[14px] text-ink-3 underline-offset-4 hover:text-ink hover:underline focus-ring">
+          <CircleDashed size={14} aria-hidden /> {x('skSkip', { term: name(block.term) })}
+        </button>
+      )}
     </div>
   )
 }
@@ -793,17 +857,31 @@ function ClinicalStep({ parts, onChange, fromReview, onContinue, onBack, x }: { 
 }
 
 // ─── Review and edit before submit ──────────────────────────────────────────
-function Review({ answers, answered, signalsOff, confirmed, clinical, onEditClinical, x, onEdit, onEditSignals, onSubmit }: { answers: Record<string, number>; answered: number; signalsOff: string[]; confirmed: number[]; clinical: ClinicalParts | null; onEditClinical: () => void; x: X; onEdit: (id: string) => void; onEditSignals: (s: number) => void; onSubmit: () => void }) {
-  const complete = answered >= ITEM_COUNT && (!clinical || clinicalReady(clinical))
-  const firstMissing = SITTINGS.flatMap((s) => s.blocks.flatMap((b) => b.sample)).find((i) => answers[i.id] === undefined)
-  const { t: c, lang, pick } = useCore()
+function Review({ answers, answered, signalsOff, confirmed, skipped, clinical, onEditClinical, x, onEdit, onEditSignals, onAnswerTerm, onSubmit }: { answers: Record<string, number>; answered: number; signalsOff: string[]; confirmed: number[]; skipped: TermKey[]; clinical: ClinicalParts | null; onEditClinical: () => void; x: X; onEdit: (id: string) => void; onEditSignals: (s: number) => void; onAnswerTerm: (k: TermKey) => void; onSubmit: () => void }) {
+  // Items of a term skipped for now are not owed: the term is marked not yet measured.
+  const due = SITTINGS.flatMap((s) => s.blocks.filter((b) => !skipped.includes(b.term)).flatMap((b) => b.sample))
+  const complete = due.every((i) => answers[i.id] !== undefined) && (!clinical || clinicalReady(clinical))
+  const firstMissing = due.find((i) => answers[i.id] === undefined)
+  const { t: c, lang, pick, name } = useCore()
   return (
     <div className="flex flex-1 flex-col">
       <Eyebrow tone="daybreak">{c('rvEyebrow')}</Eyebrow>
       <h1 className="mt-3 text-[2.2rem] font-light leading-tight text-ink">{rich(c('rvTitle'))}</h1>
       <p className="mt-3 text-[17px] text-ink-2">
-        {rich(c('rvCount'), { a: <span className="num text-ink">{answered}</span>, n: <span className="num text-ink">{ITEM_COUNT}</span> })}
+        {rich(c('rvCount'), { a: <span className="num text-ink">{answered}</span>, n: <span className="num text-ink">{due.length}</span> })}
       </p>
+      {skipped.length > 0 && (
+        <div role="status" className="mt-4 rounded-card border border-dashed border-line-strong px-4 py-3">
+          <p className="flex items-start gap-2 text-[15px] text-ink-2"><CircleDashed size={16} className="mt-0.5 shrink-0 text-ink-3" aria-hidden /> <span>{x('skReviewNote', { terms: ORDER.filter((k) => skipped.includes(k)).map((k) => name(k)).join(x('skJoin')) })}</span></p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {ORDER.filter((k) => skipped.includes(k)).map((k) => (
+              <Button key={k} size="sm" variant="secondary" onClick={() => onAnswerTerm(k)} aria-label={x('skAnswerAria', { term: name(k) })}>
+                <TermDot term={k} /> {name(k)} · {x('skAnswer')}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
       {lang !== 'en' && <p lang={lang} className="mt-3 rounded-card bg-paper-sunk px-3 py-2 text-[13px] text-ink-2">{INSTRUMENT_NOTE[lang]}</p>}
       <div className="mt-6 space-y-6">
         {SITTINGS.map((sit, si) => {
@@ -817,13 +895,14 @@ function Review({ answers, answered, signalsOff, confirmed, clinical, onEditClin
                   b.sample.map((item) => {
                     const v = answers[item.id]
                     const label = scaleOf(b, item).find((o) => o.value === v)?.label
+                    const off = skipped.includes(b.term)
                     return (
                       <li key={item.id} className="flex items-start gap-3 px-4 py-3">
                         <span className="mt-1.5"><TermDot term={b.term} /></span>
                         <div className="min-w-0 flex-1">
                           <p lang="en" className="text-[15px] text-ink">{item.stem && item.stem.endsWith('…') ? `${item.stem.replace('…', '')} ${item.text.replace('…', '')}` : item.text}</p>
                           <p className="mt-0.5 text-[13px] text-ink-3">
-                            <span className="num">{b.code} · {item.position}</span> · {label ? <span lang="en" className="text-ink-2">{label}</span> : <span className="text-error">{c('rvNotAnswered')}</span>}
+                            <span className="num">{b.code} · {item.position}</span> · {off ? <span className="text-ink-3">{x('skSkipped')}</span> : label ? <span lang="en" className="text-ink-2">{label}</span> : <span className="text-error">{c('rvNotAnswered')}</span>}
                           </p>
                         </div>
                         <Button variant="ghost" size="sm" onClick={() => onEdit(item.id)} aria-label={c('rvEditAria', { text: item.text })}>
@@ -906,16 +985,18 @@ function Saved({ where, answered, onResume }: { where: string; answered: number;
 }
 
 // ─── Scoring with method v1.0, from the answers, then hand-off to the result ──
-function Scoring({ answers, signalsOff, offline, clinical, x, onSee }: { answers: Record<string, number>; signalsOff: string[]; offline: boolean; clinical: boolean; x: X; onSee: () => void }) {
+function Scoring({ answers, signalsOff, skipped, offline, clinical, x, onSee }: { answers: Record<string, number>; signalsOff: string[]; skipped: TermKey[]; offline: boolean; clinical: boolean; x: X; onSee: () => void }) {
   const reduce = useReducedMotion()
   const latest = INDEX_HISTORY[0]
-  const result = useMemo(() => scoreAnswers(answers, signalsOff), [answers, signalsOff])
+  const result = useMemo(() => scoreAnswers(answers, signalsOff, skipped), [answers, signalsOff, skipped])
   const { engine } = result
   const { t: c, name, space, method } = useCore()
+  const band = useBandText()
+  const missingNames = result.missing.map((k) => name(k)).join(x('skJoin'))
   const STAGES = [
     c('scStage1'),
     c('scStage2', { m: method(latest.method), b: latest.engineBuild }),
-    c('scStage3', { gm: engine.gm.toFixed(1), b: engine.burden.toFixed(1) }),
+    result.value === null ? x('skStage3', { terms: missingNames }) : c('scStage3', { gm: engine.gm.toFixed(1), b: engine.burden.toFixed(1) }),
     c('scStage4'),
   ]
   const [done, setDone] = useState(0)
@@ -954,17 +1035,27 @@ function Scoring({ answers, signalsOff, offline, clinical, x, onSee }: { answers
                   <WheelGhostKey />
                 </div>
                 <div className="text-center sm:text-left">
-                  <div className="flex items-end justify-center gap-3 sm:justify-start">
-                    <span className="num text-[5rem] font-light leading-[0.85] text-ink" aria-label={c('jiAria', { v: engine.value })}>{engine.value}</span>
-                    <span className="mb-1 flex flex-col gap-1">
-                      <Delta value={engine.value - latest.value} />
-                      <BandLabel band={bandFor(engine.value)} />
-                    </span>
-                  </div>
-                  <p className="mt-3 text-[17px] text-ink-2">
-                    {rich(c(engine.value === latest.value ? 'scSame' : engine.value > latest.value ? 'scUp' : 'scFrom'), { v: <span className="num">{latest.value}</span>, term: <span className="text-ink">{name(lowest.key)}</span> })}
-                  </p>
-                  {engine.value < latest.value && (
+                  {result.value === null ? (
+                    <>
+                      <p className="text-[2rem] font-light leading-tight text-ink">{x('skNoIndex')}</p>
+                      <BandLabel band="not-yet-measured" className="mt-1" />
+                      <p className="mt-3 text-[17px] text-ink-2">{x('skScoringLine', { terms: missingNames })}</p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-end justify-center gap-3 sm:justify-start">
+                        <span className="num text-[5rem] font-light leading-[0.85] text-ink" aria-label={c('jiAria', { v: result.value })}><CountUp value={result.value} from={latest.value} /></span>
+                        <span className="mb-1 flex flex-col gap-1">
+                          <Delta value={result.value - latest.value} />
+                          <BandLabel band={bandFor(result.value)} />
+                        </span>
+                      </div>
+                      <p className="mt-3 text-[17px] text-ink-2">
+                        {rich(c(result.value === latest.value ? 'scSame' : result.value > latest.value ? 'scUp' : 'scFrom'), { v: <span className="num">{latest.value}</span>, term: <span className="text-ink">{name(lowest.key)}</span> })}
+                      </p>
+                    </>
+                  )}
+                  {result.value !== null && result.value < latest.value && (
                     <p className="mt-2 text-[15px] text-ink-2">{c('scLower', { coach: coachFirst })}</p>
                   )}
                 </div>
@@ -975,7 +1066,7 @@ function Scoring({ answers, signalsOff, offline, clinical, x, onSee }: { answers
                   return (
                     <li key={k} className="flex items-center justify-between gap-2 text-[14px] text-ink-2">
                       <span className="flex min-w-0 items-center gap-2"><TermDot term={k} /> <span className="min-w-0 break-words">{space(k)}</span></span>
-                      <span className="num text-ink">{s.value === null ? '—' : k === 'B' ? `−${s.value}` : s.value}</span>
+                      {s.value === null ? <span className="eyebrow text-ink-3">{band('not-yet-measured')}</span> : <span className="num text-ink">{k === 'B' ? `−${s.value}` : s.value}</span>}
                     </li>
                   )
                 })}
@@ -1018,6 +1109,166 @@ function Scoring({ answers, signalsOff, offline, clinical, x, onSee }: { answers
           </Link>
         )}
       </div>
+    </div>
+  )
+}
+
+// ─── A term skipped for now, measured later (?term=F) ───────────────────────
+// Only the skipped term's instruments, one item per screen; the answers join the sitting's
+// record as append-only amendments ("answered later"), the Index is scored again, and the
+// first score stays in the history.
+type TermStep = { type: 'intro'; block: InstrumentBlock; b: number; of: number } | { type: 'item'; block: InstrumentBlock; item: SampleItem }
+
+function TermFlow({ term }: { term: TermKey }) {
+  const [m, setMeasured] = useMeasured()
+  const navigate = useNavigate()
+  const x = useX()
+  const { t: c, name } = useCore()
+  const fmtDate = useFmtDate()
+  const blocks = useMemo(() => SITTINGS.flatMap((sit) => sit.blocks).filter((b) => b.term === term), [term])
+  const steps = useMemo<TermStep[]>(() => blocks.flatMap((block, b) => [{ type: 'intro' as const, block, b, of: blocks.length }, ...block.sample.map((item) => ({ type: 'item' as const, block, item }))]), [blocks])
+  const items = blocks.flatMap((b) => b.sample)
+  const [stage, setStage] = useState<'overview' | 'step' | 'review'>('overview')
+  const [cursor, setCursor] = useState(0)
+  const [answers, setAnswers] = useState<Record<string, number>>({})
+  const [fromReview, setFromReview] = useState(false)
+  const timer = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+  const open = !!m && !!m.answers && (m.skipped ?? []).includes(term)
+  const answered = items.filter((i) => answers[i.id] !== undefined).length
+
+  const go = (n: number) => {
+    window.clearTimeout(timer.current)
+    if (n >= steps.length) return setStage('review')
+    setCursor(Math.max(0, n))
+    setStage('step')
+  }
+  const next = () => {
+    if (fromReview) {
+      setFromReview(false)
+      return setStage('review')
+    }
+    go(cursor + 1)
+  }
+  const back = () => (cursor === 0 ? setStage('overview') : go(cursor - 1))
+
+  const add = () => {
+    if (!m || !m.answers || answered < items.length) return
+    // Each answer is its own append-only amendment, scored in order, so the history reads true.
+    const skipLeft = (m.skipped ?? []).filter((k) => k !== term)
+    let current = amendedAnswers(m.answers, m.amendments)
+    let before = m.value
+    const added: Amendment[] = []
+    const base = Date.now()
+    let r = scoreAnswers(current, m.signalsOff ?? [], m.skipped ?? [])
+    items.forEach((item, i) => {
+      current = { ...current, [item.id]: answers[item.id] }
+      r = scoreAnswers(current, m.signalsOff ?? [], i === items.length - 1 ? skipLeft : m.skipped ?? [])
+      const after = i === items.length - 1 ? r.value : before
+      added.push({ id: `am_${(base + i).toString(36)}`, itemId: item.id, from: null, to: answers[item.id], reason: '', at: specimenNow(), before, after })
+      before = after
+    })
+    setMeasured((prev) =>
+      prev
+        ? {
+            ...prev,
+            original: prev.original ?? { value: prev.value, terms: prev.terms, lowestTerm: prev.lowestTerm },
+            value: r.value,
+            gm: r.engine.gm,
+            burden: r.engine.burden,
+            terms: r.terms,
+            lowestTerm: r.lowest,
+            phqFlag: r.phqFlag,
+            skipped: skipLeft,
+            amendments: [...(prev.amendments ?? []), ...added],
+          }
+        : prev,
+    )
+    playSound('complete')
+    navigate('/app/index')
+  }
+
+  const step = steps[cursor]
+  return (
+    <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-2xl flex-col">
+      <div className="flex items-center justify-between gap-3 pb-5">
+        <div className="flex items-center gap-3">
+          <AiwoMark size={20} />
+          <span className="eyebrow text-ink-3">{c('tkBrand')}</span>
+        </div>
+        <Link to="/app/index" className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[14px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring" aria-label={c('tkCloseAria')}>
+          <X size={16} /> {c('close')}
+        </Link>
+      </div>
+      {!open ? (
+        <div className="flex flex-1 flex-col">
+          <p className="text-[17px] text-ink-2">{x('tmNone')}</p>
+          <Link to="/app/index" className="mt-6 inline-flex items-center gap-1.5 self-start text-[15px] text-ink underline-offset-4 hover:underline focus-ring">{x('tmBack')} <ArrowRight size={14} /></Link>
+        </div>
+      ) : stage === 'overview' ? (
+        <div className="flex flex-1 flex-col">
+          <Eyebrow tone="daybreak">{x('tmEyebrow', { term: name(term), date: fmtDate(m!.takenOn) })}</Eyebrow>
+          <h1 className="mt-3 text-[2.2rem] font-light leading-tight text-ink">{rich(x('tmTitle'))}</h1>
+          <p className="mt-4 text-[17px] leading-relaxed text-ink-2">{x('tmBody')}</p>
+          <ul className="mt-6 flex flex-wrap gap-2">
+            {blocks.map((b) => (
+              <li key={b.code} className="inline-flex items-center gap-2 rounded-full border border-line px-2.5 py-1 text-[13px] text-ink-2">
+                <TermDot term={b.term} /> {b.code} <span className="num text-ink-3">{b.sample.length}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-auto flex flex-col gap-2 pt-10">
+            <DaybreakButton onClick={() => go(0)} className="w-full">{x('tmBegin')}</DaybreakButton>
+            <Link to="/app/index" className="self-center py-2 text-[15px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring">{x('tmBack')}</Link>
+          </div>
+        </div>
+      ) : stage === 'step' && step?.type === 'intro' ? (
+        <InstrumentIntro block={step.block} index={step.b} of={step.of} onBegin={next} onBack={back} />
+      ) : stage === 'step' && step?.type === 'item' ? (
+        <ItemScreen
+          key={step.item.id}
+          block={step.block}
+          item={step.item}
+          value={answers[step.item.id]}
+          fromReview={fromReview}
+          onAnswer={(v) => setAnswers((a) => ({ ...a, [step.item.id]: v }))}
+          onNext={next}
+          onAutoAdvance={(delay) => {
+            window.clearTimeout(timer.current)
+            const at = cursor
+            timer.current = window.setTimeout(() => go(at + 1), delay)
+          }}
+          onBack={back}
+        />
+      ) : (
+        <div className="flex flex-1 flex-col">
+          <Eyebrow tone="daybreak">{x('tmEyebrow', { term: name(term), date: fmtDate(m!.takenOn) })}</Eyebrow>
+          <h1 className="mt-3 text-[2.2rem] font-light leading-tight text-ink">{rich(x('tmReviewTitle'))}</h1>
+          <p className="mt-3 text-[17px] text-ink-2">{rich(x('tmCount'), { a: <span className="num text-ink">{answered}</span>, n: <span className="num text-ink">{items.length}</span> })}</p>
+          <ul className="mt-6 divide-y divide-line rounded-card border border-line bg-paper-raised">
+            {blocks.flatMap((b) =>
+              b.sample.map((item) => {
+                const label = scaleOf(b, item).find((o) => o.value === answers[item.id])?.label
+                return (
+                  <li key={item.id} className="flex items-start gap-3 px-4 py-3">
+                    <span className="mt-1.5"><TermDot term={b.term} /></span>
+                    <div className="min-w-0 flex-1">
+                      <p lang="en" className="text-[15px] text-ink">{item.text}</p>
+                      <p className="mt-0.5 text-[13px] text-ink-3"><span className="num">{b.code} · {item.position}</span> · {label ? <span lang="en" className="text-ink-2">{label}</span> : <span className="text-error">{c('rvNotAnswered')}</span>}</p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => { setFromReview(true); go(steps.findIndex((s) => s.type === 'item' && s.item.id === item.id)) }} aria-label={c('rvEditAria', { text: item.text })}>
+                      <Pencil size={14} /> {c('rvEdit')}
+                    </Button>
+                  </li>
+                )
+              }),
+            )}
+          </ul>
+          <div className="mt-auto flex flex-col gap-2 pt-10">
+            <DaybreakButton onClick={add} disabled={answered < items.length} className="w-full">{x('tmAdd')}</DaybreakButton>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -6,10 +6,9 @@ import { useLocation, useNavigate, useSearchParams, Link } from 'react-router-do
 import { DaybreakButton, Eyebrow, SpecimenTag } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill } from '@/components/ui'
 import { CONSOLES } from '@/layouts/ConsoleLayout'
-import { ACCESS_LOG } from '@/data/member'
 import { AccessRequestSheet } from './_access'
-import { DECLINE_REASONS, access, isLive, standingRequest, lastSettled, statusLabel, useAccessRequests, type AccessRequest } from './_accessStore'
-import { useClinicalState } from './_clinicalStore'
+import { DECLINE_REASONS, STRUCTURE_ONLY, AGGREGATES_ONLY, NAMED_MEMBER, access, isLive, scopeLabel, standingRequest, lastSettled, statusLabel, useAccessRequests, type AccessRequest } from './_accessStore'
+import { useMemberAccessLog } from '@/routes/member/account/_access'
 import { GATE, ROLE_OPTIONS, specimenRoleOf, useConsoleRole } from './_gate'
 import { AccessNote, fmtClock, fmtDuration, useConsoleNow } from './_parts'
 
@@ -63,7 +62,9 @@ export default function ConsoleHome() {
   const now = useConsoleNow(15_000)
   const [params, setParams] = useSearchParams()
   const { hash } = useLocation()
-  const { audit } = useClinicalState()
+  // Arjun's "Who has seen my data": the trust centre's own merged list (same module, same
+  // labels, same timestamps), so the two read line for line alike.
+  const arjunReads = useMemberAccessLog()
 
   // Opening a console as its specimen person signs the visitor in as that person, so the
   // Demo switcher and the console agree. Once a role is chosen a card never changes it.
@@ -84,12 +85,6 @@ export default function ConsoleHome() {
   useEffect(() => {
     if (hash === '#access-requests') document.getElementById('access-requests')?.scrollIntoView({ block: 'start' })
   }, [hash])
-
-  // Arjun's reads: this session's clinical portal reads of his record first, then the record so far.
-  const arjunReads = [
-    ...audit.filter((e) => e.memberId === 'm_0001' && e.kind === 'read').map((e) => ({ id: e.id, at: e.at, who: e.who, role: e.role, what: e.what, purpose: e.purpose })),
-    ...ACCESS_LOG,
-  ]
 
   return (
     <div>
@@ -298,18 +293,18 @@ export default function ConsoleHome() {
         <Card>
           <div className="mb-4 flex items-center justify-between">
             <Eyebrow>Recent console reads · Arjun’s record</Eyebrow>
-            <Eye size={16} className="text-ink-3" aria-hidden />
+            <span className="flex items-center gap-2 text-[12px] text-ink-3"><span className="num">{Math.min(4, arjunReads.length)}</span> of <span className="num">{arjunReads.length}</span> <Eye size={16} aria-hidden /></span>
           </div>
           <ul className="space-y-3.5">
             {arjunReads.slice(0, 4).map((e) => (
               <li key={e.id} className="border-b border-line pb-3 last:border-0 last:pb-0">
                 <p className="num text-[12px] text-ink-3">{e.at}</p>
-                <p className="text-[15px] text-ink">{e.who} <span className="text-ink-3">· {e.role}</span></p>
+                <p className="text-[15px] text-ink">{e.who} <span className="text-ink-3">· {e.role}{e.live && <> · <span className="eyebrow">this session</span></>}</span></p>
                 <p className="text-[13px] text-ink-2">{e.what} — {e.purpose}</p>
               </li>
             ))}
           </ul>
-          <AccessNote icon="shield" className="mt-5">This list is the same one Arjun sees under “Who has seen my data”.</AccessNote>
+          <AccessNote icon="shield" className="mt-5">This list is the same one Arjun sees under “Who has seen my data”, newest first: each coach digest or clinical record opened in this browser joins it with the reason given.</AccessNote>
         </Card>
       </section>
 
@@ -325,6 +320,13 @@ export default function ConsoleHome() {
 }
 
 // ─── Access requests: sent, decided, granted, expired ─────────────────────
+
+/** Where a one-member grant opens: that member's record in the console it covers. */
+function memberRecordPath(to: string, memberId: string) {
+  if (to === '/console/coach') return `/console/coach/member/${memberId}`
+  if (to === '/console/clinical') return `/console/clinical?tab=member&member=${memberId}`
+  return to
+}
 
 /**
  * Every request sent this session, newest first. Nobody can approve their own request; in
@@ -353,7 +355,7 @@ function AccessRequests({ requests, now }: { requests: AccessRequest[]; now: num
                     {r.label}
                     <Pill tone={live ? 'ink' : undefined}>{statusLabel(r, now)}</Pill>
                   </p>
-                  <p className="mt-1 text-[14px] text-ink-2">{r.person} · {r.roleLabel} · {r.purpose} · {r.scope} · {r.duration}</p>
+                  <p className="mt-1 text-[14px] text-ink-2">{r.person} · {r.roleLabel} · {r.purpose} · {scopeLabel(r)} · {r.duration}</p>
                   <p className="mt-1 text-[14px] text-ink-2">“{r.why}”</p>
                   <p className="mt-1.5 text-[13px] text-ink-3">
                     Sent <span className="num">{fmtClock(r.sentAt)}</span>
@@ -362,7 +364,9 @@ function AccessRequests({ requests, now }: { requests: AccessRequest[]; now: num
                     {r.status === 'granted' && !live && <> · ended <span className="num">{fmtClock(r.expiresAt ?? now)}</span></>}
                   </p>
                   {r.status === 'declined' && r.reason && <p className="mt-1 text-[14px] text-ink"><span className="eyebrow mr-2 text-ink-3">Reason</span>{r.reason}</p>}
-                  {live && r.scope.startsWith('No member data') && <p className="mt-1 text-[13px] text-ink-3">Structure only: the console opens to look, never to act on a member.</p>}
+                  {live && r.scope === STRUCTURE_ONLY && <p className="mt-1 text-[13px] text-ink-3">Structure only: the console opens to look, never to act on a member.</p>}
+                  {live && r.scope === AGGREGATES_ONLY && <p className="mt-1 text-[13px] text-ink-3">Aggregates only: never acts on a member’s record.</p>}
+                  {live && r.scope === NAMED_MEMBER && <p className="mt-1 text-[13px] text-ink-3">Acts on {r.memberName ?? r.memberId}’s record only; every other member stays view only.</p>}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 md:flex-col md:items-end">
                   {r.status === 'pending' && declining !== r.ref && (
@@ -386,7 +390,7 @@ function AccessRequests({ requests, now }: { requests: AccessRequest[]; now: num
                   )}
                   {live && (
                     <>
-                      <Link to={r.to} className="inline-flex items-center gap-1.5 text-[14px] text-ink underline-offset-4 hover:underline focus-ring">Open {r.label.toLowerCase()} <ArrowRight size={14} aria-hidden /></Link>
+                      <Link to={r.scope === NAMED_MEMBER && r.memberId ? memberRecordPath(r.to, r.memberId) : r.to} className="inline-flex items-center gap-1.5 text-[14px] text-ink underline-offset-4 hover:underline focus-ring">{r.scope === NAMED_MEMBER && r.memberId ? <>Open {r.memberName ?? r.memberId}’s record</> : <>Open {r.label.toLowerCase()}</>} <ArrowRight size={14} aria-hidden /></Link>
                       <Button size="sm" variant="ghost" onClick={() => access.revoke(r.ref)}>End grant now</Button>
                     </>
                   )}

@@ -1,11 +1,12 @@
 import { useContext, useEffect, useState } from 'react'
-import { Pressable, View, useWindowDimensions } from 'react-native'
+import { Animated, Pressable, View, useWindowDimensions } from 'react-native'
 import Svg, { Circle, ClipPath, Defs, G, Path, Text as SvgText } from 'react-native-svg'
 import { TERM_TEXT, useLang } from '../lib/i18n'
 import { useReduceMotion, type Lang } from '../lib/store'
 import type { TermKey, TermScore } from '../shared/types'
 import { useTheme } from '../theme/ThemeProvider'
-import { palettes, termColors } from '../theme/tokens'
+import { easeBrand, motion, palettes, termColors } from '../theme/tokens'
+import { useCountUp, useFadeIn } from './CountUp'
 import { HatchPattern, useSvgId } from './Term'
 import { InkSurface } from './Text'
 import { kit, type KitKey } from './_i18n'
@@ -14,8 +15,9 @@ import { kit, type KitKey } from './_i18n'
 // joy-os-web/src/components/joy/JoyspanWheel.tsx.
 // Six fixed petals, clockwise from the top: Body, Purpose, People, Freedom, Pleasure, Ease.
 // Each petal fills from the centre in proportion to its score over a pale ghost of itself;
-// the Burden petal is hatched Amber and signed with a minus. The fill blooms over 960 ms
-// (skipped under Reduce Motion, the system's or the member's own). VoiceOver reads each petal with term, score and band
+// the Burden petal is hatched Amber and signed with a minus. The fill blooms over 960 ms on the
+// brand easing while the centre Index counts to its value; under Reduce Motion (the system's
+// or the member's own) the Wheel is drawn at its value and fades in over 120 ms. VoiceOver reads each petal with term, score and band
 // (Architecture p21): one image label listing all six, or one button per petal when onSelect.
 // With `baseline` (the Day-0 measure) each petal also carries the Day-0 outline: a 14% Ink
 // ghost of where that petal stood at the start of the ninety days (Playbook p45), read aloud too.
@@ -36,27 +38,45 @@ interface Props {
   baseline?: TermScore[] | null
 }
 
-const ease = (x: number) => 1 - Math.pow(1 - x, 3)
+// "The Wheel blooms petal by petal, clockwise from Healthspan, in 960 ms on the brand easing,
+// while the Index counts up to its value" (Playbook p53). The whole bloom, stagger included,
+// is the 960 ms bloom token: each petal rises over PETAL ms, PETAL_STAGGER ms after the last.
+const PETAL_STAGGER = 70
+const PETAL = motion.bloom - 5 * PETAL_STAGGER
 
-function useBloom(enabled: boolean) {
-  // Reduce motion (the member's own setting or the system one) skips the bloom entirely.
+/**
+ * Bloom clock and per-petal extents. On first show every petal rises from the centre; when the
+ * scores change the petals move from where they stand to the new value at the same speed, so
+ * a fall animates exactly like a rise. Under Reduce Motion there is no movement: the Wheel is
+ * drawn at its value and fades in over 120 ms (see useFadeIn below).
+ */
+function useBloom(enabled: boolean, targets: (number | null)[]) {
   const reduce = useReduceMotion()
-  const [p, setP] = useState(enabled && !reduce ? 0 : 1)
+  const run = enabled && !reduce
+  const key = targets.join(',')
+  // Extents run 0..100. `from` is where each petal starts this move, `to` its score, `p` the clock.
+  // `grow` marks the first bloom out of the centre, the only move in which the 6% floor ramps in.
+  const [anim, setAnim] = useState(() => {
+    const to = targets.map((v) => v ?? 0)
+    return { from: run ? to.map(() => 0) : to, to, p: run ? 0 : 1, grow: run }
+  })
   useEffect(() => {
-    if (!enabled) return
-    if (reduce) {
-      setP(1)
-      return
-    }
+    const to = key.split(',').map((v) => (v === '' ? 0 : Number(v)))
+    // Where each petal stands now becomes the start of this move (an interrupted bloom carries on).
+    setAnim((prev) => {
+      const same = prev.to.length === to.length && prev.to.every((v, i) => v === to[i])
+      if (same && (prev.p < 1 || !run)) return run ? prev : { ...prev, from: to, p: 1, grow: false }
+      return { from: to.map((_, i) => extentAt(prev, i)), to, p: run ? 0 : 1, grow: false }
+    })
+    if (!run) return
     let raf = 0
     let alive = true
     let start = 0
-    const total = 960 + 100 + 5 * 70
     const step = (ts: number) => {
       if (!alive) return
       if (!start) start = ts
-      const t = Math.min(1, (ts - start) / total)
-      setP(t)
+      const t = Math.min(1, (ts - start) / motion.bloom)
+      setAnim((prev) => ({ ...prev, p: t }))
       if (t < 1) raf = requestAnimationFrame(step)
     }
     raf = requestAnimationFrame(step)
@@ -64,8 +84,22 @@ function useBloom(enabled: boolean) {
       alive = false
       cancelAnimationFrame(raf)
     }
-  }, [enabled, reduce])
-  return p
+  }, [key, run])
+  // The floor scale (0..1): while a petal first blooms out of the centre its 6% floor grows with
+  // it, so nothing pops in at frame one; at rest and on later moves it is always the full floor.
+  const floor = (i: number) => (anim.grow && anim.p < 1 ? easeBrand(petalLocal(anim.p, i)) : 1)
+  return { extent: (i: number) => extentAt(anim, i), floor, reduce }
+}
+
+function extentAt(a: { from: number[]; to: number[]; p: number }, i: number) {
+  const from = a.from[i] ?? 0
+  const to = a.to[i] ?? 0
+  return from + (to - from) * easeBrand(petalLocal(a.p, i))
+}
+
+/** A petal's own progress (0..1) at bloom progress p: it starts i × stagger in and runs PETAL ms. */
+function petalLocal(p: number, i: number) {
+  return Math.max(0, Math.min(1, (p * motion.bloom - i * PETAL_STAGGER) / PETAL))
 }
 
 const BAND_KEY: Record<string, KitKey> = { steady: 'bandSteady', uneven: 'bandUneven', thin: 'bandThin', 'not-yet-measured': 'bandNone' }
@@ -92,7 +126,10 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
   const { fonts } = t
   const uid = useSvgId('wheel')
   const lang = useLang()
-  const progress = useBloom(animate)
+  const { extent, floor, reduce } = useBloom(animate, WHEEL_ORDER.map((k) => terms.find((x) => x.key === k)?.value ?? null))
+  // The Index counts while the petals bloom (Playbook p53); same clock, same 960 ms.
+  const centre = useCountUp(value ?? null, { enabled: animate })
+  const fade = useFadeIn(animate && reduce ? 'shown' : 'static', animate && reduce)
   const pad = showLabels ? 56 : 4
   const box = size + pad * 2
   const cx = box / 2
@@ -123,11 +160,11 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
   const px = box * scale
 
   return (
-    <View
+    <Animated.View
       accessible={!interactive}
       accessibilityRole={interactive ? undefined : 'image'}
       accessibilityLabel={interactive ? undefined : describeWheel(terms, value, lang, baseline)}
-      style={{ width: px, height: px, maxWidth: '100%' }}
+      style={{ width: px, height: px, maxWidth: '100%', opacity: fade }}
       onLayout={(e) => {
         const w = e.nativeEvent.layout.width
         // maxWidth clamped us: shrink to the width we were given.
@@ -155,9 +192,8 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
             : null}
           {WHEEL_ORDER.map((k, i) => {
             const v = terms.find((x) => x.key === k)?.value ?? null
-            const target = v === null ? 0 : inner + len * Math.max(0.06, v / 100)
-            const local = Math.max(0, Math.min(1, (progress * (960 + 450) - 100 - i * 70) / 960))
-            const r = inner + (target - inner) * ease(local)
+            const e = extent(i)
+            const r = v === null ? 0 : inner + len * Math.max(0.06 * floor(i), e / 100)
             return (
               <ClipPath key={k} id={`${uid}-clip-${k}`}>
                 <Circle cx={cx} cy={cx} r={Math.max(0, r)} />
@@ -193,7 +229,7 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
         })}
         {value !== undefined && (
           <SvgText x={cx} y={cx + size * 0.045} textAnchor="middle" fontFamily={fonts.monoLight} fontSize={size * 0.13} fill={c.ink}>
-            {value == null ? '—' : String(value)}
+            {value == null ? '—' : centre.text}
           </SvgText>
         )}
         {showLabels &&
@@ -232,6 +268,6 @@ export function JoyspanWheel({ terms, size = 240, value, showLabels = false, hig
             />
           )
         })}
-    </View>
+    </Animated.View>
   )
 }

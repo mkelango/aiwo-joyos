@@ -53,6 +53,15 @@ export const KIT = {
   undoTell: { en: 'Don’t tell {name}', ta: '{name}-இடம் சொல்ல வேண்டாம்', hi: '{name} को न बताएँ' },
   callContact: { en: 'Call {name}', ta: '{name}-ஐ அழைக்கவும்', hi: '{name} को कॉल करें' },
   callContactHint: { en: 'Calls your emergency contact', ta: 'உங்கள் அவசரத் தொடர்பை அழைக்கும்', hi: 'आपकी इमरजेंसी संपर्क को कॉल करता है' },
+  // Signed out (Welcome, Sign in, the Check, Onboarding): no member yet, so no contact and no Messages.
+  yourPeopleBodyOut: {
+    en: 'A clinician from AIWO’s care team is on call day and night. You don’t need an account to call.',
+    ta: 'AIWO பராமரிப்புக் குழுவின் மருத்துவர் ஒருவர் இரவும் பகலும் பணியில் இருக்கிறார். அழைக்க உங்களுக்குக் கணக்கு தேவையில்லை.',
+    hi: 'AIWO की केयर टीम का एक क्लिनिशियन दिन-रात ड्यूटी पर रहता है। कॉल करने के लिए आपको खाते की ज़रूरत नहीं है।',
+  },
+  onCallLineCall: { en: 'Call the on-call clinician', ta: 'பணியில் உள்ள மருத்துவரை அழைக்கவும்', hi: 'ड्यूटी पर मौजूद क्लिनिशियन को कॉल करें' },
+  onCallLineHint: { en: 'Calls AIWO’s on-call clinician line', ta: 'AIWO-வின் பணியில் உள்ள மருத்துவர் எண்ணை அழைக்கும்', hi: 'AIWO की ड्यूटी क्लिनिशियन लाइन पर कॉल करता है' },
+  onCallLineMeta: { en: 'On-call line (specimen number):', ta: 'பணியில் உள்ள மருத்துவர் எண் (மாதிரி எண்):', hi: 'ड्यूटी लाइन (नमूना नंबर):' },
   emergencyContact: { en: 'Emergency contact · {relation}', ta: 'அவசரத் தொடர்பு · {relation}', hi: 'इमरजेंसी संपर्क · {relation}' },
 
   // App-wide banners: offline with its sync queue, and payments grace.

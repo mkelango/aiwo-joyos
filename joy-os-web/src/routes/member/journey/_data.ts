@@ -503,9 +503,10 @@ export const SALONS = [
 
 // ─── Events ───────────────────────────────────────────────────────────────
 
+/** The member's own specimen passes; the holder is the member's saved name (useMemberName). */
 export const PASSES = [
-  { id: 'ev2', code: 'JS-CHN-0220-0001', gate: 'Gate B · East lawn', seat: 'Open seating', holder: 'Arjun Rao', status: 'Valid' as const },
-  { id: 'ev1', code: 'AJ27-FMB-0001', gate: 'Grand ballroom', seat: 'Table 14', holder: 'Arjun Rao', status: 'Used' as const },
+  { id: 'ev2', code: 'JS-CHN-0220-0001', gate: 'Gate B · East lawn', seat: 'Open seating', status: 'Valid' as const },
+  { id: 'ev1', code: 'AJ27-FMB-0001', gate: 'Grand ballroom', seat: 'Table 14', status: 'Used' as const },
 ]
 
 export const SESSION_SCHEDULE = [
@@ -541,6 +542,18 @@ export const FLAGSHIP_RECAP = {
   circleFormed: '2027-01-05',
   sessionsAttended: ['The Summit: the Mentor’s address', 'Experience Zone: Pleasure', 'Capacity battery', 'The Ikigai map', 'The slow dinner'],
 }
+
+/**
+ * New Year's Eve at AIWO Joyspan 2027 (Playbook p61): the evening ends with the
+ * Declaration at 23:50, then the sun rises on the stage LED at midnight.
+ */
+export const NYE_PROGRAMME: { time: string; title: string; where: string; term?: TermKey; declaration?: boolean }[] = [
+  { time: '19:30', title: 'The slow dinner at the Long Table', where: 'The Long Table', term: 'D' },
+  { time: '21:30', title: 'The Summit: the Mentor’s address', where: 'Main hall', term: 'P' },
+  { time: '23:00', title: 'The quiet hour: the Wardrobe and the Quiet Pods', where: 'Pavilion' },
+  { time: '23:50', title: 'The Declaration', where: 'Main hall', declaration: true },
+  { time: '00:00', title: 'Begin 2027 with joy: the sun rises on the stage', where: 'Main hall' },
+]
 
 /** Call-room captions — one line per member, first person, on this week’s prompt (specimen). */
 export const CAPTIONS: Record<string, string> = {

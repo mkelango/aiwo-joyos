@@ -24,12 +24,32 @@ export function readJSON<T>(key: string): T | null {
   }
 }
 
+/**
+ * Fired on window whenever an entry record is written or removed (detail: the key), so a
+ * screen reading 'joyos:onboarding' (the member's name, the minors record) follows setup
+ * in this tab; other tabs get the browser's own 'storage' event.
+ */
+export const ENTRY_CHANGED = 'joyos:entry-changed'
+
+function changed(key: string) {
+  // After the current task: a write can happen inside a state updater, and a listener's
+  // setState must never run while another component renders.
+  queueMicrotask(() => {
+    try {
+      window.dispatchEvent(new CustomEvent<string>(ENTRY_CHANGED, { detail: key }))
+    } catch {
+      /* no window (tests): nothing listens */
+    }
+  })
+}
+
 export function writeJSON(key: string, value: unknown) {
   try {
     window.localStorage.setItem(key, JSON.stringify(value))
   } catch {
     /* storage unavailable: keep going in memory */
   }
+  changed(key)
 }
 
 export function removeKey(key: string) {
@@ -38,6 +58,7 @@ export function removeKey(key: string) {
   } catch {
     /* ignore */
   }
+  changed(key)
 }
 
 /** A finished Check: bands only, never a number. Written when the result screen opens. */
@@ -61,7 +82,10 @@ export interface CheckProgress {
 export interface SavedOnboarding {
   step: number
   account: {
+    /** First name: what the coach and VIVA call the member. */
     name: string
+    /** Family name, optional (older drafts have none). */
+    lastName?: string
     via: 'phone' | 'email'
     country: string
     phone: string
@@ -70,6 +94,8 @@ export interface SavedOnboarding {
   }
   intents: TermKey[]
   consents: { care: boolean; data: boolean; publishing: boolean }
+  /** The artefact version of each consent text as shown when it was given (Arch p17, consent_event). */
+  consentVersions?: { care: string; data: string; publishing: string }
   device: string
   linked: string[]
   invites: { name: string; relation: string; contact: string }[]
@@ -80,6 +106,21 @@ export interface SavedOnboarding {
   age?: SavedAge
   savedAt: string
   completedAt?: string
+}
+
+/**
+ * The member's own name as given in setup (C1: lib/memberName reads it, falling back to the
+ * specimen member). Only from a finished setup; null before that or when storage is blocked.
+ * A family name typed into the first-name field ("Kavya Menon") is split off as the last name.
+ */
+export function setupName(): { firstName: string; lastName: string } | null {
+  const ob = readJSON<SavedOnboarding>(ONBOARDING_KEY)
+  const name = ob?.completedAt ? ob.account?.name?.trim() : ''
+  if (!ob || !name) return null
+  const last = ob.account.lastName?.trim() ?? ''
+  if (last) return { firstName: name, lastName: last }
+  const [firstName, ...rest] = name.split(/\s+/)
+  return { firstName, lastName: rest.join(' ') }
 }
 
 /** The minors gate (Arch p26: minors are never scored; verifiable parental consent). */

@@ -31,6 +31,12 @@ export function FlowTopBar({ exitTo = '/', exitLabel, hideExit = false, onExit, 
   )
 }
 
+/** The Burnight credit (Playbook p17, p44): shown wherever the word Joyspan is defined in public. */
+export function JoyspanCredit({ className }: { className?: string }) {
+  const t = useDict(E)
+  return <span className={clsx('block text-[14px] text-ink-3', className)}>{t('credit')}</span>
+}
+
 /** A section heading used on the long public method/evidence pages. */
 export function Section({ id, eyebrow, title, lead, children, className }: { id?: string; eyebrow: string; title: ReactNode; lead?: ReactNode; children: ReactNode; className?: string }) {
   return (

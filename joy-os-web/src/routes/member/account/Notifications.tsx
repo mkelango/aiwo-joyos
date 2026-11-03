@@ -225,11 +225,11 @@ function Row({ n, read, muted, onOpen, onRead }: { n: Notif; read: boolean; mute
             <span className={clsx('text-[16px]', read || upcoming ? 'text-ink-2' : 'text-ink')}>
               <span className="sr-only">{read || upcoming ? '' : t('unreadSr')}</span>{dx(n.title)}
             </span>
-            <span className="num shrink-0 text-[12px] text-ink-3" title={n.at}>{dx(n.ago)}</span>
+            <span className="num shrink-0 text-[12px] text-ink-3" title={dx(n.at)}>{dx(n.ago)}</span>
           </span>
           <span className="mt-0.5 block text-[14px] leading-snug text-ink-2">{dx(n.body)}</span>
           <span className="eyebrow mt-1.5 flex flex-wrap items-center gap-x-2 text-ink-3">
-            {dx(KIND_LABEL[n.kind])} · <span className="num normal-case">{n.at}</span>
+            {dx(KIND_LABEL[n.kind])} · <span className="num normal-case">{dx(n.at)}</span>
             {muted && <span className="normal-case tracking-normal">{t('typeNowOff')}</span>}
             <ArrowRight size={12} className="opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
           </span>

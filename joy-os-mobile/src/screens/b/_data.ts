@@ -17,6 +17,8 @@ export interface Notice {
   title: string
   body: string
   at: string
+  /** For a notice older than yesterday: its ISO day, shown as day and month in the member's language. */
+  date?: string
   href: string
   cta: string
 }
@@ -26,8 +28,8 @@ export const NOTICES: Notice[] = [
   { id: 'n3', group: 'Today', kind: 'ledger', title: 'Anything good in the last few hours?', body: 'Ten seconds for the Joy Ledger.', at: '16:30', href: '/ledger', cta: 'Add to the Ledger' },
   { id: 'n2', group: 'Earlier', kind: 'message', title: 'Priya replied', body: 'Skipping is allowed — it is never counted against you…', at: 'Yesterday', href: '/messages?t=t_priya', cta: 'Read the reply' },
   { id: 'n4', group: 'Earlier', kind: 'circle', title: 'Circle on Monday, 19:00', body: 'Week 4 · Don’t Postpone Joy. Thirty minutes with the same eight.', at: 'Yesterday', href: '/circles', cta: 'See the circle' },
-  { id: 'n5', group: 'Earlier', kind: 'care', title: 'Your January panel is signed', body: 'Dr Meera Iyer signed it with a note in plain words.', at: '24 Jan', href: '/care', cta: 'See results' },
-  { id: 'n6', group: 'Earlier', kind: 'letter', title: 'The Joyspan Letter · Winter', body: 'Published results, up and down, and what we changed.', at: '15 Jan', href: '/method', cta: 'Read the method' },
+  { id: 'n5', group: 'Earlier', kind: 'care', title: 'Your January panel is signed', body: 'Dr Meera Iyer signed it with a note in plain words.', at: '24 Jan', date: '2027-01-24', href: '/care', cta: 'See results' },
+  { id: 'n6', group: 'Earlier', kind: 'letter', title: 'The Joyspan Letter · Winter', body: 'Published results, up and down, and what we changed.', at: '15 Jan', date: '2027-01-15', href: '/method', cta: 'Read the method' },
 ]
 
 export const PLANS = [

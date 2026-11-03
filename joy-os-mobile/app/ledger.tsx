@@ -260,7 +260,7 @@ function Ledger() {
       <Card tone="raised" style={{ gap: space.s1 }}>
         <Eyebrow {...H2}>{tl('recent')}</Eyebrow>
         {recent.map(({ e, stamp }, i) => {
-          const when = ledgerWhen(stamp)
+          const when = ledgerWhen(stamp, lang)
           return (
             <View key={e.id} style={{ flexDirection: 'row', gap: 12, paddingVertical: 10, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: c.line }}>
               <Mono size={13} tone="ink3" style={{ width: 92 }}>

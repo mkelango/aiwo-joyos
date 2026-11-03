@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Platform, View } from 'react-native'
 import { ArrowLink, Avatar, Body, Divider, DaybreakButton, Eyebrow, JoyspanWheel, LoopRing, Meta, Mono, Numeral, Screen, ScreenHeader, Serif, SpecimenTag, TermDot, fmtDate } from '@/components'
 import { useApp } from '@/lib/store'
+import { useIsMinor } from '@/lib/minor'
 import { useDict, useTermText } from '@/lib/i18n'
 import { H2 } from '@/screens/a/local'
 import { DAY40_COACH_NOTE, DAY40_DATES } from '@/screens/b/entryData'
@@ -37,6 +38,8 @@ function Day40() {
   const low = day0.lowestTerm
   const priya = TEAM.find((p) => p.id === 'p_priya')!
   const web = Platform.OS === 'web'
+  // Under 18: never scored, so the page carries no Wheel, no lowest term and no measure dates.
+  const minor = useIsMinor()
 
   return (
     <Screen>
@@ -70,10 +73,16 @@ function Day40() {
           </View>
         </View>
 
-        <View style={{ alignItems: 'center', gap: space.s1 }}>
-          <JoyspanWheel terms={day0.terms} size={200} value={day0.value} animate={false} />
-          <Meta align="center">{t('wheelNote', { date: fmtDate(day0.takenOn) })}</Meta>
-        </View>
+        {minor ? (
+          <View style={{ backgroundColor: c.paperSunk, borderRadius: radius.card, padding: space.s2 }}>
+            <Meta tone="ink">{t('minorNote')}</Meta>
+          </View>
+        ) : (
+          <View style={{ alignItems: 'center', gap: space.s1 }}>
+            <JoyspanWheel terms={day0.terms} size={200} value={day0.value} animate={false} />
+            <Meta align="center">{t('wheelNote', { date: fmtDate(day0.takenOn) })}</Meta>
+          </View>
+        )}
 
         <View style={{ gap: space.s1 }}>
           <Eyebrow {...H2}>{t('signalsTitle')}</Eyebrow>
@@ -94,7 +103,7 @@ function Day40() {
         <Divider />
         <View style={{ gap: space.s1 }}>
           <Eyebrow {...H2} tone="daybreak">{t('focusTitle')}</Eyebrow>
-          <Body>{t('focusBody', { space: tt.space(low) })}</Body>
+          <Body>{minor ? t('minorFocus') : t('focusBody', { space: tt.space(low) })}</Body>
           <Body size={20}>
             <Serif>{txFor(lang, TODAY_ACTION.title)}</Serif>
           </Body>
@@ -117,11 +126,16 @@ function Day40() {
         <View style={{ gap: space.s1 }}>
           <Eyebrow {...H2}>{t('nextTitle')}</Eyebrow>
           {(
-            [
-              ['45', DAY40_DATES.day45, t('next45')],
-              ['76', DAY40_DATES.day76, t('next76')],
-              ['90', DAY40_DATES.day90, t('next90')],
-            ] as const
+            (minor
+              ? [
+                  ['45', DAY40_DATES.day45, t('next45')],
+                  ['90', DAY40_DATES.day90, t('minorNext90')],
+                ]
+              : [
+                  ['45', DAY40_DATES.day45, t('next45')],
+                  ['76', DAY40_DATES.day76, t('next76')],
+                  ['90', DAY40_DATES.day90, t('next90')],
+                ]) as [string, string, string][]
           ).map(([d, date, label]) => (
             <View key={d} style={{ flexDirection: 'row', gap: 12, alignItems: 'baseline' }}>
               <Mono size={14} tone="ink" style={{ minWidth: 64 }}>
@@ -156,9 +170,11 @@ function Day40() {
         >
           {web ? t('print') : t('save')}
         </DaybreakButton>
-        <ArrowLink icon="bar-chart-2" onPress={() => router.push('/index-result')}>
-          {t('seeIndex')}
-        </ArrowLink>
+        {minor ? null : (
+          <ArrowLink icon="bar-chart-2" onPress={() => router.push('/index-result')}>
+            {t('seeIndex')}
+          </ArrowLink>
+        )}
       </View>
     </Screen>
   )

@@ -2,15 +2,19 @@ import clsx from 'clsx'
 import { Link } from 'react-router-dom'
 import { useDict } from '@/lib/i18n'
 import { SHARED } from '@/components/_i18n'
+import { Wordmark } from './Wordmark'
 
 // AIWO is a branded house: Joy OS never has its own logo. It is a line of type
 // under or beside the mark, caps, +240 tracking (Playbook p20–27).
+// The mark itself is the vector master (Wordmark.tsx), never set in a font.
+
+/**
+ * The AIWO wordmark. `size` keeps its old meaning (the type size the mark sat beside, in px):
+ * the drawn cap height is three quarters of it, never below the 72 px screen minimum width.
+ * Colour follows the text colour (`text-ink` by default; pass a `text-…` class to change it).
+ */
 export function AiwoMark({ className, size = 22 }: { className?: string; size?: number }) {
-  return (
-    <span className={clsx('font-sans font-light text-ink', className)} style={{ fontSize: size, letterSpacing: '0.18em' }} role="img" aria-label="AIWO">
-      A<span className="mx-[0.02em] inline-block -skew-x-0 font-extralight" aria-hidden>\</span>WO
-    </span>
-  )
+  return <Wordmark height={size * 0.75} className={className} />
 }
 
 export function JoyOsLockup({ to = '/', className, sub = 'Joy OS' }: { to?: string; className?: string; sub?: string }) {
@@ -24,3 +28,5 @@ export function JoyOsLockup({ to = '/', className, sub = 'Joy OS' }: { to?: stri
 }
 
 export const TAGLINE = 'Joy, measured. Years worth living.'
+/** The brand line that arrives last in the animated mark (Playbook p15, p53). Stays English. */
+export const BRAND_LINE = 'Years Worth Living.'

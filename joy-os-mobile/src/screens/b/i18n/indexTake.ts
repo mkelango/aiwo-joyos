@@ -132,6 +132,30 @@ export const TAKE = {
   csWhere: { en: 'See where it stands', ta: 'இது எந்த நிலையில் உள்ளது என்று பாருங்கள்', hi: 'देखें यह कहाँ तक पहुँचा' },
   csAlready: { en: 'This re-measure has been sent. It waits for, or already has, Dr Meera’s signature.', ta: 'இந்த மறு அளவீடு அனுப்பப்பட்டுவிட்டது. இது Dr Meera-வின் கையொப்பத்துக்குக் காத்திருக்கிறது, அல்லது ஏற்கனவே பெற்றுவிட்டது.', hi: 'यह दोबारा माप भेजा जा चुका है। इस पर Dr Meera के हस्ताक्षर का इंतज़ार है, या हो चुके हैं।' },
 
+  // Signals beside the answers (Arch p30: signals down → a survey-only Index, flagged)
+  sigEyebrow: { en: 'Signals · beside your answers', ta: 'சமிக்ஞைகள் · உங்கள் பதில்களுடன்', hi: 'संकेत · आपके जवाबों के साथ' },
+  sigA: { en: 'What your devices ', ta: 'உங்கள் சாதனங்கள் ', hi: 'आपके डिवाइस क्या ' },
+  sigSerif: { en: 'add', ta: 'சேர்ப்பது', hi: 'जोड़ते' },
+  sigB: { en: '.', ta: '.', hi: ' हैं।' },
+  sigLead: { en: 'Some terms blend your answers with readings from a linked device. You can score this sitting from your answers alone.', ta: 'சில அம்சங்கள் உங்கள் பதில்களை இணைக்கப்பட்ட சாதனத்தின் அளவீடுகளுடன் கலக்கின்றன. இந்த அமர்வை உங்கள் பதில்களை மட்டும் கொண்டு மதிப்பிடலாம்.', hi: 'कुछ पहलू आपके जवाबों को जुड़े डिवाइस की रीडिंग के साथ मिलाते हैं। आप इस बैठक को सिर्फ़ अपने जवाबों से भी स्कोर कर सकते हैं।' },
+  sigDownTitle: { en: 'Signals are down', ta: 'சமிக்ஞைகள் கிடைக்கவில்லை', hi: 'संकेत बंद हैं' },
+  sigDownBody: { en: 'No device is connected, or its readings are too old to use. This sitting is scored from your answers alone and marked survey-only. Nothing else changes.', ta: 'எந்தச் சாதனமும் இணைக்கப்படவில்லை, அல்லது அதன் அளவீடுகள் பயன்படுத்த முடியாத அளவு பழையவை. இந்த அமர்வு உங்கள் பதில்களை மட்டும் கொண்டு மதிப்பிடப்பட்டு, கேள்வித்தாள் மட்டும் எனக் குறிக்கப்படும். வேறு எதுவும் மாறாது.', hi: 'कोई डिवाइस जुड़ा नहीं है, या उसकी रीडिंग इस्तेमाल के लिए बहुत पुरानी हैं। यह बैठक सिर्फ़ आपके जवाबों से स्कोर होगी और "सिर्फ़ प्रश्नावली" के रूप में चिह्नित होगी। और कुछ नहीं बदलता।' },
+  sigUpBody: { en: 'Your linked device is connected and its readings are current.', ta: 'உங்கள் இணைக்கப்பட்ட சாதனம் இணைப்பில் உள்ளது; அதன் அளவீடுகள் புதியவை.', hi: 'आपका जुड़ा डिवाइस कनेक्टेड है और उसकी रीडिंग ताज़ा हैं।' },
+  sigUse: { en: 'Use my device signals for this sitting', ta: 'இந்த அமர்வுக்கு என் சாதனச் சமிக்ஞைகளைப் பயன்படுத்து', hi: 'इस बैठक में मेरे डिवाइस के संकेत इस्तेमाल करें' },
+  sigUseD: { en: 'Off: scored from your answers alone, and marked survey-only.', ta: 'அணைத்தால்: உங்கள் பதில்களை மட்டும் கொண்டு மதிப்பிடப்பட்டு, கேள்வித்தாள் மட்டும் எனக் குறிக்கப்படும்.', hi: 'बंद: सिर्फ़ आपके जवाबों से स्कोर होगा, और "सिर्फ़ प्रश्नावली" चिह्नित होगा।' },
+  sigShareB: { en: ' from signals', ta: ' சமிக்ஞைகளிலிருந்து', hi: ' संकेतों से' },
+  sigNone: { en: 'answers only', ta: 'பதில்கள் மட்டும்', hi: 'सिर्फ़ जवाब' },
+  sigShareA11y: { en: '{space}: {pct} percent from signals', ta: '{space}: {pct} சதவீதம் சமிக்ஞைகளிலிருந்து', hi: '{space}: {pct} प्रतिशत संकेतों से' },
+  sigDevices: { en: 'Open Devices', ta: 'சாதனங்களைத் திற', hi: 'डिवाइस खोलें' },
+  sigContinue: { en: 'Continue to review', ta: 'மறுபார்வைக்குத் தொடர்', hi: 'समीक्षा पर आगे बढ़ें' },
+  sigReview: { en: 'Signals', ta: 'சமிக்ஞைகள்', hi: 'संकेत' },
+  sigReviewOn: { en: 'Read from your linked device', ta: 'உங்கள் இணைக்கப்பட்ட சாதனத்திலிருந்து படிக்கப்படும்', hi: 'आपके जुड़े डिवाइस से पढ़े जाएँगे' },
+  sigReviewOff: { en: 'Answers only · survey-only', ta: 'பதில்கள் மட்டும் · கேள்வித்தாள் மட்டும்', hi: 'सिर्फ़ जवाब · सिर्फ़ प्रश्नावली' },
+  surveyOnlyTag: { en: 'Survey only', ta: 'கேள்வித்தாள் மட்டும்', hi: 'सिर्फ़ प्रश्नावली' },
+  surveyOnlyDone: { en: 'Scored from your answers alone: no device signal was read. Your Index says so wherever it appears.', ta: 'உங்கள் பதில்களை மட்டும் கொண்டு மதிப்பிடப்பட்டது: எந்தச் சாதனச் சமிக்ஞையும் படிக்கப்படவில்லை. உங்கள் குறியீடு காட்டப்படும் இடமெல்லாம் இது குறிப்பிடப்படும்.', hi: 'सिर्फ़ आपके जवाबों से स्कोर हुआ: किसी डिवाइस का संकेत नहीं पढ़ा गया। आपका इंडेक्स जहाँ भी दिखेगा, यह बताएगा।' },
+  introSigDown: { en: 'No device is connected, so this sitting will be survey-only. You can link one in Devices first.', ta: 'எந்தச் சாதனமும் இணைக்கப்படவில்லை, அதனால் இந்த அமர்வு கேள்வித்தாள் மட்டுமாக இருக்கும். முதலில் சாதனங்களில் ஒன்றை இணைக்கலாம்.', hi: 'कोई डिवाइस जुड़ा नहीं है, इसलिए यह बैठक सिर्फ़ प्रश्नावली होगी। चाहें तो पहले डिवाइस में एक जोड़ लें।' },
+  introSigUp: { en: 'A signals check comes before the review: your linked device adds to some terms.', ta: 'மறுபார்வைக்கு முன் ஒரு சமிக்ஞைச் சரிபார்ப்பு வரும்: உங்கள் இணைக்கப்பட்ட சாதனம் சில அம்சங்களுக்குச் சேர்க்கிறது.', hi: 'समीक्षा से पहले संकेतों की जाँच आती है: आपका जुड़ा डिवाइस कुछ पहलुओं में जुड़ता है।' },
+
   // Minors: no scoring (Architecture, minors gate)
   minorEyebrow: { en: 'Under 18 · not scored', ta: '18 வயதுக்குக் கீழ் · மதிப்பெண் இல்லை', hi: '18 से कम · स्कोर नहीं' },
   minorA: { en: 'Joy OS does not ', ta: 'Joy OS 18 வயதுக்குக் கீழ் உள்ள யாருக்கும் ', hi: 'Joy OS 18 से कम उम्र के किसी को ' },
@@ -140,3 +164,8 @@ export const TAKE = {
   minorLead: { en: 'There is no Index for you to take. The Ledger, the practices and your people are all open, with your parent or guardian’s consent.', ta: 'நீங்கள் எடுக்க வேண்டிய குறியீடு எதுவும் இல்லை. லெட்ஜர், பயிற்சிகள், உங்கள் மனிதர்கள் எல்லாம் உங்கள் பெற்றோர் அல்லது பாதுகாவலரின் ஒப்புதலுடன் திறந்துள்ளன.', hi: 'आपके लिए लेने को कोई इंडेक्स नहीं है। लेजर, अभ्यास और आपके लोग, सब आपके माता-पिता या अभिभावक की सहमति से खुले हैं।' },
 } satisfies Dict
 
+/** Lab marker names in the Clinical-grade panel. Codes (HbA1c, ApoB, hs-CRP) stay as written. */
+export const LAB_TEXT: Record<string, { ta: string; hi: string }> = {
+  'LDL cholesterol': { ta: 'LDL கொழுப்பு', hi: 'LDL कोलेस्ट्रॉल' },
+  'Vitamin D (25-OH)': { ta: 'வைட்டமின் D (25-OH)', hi: 'विटामिन D (25-OH)' },
+}
