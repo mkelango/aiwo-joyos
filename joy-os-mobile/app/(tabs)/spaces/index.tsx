@@ -25,7 +25,7 @@ import { useLatestIndex } from '@/lib/indexRecord'
 import { useIsMinor } from '@/lib/minor'
 import { Rich, useA } from '@/screens/a/i18n'
 import { H2 } from '@/screens/a/local'
-import { NotScored } from '@/screens/a/parts'
+import { monoNums, NotScored } from '@/screens/a/parts'
 import { ROOM_PLAIN, roomVerdict } from '@/screens/a/spacesData'
 import { termByKey } from '@/shared/terms'
 import type { TermKey } from '@/shared/types'
@@ -88,7 +88,7 @@ export default function SpacesHome() {
                 <BandLabel band={focusScore.band} />
               </View>
             </View>
-            <Body tone="ink2">{tx(verdict.text, verdict.vars)}</Body>
+            <Body tone="ink2">{monoNums(tx(verdict.text, verdict.vars))}</Body>
           </View>
           <DaybreakButton onPress={() => router.push(`/spaces/${focusTerm.slug}`)} accessibilityHint={t('Opens the {space} space', { space: spaceName(focus) })}>
             {t('Open {space}', { space: spaceName(focus) })}
@@ -132,7 +132,7 @@ export default function SpacesHome() {
                     </Body>
                     {term.name !== term.space ? <Meta tone="ink3">{name(k)}</Meta> : null}
                   </View>
-                  <Meta>{tx(ROOM_PLAIN[k])}</Meta>
+                  <Meta>{monoNums(tx(ROOM_PLAIN[k]))}</Meta>
                 </View>
                 {minor ? (
                   <Icon name="chevron-right" size={18} color={c.ink3} />

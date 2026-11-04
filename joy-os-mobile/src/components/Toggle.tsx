@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Pressable, View } from 'react-native'
+import { MonoNums } from '../lib/monoNums'
 import { useTheme } from '../theme/ThemeProvider'
 import { Body, Meta } from './Text'
 
@@ -22,7 +23,7 @@ export function Toggle({ checked, onChange, label, description, disabled }: { ch
     >
       <View style={{ flex: 1, gap: 2 }}>
         <Body>{label}</Body>
-        {description ? typeof description === 'string' ? <Meta>{description}</Meta> : description : null}
+        {description ? typeof description === 'string' ? <Meta><MonoNums text={description} /></Meta> : description : null}
       </View>
       <View style={{ width: 52, height: 32, borderRadius: 16, padding: 4, marginTop: 2, backgroundColor: checked ? c.ink : c.lineStrong, alignItems: checked ? 'flex-end' : 'flex-start' }}>
         <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: c.paper }} />

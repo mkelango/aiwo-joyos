@@ -1,8 +1,8 @@
 import { router } from 'expo-router'
 import { useEffect, useState } from 'react'
-import { Modal, Pressable, ScrollView, View } from 'react-native'
+import { Animated, Modal, Pressable, ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Avatar, Body, Button, Card, DaybreakButton, Eyebrow, Icon, type IconName, InkSurface, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, TermChip, Title, Toggle, fmtDate } from '@/components'
+import { Avatar, Body, Button, Card, DaybreakButton, Eyebrow, Icon, type IconName, InkSurface, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, TermChip, Title, fmtDate, useReducedFade } from '@/components'
 import { CIRCLE } from '@/shared/platform'
 import { MEMBER } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
@@ -10,10 +10,11 @@ import { palettes } from '@/theme/tokens'
 import { useApp, useReduceMotion } from '@/lib/store'
 import { CAPTIONS, CIRCLE_NEXT, CIRCLE_SESSIONS, OTHER_CIRCLES, PRACTICE_CONTENT, SALONS } from '@/screens/b/journeyData'
 import { a11yStore, accountStore, circleReportsStore, refCode, useStore, type BookedPass } from '@/screens/b/bStore'
-import { CheckLine, ChoiceCard, Done, Field, FilterChips, TimelineStep, fmtWhen, memberOnly, useAccount, useSheetCrisisGuard } from '@/screens/b/parts'
+import { CheckLine, ChoiceCard, Done, Field, FilterChips, TimelineStep, fmtWhen, memberOnly, useAccount, useSheetCrisisGuard, FigurePill, useFigures, FigureToggle } from '@/screens/b/parts'
 import { useDict } from '@/lib/i18n'
 import { CIRCLES, OTHER_CIRCLE_TEXT, CIRCLE_STATUS, SALON_TITLE, CIRCLE_PROMPT } from '@/screens/b/i18n/journey'
 import { PRACTICE_TITLE, useCommon, useTx } from '@/screens/b/i18n/common'
+import { MonoNums } from '@/lib/monoNums'
 
 // CIRCLES (Memo p.21): the circle of eight — the same eight people and a lead, Monday at
 // 7 pm, thirty minutes, for the ninety days. First names only, cameras optional, nothing
@@ -39,6 +40,8 @@ function Circles() {
   // The call room: the waiting room before Monday 18:50, then the call itself (specimen preview).
   const [room, setRoom] = useState<RoomMode | null>(null)
   const [left, setLeft] = useState<RoomMode | null>(null)
+  // Under Reduce Motion the room fades out over 120 ms before it unmounts.
+  const [closing, setClosing] = useState<RoomMode | null>(null)
   const [acct, setAcct] = useStore(accountStore)
   const setCircle = (p: Partial<typeof acct.circle>) => setAcct((a) => ({ ...a, circle: { ...a.circle, ...p } }))
   // Join and accept requests and salon places are kept on the phone (accountStore); a salon
@@ -60,6 +63,7 @@ function Circles() {
     setUndoneNote((n) => ({ ...n, [id]: t('gaveUp', { title }) }))
   }
   const t = useDict(CIRCLES)
+  const fig = useFigures()
   const tc = useCommon()
   const tx = useTx()
   const prompt = PRACTICE_CONTENT.find((p) => p.week === CIRCLE_NEXT.week)!
@@ -87,10 +91,10 @@ function Circles() {
       <Card tone="raised" style={{ gap: space.s2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: space.s1 }}>
           <Eyebrow tone="daybreak">{t('nextCall')}</Eyebrow>
-          <Pill>{t('weekOf', { n: CIRCLE_NEXT.week })}</Pill>
+          <FigurePill>{t('weekOf', { n: CIRCLE_NEXT.week })}</FigurePill>
         </View>
         <View style={{ gap: 4 }}>
-          <Title size={26}>{t('monday', { date: fmtDate(CIRCLE_NEXT.date) })}</Title>
+          <Title size={26}><MonoNums text={t('monday', { date: fmtDate(CIRCLE_NEXT.date) })} /></Title>
           <Meta>
             <Mono tone="ink2">{CIRCLE_NEXT.time}</Mono> · <Mono tone="ink2">{String(CIRCLE.callMinutes)}</Mono>{t('minutesA', { coach: CIRCLE.coach })}
           </Meta>
@@ -121,7 +125,7 @@ function Circles() {
               const k = reasonOf(rp.reason)
               return (
                 <View key={rp.id} style={{ gap: 2 }}>
-                  <Body>{t('repRow', { name: rp.about, d: fmtDate(rp.at.slice(0, 10)) })}</Body>
+                  <Body><MonoNums text={t('repRow', { name: rp.about, d: fmtDate(rp.at.slice(0, 10)) })} /></Body>
                   <Meta size={14}>{`${k ? t(`rep_${k}`) : rp.reason} · ${t('repWithCoach', { c: coachFirst })}`}</Meta>
                   <Button
                     size="sm"
@@ -150,7 +154,7 @@ function Circles() {
           <Card tone="sunk" padding={16} style={{ gap: 6 }}>
             <View style={{ flexDirection: 'row', gap: 8 }} accessibilityLiveRegion="polite">
               <Icon name="check" size={16} color={c.ink2} />
-              <Body style={{ flex: 1 }}>{left === 'live' ? t('leftLive') : t('leftWaiting')}</Body>
+              <Body style={{ flex: 1 }}><MonoNums text={left === 'live' ? t('leftLive') : t('leftWaiting')} /></Body>
             </View>
             <Button variant="link" onPress={() => setLeft(null)} style={{ alignSelf: 'flex-start' }}>
               {t('dismiss')}
@@ -180,7 +184,7 @@ function Circles() {
           {CIRCLE_SESSIONS.map((s, i) => (
             <TimelineStep key={s.week} index={i} state="done" last={i === CIRCLE_SESSIONS.length - 1}>
               <View accessible accessibilityLabel={t('sessionA11y', { label: s.week === 0 ? t('formed') : t('weekN', { n: s.week }), date: fmtDate(s.date), title: s.week === 0 ? tx(CIRCLES.formedAt, s.title) : tx(PRACTICE_TITLE[s.week], s.title), n: s.attended, note: s.note })} style={{ gap: 4 }}>
-                <Eyebrow>{s.week === 0 ? `${t('formed')} · ${fmtDate(s.date)}` : `${t('weekN', { n: s.week })} · ${fmtDate(s.date)}`}</Eyebrow>
+                <Eyebrow>{fig(s.week === 0 ? `${t('formed')} · ${fmtDate(s.date)}` : `${t('weekN', { n: s.week })} · ${fmtDate(s.date)}`)}</Eyebrow>
                 <Body weight="medium">{s.week === 0 ? tx(CIRCLES.formedAt, s.title) : tx(PRACTICE_TITLE[s.week], s.title)}</Body>
                 <Meta>{s.note}</Meta>
                 <Meta size={13} tone="ink3">
@@ -208,7 +212,7 @@ function Circles() {
                 <Pill tone={oc.status === 'Invited' ? 'daybreak' : oc.status === 'Member' ? 'ink' : 'neutral'}>{tx(CIRCLE_STATUS[oc.status], oc.status)}</Pill>
               </View>
               <Meta tone="ink">{tx(ot?.who, oc.who)}</Meta>
-              <Meta size={14}>{t('ledBy', { when: tx(ot?.when, oc.when), lead: oc.lead })}</Meta>
+              <Meta size={14}><MonoNums text={t('ledBy', { when: tx(ot?.when, oc.when), lead: oc.lead })} /></Meta>
               <Meta size={14} tone="ink3">
                 {tx(ot?.note, oc.note)}
               </Meta>
@@ -326,7 +330,7 @@ function Circles() {
           </View>
         }
       >
-        <Body>{t('roomAt', { date: fmtDate(CIRCLE_NEXT.date), coach: CIRCLE.coach.split(' ')[0] })}</Body>
+        <Body><MonoNums text={t('roomAt', { date: fmtDate(CIRCLE_NEXT.date), coach: CIRCLE.coach.split(' ')[0] })} /></Body>
         <Card tone="sunk" padding={16} style={{ gap: 6 }}>
           <Eyebrow>{t('room')}</Eyebrow>
           <Mono tone="ink">{CIRCLE_NEXT.room}</Mono>
@@ -341,7 +345,7 @@ function Circles() {
           ]}
         />
         <Meta size={14}>{acct.circle.mode === 'audio' ? t('remAudio') : t('remVideo')}</Meta>
-        <Toggle checked={acct.circle.remind} onChange={(v) => setCircle({ remind: v })} label={t('remind')} description={t('remindD')} />
+        <FigureToggle checked={acct.circle.remind} onChange={(v) => setCircle({ remind: v })} label={t('remind')} description={t('remindD')} />
         {acct.circle.calendar ? (
           <View style={{ gap: 4 }}>
             <Done>{t('addedCal')}</Done>
@@ -365,15 +369,18 @@ function Circles() {
         />
       ) : null}
 
-      {room ? (
+      {room || closing ? (
         <CallRoom
-          mode={room}
+          open={!!room}
+          mode={room ?? closing!}
           audioOnly={acct.circle.mode === 'audio'}
           onMode={setRoom}
           onLeave={() => {
             setLeft(room)
+            setClosing(room)
             setRoom(null)
           }}
+          onClosed={() => setClosing(null)}
         />
       ) : null}
     </Screen>
@@ -441,7 +448,7 @@ function ReportSheet({ coach, onClose, onSend }: { coach: string; onClose: () =>
       {sent ? (
         <>
           <Done>{t('repSent', { c: coach })}</Done>
-          <Meta>{t('repSentNext', { c: coach })}</Meta>
+          <Meta><MonoNums text={t('repSentNext', { c: coach })} /></Meta>
           <Card tone="sunk" padding={16} style={{ gap: 6 }}>
             <Meta tone="ink">{t('repDanger')}</Meta>
             <Button
@@ -459,7 +466,7 @@ function ReportSheet({ coach, onClose, onSend }: { coach: string; onClose: () =>
         </>
       ) : (
         <>
-          <Meta>{t('repLead', { c: coach })}</Meta>
+          <Meta><MonoNums text={t('repLead', { c: coach })} /></Meta>
           <Meta tone="ink">{t('repWho')}</Meta>
           <FilterChips<string> label={t('repWho')} value={about} onChange={setAbout} items={others.map((m) => ({ value: m, label: m }))} />
           {tried && !about ? (
@@ -491,10 +498,15 @@ type RoomMode = 'waiting' | 'live'
 const ROOM = palettes.dark
 
 /** The circle call (specimen): no camera or microphone is opened; the room is simulated on this phone. */
-function CallRoom({ mode, audioOnly, onMode, onLeave }: { mode: RoomMode; audioOnly: boolean; onMode: (m: RoomMode) => void; onLeave: () => void }) {
+function CallRoom({ open, mode, audioOnly, onMode, onLeave, onClosed }: { open: boolean; mode: RoomMode; audioOnly: boolean; onMode: (m: RoomMode) => void; onLeave: () => void; onClosed: () => void }) {
   const { space, radius } = useTheme()
   const insets = useSafeAreaInsets()
   const reduce = useReduceMotion()
+  // Reduce Motion (Playbook p53): the room never jumps; it fades in and out over 120 ms.
+  const fade = useReducedFade(open, reduce)
+  useEffect(() => {
+    if (!open && !fade.visible) onClosed()
+  }, [open, fade.visible, onClosed])
   const t = useDict(CIRCLES)
   const tx = useTx()
   const [a11y] = useStore(a11yStore)
@@ -536,7 +548,8 @@ function CallRoom({ mode, audioOnly, onMode, onLeave }: { mode: RoomMode; audioO
   const disc = { backgroundColor: ROOM.paperRaised, borderWidth: 1, borderColor: ROOM.lineStrong }
 
   return (
-    <Modal visible transparent={false} animationType={reduce ? 'none' : 'fade'} onRequestClose={onLeave} statusBarTranslucent>
+    <Modal visible={fade.visible} transparent={reduce} animationType={reduce ? 'none' : 'fade'} onRequestClose={onLeave} statusBarTranslucent>
+      <Animated.View style={{ flex: 1, opacity: fade.opacity }} pointerEvents={open ? 'auto' : 'none'}>
       <InkSurface.Provider value>
         <View
           accessibilityViewIsModal
@@ -566,7 +579,7 @@ function CallRoom({ mode, audioOnly, onMode, onLeave }: { mode: RoomMode; audioO
             ) : (
               <View style={{ backgroundColor: tileBg, borderRadius: radius.card, padding: 14, gap: 10 }}>
                 <Eyebrow tone="ink3">{t('waitingRoom')}</Eyebrow>
-                <Body>{t('waitingOpens')}</Body>
+                <Body><MonoNums text={t('waitingOpens')} /></Body>
                 <Pressable
                   onPress={() => onMode('live')}
                   accessibilityRole="button"
@@ -680,6 +693,7 @@ function CallRoom({ mode, audioOnly, onMode, onLeave }: { mode: RoomMode; audioO
           </View>
         </View>
       </InkSurface.Provider>
+      </Animated.View>
     </Modal>
   )
 }

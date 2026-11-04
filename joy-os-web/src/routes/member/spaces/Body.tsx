@@ -1,18 +1,25 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowDown, ArrowRight, ArrowUp, Check, ChevronDown, ChevronLeft, Link2, Lock, Pause, Play, Plus, RotateCcw, Search, ShieldCheck, Smartphone, Timer, Trash2 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { DaybreakButton, Eyebrow, MethodLine, SpecimenTag, fmtDate } from '@/components/joy/primitives'
 import { Button, Pill, Sheet, Tabs } from '@/components/ui'
 import { DEVICES as ACCOUNT_DEVICES, type DeviceState } from '@/routes/member/account/_data'
-import { useData as useAccountData } from '@/routes/member/account/_i18n'
+import { DEV, useData as useAccountData } from '@/routes/member/account/_i18n'
 import { usePersisted } from '@/routes/member/account/_util'
+import { Checkbox } from '@/routes/member/account/_parts'
+import { ACCT_CHANGED } from '@/routes/member/account/_prefs'
+import { CONSENT_SEED, latestFor, type ConsentHistory } from '@/routes/member/account/_consent'
+import { DEVICE_CONSENT, consentAllows, readConsents, setDeviceConsent, type ConsentRecord, type DevicePurpose } from '@/routes/member/account/_links'
+import { EmptyIllustration } from '@/components/joy/EmptyIllustration'
+import { useDict } from '@/lib/i18n'
+import { VIZ } from '@/lib/viz'
 import { postCareMessage } from '@/routes/member/account/_careInbox'
 import { BIOMARKERS, CAPACITY, CAPACITY_HISTORY_START, LE8, LE8_HEIGHT_CM, LE8_KEY, LE8_LOG_START, PANEL_META, SIGNALS, SPACE_TODAY, bmiOf, le8Latest, le8Score, le8Series, le8Status, type Le8Key, type Le8Reading, type Marker, type MarkerStatus } from './_data'
 import { ChartTip, SpaceShell, ToolCard, axisTick, Toggle } from './_SpaceShell'
-import { useSpaceText, type SpKey } from './_i18n'
+import { mono, useSpaceText, type SpKey } from './_i18n'
 import { useSpaceState } from './_state'
 import { useIsMinor } from '@/lib/minor'
 
@@ -23,10 +30,12 @@ import { useIsMinor } from '@/lib/minor'
 // The one Daybreak button: start the home capacity test.
 export default function Body() {
   const { t, r } = useSpaceText()
+  // One device record for the page: the device card changes it, the signal trends read it.
+  const dev = useBodyDevices()
   return (
     <SpaceShell term="H" title={<>{r('body.title', { e: <em>{t('body.titleE')}</em> })}</>}>
       <div className="grid gap-6 lg:grid-cols-12">
-        <div className="flex lg:col-span-5"><DeviceLink /></div>
+        <div className="flex lg:col-span-5"><DeviceLink dev={dev} /></div>
         <div className="flex lg:col-span-7"><Le8Tracker /></div>
       </div>
       <BiomarkerVault />
@@ -35,60 +44,109 @@ export default function Body() {
         <div className="flex lg:col-span-7"><CapacityBattery /></div>
         <div className="flex lg:col-span-5"><BiologicalAge /></div>
       </div>
-      <SignalTrends />
+      <SignalTrends dev={dev} />
     </SpaceShell>
   )
 }
 
 // ─── Device link ──────────────────────────────────────────────────────────
 
-/** The day the device consents (Oura, Apple Health) were given in setup (data/member CONSENTS). */
-const DEVICE_CONSENT_ON = '2026-07-07'
-
-// The device record /app/devices keeps (joyos:acct:devices) is the one source of truth:
-// a link or disconnect here shows there, and the reverse. Same key, same shape.
-type DeviceOverride = { state: DeviceState; lastSync?: string; freshness?: 'fresh' | 'stale' }
-type AcctDevice = (typeof ACCOUNT_DEVICES)[number]
-function applyDeviceStates(states: Record<string, DeviceOverride>): AcctDevice[] {
-  // As on /app/devices: Android-only sources keep their own state.
-  return ACCOUNT_DEVICES.map((d) => (states[d.id] ? { ...d, ...states[d.id], state: states[d.id].state === 'available' && d.state === 'android' ? 'android' : states[d.id].state } : d))
+// The device record /app/devices keeps (joyos:acct:devices) is the one source of truth, and
+// each device's consent lives in the Trust centre (account/_links): linking here grants it
+// with the purposes chosen (Body, Ease) and records a consent_event, disconnecting withdraws
+// it, and a withdrawn consent shows the device as not linked, exactly as /app/devices does.
+// Body holds the record once and hands it to the device card and the signal trends, so
+// both always show the same state.
+type DeviceOverride = { state: DeviceState; lastSync?: string; freshness?: 'fresh' | 'stale'; purposes?: DevicePurpose[] }
+type AcctDevice = (typeof ACCOUNT_DEVICES)[number] & { purposes?: DevicePurpose[] }
+function applyDeviceStates(states: Record<string, DeviceOverride>, consents: ConsentRecord): AcctDevice[] {
+  // As on /app/devices: Android-only sources keep their own state, and a withdrawn consent wins.
+  return ACCOUNT_DEVICES.map((d): AcctDevice => {
+    const o = states[d.id]
+    const merged: AcctDevice = o ? { ...d, ...o, state: o.state === 'available' && d.state === 'android' ? 'android' : o.state } : d
+    return merged.state === 'connected' && !consentAllows(d.id, consents) ? { ...merged, state: 'available' } : merged
+  })
 }
 
-function DeviceLink() {
+/** The Trust centre's consents and consent history, re-read after every change on the page. */
+function readTrust() {
+  let history: ConsentHistory = CONSENT_SEED
+  try {
+    const raw = localStorage.getItem('joyos:acct:consent-history')
+    if (raw) history = { ...CONSENT_SEED, ...(JSON.parse(raw) as ConsentHistory) }
+  } catch {
+    /* storage unavailable: the specimen history stands */
+  }
+  return { consents: readConsents(), history }
+}
+
+/** The day a device's consent was last given or withdrawn, from the consent history. */
+function consentDay(history: ConsentHistory, deviceId: string, action: 'granted' | 'withdrawn') {
+  const id = DEVICE_CONSENT[deviceId]
+  const e = id ? latestFor(history, id) : undefined
+  return e && e.action === action ? e.at.slice(0, 10) : null
+}
+
+function useBodyDevices() {
   const [saved, setSaved] = usePersisted<{ states: Record<string, DeviceOverride> }>('devices', { states: {} })
-  const devices = useMemo(() => applyDeviceStates(saved.states), [saved])
+  const [trust, setTrust] = useState(readTrust)
+  useEffect(() => {
+    const sync = () => setTrust(readTrust())
+    window.addEventListener(ACCT_CHANGED, sync)
+    window.addEventListener('storage', sync)
+    window.addEventListener('focus', sync)
+    return () => {
+      window.removeEventListener(ACCT_CHANGED, sync)
+      window.removeEventListener('storage', sync)
+      window.removeEventListener('focus', sync)
+    }
+  }, [])
+  const devices = useMemo(() => applyDeviceStates(saved.states, trust.consents), [saved, trust.consents])
   const setDevice = (id: string, patch: DeviceOverride) => setSaved((cur) => {
-    const next = applyDeviceStates(cur.states).map((d) => (d.id === id ? { ...d, ...patch } : d))
-    return { states: Object.fromEntries(next.map((d) => [d.id, { state: d.state, lastSync: d.lastSync, freshness: d.freshness }])) }
+    const next = applyDeviceStates(cur.states, readConsents()).map((d) => (d.id === id ? { ...d, ...patch } : d))
+    return { states: Object.fromEntries(next.map((d) => [d.id, { state: d.state, lastSync: d.lastSync, freshness: d.freshness, purposes: d.purposes }])) }
   })
   // Pausing a share is this card's own choice (the device stays linked), kept apart from the device record.
   const [paused, setPaused] = useSpaceState<Record<string, boolean>>('body.devices.paused.v1', {})
+  return { devices, setDevice, history: trust.history, paused, setPaused }
+}
+type BodyDevices = ReturnType<typeof useBodyDevices>
+
+function DeviceLink({ dev }: { dev: BodyDevices }) {
+  const { devices, setDevice, history, paused, setPaused } = dev
   const [linking, setLinking] = useState<string | null>(null)
+  const [choose, setChoose] = useState<AcctDevice | null>(null)
   const [confirm, setConfirm] = useState<AcctDevice | null>(null)
   const [note, setNote] = useState('')
   const timer = useRef<number | undefined>(undefined)
   useEffect(() => () => window.clearTimeout(timer.current), [])
-  const { t, r, lang } = useSpaceText()
+  const { t, r, tt, lang, tn } = useSpaceText()
   const dx = useAccountData()
-  const link = (dv: AcctDevice) => {
+  const dev2 = useDict(DEV)
+  // The purposes chosen for the device, then the simulated link; the consent is given on success.
+  const link = (dv: AcctDevice, purposes: DevicePurpose[]) => {
+    setChoose(null)
     setLinking(dv.id); setNote('')
     window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => {
-      setDevice(dv.id, { state: 'connected', lastSync: 'Just now', freshness: 'fresh' })
+      setDeviceConsent(dv.id, true, purposes, 'body')
+      setDevice(dv.id, { state: 'connected', lastSync: 'Just now', freshness: 'fresh', purposes })
       setPaused((p) => ({ ...p, [dv.id]: false }))
       setLinking(null)
-      setNote(t('body.dev.linked', { name: dv.name }))
+      setNote(t('body.dev.linkedConsent', { name: dv.name }))
     }, 1200)
   }
   const disconnect = (dv: AcctDevice) => {
-    setDevice(dv.id, { state: 'available' })
+    setDeviceConsent(dv.id, false, undefined, 'body')
+    setDevice(dv.id, { state: 'available', lastSync: dv.lastSync, freshness: dv.freshness, purposes: dv.purposes })
     setPaused((p) => ({ ...p, [dv.id]: false }))
     setConfirm(null)
-    setNote(t('body.dev.disconnected', { name: dv.name }))
+    setNote(t('body.dev.disconnectedConsent', { name: dv.name }))
   }
   // Connected first, then the ones that can be linked; Android-only sources last.
   const order: Record<DeviceState, number> = { connected: 0, available: 1, android: 2 }
   const list = [...devices].sort((a, b) => order[a.state] - order[b.state])
+  const spaceOf = (p: DevicePurpose) => tt.space(p === 'body' ? 'H' : 'B')
   return (
     <ToolCard className="w-full" eyebrow={t('body.dev.eyebrow')} title={t('body.dev.title')} sub={t('body.dev.sub')} aside={<SpecimenTag />}>
       <ul className="space-y-3">
@@ -96,25 +154,35 @@ function DeviceLink() {
           const on = dv.state === 'connected'
           const busy = linking === dv.id
           const sharing = on && !paused[dv.id]
+          const given = on ? consentDay(history, dv.id, 'granted') : null
+          const withdrawn = !on ? consentDay(history, dv.id, 'withdrawn') : null
           return (
             <li key={dv.id} className="rounded-2xl border border-line p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[16px] text-ink">{dv.name} <span className="text-[13px] text-ink-3">{dx(dv.via)}</span></p>
+                  <p className="text-[16px] text-ink">{mono(dv.name)} <span className="text-[13px] text-ink-3">{dx(dv.via)}</span></p>
                   <p className="mt-0.5 text-[13px] text-ink-2">{dv.signals.map(dx).join(', ')}</p>
                   <p className="mt-1.5 flex items-center gap-1.5 text-[13px] text-ink-3">
-                    <span className={clsx('h-2 w-2 shrink-0 rounded-full', on ? 'bg-term-h' : 'border border-line-strong')} aria-hidden />
+                    <span className={clsx('h-2 w-2 shrink-0 rounded-full', on ? 'bg-ink' : 'border border-line-strong')} aria-hidden />
                     {on
-                      ? (sharing ? t('body.dev.lastSync', { when: dx(dv.lastSync ?? 'Just now') }) : t('body.dev.paused'))
+                      ? (sharing ? tn('body.dev.lastSync', { when: dx(dv.lastSync ?? 'Just now') }) : t('body.dev.paused'))
                       : busy ? t('body.dev.linking') : dv.state === 'android' ? <span className="inline-flex items-center gap-1"><Smartphone size={13} aria-hidden /> {t('body.dev.notLinked')}</span> : t('body.dev.notLinked')}
                   </p>
+                  {on && (given || dv.purposes) && (
+                    <p className="mt-1 text-[12px] text-ink-3">
+                      {given && r('body.dev.consentOn', { d: <span className="num">{fmtDate(given, lang)}</span> })}
+                      {given && dv.purposes && ' · '}
+                      {dv.purposes && t('body.dev.feeds', { list: dv.purposes.map(spaceOf).join(' · ') })}
+                    </p>
+                  )}
+                  {!on && !busy && withdrawn && <p className="mt-1 text-[12px] text-ink-3">{r('body.dev.withdrawn', { d: <span className="num">{fmtDate(withdrawn, lang)}</span> })}</p>}
                 </div>
                 {on ? (
                   <div className="pt-0.5">
                     <Toggle checked={sharing} onChange={(v) => setPaused((s) => ({ ...s, [dv.id]: !v }))} label={<span className="sr-only">{t('body.dev.share', { name: dv.name })}</span>} />
                   </div>
                 ) : dv.state === 'android' ? null : (
-                  <Button size="sm" onClick={() => link(dv)} disabled={busy || !!linking} className="shrink-0"><Link2 size={14} /> {busy ? t('body.dev.linkingBtn') : t('body.dev.link')}</Button>
+                  <Button size="sm" onClick={() => setChoose(dv)} disabled={busy || !!linking} className="shrink-0"><Link2 size={14} /> {busy ? t('body.dev.linkingBtn') : t('body.dev.link')}</Button>
                 )}
               </div>
               {on && (
@@ -126,13 +194,15 @@ function DeviceLink() {
           )
         })}
       </ul>
-      {note && <p role="status" className="mt-3 flex items-center gap-2 text-[14px] text-ink-2"><Check size={14} className="shrink-0" aria-hidden /> {note}</p>}
+      {note && <p role="status" className="mt-3 flex items-center gap-2 text-[14px] text-ink-2"><Check size={14} className="shrink-0" aria-hidden /> {mono(note)}</p>}
       <Link to="/app/devices" className="mt-4 inline-flex items-center gap-1.5 self-start rounded text-[15px] text-ink underline-offset-4 hover:underline focus-ring">{t('body.dev.manage')} <ArrowRight size={15} /></Link>
-      <p className="mt-4 flex items-start gap-2 text-[13px] text-ink-3"><ShieldCheck size={15} className="mt-0.5 shrink-0" aria-hidden /> <span>{r('body.dev.consent', { d: <span className="num">{fmtDate(DEVICE_CONSENT_ON, lang)}</span>, link: <Link to="/app/trust" className="rounded underline underline-offset-4 focus-ring">{t('c.trust')}</Link> })}</span></p>
+      <p className="mt-4 flex items-start gap-2 text-[13px] text-ink-3"><ShieldCheck size={15} className="mt-0.5 shrink-0" aria-hidden /> <span>{r('body.dev.consentEach', { h: <span className="num">24</span>, link: <Link to="/app/trust" className="rounded underline underline-offset-4 focus-ring">{t('c.trust')}</Link> })}</span></p>
+      <PurposeSheet device={choose} withdrawnOn={choose ? consentDay(history, choose.id, 'withdrawn') : null} onClose={() => setChoose(null)} onLink={link} />
       <Sheet open={!!confirm} onClose={() => setConfirm(null)} title={t('body.dev.disconnectQ', { name: confirm?.name ?? '' })} side="center">
         {confirm && (
           <>
             <p className="text-[17px] text-ink-2">{t('body.dev.disconnectBody')}</p>
+            <p className="mt-3 text-[15px] text-ink-2">{dev2('disconnectConsent')}</p>
             <div className="mt-6 flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setConfirm(null)}>{t('body.dev.keep')}</Button>
               <Button variant="ink" onClick={() => disconnect(confirm)}>{t('body.dev.disconnect')}</Button>
@@ -141,6 +211,48 @@ function DeviceLink() {
         )}
       </Sheet>
     </ToolCard>
+  )
+}
+
+/** The purpose choice /app/devices asks for (Body, Ease; at least one), before the link. */
+function PurposeSheet({ device, withdrawnOn, onClose, onLink }: { device: AcctDevice | null; withdrawnOn: string | null; onClose: () => void; onLink: (d: AcctDevice, purposes: DevicePurpose[]) => void }) {
+  const dv = useDict(DEV)
+  const { t, r, tt, lang } = useSpaceText()
+  const [purposes, setPurposes] = useState({ body: true, ease: true })
+  const [tried, setTried] = useState(false)
+  const reset = () => { setPurposes({ body: true, ease: true }); setTried(false) }
+  const close = () => { reset(); onClose() }
+  const any = purposes.body || purposes.ease
+  const submit = () => {
+    setTried(true)
+    if (!device || !any) return
+    const chosen: DevicePurpose[] = [...(purposes.body ? ['body' as const] : []), ...(purposes.ease ? ['ease' as const] : [])]
+    reset()
+    onLink(device, chosen)
+  }
+  return (
+    <Sheet open={!!device} onClose={close} title={device ? t('body.dev.linkName', { name: device.name }) : t('body.dev.link')}>
+      {device && (
+        <div className="flex flex-col gap-5">
+          {withdrawnOn && <p className="rounded-2xl border border-line px-4 py-3 text-[14px] text-ink-2">{r('body.dev.withdrawnOn', { d: <span className="num">{fmtDate(withdrawnOn, lang)}</span> })}</p>}
+          <p className="text-[17px] text-ink-2">{dv('choosePurpose', { name: device.name })}</p>
+          <div className="space-y-3 rounded-card bg-paper-sunk p-4">
+            <Checkbox checked={purposes.body} onChange={(v) => setPurposes({ ...purposes, body: v })}>{dv('purposeBody', { space: tt.space('H'), term: tt.name('H') })}</Checkbox>
+            <Checkbox checked={purposes.ease} onChange={(v) => setPurposes({ ...purposes, ease: v })}>{dv('purposeEase', { space: tt.space('B'), term: tt.name('B') })}</Checkbox>
+            {tried && !any && <p role="alert" className="text-[14px] text-error">{dv('purposeErr')}</p>}
+          </div>
+          <ul className="space-y-2 text-[14px] text-ink-2">
+            <li className="flex gap-2"><Check size={15} className="mt-0.5 shrink-0 text-ink-3" aria-hidden /> {dv('rawOnly', { name: device.name })}</li>
+            <li className="flex gap-2"><Check size={15} className="mt-0.5 shrink-0 text-ink-3" aria-hidden /> {dv('neverAds')}</li>
+          </ul>
+          <p className="text-[13px] text-ink-3">{dv('consentRecorded')}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="ink" onClick={submit}><Link2 size={15} /> {t('body.dev.linkName', { name: device.name })}</Button>
+            <Button variant="ghost" onClick={close}>{t('c.cancel')}</Button>
+          </div>
+        </div>
+      )}
+    </Sheet>
   )
 }
 
@@ -184,7 +296,7 @@ function Le8Tracker() {
   const [store, setStore] = useSpaceState<{ log: Le8Reading[] }>(LE8_KEY, { log: LE8_LOG_START })
   const [logging, setLogging] = useState<Le8Key | null>(null)
   const [savedNote, setSavedNote] = useState('')
-  const { t, d, dm, mon } = useSpaceText()
+  const { t, d, dm, mon, tn, dn } = useSpaceText()
   // Under 18 nothing is scored: the readings stay, the composite, per-metric scores and bands do not.
   const minor = useIsMinor()
   const reading = useLe8Reading()
@@ -213,7 +325,7 @@ function Le8Tracker() {
       className="w-full"
       eyebrow="Life’s Essential 8 · AHA"
       title={<>{t('body.le8.title')}</>}
-      sub={minor ? t('mn.le8') : t('body.le8.sub')}
+      sub={minor ? tn('mn.le8') : tn('body.le8.sub')}
       aside={minor ? undefined : <div className="text-right"><span className="num block text-[2.25rem] font-light leading-none text-ink">{composite}</span><span className="eyebrow text-ink-3">{t('body.le8.composite')}</span></div>}
     >
       {series.length > 1 && !minor && (
@@ -225,14 +337,15 @@ function Le8Tracker() {
                 <XAxis dataKey="on" tick={axisTick} tickLine={false} axisLine={{ stroke: 'var(--line)' }} tickFormatter={dm} />
                 <YAxis tick={axisTick} tickLine={false} axisLine={false} domain={['dataMin - 5', 'dataMax + 5']} allowDecimals={false} />
                 <Tooltip content={<ChartTip fmt={dm} />} cursor={{ stroke: 'var(--line-strong)' }} />
-                <Line isAnimationActive={false} type="monotone" dataKey="value" stroke="var(--term-h)" strokeWidth={2} dot={{ r: 3, fill: 'var(--term-h)' }} />
+                {/* Life's Essential 8 is not a term: drawn in Ink, never in the Spectrum (Playbook p39). */}
+                <Line isAnimationActive={false} type="monotone" dataKey="value" stroke={VIZ.ink} strokeWidth={2} dot={{ r: 3, fill: VIZ.ink }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
-          <p className="sr-only">{t('body.le8.trendSr', { list: series.map((p) => `${dm(p.on)} ${p.value}`).join(', ') })}</p>
+          <p className="sr-only">{tn('body.le8.trendSr', { list: series.map((p) => `${dm(p.on)} ${p.value}`).join(', ') })}</p>
         </div>
       )}
-      {savedNote && <p role="status" className="mb-2 flex items-center gap-2 text-[14px] text-ink-2"><Check size={14} className="shrink-0" aria-hidden /> {savedNote}</p>}
+      {savedNote && <p role="status" className="mb-2 flex items-center gap-2 text-[14px] text-ink-2"><Check size={14} className="shrink-0" aria-hidden /> {mono(savedNote)}</p>}
       <ul className="divide-y divide-line">
         {rows.map((m) => {
           const hist = store.log.filter((x) => x.key === m.key).sort((a, b) => (a.on < b.on ? 1 : a.on > b.on ? -1 : 0))
@@ -241,11 +354,11 @@ function Le8Tracker() {
               <button onClick={() => { setOpen(open === m.key ? null : m.key); setLogging(null) }} aria-expanded={open === m.key} className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 py-3 text-left focus-ring rounded sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)_auto]">
                 <span className="min-w-0 break-words text-[15px] text-ink">{d(m.name)}</span>
                 {minor ? (
-                  <span className="order-3 col-span-2 min-w-0 break-words text-[13px] text-ink-3 sm:order-none sm:col-span-1">{m.r ? reading(m.r) : d(m.reading)}</span>
+                  <span className="order-3 col-span-2 min-w-0 break-words text-[13px] text-ink-3 sm:order-none sm:col-span-1">{mono(m.r ? reading(m.r) : d(m.reading))}</span>
                 ) : (
                   <span className="order-3 col-span-2 flex items-center gap-3 sm:order-none sm:col-span-1">
                     <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-paper-sunk" aria-hidden>
-                      <span className="block h-full rounded-full bg-term-h" style={{ width: `${m.score}%`, opacity: m.status === 'watch' ? 0.55 : 1 }} />
+                      <span className="block h-full rounded-full" style={{ width: `${m.score}%`, background: m.status === 'watch' ? VIZ.slate : VIZ.ink }} />
                     </span>
                     <span className="num w-8 text-right text-[14px] text-ink">{m.score}</span>
                   </span>
@@ -265,7 +378,7 @@ function Le8Tracker() {
                           <span className="num text-ink">{m.r ? reading(m.r) : d(m.reading)}</span>
                           <span className="block text-[12px] text-ink-3">{source(m.r?.source ?? m.source)}{m.r ? <> · <span className="num">{dm(m.r.on)}</span></> : null}</span>
                         </div>
-                        <p className="text-ink-2 sm:border-l sm:border-line sm:pl-4">{d(LE8_IDEAL[m.key])}</p>
+                        <p className="text-ink-2 sm:border-l sm:border-line sm:pl-4">{dn(LE8_IDEAL[m.key])}</p>
                       </div>
                       {hist.length > 0 && (
                         <div className="mt-4 border-t border-line pt-3">
@@ -274,7 +387,7 @@ function Le8Tracker() {
                             {hist.map((x) => (
                               <li key={x.id} className="grid grid-cols-[4.25rem_minmax(0,1fr)_auto] items-center gap-2 text-[13px]">
                                 <span className="num text-ink-3">{dm(x.on)}</span>
-                                <span className="min-w-0 break-words text-ink">{reading(x)} <span className="text-ink-3">· {source(x.source)}</span></span>
+                                <span className="min-w-0 break-words text-ink">{mono(reading(x))} <span className="text-ink-3">· {source(x.source)}</span></span>
                                 <span className="flex items-center gap-1.5">
                                   {!minor && <span className="num text-ink-2" aria-label={t('body.le8.score', { n: le8Score(x.key, x.v) })}>{le8Score(x.key, x.v)}</span>}
                                   {x.mine && <button type="button" onClick={() => remove(x.id)} aria-label={t('body.le8.removeReading', { d: dm(x.on) })} className="rounded-full p-1 text-ink-3 hover:bg-paper-raised focus-ring"><Trash2 size={13} /></button>}
@@ -303,7 +416,7 @@ function Le8Tracker() {
 
 /** The input for one LE8 metric; numbers only, so nothing here needs the emergency intercept. */
 function Le8Form({ k, last, onSave, onCancel }: { k: Le8Key; last?: Le8Reading; onSave: (v: number[]) => void; onCancel: () => void }) {
-  const { t } = useSpaceText()
+  const { t, tn } = useSpaceText()
   const lv = last?.v ?? []
   const [a, setA] = useState(k === 'sleep' ? String(Math.floor((lv[0] ?? 420) / 60)) : k === 'nicotine' ? String(lv[0] ?? 0) : '')
   const [b, setB] = useState(k === 'sleep' ? String((lv[0] ?? 420) % 60) : '')
@@ -329,7 +442,7 @@ function Le8Form({ k, last, onSave, onCancel }: { k: Le8Key; last?: Le8Reading; 
     onSave(k === 'sleep' ? [x * 60 + y] : k === 'bp' ? [x, y] : k === 'bmi' ? [Math.round(x * 10) / 10] : k === 'glucose' ? [Math.round(x * 10) / 10] : [x])
   }
   const inCls = 'num h-11 w-full rounded-xl border border-line-strong bg-paper px-3.5 text-[16px] text-ink focus-ring'
-  const field = (label: string, v: string, set: (s: string) => void, ph: string, decimal = false) => (
+  const field = (label: ReactNode, v: string, set: (s: string) => void, ph: string, decimal = false) => (
     <label className="block min-w-0">
       <span className="text-[13px] text-ink-2">{label}</span>
       <input inputMode={decimal ? 'decimal' : 'numeric'} value={v} onChange={(e) => { set(e.target.value); setErr(false) }} placeholder={ph} aria-invalid={err} aria-describedby={err ? `${id}-err` : undefined} className={clsx(inCls, 'mt-1')} />
@@ -337,7 +450,7 @@ function Le8Form({ k, last, onSave, onCancel }: { k: Le8Key; last?: Le8Reading; 
   )
   return (
     <form onSubmit={(e) => { e.preventDefault(); submit() }} noValidate className="space-y-3 rounded-xl border border-line bg-paper-raised p-3.5">
-      {k === 'diet' && field(t('body.le8.in.diet'), a, setA, '12')}
+      {k === 'diet' && field(tn('body.le8.in.diet'), a, setA, '12')}
       {k === 'activity' && field(t('body.le8.in.activity'), a, setA, '150')}
       {k === 'nicotine' && (
         <fieldset>
@@ -361,7 +474,7 @@ function Le8Form({ k, last, onSave, onCancel }: { k: Le8Key; last?: Le8Reading; 
           </div>
         </fieldset>
       )}
-      {k === 'bmi' && <>{field(t('body.le8.in.bmi'), a, setA, '77.2', true)}<p className="text-[12px] text-ink-3">{t('body.le8.in.bmiNote', { h: LE8_HEIGHT_CM })}</p></>}
+      {k === 'bmi' && <>{field(t('body.le8.in.bmi'), a, setA, '77.2', true)}<p className="text-[12px] text-ink-3">{tn('body.le8.in.bmiNote', { h: LE8_HEIGHT_CM })}</p></>}
       {k === 'lipids' && <>{field(t('body.le8.in.lipids'), a, setA, '146')}<p className="text-[12px] text-ink-3">{t('body.le8.labNote')}</p></>}
       {k === 'glucose' && <>{field(t('body.le8.in.glucose'), a, setA, '5.8', true)}<p className="text-[12px] text-ink-3">{t('body.le8.labNote')}</p></>}
       {k === 'bp' && (
@@ -373,7 +486,7 @@ function Le8Form({ k, last, onSave, onCancel }: { k: Le8Key; last?: Le8Reading; 
           </div>
         </fieldset>
       )}
-      {err && <p id={`${id}-err`} role="alert" className="text-[13px] text-error">{t('body.le8.err', { range: LE8_RANGE[k] || '0–4' })}</p>}
+      {err && <p id={`${id}-err`} role="alert" className="text-[13px] text-error">{tn('body.le8.err', { range: LE8_RANGE[k] || '0–4' })}</p>}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" size="sm" variant="ink"><Check size={14} /> {t('body.le8.save')}</Button>
         <Button size="sm" variant="ghost" onClick={onCancel}>{t('c.cancel')}</Button>
@@ -398,7 +511,7 @@ function BiomarkerVault() {
   const [panel, setPanel] = useState<string>('All')
   const [onlyWatch, setOnlyWatch] = useState(false)
   const [open, setOpen] = useState<Marker | null>(null)
-  const { t, d, r } = useSpaceText()
+  const { t, d, r, tn, dn } = useSpaceText()
   const panels = ['All', ...Array.from(new Set(BIOMARKERS.map((b) => b.panel)))]
   const rows = useMemo(
     () => BIOMARKERS.filter((b) => (panel === 'All' || b.panel === panel) && (!onlyWatch || b.status !== 'in range') && [b.name, b.plain, b.panel, d(b.name), d(b.plain), d(b.panel)].join(' ').toLowerCase().includes(q.trim().toLowerCase())),
@@ -409,7 +522,7 @@ function BiomarkerVault() {
     <ToolCard
       eyebrow={t('body.bio.eyebrow')}
       title={<>{r('body.bio.title', { n: <span className="num">{BIOMARKERS.length}</span> })}</>}
-      sub={t('body.bio.sub', { inRange: BIOMARKERS.length - watching, watch: watching })}
+      sub={tn('body.bio.sub', { inRange: BIOMARKERS.length - watching, watch: watching })}
       aside={<span className="flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-[13px] text-ink"><ShieldCheck size={14} aria-hidden /> {t('body.bio.signed', { name: PANEL_META.signedBy })}</span>}
     >
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -443,11 +556,11 @@ function BiomarkerVault() {
             </button>
           </li>
         ))}
-        {rows.length === 0 && <li className="break-words py-8 text-center text-[15px] text-ink-2">{t('body.bio.none', { q })}</li>}
+        {rows.length === 0 && <li className="break-words py-8 text-center text-[15px] text-ink-2"><EmptyIllustration kind="generic" width={120} className="mb-4" />{tn('body.bio.none', { q })}</li>}
       </ul>
       <div className="mt-4 hidden overflow-x-auto md:block">
         <table className="w-full min-w-[640px] border-collapse text-left text-[14px]">
-          <caption className="sr-only">{t('body.bio.caption', { drawn: fmtDate(PANEL_META.drawn), name: PANEL_META.signedBy })}</caption>
+          <caption className="sr-only">{tn('body.bio.caption', { drawn: fmtDate(PANEL_META.drawn), name: PANEL_META.signedBy })}</caption>
           <thead>
             <tr className="border-b border-line">
               {[t('body.bio.hMarker'), t('body.bio.hValue'), t('body.bio.hRange'), t('c.october'), t('body.bio.hStatus')].map((h, i) => (
@@ -482,7 +595,7 @@ function BiomarkerVault() {
             })}
           </tbody>
         </table>
-        {rows.length === 0 && <p className="py-8 text-center text-[15px] text-ink-2">{t('body.bio.none', { q })}</p>}
+        {rows.length === 0 && <div className="break-words py-8 text-center text-[15px] text-ink-2"><EmptyIllustration kind="generic" width={120} className="mb-4" />{tn('body.bio.none', { q })}</div>}
       </div>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
         <MethodLine method="v1.0" grade="clinical" takenOn={PANEL_META.drawn} signedBy={`${PANEL_META.signedBy} · ${fmtDate(PANEL_META.signed)}`} />
@@ -492,14 +605,14 @@ function BiomarkerVault() {
         {open && (
           <div>
             <StatusTag s={open.status} />
-            <p className="mt-4 text-[17px] text-ink">{d(open.plain)}</p>
+            <p className="mt-4 text-[17px] text-ink">{dn(open.plain)}</p>
             <div className="mt-5 grid grid-cols-3 gap-3">
               <div className="rounded-xl bg-paper-sunk p-3"><span className="eyebrow block text-ink-3">{t('c.january')}</span><span className="num text-[1.6rem] font-light text-ink">{open.value}</span><span className="block text-[12px] text-ink-3">{open.unit}</span></div>
               <div className="rounded-xl bg-paper-sunk p-3"><span className="eyebrow block text-ink-3">{t('c.october')}</span><span className="num text-[1.6rem] font-light text-ink">{open.prev ?? '—'}</span><span className="block text-[12px] text-ink-3">{open.prev === null ? t('body.bio.notMeasured') : open.unit}</span></div>
               <div className="rounded-xl bg-paper-sunk p-3"><span className="eyebrow block text-ink-3">{t('body.bio.rangeCap')}</span><span className="num text-[1.05rem] text-ink">{open.range}</span></div>
             </div>
             <p className="mt-5 rounded-xl border border-line p-4 text-[14px] text-ink-2">
-              <b className="font-medium text-ink">{t('body.bio.notT')}</b> {t('body.bio.notB', { name: PANEL_META.signedBy, date: fmtDate(PANEL_META.signed) })}
+              <b className="font-medium text-ink">{t('body.bio.notT')}</b> {tn('body.bio.notB', { name: PANEL_META.signedBy, date: fmtDate(PANEL_META.signed) })}
             </p>
             <Link to={PHYSICIAN_THREAD} className="mt-5 inline-flex items-center gap-1.5 text-[15px] text-ink underline underline-offset-4">{t('body.bio.ask', { name: d(open.name) })}</Link>
           </div>
@@ -522,7 +635,7 @@ const VITAMIN_D = BIOMARKERS.find((b) => b.name === 'Vitamin D (25-OH)')
 const PHYSICIAN_THREAD = '/app/care/messages?p=p_meera'
 
 function DailyStack() {
-  const { t, r, dm } = useSpaceText()
+  const { t, r, dm, tn } = useSpaceText()
   const [done, setDone] = useSpaceState<{ on: string; ids: string[] }>('body.stack.today.v1', { on: SPACE_TODAY, ids: [] })
   const [asked, setAsked] = useSpaceState<string[]>('body.stack.asked.v1', [])
   const today = done.on === SPACE_TODAY ? done.ids : []
@@ -553,8 +666,8 @@ function DailyStack() {
             {on && <Check size={13} />}
           </span>
           <span className="min-w-0">
-            <span className={clsx('block text-[16px]', on ? 'text-ink-2' : 'text-ink')}>{i.label}{i.dose && <> · <span className="num">{i.dose}</span></>}</span>
-            <span className="mt-0.5 block text-[13px] text-ink-3">{i.why}</span>
+            <span className={clsx('block text-[16px]', on ? 'text-ink-2' : 'text-ink')}>{mono(i.label)}{i.dose && <> · <span className="num">{i.dose}</span></>}</span>
+            <span className="mt-0.5 block text-[13px] text-ink-3">{mono(i.why)}</span>
           </span>
         </label>
         {i.kind === 'supplement' && (
@@ -571,10 +684,10 @@ function DailyStack() {
     <ToolCard
       eyebrow={t('body.st.eyebrow')}
       title={t('body.st.title')}
-      sub={t('body.st.sub', { name: doc, date: fmtDate(PANEL_META.signed) })}
+      sub={tn('body.st.sub', { name: doc, date: fmtDate(PANEL_META.signed) })}
       aside={<><SpecimenTag /><span className="num text-[1.6rem] font-light text-ink" aria-label={t('body.st.done', { n: String(n), m: String(items.length) })}>{n}<span className="text-[14px] text-ink-3">/{items.length}</span></span></>}
     >
-      <p className="eyebrow text-ink-3">{t('body.st.today', { d: dm(SPACE_TODAY) })}</p>
+      <p className="eyebrow text-ink-3">{tn('body.st.today', { d: dm(SPACE_TODAY) })}</p>
       <div className="mt-3 grid gap-6 lg:grid-cols-2">
         <section aria-labelledby="st-protocol">
           <h3 id="st-protocol" className="text-[15px] font-medium text-ink">{t('body.st.protocol')}</h3>
@@ -588,7 +701,7 @@ function DailyStack() {
       </div>
       <p className="mt-5 flex items-start gap-2 rounded-2xl bg-paper-sunk p-4 text-[14px] text-ink-2"><ShieldCheck size={15} className="mt-0.5 shrink-0" aria-hidden /> <span>{t('body.st.rule')}</span></p>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4 text-[13px] text-ink-3">
-        <span>{t('body.st.review')} · {t('body.st.change', { name: doc })}</span>
+        <span>{tn('body.st.review')} · {t('body.st.change', { name: doc })}</span>
         <Link to={PHYSICIAN_THREAD} className="inline-flex items-center gap-1.5 rounded text-[14px] text-ink underline underline-offset-4 focus-ring">{r('c.messageX', { name: doc })} <ArrowRight size={14} aria-hidden /></Link>
       </div>
     </ToolCard>
@@ -613,7 +726,7 @@ function useStopwatch() {
 
 function Stopwatch({ label, onUse }: { label: string; onUse: (seconds: number) => void }) {
   const sw = useStopwatch()
-  const { t } = useSpaceText()
+  const { t, tn } = useSpaceText()
   const s = sw.ms / 1000
   return (
     <div className="rounded-2xl bg-paper-sunk p-4">
@@ -624,7 +737,7 @@ function Stopwatch({ label, onUse }: { label: string; onUse: (seconds: number) =
       <div className="mt-3 flex flex-wrap gap-2">
         <Button variant="ink" size="sm" onClick={sw.toggle}>{sw.running ? <><Pause size={14} /> {t('body.sw.stop')}</> : <><Play size={14} /> {sw.ms ? t('c.resume') : t('body.sw.start')}</>}</Button>
         <Button size="sm" variant="ghost" onClick={sw.reset} disabled={!sw.ms}><RotateCcw size={14} /> {t('body.sw.reset')}</Button>
-        <Button size="sm" onClick={() => onUse(Math.round(s * 10) / 10)} disabled={!sw.ms || sw.running}>{t('body.sw.use', { s: s.toFixed(1) })}</Button>
+        <Button size="sm" onClick={() => onUse(Math.round(s * 10) / 10)} disabled={!sw.ms || sw.running}>{tn('body.sw.use', { s: s.toFixed(1) })}</Button>
       </div>
     </div>
   )
@@ -638,7 +751,7 @@ function CapacityBattery() {
   const [stsManual, setStsManual] = useState('')
   const [gaitTime, setGaitTime] = useState<number | null>(null)
   const [err, setErr] = useState<SpKey | ''>('')
-  const { t, d, r, dm } = useSpaceText()
+  const { t, d, r, dm, tn, dn } = useSpaceText()
   // The committed readings persist; prevOn is the date of the readings compared against (null: the October baseline).
   const [latest, setLatest] = useSpaceState<{ on: string; values: number[]; prev: number[]; prevOn: string | null }>('body.capacity.v1', {
     on: '2027-01-02', values: CAPACITY.map((c) => c.last), prev: CAPACITY.map((c) => c.prev), prevOn: null,
@@ -681,10 +794,10 @@ function CapacityBattery() {
   }
 
   return (
-    <ToolCard className="w-full" eyebrow={t('body.cap.eyebrow')} title={t('body.cap.title')} sub={t('body.cap.sub')}>
+    <ToolCard className="w-full" eyebrow={t('body.cap.eyebrow')} title={t('body.cap.title')} sub={tn('body.cap.sub')}>
       {step === 'intro' && (
         <div className="flex flex-1 flex-col">
-          {justSaved && <p role="status" className="mb-4 flex items-center gap-2 text-[14px] text-ink-2"><Check size={14} className="shrink-0" aria-hidden /> {t('body.cap.saved')}</p>}
+          {justSaved && <p role="status" className="mb-4 flex items-center gap-2 text-[14px] text-ink-2"><Check size={14} className="shrink-0" aria-hidden /> {tn('body.cap.saved')}</p>}
           <ul className="grid gap-3 sm:grid-cols-3">
             {CAPACITY.map((c, i) => {
               const last = latest.values[i]
@@ -693,16 +806,16 @@ function CapacityBattery() {
               const same = last === prev
               return (
                 <li key={c.key} className="rounded-2xl border border-line p-4">
-                  <span className="eyebrow block text-ink-3">{d(c.name)}</span>
+                  <span className="eyebrow block text-ink-3">{dn(c.name)}</span>
                   <span className="num mt-2 block text-[2rem] font-light leading-none text-ink">{last}<span className="ml-1 text-[14px] text-ink-3">{c.unit}</span></span>
                   <span className="mt-2 block text-[13px] text-ink-2">{t(same ? 'body.cap.sameAs' : better ? 'body.cap.better' : 'body.cap.notQuite', { label: prevLabel })} (<span className="num">{prev}</span> {c.unit})</span>
-                  <span className="mt-1 block text-[12px] text-ink-3">{d(c.norm)}</span>
+                  <span className="mt-1 block text-[12px] text-ink-3">{dn(c.norm)}</span>
                 </li>
               )
             })}
           </ul>
           <CapacityHistory history={history} />
-          <p className="mt-4 rounded-xl bg-paper-sunk p-3.5 text-[14px] text-ink-2"><b className="font-medium text-ink">{t('body.cap.beforeT')}</b> {t('body.cap.beforeB')}</p>
+          <p className="mt-4 rounded-xl bg-paper-sunk p-3.5 text-[14px] text-ink-2"><b className="font-medium text-ink">{t('body.cap.beforeT')}</b> {tn('body.cap.beforeB')}</p>
           <div className="mt-auto flex flex-wrap items-center gap-3 pt-6">
             <DaybreakButton onClick={() => { setJustSaved(false); setStep('grip') }}>{t('body.cap.start')}</DaybreakButton>
             <span className="text-[13px] text-ink-3">{r('body.cap.lastTaken', { date: <span className="num">{fmtDate(latest.on)}</span>, day: <span className="num">76</span> })}</span>
@@ -714,7 +827,7 @@ function CapacityBattery() {
         <div className="flex flex-1 flex-col" aria-live="polite">
           {step !== 'done' && (
             <ol className="mb-5 flex gap-2" aria-label={t('body.cap.stepOf', { n: idx + 1 })}>
-              {steps.map((s, i) => <li key={s} className={clsx('h-1.5 flex-1 rounded-full', i <= idx ? 'bg-term-h' : 'bg-paper-sunk')} />)}
+              {steps.map((s, i) => <li key={s} className={clsx('h-1.5 flex-1 rounded-full', i <= idx ? 'bg-ink' : 'bg-paper-sunk')} />)}
             </ol>
           )}
           <AnimatePresence mode="wait" initial={false}>
@@ -722,7 +835,7 @@ function CapacityBattery() {
               {step === 'grip' && (
                 <>
                   <Eyebrow>{t('body.cap.stepName', { n: 1, name: d(CAPACITY[0].name) })}</Eyebrow>
-                  <p className="mt-2 text-[17px] text-ink">{d(CAPACITY[0].how)}</p>
+                  <p className="mt-2 text-[17px] text-ink">{dn(CAPACITY[0].how)}</p>
                   <label className="mt-4 block max-w-xs">
                     <span className="text-[14px] text-ink-2">{t('body.cap.gripLabel')}</span>
                     <input inputMode="decimal" value={grip} onChange={(e) => setGrip(e.target.value)} aria-invalid={!!err} aria-describedby={err ? 'cap-err' : undefined} className="num mt-1.5 h-12 w-full rounded-xl border border-line-strong bg-paper px-4 text-[20px] text-ink focus-ring" placeholder="38" />
@@ -732,7 +845,7 @@ function CapacityBattery() {
               {step === 'sts' && (
                 <>
                   <Eyebrow>{t('body.cap.stepName', { n: 2, name: t('body.cap.fiveSts') })}</Eyebrow>
-                  <p className="mt-2 text-[17px] text-ink">{d(CAPACITY[1].how)}</p>
+                  <p className="mt-2 text-[17px] text-ink">{dn(CAPACITY[1].how)}</p>
                   <div className="mt-4"><Stopwatch label={t('body.cap.swSts')} onUse={(v) => { setSts(v); setStsManual(String(v)) }} /></div>
                   <label className="mt-3 block max-w-xs">
                     <span className="text-[14px] text-ink-2">{t('body.cap.orType')}</span>
@@ -743,7 +856,7 @@ function CapacityBattery() {
               {step === 'gait' && (
                 <>
                   <Eyebrow>{t('body.cap.stepName', { n: 3, name: d(CAPACITY[2].name) })}</Eyebrow>
-                  <p className="mt-2 text-[17px] text-ink">{d(CAPACITY[2].how)}</p>
+                  <p className="mt-2 text-[17px] text-ink">{dn(CAPACITY[2].how)}</p>
                   <div className="mt-4"><Stopwatch label={t('body.cap.swGait')} onUse={finish} /></div>
                 </>
               )}
@@ -759,7 +872,7 @@ function CapacityBattery() {
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-4 text-[15px] text-ink-2">{t('body.cap.after')}</p>
+                  <p className="mt-4 text-[15px] text-ink-2">{tn('body.cap.after')}</p>
                 </>
               )}
               {err && <p id="cap-err" role="alert" className="mt-3 text-[14px] text-error">{t(err)}</p>}
@@ -834,7 +947,7 @@ function BiologicalAge() {
   const [asked, setAsked] = useSpaceState('body.bioAge.asked.v1', false)
   // A specimen switch shows the card as it reads once the physician has signed the estimate.
   const [signedView, setSignedView] = useSpaceState('body.bioAge.signedView.v1', false)
-  const { t, dm } = useSpaceText()
+  const { t, dm, tn } = useSpaceText()
   const doc = PANEL_META.signedBy
   const addToReview = () => {
     if (asked) return
@@ -851,31 +964,31 @@ function BiologicalAge() {
                 <span className="num text-[3rem] font-light leading-none text-ink" aria-hidden>{BIO_AGE.low} – {BIO_AGE.high}</span>
                 <span className="mt-1.5 text-[13px] text-ink-3" aria-hidden>{t('body.ba.years')}</span>
               </div>
-              <p className="mt-5 text-[17px] text-ink">{t('body.ba.signedBy', { name: doc })}</p>
-              <p className="mt-1.5 text-[15px] text-ink-2">{t('body.ba.signedB', { name: doc })}</p>
+              <p className="mt-5 text-[17px] text-ink">{tn('body.ba.signedBy', { name: doc })}</p>
+              <p className="mt-1.5 text-[15px] text-ink-2">{tn('body.ba.signedB', { name: doc })}</p>
             </motion.div>
           ) : (
             <motion.div key="locked" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }}>
               <div className="flex h-28 items-center justify-center rounded-2xl border border-dashed border-line-strong">
                 <span className="num text-[3rem] font-light text-ink-3" aria-label={t('body.ba.locked')}>— —</span>
               </div>
-              <p className="mt-5 text-[17px] text-ink">{t('body.ba.t')}</p>
-              <p className="mt-1.5 text-[15px] text-ink-2">{t('body.ba.b')}</p>
+              <p className="mt-5 text-[17px] text-ink">{tn('body.ba.t')}</p>
+              <p className="mt-1.5 text-[15px] text-ink-2">{tn('body.ba.b')}</p>
             </motion.div>
           )}
         </AnimatePresence>
         <ol className="mt-5 space-y-2 text-[14px]">
-          <li className="flex items-center gap-2 text-ink"><Check size={15} className="shrink-0" aria-hidden /> {t('body.ba.s1', { d: dm(PANEL_META.drawn) })}</li>
-          <li className="flex items-center gap-2 text-ink"><Check size={15} className="shrink-0" aria-hidden /> {t('body.ba.s2', { d: dm(PANEL_META.signed) })}</li>
+          <li className="flex items-center gap-2 text-ink"><Check size={15} className="shrink-0" aria-hidden /> {tn('body.ba.s1', { d: dm(PANEL_META.drawn) })}</li>
+          <li className="flex items-center gap-2 text-ink"><Check size={15} className="shrink-0" aria-hidden /> {tn('body.ba.s2', { d: dm(PANEL_META.signed) })}</li>
           {signedView
-            ? <li className="flex items-center gap-2 text-ink"><Check size={15} className="shrink-0" aria-hidden /> {t('body.ba.s3')}</li>
-            : <li className="flex items-center gap-2 text-ink-3"><span className="ml-[3px] h-2 w-2 shrink-0 rounded-full border border-line-strong" aria-hidden /> <span className="ml-0.5">{t('body.ba.s3')}</span></li>}
+            ? <li className="flex items-center gap-2 text-ink"><Check size={15} className="shrink-0" aria-hidden /> {tn('body.ba.s3')}</li>
+            : <li className="flex items-center gap-2 text-ink-3"><span className="ml-[3px] h-2 w-2 shrink-0 rounded-full border border-line-strong" aria-hidden /> <span className="ml-0.5">{tn('body.ba.s3')}</span></li>}
         </ol>
         {!signedView && (
           <div className="pt-5">
             {asked
-              ? <p className="text-[14px] text-ink-2" role="status">{t('body.ba.added')} <Link to={PHYSICIAN_THREAD} className="inline-flex items-center gap-1 rounded text-ink underline underline-offset-4 focus-ring">{t('c.openThread')} <ArrowRight size={13} aria-hidden /></Link></p>
-              : <Button size="sm" onClick={addToReview}>{t('body.ba.add')}</Button>}
+              ? <p className="text-[14px] text-ink-2" role="status">{tn('body.ba.added')} <Link to={PHYSICIAN_THREAD} className="inline-flex items-center gap-1 rounded text-ink underline underline-offset-4 focus-ring">{t('c.openThread')} <ArrowRight size={13} aria-hidden /></Link></p>
+              : <Button size="sm" onClick={addToReview}>{tn('body.ba.add')}</Button>}
           </div>
         )}
         <div className="mt-auto pt-5">
@@ -891,17 +1004,49 @@ function BiologicalAge() {
 
 // ─── Signals ──────────────────────────────────────────────────────────────
 
-function SignalTrends() {
+/** Devices that send nightly HRV, resting heart rate and sleep timing (a ring or a band). */
+const SIGNAL_SOURCES = ['oura', 'whoop', 'ultrahuman']
+/** Only the default ring has specimen nights; a ring linked here has none of its own yet. */
+const SPECIMEN_SOURCE = 'oura'
+/** Nights a trend needs before one is drawn. */
+const TREND_NIGHTS = 7
+
+// The trend follows the device record: it is drawn only from a ring that is linked, shared
+// with Body (its purposes) and not paused. A stale sync ends the line at the last sync and
+// leaves last night empty; otherwise the card says plainly why there is nothing to show.
+function SignalTrends({ dev }: { dev: BodyDevices }) {
   type K = 'regularity' | 'hrv' | 'rhr'
   const [k, setK] = useState<K>('hrv')
-  const { t, dm } = useSpaceText()
+  const { t, r, tt, dm, tn } = useSpaceText()
+  const dx = useAccountData()
+  const linked = dev.devices.filter((d) => SIGNAL_SOURCES.includes(d.id) && d.state === 'connected')
+  const forBody = linked.filter((d) => !d.purposes || d.purposes.includes('body'))
+  const feeding = forBody.filter((d) => !dev.paused[d.id])
+  const source = feeding.find((d) => d.id === SPECIMEN_SOURCE) ?? feeding[0]
+  const stale = source?.freshness === 'stale'
+  const data = useMemo(() => (stale ? SIGNALS.slice(0, -1) : SIGNALS), [stale])
   const meta: Record<K, { name: string; unit: string; sentence: string; better: string; domain: [number, number] }> = {
     regularity: { name: t('body.sig.regularity'), unit: '', sentence: t('body.sig.regS'), better: t('body.sig.regB'), domain: [55, 95] },
     hrv: { name: t('body.sig.hrvName'), unit: ' ms', sentence: t('body.sig.hrvS'), better: t('body.sig.hrvB'), domain: [25, 55] },
     rhr: { name: t('body.sig.rhrName'), unit: ' bpm', sentence: t('body.sig.rhrS'), better: t('body.sig.rhrB'), domain: [54, 66] },
   }
   const m = meta[k]
-  const mean = Math.round((SIGNALS.reduce((a, s) => a + s[k], 0) / SIGNALS.length) * 10) / 10
+  const mean = Math.round((data.reduce((a, s) => a + s[k], 0) / data.length) * 10) / 10
+  const empty = (title: string, body: string) => (
+    <div className="rounded-2xl border border-dashed border-line-strong p-6 text-center">
+      <EmptyIllustration kind="generic" width={130} className="mb-4" />
+      <p className="text-[17px] text-ink">{mono(title)}</p>
+      <p className="mx-auto mt-2 max-w-md text-[15px] text-ink-2">{mono(body)}</p>
+      <Link to="/app/devices" className="mt-4 inline-flex items-center gap-1.5 rounded text-[15px] text-ink underline-offset-4 hover:underline focus-ring">{t('body.sig.devices')} <ArrowRight size={15} aria-hidden /></Link>
+    </div>
+  )
+  const body = (() => {
+    if (source && source.id !== SPECIMEN_SOURCE) return empty(t('body.sig.waitT', { name: source.name }), t('body.sig.waitB', { n: TREND_NIGHTS }))
+    if (!source && linked.length > 0 && forBody.length === 0) return empty(t('body.sig.notBodyT', { name: linked[0].name, space: tt.space('H') }), t('body.sig.notBodyB', { ease: tt.space('B'), space: tt.space('H') }))
+    if (!source && forBody.length > 0) return empty(t('body.sig.pausedT', { name: forBody[0].name }), t('body.sig.pausedB'))
+    if (!source) return empty(t('body.sig.noneT'), t('body.sig.noneB', { space: tt.space('H') }))
+    return null
+  })()
   return (
     <ToolCard
       eyebrow={t('body.sig.eyebrow')}
@@ -909,31 +1054,39 @@ function SignalTrends() {
       sub={t('body.sig.sub')}
       aside={<SpecimenTag />}
     >
-      <Tabs value={k} onChange={setK} className="self-start" items={[{ value: 'hrv', label: 'HRV' }, { value: 'rhr', label: t('body.sig.restingHr') }, { value: 'regularity', label: t('body.sig.regularity') }]} />
-      <div className="mt-5 grid gap-6 md:grid-cols-[minmax(0,1fr)_14rem]">
-        <div className="min-w-0">
-          <p className="text-[15px] text-ink-2">{m.sentence} {t('body.sig.dashed')}</p>
-          <div className="mt-3 h-[220px]" aria-hidden>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={SIGNALS} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-                <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="2 4" />
-                <XAxis dataKey="on" tick={axisTick} tickLine={false} axisLine={{ stroke: 'var(--line)' }} interval={6} tickFormatter={dm} />
-                <YAxis tick={axisTick} tickLine={false} axisLine={false} domain={m.domain} />
-                <Tooltip content={<ChartTip unit={m.unit} fmt={dm} />} cursor={{ stroke: 'var(--line-strong)' }} />
-                <ReferenceLine y={mean} stroke="var(--ink-3)" strokeDasharray="4 4" />
-                <Line isAnimationActive={false} type="monotone" dataKey={k} stroke="var(--term-h)" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: 'var(--term-h)' }} />
-              </LineChart>
-            </ResponsiveContainer>
+      {body ?? (source && (
+        <>
+          <Tabs value={k} onChange={setK} className="self-start" items={[{ value: 'hrv', label: 'HRV' }, { value: 'rhr', label: t('body.sig.restingHr') }, { value: 'regularity', label: t('body.sig.regularity') }]} />
+          {stale && <p role="status" className="mt-4 rounded-2xl border border-line px-4 py-3 text-[14px] text-ink-2">{mono(t('body.sig.stale', { name: source.name, when: dx(source.lastSync ?? '') }))}</p>}
+          <div className="mt-5 grid gap-6 md:grid-cols-[minmax(0,1fr)_14rem]">
+            <div className="min-w-0">
+              <p className="text-[15px] text-ink-2">{mono(m.sentence)} {tn('body.sig.dashed')}</p>
+              <div className="mt-3 h-[220px]" aria-hidden>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                    <CartesianGrid vertical={false} stroke="var(--line)" strokeDasharray="2 4" />
+                    <XAxis dataKey="on" tick={axisTick} tickLine={false} axisLine={{ stroke: 'var(--line)' }} interval={6} tickFormatter={dm} />
+                    <YAxis tick={axisTick} tickLine={false} axisLine={false} domain={m.domain} />
+                    <Tooltip content={<ChartTip unit={m.unit} fmt={dm} />} cursor={{ stroke: 'var(--line-strong)' }} />
+                    <ReferenceLine y={mean} stroke={VIZ.slate} strokeDasharray="4 4" />
+                    {/* A signal is not a term: drawn in Ink, never in the Spectrum (Playbook p39). */}
+                    <Line isAnimationActive={false} type="monotone" dataKey={k} stroke={VIZ.ink} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: VIZ.ink }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <p className="sr-only">{tn('body.sig.sr', { name: m.name, list: data.map((s) => `${dm(s.on)} ${s[k]}`).join(', ') })}</p>
+            </div>
+            <dl className="grid grid-cols-3 gap-3 md:grid-cols-1">
+              <div className="rounded-xl bg-paper-sunk p-3"><dt className="eyebrow text-ink-3">{tn('body.sig.mean')}</dt><dd className="num mt-1 text-[1.6rem] font-light text-ink">{mean}<span className="text-[13px] text-ink-3">{m.unit}</span></dd></div>
+              <div className="rounded-xl bg-paper-sunk p-3"><dt className="eyebrow text-ink-3">{t('body.sig.lastNight')}</dt>{stale
+                ? <dd className="mt-1 text-[15px] text-ink-3">{t('body.sig.noReading')}</dd>
+                : <dd className="num mt-1 text-[1.6rem] font-light text-ink">{SIGNALS[SIGNALS.length - 1][k]}<span className="text-[13px] text-ink-3">{m.unit}</span></dd>}</div>
+              <div className="rounded-xl bg-paper-sunk p-3"><dt className="eyebrow text-ink-3">{t('body.sig.readingIt')}</dt><dd className="mt-1 text-[13px] text-ink-2">{m.better}</dd></div>
+            </dl>
           </div>
-          <p className="sr-only">{t('body.sig.sr', { name: m.name, list: SIGNALS.map((s) => `${dm(s.on)} ${s[k]}`).join(', ') })}</p>
-        </div>
-        <dl className="grid grid-cols-3 gap-3 md:grid-cols-1">
-          <div className="rounded-xl bg-paper-sunk p-3"><dt className="eyebrow text-ink-3">{t('body.sig.mean')}</dt><dd className="num mt-1 text-[1.6rem] font-light text-ink">{mean}<span className="text-[13px] text-ink-3">{m.unit}</span></dd></div>
-          <div className="rounded-xl bg-paper-sunk p-3"><dt className="eyebrow text-ink-3">{t('body.sig.lastNight')}</dt><dd className="num mt-1 text-[1.6rem] font-light text-ink">{SIGNALS[SIGNALS.length - 1][k]}<span className="text-[13px] text-ink-3">{m.unit}</span></dd></div>
-          <div className="rounded-xl bg-paper-sunk p-3"><dt className="eyebrow text-ink-3">{t('body.sig.readingIt')}</dt><dd className="mt-1 text-[13px] text-ink-2">{m.better}</dd></div>
-        </dl>
-      </div>
-      <p className="mt-4 text-[13px] text-ink-3">{t('body.sig.from')}<Pill className="!py-0.5 !whitespace-normal">{t('body.sig.pill')}</Pill></p>
+          <p className="mt-4 text-[13px] text-ink-3">{r('body.sig.fromX', { name: mono(source.name), via: dx(source.via) })}<Pill className="!py-0.5 !whitespace-normal">{tn('body.sig.pill')}</Pill></p>
+        </>
+      ))}
     </ToolCard>
   )
 }

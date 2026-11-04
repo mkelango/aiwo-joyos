@@ -29,7 +29,7 @@ import { useIsMinor } from '@/lib/minor'
 import { Rich, useA } from '@/screens/a/i18n'
 import { formulaIn } from '@/screens/a/i18n/formula'
 import { H2, usePlanned } from '@/screens/a/local'
-import { HumanWritten, NotScored, Sparkline } from '@/screens/a/parts'
+import { HumanWritten, NotScored, Sparkline, monoNums } from '@/screens/a/parts'
 import { VIVA_DRAFT, actionsFor, roomVerdict, termHistory, todayActionFor } from '@/screens/a/spacesData'
 import { SPACE_TITLE, SpaceTools } from '@/screens/a/tools'
 import { RoomViva } from '@/screens/a/viva'
@@ -111,7 +111,7 @@ export default function SpaceDetail() {
               <BandLabel band={score.band} />
             </View>
           </View>
-          <Body tone="ink2">{tx(verdict.text, verdict.vars)}</Body>
+          <Body tone="ink2">{monoNums(tx(verdict.text, verdict.vars))}</Body>
           {inverse ? <Meta>{t('Burden is the one term where lower is better. It is subtracted from the Index at a quarter of its weight.')}</Meta> : null}
           <View style={{ gap: space.s1, marginTop: space.half }}>
             <Meta>
@@ -131,7 +131,7 @@ export default function SpaceDetail() {
       {/* What this room measures */}
       <Card tone="sunk" style={{ gap: space.s2 }}>
         <Eyebrow {...H2}>{t('What this room measures')}</Eyebrow>
-        <Body>{tx(term.framework)}</Body>
+        <Body>{monoNums(tx(term.framework))}</Body>
         <View style={{ gap: 6 }}>
           <Eyebrow>{t('Formula · method v1.0')}</Eyebrow>
           <Mono tone="ink" size={15}>
@@ -156,7 +156,7 @@ export default function SpaceDetail() {
           <Meta tone="ink" weight="semibold">
             {t('Lead ’cations.')}
           </Meta>{' '}
-          {term.leadCations.join(' · ')} · {t('Practice week {w}', { w: tx(term.practiceWeek) })}
+          {term.leadCations.join(' · ')} · {monoNums(t('Practice week {w}', { w: tx(term.practiceWeek) }))}
         </Meta>
       </Card>
 
@@ -206,8 +206,8 @@ export default function SpaceDetail() {
                         {on ? <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: c.ink }} /> : null}
                       </View>
                       <View style={{ flex: 1, gap: 4 }}>
-                        <Body weight="medium">{tx(a.title)}</Body>
-                        <Meta>{tx(a.detail)}</Meta>
+                        <Body weight="medium">{monoNums(tx(a.title))}</Body>
+                        <Meta>{monoNums(tx(a.detail))}</Meta>
                       </View>
                     </View>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, paddingLeft: 34 }}>
@@ -225,7 +225,7 @@ export default function SpaceDetail() {
                         <Meta size={14} tone="ink" weight="semibold">
                           {t('Why.')}
                         </Meta>{' '}
-                        {tx(a.why)} <Meta size={14} tone="ink3">{tx(a.evidence)}</Meta>
+                        {tx(a.why)} <Meta size={14} tone="ink3">{monoNums(tx(a.evidence))}</Meta>
                       </Meta>
                     ) : null}
                   </Pressable>

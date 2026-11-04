@@ -1,14 +1,19 @@
 import { Redirect } from 'expo-router'
 import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react'
-import { Platform, Pressable, ScrollView, Share, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native'
-import { Body, Eyebrow, Icon, Meta, Mono, TermChip, TermDot, Title, Toggle, fmtDate, type IconName } from '@/components'
+import { Platform, Pressable, ScrollView, Share, Text, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native'
+import { Body, Eyebrow, Icon, Meta, Mono, TermChip, TermDot, Title, Toggle, fmtDate, useToneColor, type ButtonVariant, type IconName, type PillTone } from '@/components'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { palettes } from '@/theme/tokens'
-import { ACCOUNT_PROFILES, accountStore, sessionStore, useStore } from './bStore'
+import { ACCOUNT_PROFILES, accountStore, claimFor, measuredClaimed, phoneOwnersStore, sessionStore, useStore } from './bStore'
+import { MEASURED_KEY, useLatestIndex, type LatestIndex } from '@/lib/indexRecord'
+import { useCationRequests, useLocal } from '@/screens/a/local'
+import { measuredScore, type MeasuredIndex } from '@/shared/indexScoring'
+import { INDEX_HISTORY, MEMBER } from '@/shared/member'
 import { onboardingAccountStore } from '@/lib/onboardingAccount'
 import { useDict } from '@/lib/i18n'
+import { MonoNums, splitNums } from '@/lib/monoNums'
 import { PARTS } from './i18n/parts'
 
 // Lane B helpers: ’Cation, Practice, Care, account and entry screens.
@@ -18,6 +23,124 @@ export const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 
 /** A dated item ("20 Feb 2027 · 10:00", or a range) through the member's language. */
 export const fmtWhen = (w: { date: string; to?: string; time?: string }) => `${fmtDate(w.date)}${w.to ? ` – ${fmtDate(w.to)}` : ''}${w.time ? ` · ${w.time}` : ''}`
+
+/**
+ * A string as children with its figures set in Mono (as MonoNums), the words left as plain strings
+ * so Body, Meta and Eyebrow still see the script they are written in: a Tamil or Hindi eyebrow
+ * takes its script's sans while its week, date or count stays in Mono.
+ */
+export function useFigures() {
+  const { fonts } = useTheme()
+  return (s: string): ReactNode =>
+    splitNums(s).map((r, i) =>
+      r.n ? (
+        <Text key={i} style={{ fontFamily: fonts.mono, fontVariant: ['tabular-nums'] }}>
+          {r.t}
+        </Text>
+      ) : (
+        r.t
+      ),
+    )
+}
+
+/** The kit's ListRow, with figures in its title and sub (a date, an amount, a count) set in Mono. */
+export function FigureListRow({ title, sub, leading, trailing, icon, onPress, accessibilityHint }: { title: string; sub?: string; leading?: ReactNode; trailing?: ReactNode; icon?: IconName; onPress?: () => void; accessibilityHint?: string }) {
+  const { c } = useTheme()
+  const fig = useFigures()
+  const content = (
+    <>
+      {leading}
+      {icon ? <Icon name={icon} size={18} color={c.ink2} /> : null}
+      <View style={{ flex: 1, gap: 2 }}>
+        <Body>{fig(title)}</Body>
+        {sub ? <Meta>{fig(sub)}</Meta> : null}
+      </View>
+      {trailing}
+      {onPress ? <Icon name="chevron-right" size={18} color={c.ink3} /> : null}
+    </>
+  )
+  const row: ViewStyle = { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, paddingVertical: 10 }
+  if (!onPress) return <View style={row}>{content}</View>
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={sub ? `${title}, ${sub}` : title} accessibilityHint={accessibilityHint} style={({ pressed }) => [row, pressed && { opacity: 0.7 }]}>
+      {content}
+    </Pressable>
+  )
+}
+
+/**
+ * A Button label with its figure in Mono ("Show all 12"), set as the kit's Button sets a string
+ * label. Give the Button the plain string as its accessibilityLabel.
+ */
+export function ButtonFigures({ text, variant = 'secondary', size = 'md' }: { text: string; variant?: ButtonVariant; size?: 'sm' | 'md' }) {
+  const t = useTheme()
+  const ink = useToneColor('ink')
+  const ink2 = useToneColor('ink2')
+  const fig = useFigures()
+  const fs = t.step(size === 'sm' ? 15 : 17) * t.textScale
+  const color = { secondary: t.c.ink, ghost: ink2, ink: t.c.paper, link: ink }[variant]
+  return (
+    <Text
+      maxFontSizeMultiplier={1.8}
+      style={{ fontFamily: t.fonts.sansSemi, fontSize: fs, lineHeight: Math.round(fs * 1.35 * t.script.leading), color, textDecorationLine: variant === 'link' ? 'underline' : 'none', textDecorationColor: t.c.lineStrong }}
+    >
+      {fig(text)}
+    </Text>
+  )
+}
+
+/** The kit's Toggle, with figures in its label and description ("At 18:00") set in Mono. */
+export function FigureToggle({ checked, onChange, label, description, disabled }: { checked: boolean; onChange: (v: boolean) => void; label: string; description?: string; disabled?: boolean }) {
+  const { c } = useTheme()
+  const fig = useFigures()
+  return (
+    <Pressable
+      onPress={() => onChange(!checked)}
+      disabled={disabled}
+      accessibilityRole="switch"
+      accessibilityLabel={label}
+      accessibilityHint={description}
+      accessibilityState={{ checked, disabled: !!disabled }}
+      aria-checked={checked}
+      aria-disabled={!!disabled}
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, minHeight: 44, opacity: disabled ? 0.5 : pressed ? 0.8 : 1 })}
+    >
+      <View style={{ flex: 1, gap: 2 }}>
+        <Body>{fig(label)}</Body>
+        {description ? <Meta>{fig(description)}</Meta> : null}
+      </View>
+      <View style={{ width: 52, height: 32, borderRadius: 16, padding: 4, marginTop: 2, backgroundColor: checked ? c.ink : c.lineStrong, alignItems: checked ? 'flex-end' : 'flex-start' }}>
+        <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: c.paper }} />
+      </View>
+    </Pressable>
+  )
+}
+
+/** The kit's Pill, with a figure in its label ("Week 7") set in Mono. Not a badge: no counts, no rewards. */
+export function FigurePill({ children, tone = 'neutral' }: { children: string; tone?: PillTone }) {
+  const { c, radius, fonts, textScale } = useTheme()
+  const fig = useFigures()
+  const tones: Record<PillTone, { bg: string; fg: string; border?: string; dashed?: boolean }> = {
+    neutral: { bg: c.paperSunk, fg: c.ink2 },
+    daybreak: { bg: c.daybreakSoft, fg: c.daybreakInk },
+    ink: { bg: c.ink, fg: c.paper },
+    positive: { bg: c.paperSunk, fg: c.ink, border: c.lineStrong },
+    caution: { bg: 'transparent', fg: c.ink2, border: c.lineStrong, dashed: true },
+  }
+  const tn = tones[tone]
+  return (
+    <View
+      style={[
+        { alignSelf: 'flex-start', maxWidth: '100%', backgroundColor: tn.bg, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 3 },
+        tn.border ? { borderWidth: 1, borderColor: tn.border, borderStyle: tn.dashed ? 'dashed' : 'solid', paddingHorizontal: 9, paddingVertical: 2 } : null,
+      ]}
+    >
+      <Text maxFontSizeMultiplier={1.6} accessibilityLabel={children} style={{ fontFamily: fonts.sansSemi, fontSize: 13 * textScale, color: tn.fg }}>
+        {fig(children)}
+      </Text>
+    </View>
+  )
+}
 
 /** Primary-term chip that also handles the master ’cation (all six terms, each named in VoiceOver). */
 export function PrimaryChip({ primary, style }: { primary: TermKey | 'ALL'; style?: StyleProp<ViewStyle> }) {
@@ -99,6 +222,7 @@ export function ChoiceCard({
   tint?: string
 }) {
   const { c, radius } = useTheme()
+  const fig = useFigures()
   return (
     <Pressable
       onPress={onPress}
@@ -135,7 +259,7 @@ export function ChoiceCard({
           {selected ? <Icon name="check" size={14} color={c.paper} /> : null}
         </View>
       </View>
-      {sub ? typeof sub === 'string' ? <Meta>{sub}</Meta> : sub : null}
+      {sub ? typeof sub === 'string' ? <Meta>{fig(sub)}</Meta> : sub : null}
       {detail}
     </Pressable>
   )
@@ -144,10 +268,11 @@ export function ChoiceCard({
 /** Key / value row for summaries (label in mono caps, value in body). */
 export function KeyValue({ k, children, last }: { k: string; children: ReactNode; last?: boolean }) {
   const { c, space } = useTheme()
+  const fig = useFigures()
   return (
     <View style={{ gap: 4, paddingVertical: space.s1 + 4, borderBottomWidth: last ? 0 : 1, borderBottomColor: c.line }}>
       <Eyebrow>{k}</Eyebrow>
-      {typeof children === 'string' ? <Body>{children}</Body> : children}
+      {typeof children === 'string' ? <Body>{fig(children)}</Body> : children}
     </View>
   )
 }
@@ -155,10 +280,11 @@ export function KeyValue({ k, children, last }: { k: string; children: ReactNode
 /** Labelled text field (17pt, 48pt tall). Free text must pass useCrisisGuard() before use. */
 export function Field({ label, error, help, style, ...rest }: TextInputProps & { label: string; error?: string | null; help?: string }) {
   const { c, fonts, textScale, radius } = useTheme()
+  const fig = useFigures()
   const fs = 17 * textScale
   return (
     <View style={[{ gap: 6 }, style as StyleProp<ViewStyle>]}>
-      <Meta tone="ink">{label}</Meta>
+      <Meta tone="ink">{fig(label)}</Meta>
       <TextInput
         accessibilityLabel={label}
         accessibilityHint={error ?? help}
@@ -181,11 +307,11 @@ export function Field({ label, error, help, style, ...rest }: TextInputProps & {
       />
       {error ? (
         <Meta tone="error" accessibilityLiveRegion="polite">
-          {error}
+          {fig(error)}
         </Meta>
       ) : help ? (
         <Meta tone="ink3" size={14}>
-          {help}
+          {fig(help)}
         </Meta>
       ) : null}
     </View>
@@ -277,6 +403,67 @@ export function useAccount() {
   }
 }
 
+/**
+ * The signed-in account's own Index (L2), or null when it has none on record. Arjun: the Index he
+ * took on this phone, else his recorded history (INDEX_HISTORY). Lakshmi and the account made in
+ * onboarding: only an Index they took on this phone themselves. The phone keeps one measured
+ * record for everyone (Lane A); each account keeps a copy of its own (bStore phoneOwnersStore), so
+ * another account's re-take never shows as yours. Screens still hide it for under-18s.
+ */
+export function useAccountIndex(): LatestIndex | null {
+  const [session] = useStore(sessionStore)
+  const id = session.account ?? 'arjun'
+  const [owners, setOwners] = useStore(phoneOwnersStore)
+  const [measured] = useLocal<MeasuredIndex>(MEASURED_KEY, null)
+  const phoneLatest = useLatestIndex()
+  // A measured Index nobody has claimed was taken while this account was signed in. Claims wait
+  // until the owners have been read from the phone and the records from before ownership was kept
+  // have been set aside as nobody's (bStore), so none is ever lost or given to the wrong account.
+  const unclaimed = phoneOwnersStore.hydrated() && !!owners.checked && !!measured && !owners.pending && !measuredClaimed(owners, measured)
+  useEffect(() => {
+    if (unclaimed && measured) setOwners((o) => claimFor(o, id, measured, []))
+  }, [unclaimed, measured, id, setOwners])
+  return useMemo(() => {
+    const own = unclaimed && measured ? measured : owners.measured[id]
+    if (own) {
+      // The phone's current record is this account's: read it as Today does.
+      if (measured && JSON.stringify(own) === JSON.stringify(measured)) return phoneLatest
+      return { ...measuredScore(own), surveyOnly: !!own.surveyOnly, onPhone: true, previous: INDEX_HISTORY[0] }
+    }
+    if (id !== 'arjun') return null
+    const latest = INDEX_HISTORY[0]
+    return { ...latest, surveyOnly: !!latest.surveyOnly, onPhone: false, previous: INDEX_HISTORY[1] }
+  }, [unclaimed, measured, owners.measured, id, phoneLatest])
+}
+
+/** The ’Cation requests the signed-in account made on this phone (the phone keeps one list for all). */
+export function useAccountCationRequests() {
+  const { requests, ready } = useCationRequests()
+  const [session] = useStore(sessionStore)
+  const id = session.account ?? 'arjun'
+  const [owners, setOwners] = useStore(phoneOwnersStore)
+  const refs = Object.values(requests).map((r) => r.ref)
+  const fresh = owners.pending || !owners.checked || !ready || !phoneOwnersStore.hydrated() ? [] : refs.filter((r) => !(r in owners.cation))
+  const freshKey = fresh.join(',')
+  useEffect(() => {
+    if (freshKey) setOwners((o) => claimFor(o, id, undefined, freshKey.split(',')))
+  }, [freshKey, id, setOwners])
+  return Object.fromEntries(Object.entries(requests).filter(([, r]) => (owners.cation[r.ref] ?? (fresh.includes(r.ref) ? id : null)) === id))
+}
+
+/** Circle membership (coach, concierge, quarterly Index, Sessions) is the specimen member's own;
+ *  Lakshmi and an account made in onboarding have the plan alone. */
+export const hasCircle = (account: 'arjun' | 'lakshmi' | 'new') => account === 'arjun'
+
+/** "Joy OS Plus + Circle": the signed-in account's plan, with Circle only when it has it. */
+export function usePlanLabel() {
+  const [acct] = useStore(accountStore)
+  const [session] = useStore(sessionStore)
+  const name = PLAN_NAMES[acct.plan]
+  return hasCircle(session.account ?? 'arjun') ? `${name} + ${MEMBER.membership}` : name
+}
+const PLAN_NAMES: Record<'Free' | 'Plus' | 'Patron', string> = { Free: 'Joy OS', Plus: 'Joy OS Plus', Patron: 'Patron' }
+
 /** One vertical timeline step: marker, connector, content. state drives the marker. */
 export function TimelineStep({ index, state, last, children }: { index: number; state: 'done' | 'now' | 'next'; last?: boolean; children: ReactNode }) {
   const { c } = useTheme()
@@ -307,11 +494,12 @@ export function TimelineStep({ index, state, last, children }: { index: number; 
 /** "You are here" marker. */
 export function HereMarker({ label }: { label: string }) {
   const { c, radius } = useTheme()
+  const fig = useFigures()
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: c.daybreakSoft, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 }}>
       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.daybreak }} />
       <Meta size={13} color={c.daybreakInk} weight="semibold">
-        {label}
+        {fig(label)}
       </Meta>
     </View>
   )
@@ -498,15 +686,16 @@ export function StepProgress({ step, steps }: { step: number; steps: readonly st
 /** A heading block for a flow step (one serif word allowed in the title). */
 export function StepHead({ eyebrow, title, lead }: { eyebrow: string; title: ReactNode; lead?: string }) {
   const { space } = useTheme()
+  const fig = useFigures()
   // Sign in and onboarding show a StepHead: the account's text size follows it in (M1).
   useElderType()
   return (
     <View style={{ gap: space.s1 }}>
-      <Eyebrow tone="daybreak">{eyebrow}</Eyebrow>
+      <Eyebrow tone="daybreak">{fig(eyebrow)}</Eyebrow>
       <Title accessibilityRole="header" size={30}>
         {title}
       </Title>
-      {lead ? <Body tone="ink2">{lead}</Body> : null}
+      {lead ? <Body tone="ink2">{fig(lead)}</Body> : null}
     </View>
   )
 }
@@ -514,12 +703,13 @@ export function StepHead({ eyebrow, title, lead }: { eyebrow: string; title: Rea
 /** A check-marked bullet line. */
 export function CheckLine({ children, icon = 'check' }: { children: ReactNode; icon?: IconName }) {
   const { c } = useTheme()
+  const fig = useFigures()
   return (
     <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
       <View style={{ paddingTop: 3 }}>
         <Icon name={icon} size={15} color={c.ink2} />
       </View>
-      <View style={{ flex: 1 }}>{typeof children === 'string' ? <Meta>{children}</Meta> : children}</View>
+      <View style={{ flex: 1 }}>{typeof children === 'string' ? <Meta>{fig(children)}</Meta> : children}</View>
     </View>
   )
 }
@@ -533,7 +723,8 @@ export function Done({ children }: { children: ReactNode }) {
       <View style={{ paddingTop: 3 }}>
         <Icon name="check-circle" size={16} color={c.ink} />
       </View>
-      <View style={{ flex: 1 }}>{typeof children === 'string' ? <Meta tone="ink">{children}</Meta> : children}</View>
+      {/* A figure inside the line (a date, a time, a count) is set in Mono. */}
+      <View style={{ flex: 1 }}>{typeof children === 'string' ? <Meta tone="ink"><MonoNums text={children} /></Meta> : children}</View>
     </View>
   )
 }

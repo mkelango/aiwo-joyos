@@ -8,7 +8,7 @@ import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { useA } from './i18n'
 import { H2, useLocal } from './local'
-import { TextField } from './parts'
+import { monoNums, TextField } from './parts'
 import { LE8, LE8_SERIES, NO_LIST_DRAFT_NO_CALENDAR, VIVA_DRAFT, VIVA_MATCH, VIVA_MORE, type Le8Key } from './spacesData'
 import { le8Score } from './tools/body'
 import { useTimeAuditAccess } from './tools/freedom'
@@ -106,7 +106,7 @@ export function RoomViva({ term }: { term: TermKey }) {
               accessibilityLabel={t('Ask VIVA: {ask}', { ask: tx(d.ask) })}
               style={({ pressed }) => ({ borderRadius: radius.card, borderWidth: 1, borderColor: c.line, backgroundColor: pressed ? c.paperSunk : c.paperRaised, paddingHorizontal: 16, paddingVertical: 12, gap: 4 })}
             >
-              <Body>{`“${tx(d.ask)}”`}</Body>
+              <Body>{monoNums(`“${tx(d.ask)}”`)}</Body>
               <Eyebrow size={11}>{t('Tap to ask · {tool}', { tool: d.tool })}</Eyebrow>
             </Pressable>
           ))}

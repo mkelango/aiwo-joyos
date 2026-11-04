@@ -8,6 +8,7 @@ import { accountStore, useStore } from '@/screens/b/bStore'
 import { ChoiceCard, KeyValue } from '@/screens/b/parts'
 import { useCareConsults } from '@/screens/a/care'
 import { localDate, Rich, useA } from '@/screens/a/i18n'
+import { monoNums } from '@/screens/a/parts'
 
 // THE CONSULT ROOM (Telemedicine Practice Guidelines 2020; Memo p.24), reached from a confirmed
 // consult on Care. Before you join: the clinician's name and registration, your identity, your
@@ -105,7 +106,7 @@ export default function ConsultRoom() {
               selected={consent}
               onPress={() => setConsent(!consent)}
               accessibilityLabel={t('I consent to this teleconsultation under the Telemedicine Practice Guidelines 2020. Notes go into my clinical record.')}
-              title={<Body>{t('I consent to this teleconsultation under the Telemedicine Practice Guidelines 2020. Notes go into my clinical record.')}</Body>}
+              title={<Body>{monoNums(t('I consent to this teleconsultation under the Telemedicine Practice Guidelines 2020. Notes go into my clinical record.'))}</Body>}
             />
           </View>
           <Meta size={14} tone="ink3">
@@ -145,7 +146,7 @@ export default function ConsultRoom() {
           </Card>
           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }} accessibilityLiveRegion="polite">
             <Icon name="check" size={15} color={c.ink3} />
-            <Meta style={{ flex: 1 }}>{t('Identity and consent recorded · {name} has joined', { name: cs.who.name })}</Meta>
+            <Meta style={{ flex: 1 }}>{monoNums(t('Identity and consent recorded · {name} has joined', { name: cs.who.name }))}</Meta>
           </View>
           {mic ? null : (
             <Meta tone="ink" accessibilityLiveRegion="polite">
@@ -183,7 +184,7 @@ export default function ConsultRoom() {
               <Mono tone="ink">{mmss(secs)}</Mono>
             </KeyValue>
           </Card>
-          <Body tone="ink2">{t('{name} writes a short summary. It appears in Results once it is signed, usually within one working day.', { name: cs.who.name })}</Body>
+          <Body tone="ink2">{monoNums(t('{name} writes a short summary. It appears in Results once it is signed, usually within one working day.', { name: cs.who.name }))}</Body>
           <View style={{ gap: space.s1 }}>
             <DaybreakButton onPress={toCare}>{t('Back to Care')}</DaybreakButton>
             {cs.who.personId ? (

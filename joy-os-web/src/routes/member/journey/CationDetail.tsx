@@ -6,14 +6,16 @@ import { Link, useLocation, useParams } from 'react-router-dom'
 import { DaybreakButton, Eyebrow, TermChip, TermDot, useFmtDate } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill, SectionTitle, Tabs } from '@/components/ui'
 import { CATIONS, CATION_PHASES } from '@/data/platform'
-import { INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
+import { MEMBER, TEAM } from '@/data/member'
+import { useIndexHistory } from '@/routes/member/core/_latest'
 import { useScoresHidden } from '@/lib/minor'
 import { CATION_DETAIL, buildItinerary, type ItinDay } from './_data'
-import { JourneyEmpty, PrimaryChip, fade, kindIcon } from './_parts'
+import { JourneyEmpty, PrimaryChip, useFade, kindIcon } from './_parts'
 // One shared emergency intercept for every member free-text field (Memo p.24).
 import { useCrisisGuard } from '@/routes/member/spaces/_SpaceShell'
 import { addCationRequest, isoDate, useJourney, useVenueItinerary, withdrawCationRequest, type CationRequest } from './_store'
 import { useJ, type JourneyKey } from './_i18n'
+import { monoDigits } from './_mono'
 
 // ’CATION DETAIL (Memo p.20): one template per ’cation — promise, primary and
 // secondary terms, Day-90 measure, itinerary, before/after, named clinician
@@ -24,6 +26,7 @@ import { useJ, type JourneyKey } from './_i18n'
 // it is never shown to the member.
 
 export default function CationDetail() {
+  const fade = useFade()
   const { slug = '' } = useParams()
   const c = CATIONS.find((x) => x.slug === slug)
   const d = CATION_DETAIL[slug]
@@ -60,8 +63,11 @@ export default function CationDetail() {
     document.getElementById(`${tabId}-t${to}`)?.focus()
   }
 
+  // The latest Index (a signed Day-90 re-measure included) names the lowest term and its score.
+  const { latest } = useIndexHistory()
+
   if (!c || !d) {
-    return (
+    return monoDigits(
       <div>
         <PageHeader eyebrow={t('cation')} title={t('nfTitle')} lead={t('nfLead')} />
         <JourneyEmpty kind="cation" title={t('nfEmpty')} body={t('nfBody')} action={<Link to="/app/cation" className="btn-daybreak">{t('seeAllTen')}</Link>} />
@@ -69,14 +75,13 @@ export default function CationDetail() {
     )
   }
 
-  const latest = INDEX_HISTORY[0]
   const isLowest = c.primary === latest.lowestTerm
   const primaryScore = c.primary === 'ALL' ? latest.value : latest.terms.find((t) => t.key === c.primary)?.value
   const current = itinerary.find((x) => x.day === day) ?? itinerary[0]
   const pickSource = (v: 'venue' | 'template') => { setSource(v); setDay(1) }
   const coach = TEAM.find((p) => p.role === 'Coach')!
 
-  return (
+  return monoDigits(
     <div>
       <Link to="/app/cation" className="mb-6 inline-flex items-center gap-1.5 text-[14px] text-ink-2 hover:text-ink focus-ring"><ArrowLeft size={15} /> {t('yourCation')}</Link>
 
@@ -237,6 +242,7 @@ export default function CationDetail() {
 }
 
 function BookingPanel({ slug, name, priceFrom, venues, windows, placeholder, interestOnly, forTwo, concierge, coach }: { slug: string; name: string; priceFrom: string; venues: string[]; windows: string[]; placeholder: string; interestOnly: boolean; forTwo: boolean; concierge: string; coach: string }) {
+  const fade = useFade()
   const id = useId()
   const journey = useJourney()
   const existing = journey.cationRequests.find((r) => r.slug === slug)
@@ -282,7 +288,7 @@ function BookingPanel({ slug, name, priceFrom, venues, windows, placeholder, int
   }
 
   if (sent) {
-    return (
+    return monoDigits(
       <motion.div {...fade}>
         <Card tone="soft">
           <span className="flex h-11 w-11 items-center justify-center rounded-full bg-paper-raised text-daybreak-ink" aria-hidden><Check size={20} /></span>
@@ -316,7 +322,7 @@ function BookingPanel({ slug, name, priceFrom, venues, windows, placeholder, int
     )
   }
 
-  return (
+  return monoDigits(
     <Card as="div" className="p-5 md:p-6">
       <form onSubmit={submit} noValidate>
         <p className="eyebrow text-ink-3">{t(interestOnly ? 'registerInterest' : 'requestThis')}</p>

@@ -5,12 +5,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { DaybreakButton, Eyebrow } from '@/components/joy/primitives'
 import { Button, Pill, Sheet } from '@/components/ui'
+import { EmptyIllustration } from '@/components/joy/EmptyIllustration'
 import { CIRCLE } from '@/data/platform'
 import { fmtDate } from '@/components/joy/primitives'
 import { useSpaceState } from './_state'
 import { COUPLES_CHECK, COUPLES_ITEMS, COUPLES_OPTIONS, CONNECTIONS, CIRCLE_START, PHONE_CONTACTS, SPACE_TODAY, STATE_OF_US, STATE_OF_US_PAST, TWO_AM_START, type CirclePerson } from './_data'
 import { SpaceShell, ToolCard, rovingRadio, useCrisisGuard, Toggle } from './_SpaceShell'
-import { useSpaceText, type SpKey } from './_i18n'
+import { mono, useSpaceText, type SpKey } from './_i18n'
 import { INSTRUMENT_NOTE } from '@/lib/i18n'
 
 // PEOPLE · Relationships (Memo p.19): circles (draw your 5 and your 15; who you
@@ -120,7 +121,7 @@ function CirclesOrbit() {
   return (
     <ToolCard
       eyebrow={t('ppl.c.eyebrow')}
-      title={t('ppl.c.title')}
+      title={mono(t('ppl.c.title'))}
       sub={t('ppl.c.sub')}
       aside={<Pill tone="neutral" className="!whitespace-normal">{r('ppl.c.unseen', { n: <span className="num">{unseen.length}</span> })}</Pill>}
     >
@@ -129,8 +130,8 @@ function CirclesOrbit() {
           <svg viewBox="0 -8 420 428" className="mx-auto w-full max-w-[460px]" role="group" aria-label={t('ppl.c.aria', { a: inner.map((p) => p.name).join(', '), b: outer.map((p) => p.name).join(', '), c: unseen.map((p) => p.name).join(', ') || t('ppl.c.noOne') })}>
             <circle cx={C} cy={C} r={170} fill="none" stroke="var(--line)" />
             <circle cx={C} cy={C} r={88} fill="var(--term-r-soft)" fillOpacity={0.5} stroke="var(--line)" />
-            <text x={C} y={C - 170 - 14} textAnchor="middle" fontSize={10} fontFamily="var(--font-mono)" letterSpacing={lang === 'en' ? '0.14em' : '0'} fill="var(--ink-3)">{t('ppl.c.YOUR15')}</text>
-            <text x={C} y={C - 46} textAnchor="middle" fontSize={10} fontFamily="var(--font-mono)" letterSpacing={lang === 'en' ? '0.14em' : '0'} fill="var(--ink-3)">{t('ppl.c.YOUR5')}</text>
+            <text x={C} y={C - 170 - 14} textAnchor="middle" fontSize={10} fontFamily="var(--font-mono)" letterSpacing={lang === 'en' ? '0.14em' : '0'} fill="var(--ink-3)">{mono(t('ppl.c.YOUR15'))}</text>
+            <text x={C} y={C - 46} textAnchor="middle" fontSize={10} fontFamily="var(--font-mono)" letterSpacing={lang === 'en' ? '0.14em' : '0'} fill="var(--ink-3)">{mono(t('ppl.c.YOUR5'))}</text>
             <circle cx={C} cy={C} r={24} fill="var(--ink)" />
             <text x={C} y={C} textAnchor="middle" dominantBaseline="central" fontSize={lang === 'ta' ? 8.5 : 11} fontFamily="var(--font-mono)" fill="var(--paper)">{t('ppl.c.YOU')}</text>
             {dots.map(({ p, x, y, a }) => {
@@ -182,7 +183,7 @@ function CirclesOrbit() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-[1.2rem] font-light text-ink">{selected.name}</p>
-                    <p className="text-[13px] text-ink-3">{t('ppl.c.your', { ring: selected.ring })}{selected.note ? ` · ${d(selected.note)}` : ''}</p>
+                    <p className="text-[13px] text-ink-3">{mono(t('ppl.c.your', { ring: selected.ring }))}{selected.note ? <> · {mono(d(selected.note))}</> : ''}</p>
                   </div>
                   <button onClick={() => setSel(null)} aria-label={t('c.close')} className="rounded-full p-1 text-ink-3 hover:bg-paper-sunk focus-ring"><X size={16} /></button>
                 </div>
@@ -190,7 +191,7 @@ function CirclesOrbit() {
                   <Toggle checked={selected.seen} onChange={(v) => update(selected.id, { seen: v })} label={t('ppl.c.seen')} />
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <Button size="sm" onClick={() => move(selected)}>{t('ppl.c.moveTo', { ring: selected.ring === 5 ? '15' : '5' })}</Button>
+                  <Button size="sm" onClick={() => move(selected)}>{mono(t('ppl.c.moveTo', { ring: selected.ring === 5 ? '15' : '5' }))}</Button>
                   <Button size="sm" variant="ghost" onClick={() => remove(selected)}><Trash2 size={14} /> {t('c.remove')}</Button>
                 </div>
               </motion.div>
@@ -198,7 +199,7 @@ function CirclesOrbit() {
           </AnimatePresence>
           {removed && (
             <p role="status" className="flex items-center justify-between gap-3 rounded-2xl border border-line px-4 py-3 text-[14px] text-ink-2">
-              <span>{t('ppl.c.removed', { name: removed.person.name, ring: removed.person.ring })}</span>
+              <span>{mono(t('ppl.c.removed', { name: removed.person.name, ring: removed.person.ring }))}</span>
               <button type="button" onClick={undo} className="shrink-0 rounded text-ink underline underline-offset-4 focus-ring">{t('c.undo')}</button>
             </p>
           )}
@@ -227,14 +228,14 @@ function CirclesOrbit() {
                     aria-describedby={full[r] ? `circ-full-${r}` : undefined}
                     className={clsx('flex-1 whitespace-nowrap rounded-full px-3 py-1.5 text-[14px] focus-ring disabled:cursor-not-allowed disabled:opacity-50', ring === r && !full[r] ? 'bg-ink text-paper' : 'text-ink-2')}
                   >
-                    {t('ppl.c.your', { ring: r })} <span className="num text-[12px] opacity-70">{r === 5 ? inner.length : outer.length}/{caps[r]}</span>
+                    {mono(t('ppl.c.your', { ring: r }))} <span className="num text-[12px] opacity-70">{r === 5 ? inner.length : outer.length}/{caps[r]}</span>
                   </button>
                 ))}
               </div>
               <Button type="submit" variant="ink" aria-label={t('ppl.c.addTo')} disabled={full[5] && full[15]} className="w-full sm:w-auto"><Plus size={15} /> {t('sh.add')}</Button>
             </div>
             {([5, 15] as const).filter((r) => full[r]).map((r) => (
-              <p key={r} id={`circ-full-${r}`} className="mt-2 text-[13px] text-ink-3">{t('ppl.c.fullNote', { r })}</p>
+              <p key={r} id={`circ-full-${r}`} className="mt-2 text-[13px] text-ink-3">{mono(t('ppl.c.fullNote', { r }))}</p>
             ))}
             {err && <p id="circ-err" role="alert" className="mt-2 text-[13px] text-error">{t(err.k, err.v)}</p>}
           </form>
@@ -275,7 +276,7 @@ function ContactsPicker({ open, onClose, inCircles, onPick }: { open: boolean; o
             </li>
           )
         })}
-        {rows.length === 0 && <li className="break-words py-8 text-center text-[15px] text-ink-2">{t('ppl.ct.none', { q })}</li>}
+        {rows.length === 0 && <li className="break-words py-8 text-center text-[15px] text-ink-2"><EmptyIllustration kind="circle" width={120} className="mb-4" />{mono(t('ppl.ct.none', { q }))}</li>}
       </ul>
     </Sheet>
   )
@@ -316,7 +317,7 @@ function StateOfUs() {
         {STATE_OF_US.map((s, i) => (
           <li key={s.title} className={clsx('rounded-xl px-3 py-2.5 text-[13px] transition-colors', i === step ? 'bg-ink text-paper' : i < step || done ? 'bg-[color:var(--term-r-soft)] text-[color:var(--term-r-ink)]' : 'bg-paper-sunk text-ink-2')}>
             <span className="num block text-[11px]">{String(i + 1).padStart(2, '0')} · {s.minutes} {t('c.min')}</span>
-            <span className="mt-0.5 block break-words leading-tight">{d(s.title)}</span>
+            <span className="mt-0.5 block break-words leading-tight">{mono(d(s.title))}</span>
           </li>
         ))}
       </ol>
@@ -333,7 +334,7 @@ function StateOfUs() {
                     <li key={d} className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-[13px] text-ink-2"><Check size={12} aria-hidden /> <span className="num">{dm(d)}</span></li>
                   ))}
                 </ul>
-                <p className="mt-2 text-[13px] text-ink-3">{t('ppl.s.dates')}</p>
+                <p className="mt-2 text-[13px] text-ink-3">{mono(t('ppl.s.dates'))}</p>
               </div>
               <div className="mt-auto pt-6"><DaybreakButton onClick={() => go(0)} className="w-full sm:w-auto"><span className="sm:hidden">{t('ppl.s.beginShort')}</span><span className="hidden sm:inline">{t('ppl.s.begin')}</span></DaybreakButton></div>
             </>
@@ -341,10 +342,10 @@ function StateOfUs() {
           {cur && (
             <>
               <div className="flex items-center justify-between gap-3">
-                <Eyebrow className="min-w-0">{t('ppl.s.part', { n: step + 1, title: d(cur.title) })}</Eyebrow>
+                <Eyebrow className="min-w-0">{mono(t('ppl.s.part', { n: step + 1, title: d(cur.title) }))}</Eyebrow>
                 <span className="num shrink-0 text-[2rem] font-light text-ink" aria-label={t('ppl.s.remaining', { mm })}>{mm}</span>
               </div>
-              <p className="mt-3 text-[1.3rem] font-light leading-snug text-ink">{d(cur.prompt)}</p>
+              <p className="mt-3 text-[1.3rem] font-light leading-snug text-ink">{mono(d(cur.prompt))}</p>
               <div className="mt-auto flex flex-wrap gap-2 pt-6">
                 <Button variant="ghost" onClick={() => go(step - 1)} aria-label={t('ppl.s.prev')}><ChevronLeft size={16} /></Button>
                 <Button onClick={toggleRun}>{running ? <><Pause size={14} /> {t('c.pause')}</> : <><Play size={14} /> {t('c.resume')}</>}</Button>
@@ -355,13 +356,13 @@ function StateOfUs() {
           {done && (
             <>
               <p className="text-[1.4rem] font-light text-ink">{r('ppl.s.doneT', { e: <em>{t('ppl.s.doneE')}</em> })}</p>
-              <p className="mt-2 text-[15px] text-ink-2">{t('ppl.s.kept')}</p>
+              <p className="mt-2 text-[15px] text-ink-2">{mono(t('ppl.s.kept'))}</p>
               <ul className="mt-4 space-y-1.5 text-[15px] text-ink-2">
                 <li className="flex items-start gap-2"><Check size={15} className="mt-1 shrink-0 text-ink" aria-hidden /> <span>{r('ppl.s.logged', { date: <span className="num text-ink">{fmtDate(SPACE_TODAY)}</span> })}</span></li>
                 <li className="flex items-start gap-2"><Check size={15} className="mt-1 shrink-0 text-ink" aria-hidden /> {t('ppl.s.next')}</li>
               </ul>
               <div className="mt-auto flex flex-wrap gap-3 pt-6">
-                <Link to="/app/cation/lovecation" className="inline-flex items-center gap-1.5 rounded text-[15px] text-ink underline-offset-4 hover:underline focus-ring">{t('sh.seeThe', { name: 'Lovecation' })} <ArrowRight size={15} /></Link>
+                <Link to="/app/cation/lovecation" className="inline-flex items-center gap-1.5 rounded text-[15px] text-ink underline-offset-4 hover:underline focus-ring">{mono(t('sh.seeThe', { name: 'Lovecation' }))} <ArrowRight size={15} /></Link>
                 <Button variant="link" onClick={() => go(-1)}>{t('ppl.s.backStart')}</Button>
               </div>
             </>
@@ -407,7 +408,7 @@ function CouplesCheck() {
     return (
       <ToolCard className="w-full" eyebrow={t('ppl.cc.yourPart')} title={t('ppl.cc.takeTitle')} sub={t('ppl.cc.takeSub')}>
         <form onSubmit={(e) => { e.preventDefault(); submit() }} className="flex flex-1 flex-col">
-          <p className="num text-[13px] text-ink-3" aria-live="polite">{t('ppl.cc.answered', { a: answered, b: COUPLES_ITEMS.length })}</p>
+          <p className="num text-[13px] text-ink-3" aria-live="polite">{mono(t('ppl.cc.answered', { a: answered, b: COUPLES_ITEMS.length }))}</p>
           {lang !== 'en' && <p className="mt-2 rounded-xl bg-paper-sunk px-3 py-2 text-[13px] text-ink-2">{INSTRUMENT_NOTE[lang]}</p>}
           <div className="mt-3 space-y-5">
             {COUPLES_ITEMS.map((it, qi) => (
@@ -424,7 +425,7 @@ function CouplesCheck() {
               </fieldset>
             ))}
           </div>
-          {err !== null && <p role="alert" className="mt-3 text-[13px] text-error">{t('ppl.cc.errAll', { n: err })}</p>}
+          {err !== null && <p role="alert" className="mt-3 text-[13px] text-error">{mono(t('ppl.cc.errAll', { n: err }))}</p>}
           <div className="mt-auto flex flex-wrap gap-2 pt-6">
             <Button type="submit" variant="ink">{t('ppl.cc.send')}</Button>
             <Button variant="ghost" onClick={() => { setPhase('result'); setErr(null) }}>{t('ppl.cc.notNow')}</Button>
@@ -456,7 +457,7 @@ function CouplesCheck() {
       <ul className="mt-4 divide-y divide-line">
         {rows.map((c) => (
           <li key={c.area} className="flex items-center justify-between gap-3 py-2.5">
-            <span className="min-w-0 text-[15px] text-ink">{d(c.area)}</span>
+            <span className="min-w-0 text-[15px] text-ink">{mono(d(c.area))}</span>
             <span className={clsx('inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px]', c.agree ? 'bg-[color:var(--term-r-soft)] text-[color:var(--term-r-ink)]' : 'border border-line-strong text-ink-2')}>
               {c.agree ? <><Check size={12} aria-hidden /> {t('ppl.cc.agree')}</> : t('ppl.cc.differently')}
             </span>
@@ -469,7 +470,7 @@ function CouplesCheck() {
         {result.on === SPACE_TODAY
           ? <p className="text-[14px] text-ink-2" role="status">{t('ppl.cc.done')}</p>
           : <Button onClick={() => setPhase('taking')} className="!whitespace-normal">{r('ppl.cc.take', { n: <span className="num">3</span> })}</Button>}
-        <p className="mt-4 flex items-start gap-2 text-[13px] text-ink-3"><Lock size={14} className="mt-0.5 shrink-0" aria-hidden /> {t('ppl.cc.private')}</p>
+        <p className="mt-4 flex items-start gap-2 text-[13px] text-ink-3"><Lock size={14} className="mt-0.5 shrink-0" aria-hidden /> {mono(t('ppl.cc.private'))}</p>
       </div>
     </ToolCard>
   )
@@ -497,7 +498,7 @@ function TwoAmList() {
     setNames((x) => x.filter((y) => y !== n)); setErr(null)
   }
   return (
-    <ToolCard className="w-full" eyebrow={<span className="inline-flex items-center gap-1.5"><Moon size={13} aria-hidden /> {t('ppl.2.eyebrow')}</span>} title={t('ppl.2.title')} sub={t('ppl.2.sub')}>
+    <ToolCard className="w-full" eyebrow={<span className="inline-flex items-center gap-1.5"><Moon size={13} aria-hidden /> {mono(t('ppl.2.eyebrow'))}</span>} title={mono(t('ppl.2.title'))} sub={mono(t('ppl.2.sub'))}>
       <ul className="flex flex-wrap gap-2">
         {names.map((n) => (
           <li key={n} className="inline-flex items-center gap-1.5 rounded-full border border-line py-1.5 pl-3.5 pr-1.5 text-[15px] text-ink">
@@ -509,7 +510,7 @@ function TwoAmList() {
       </ul>
       {removed && (
         <p role="status" className="mt-3 flex items-center gap-3 text-[14px] text-ink-2">
-          {t('ppl.2.removed', { n: removed.name })}
+          {mono(t('ppl.2.removed', { n: removed.name }))}
           <button type="button" className="rounded text-ink underline underline-offset-4 focus-ring" onClick={() => { setNames((x) => { const c = [...x]; c.splice(Math.min(removed.index, c.length), 0, removed.name); return c }); setRemoved(null) }}>{t('c.undo')}</button>
         </p>
       )}
@@ -528,7 +529,7 @@ function TwoAmList() {
 function CircleOfEight() {
   const { t, d, r, tt } = useSpaceText()
   return (
-    <ToolCard className="w-full" tone="sunk" eyebrow={t('ppl.8.eyebrow')} title={CIRCLE.name.replace('Circle of eight · ', '')} sub={t('ppl.8.sub', { when: d(CIRCLE.when), n: CIRCLE.callMinutes, rel: tt.name('R') })}>
+    <ToolCard className="w-full" tone="sunk" eyebrow={t('ppl.8.eyebrow')} title={CIRCLE.name.replace('Circle of eight · ', '')} sub={mono(t('ppl.8.sub', { when: d(CIRCLE.when), n: CIRCLE.callMinutes, rel: tt.name('R') }))}>
       <ul className="flex -space-x-2" aria-label={t('ppl.8.members', { list: CIRCLE.members.join(', ') })}>
         {CIRCLE.members.map((m) => (
           <li key={m} className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-paper-sunk bg-paper-raised font-mono text-[12px] text-ink ring-1 ring-line" aria-hidden>{m[0]}</li>
@@ -550,9 +551,9 @@ function Connections() {
       <ul className="space-y-3">
         {CONNECTIONS.map((c) => (
           <li key={c.id} className="rounded-2xl border border-line p-3.5">
-            <p className="text-[15px] text-ink">{d(c.title)}</p>
+            <p className="text-[15px] text-ink">{mono(d(c.title))}</p>
             <p className="mt-0.5 text-[13px] text-ink-3">{wdm(c.on)} · <span className="num">{c.at}</span> · {c.where}</p>
-            <p className="text-[13px] text-ink-3">{d(c.who)}</p>
+            <p className="text-[13px] text-ink-3">{mono(d(c.who))}</p>
             <div className="mt-2.5 flex flex-wrap gap-2">
               {rsvp[c.id] ? (
                 <p className="flex flex-wrap items-center gap-2 text-[14px] text-ink-2" role="status">

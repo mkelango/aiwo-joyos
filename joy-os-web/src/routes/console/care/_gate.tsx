@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui'
 import type { Role } from '@/domain/types'
 import { useApp } from '@/lib/store'
-import { AGGREGATES_ONLY, ASSIGNED_MEMBERS, NAMED_MEMBER, STRUCTURE_ONLY, assignedIds, grantActs, isLive, lastSettled, scopeLabel, standingRequest, useAccessRequests } from './_accessStore'
+import { AGGREGATES_ONLY, ASSIGNED_MEMBERS, NAMED_MEMBER, OPS_JIT_READ, STRUCTURE_ONLY, assignedIds, grantActs, isLive, lastSettled, scopeLabel, standingRequest, useAccessRequests } from './_accessStore'
 import { fmtClock, fmtDuration, useConsoleNow } from './_parts'
 
 // Role gating for the care consoles. A role opens a console; it does not open a member.
@@ -136,6 +136,13 @@ export const actorOf = (a: { chosen: boolean; person: string; roleLabel: string 
 })
 
 /**
+ * An audit purpose with the grant it was taken under, when there is one: every action under a
+ * grant carries the grant's reference ("Weekly review · under ACC-4127"). On standing access
+ * the purpose is written as given.
+ */
+export const withGrant = (purpose: string, a: { grant: { ref: string } | null }) => (a.grant ? `${purpose} · under ${a.grant.ref}` : purpose)
+
+/**
  * Whether the signed-in demo role may act at a desk ('/console/clinical', or
  * '/console/coach#concierge' for a desk inside a console). Fails closed: no chosen role,
  * no action. A live access grant from the DPO lets its holder act for its duration, within
@@ -261,6 +268,8 @@ export function PreviewBanner({ path, memberId }: { path: string; memberId?: str
                   ? <>Grant <span className="num">{grant.ref}</span> is aggregates only: you can look, never act on a member’s record.</>
                   : grant.scope === STRUCTURE_ONLY
                     ? <>Grant <span className="num">{grant.ref}</span> is structure only: you can look, not act on a member.</>
+                  : grant.scope === OPS_JIT_READ
+                    ? <>Grant <span className="num">{grant.ref}</span> is production read: you can look, not change anything here. A write grant is a separate request.</>
                     : <>Grant <span className="num">{grant.ref}</span> does not cover this record.</>
                 : settled?.status === 'declined'
                   ? <>Request <span className="num">{settled.ref}</span> was declined: {settled.reason}.</>

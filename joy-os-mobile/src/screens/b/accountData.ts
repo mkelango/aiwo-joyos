@@ -85,7 +85,17 @@ export const CLINICIANS = [
 
 // ─── Messages ─────────────────────────────────────────────────────────────
 
-export interface Msg { id: string; from: 'me' | 'them'; at: string; body: string; drafted?: boolean; signed?: string; clinical?: boolean }
+export interface Msg {
+  id: string
+  from: 'me' | 'them'
+  at: string
+  body: string
+  drafted?: boolean
+  signed?: string
+  clinical?: boolean
+  /** What a message written on another screen is about (VIVA, Body, a review note), shown above it. */
+  subject?: string
+}
 export interface Thread { id: string; personId: string; subject: string; clinical?: boolean; unread: number; messages: Msg[] }
 
 export const THREADS: Thread[] = [
@@ -173,6 +183,13 @@ export const EXTRA_ACCESS = [
   { id: 'e8', at: '2027-01-05 16:30', who: 'Fairmont Mumbai', role: 'Venue', what: 'Name, room, dietary note — no health data', purpose: '’Cation check-out' },
 ]
 
+/** Lakshmi's own access log (elder mode): her concierge and her helper. Arjun's is ACCESS_LOG + EXTRA_ACCESS; a new member's starts empty. */
+export const ACCESS_LAKSHMI = [
+  { id: 'lk1', at: '2027-01-19 10:18', who: 'Ravi Shankar', role: 'Concierge', what: 'Name, accessibility note', purpose: 'Joyspan Session booking' },
+  { id: 'lk2', at: '2027-01-08 11:02', who: 'Arjun Rao', role: 'Household', what: 'Elder-mode settings, as your helper', purpose: 'Helper, by your consent' },
+]
+
+/** Arjun's earlier export. Other accounts list only the exports made on this phone. */
 export const EXPORTS_PAST = [
   { id: 'x1', requested: '2026-10-06', format: 'FHIR R4 bundle', size: '2.4 MB', status: 'Downloaded · link expired' },
 ]
@@ -194,9 +211,16 @@ export const INVOICES = [
   { id: 'INV-2026-010554', date: '2026-11-01', item: 'Joy OS Plus · November', total: 499, method: 'UPI', status: 'Paid' },
   { id: 'INV-2026-009912', date: '2026-10-01', item: 'Joy OS Plus · October', total: 499, method: 'UPI', status: 'Paid' },
 ]
+/** Lakshmi's own Plus, from the day her son became her helper. A new member starts with none. */
+export const INVOICES_LAKSHMI = [
+  { id: 'INV-2027-000422', date: '2027-01-08', item: 'Joy OS Plus · January', total: 499, method: 'UPI', status: 'Paid' },
+]
+/** The UPI handle on file (masked) for the accounts that have one. */
+export const UPI_ON_FILE: Partial<Record<'arjun' | 'lakshmi' | 'new', string>> = { arjun: '••••@okhdfc', lakshmi: '••••@oksbi' }
 export const GSTIN_AIWO = '33AAKCA4417M1Z2'
 export const GST_RATE = 0.18
 
+/** The specimen member's entitlements with how he uses them; the plan's own points come from PLANS. */
 export const ENTITLEMENTS = [
   { name: 'All six spaces in full', from: 'Plus', use: 'Included' },
   { name: 'Devices and signals', from: 'Plus', use: 'Oura · Apple Health linked' },

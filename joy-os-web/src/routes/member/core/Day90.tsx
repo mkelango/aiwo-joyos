@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { ArrowRight, CalendarClock, Check, FileSignature, Hourglass, MessageCircle, Pencil, ShieldCheck } from 'lucide-react'
+import { ArrowRight, CalendarClock, Check, FileSignature, FlaskConical, Hourglass, MessageCircle, Pencil, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { JoyspanWheel, WheelGhostKey } from '@/components/joy/JoyspanWheel'
@@ -11,12 +11,13 @@ import { termByKey } from '@/data/terms'
 import { METHODS, bandFor, joyspanIndex, lowestTerm } from '@/domain/indexEngine'
 import type { Grade, TermKey, TermScore } from '@/domain/types'
 import { DAY90_DATES, DAY90_TERMS, DAY90_WHY, NEXT_90 } from './_data'
-import { INK_GROUND, PAPER_GROUND, PrintOnly } from './_parts'
+import { INK_GROUND, PAPER_GROUND, PrintOnly, nums } from './_parts'
 import { IN_REMEASURE_WINDOW, REMEASURE_OPENS, addDays, amendRemeasure, useCallRequest, useRemeasure, type Amendment } from './_store'
 import { careThreadHref, postCareMessage } from '@/routes/member/account/_careInbox'
 import type { SittingResult } from './_scoring'
 import { AmendPanel } from './_amend'
 import { IndexCardView } from './_card'
+import { useReturned } from './_remeasure'
 import { useX } from './_i18nX'
 import { DAY90_SPECIMEN_TEXT, DAY90_WHY_TEXT, NEXT90_TEXT, rich, useCore } from './_i18n'
 import { useT } from '@/lib/i18n'
@@ -45,7 +46,9 @@ export default function Day90() {
   // The member's own Clinical-grade re-measure, when the chain has reached sign-off;
   // otherwise the specimen quarter that fell, shown with its "Show as" states.
   const [rec, setRec] = useRemeasure()
-  const own = !!rec && (rec.status === 'awaiting' || rec.status === 'signed') && Array.isArray(rec.terms) && rec.terms.length === 6
+  // A draft the physician returned to the lab is still the member's own, provisional sitting.
+  const own = !!rec && (rec.status === 'awaiting' || rec.status === 'returned' || rec.status === 'signed') && Array.isArray(rec.terms) && rec.terms.length === 6
+  const returned = useReturned(own ? rec : null)
   const terms90 = own ? rec!.terms! : DAY90_TERMS
   const before = joyspanIndex(day0.terms, day0.method)!
   // null while a term of the member's own sitting is not yet measured: the Index is withheld.
@@ -117,7 +120,7 @@ export default function Day90() {
       <PageHeader
         eyebrow={c('d9Eyebrow', { date: fmtDate(DAY90_DATES.day90) })}
         title={rich(c('d9Title'))}
-        lead={c('d9Lead')}
+        lead={nums(c('d9Lead'))}
         actions={<SpecimenTag />}
       />
 
@@ -125,8 +128,8 @@ export default function Day90() {
         <p className="mb-8 max-w-2xl text-[15px] text-ink-2">{rich(x('d9OwnLine'), { date: <span className="num">{fmtDate(rec!.takenOn ?? DAY90_DATES.day90)}</span> })}</p>
       ) : !IN_REMEASURE_WINDOW && (
         <p className="mb-6 max-w-2xl rounded-card border border-dashed border-line-strong px-4 py-3 text-[14px] text-ink-2">
-          {rich(c('d9HowShown'), { d: <span className="num">{MEMBER.dayOfLoop}</span>, n: <span className="num">76</span>, date: fmtDate(REMEASURE_OPENS) })}{' '}
-          {x('d9ChainHint')} <Link to="/app" className="text-ink underline underline-offset-4 focus-ring">{x('d9ChainLink')}</Link>
+          {rich(c('d9HowShown'), { d: <span className="num">{MEMBER.dayOfLoop}</span>, n: <span className="num">76</span>, date: <span className="num">{fmtDate(REMEASURE_OPENS)}</span> })}{' '}
+          {nums(x('d9ChainHint'))} <Link to="/app" className="text-ink underline underline-offset-4 focus-ring">{x('d9ChainLink')}</Link>
         </p>
       )}
       {!own && <div className="mb-8 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -159,7 +162,7 @@ export default function Day90() {
               <BandLabel band={after === null ? 'not-yet-measured' : bandFor(after.value)} />
             </span>
           </div>
-          <p className="mt-6 max-w-[34ch] text-[1.5rem] font-light leading-snug text-ink md:text-[1.7rem]">{sentence}</p>
+          <p className="mt-6 max-w-[34ch] text-[1.5rem] font-light leading-snug text-ink md:text-[1.7rem]">{nums(sentence)}</p>
           {own && missing.length > 0 && (
             // A term skipped in the Clinical-grade sitting is measured on its own, then re-signed.
             <div className="mt-4 max-w-xl">
@@ -178,7 +181,7 @@ export default function Day90() {
               <Pill tone="neutral">{c('soPill')}</Pill> {c('soBanner')}
             </p>
           )}
-          <GradeStatus grade={grade} signer={signer} signedOn={signedOn} />
+          <GradeStatus grade={grade} signer={signer} signedOn={signedOn} returned={returned} />
           {own && grade === 'awaiting' && lastPrior && (
             <p className="mt-3 max-w-xl text-[14px] text-ink-2">{rich(x('d9Resign'), { who: lastPrior.by, date: <span className="num">{fmtDate(lastPrior.at.slice(0, 10))}</span> })}</p>
           )}
@@ -194,10 +197,17 @@ export default function Day90() {
             </Button>
           )}
           {own && grade === 'awaiting' && (
-            <p className="mt-3 max-w-xl rounded-card border border-dashed border-line-strong px-4 py-2.5 text-[13px] text-ink-2">
-              {x('d9SpecimenSign', { who: meera.name })}{' '}
-              <Link to="/console/clinical" className="text-ink underline underline-offset-4 focus-ring">{x('d9OpenPortal')}</Link>
-            </p>
+            returned ? (
+              <p className="mt-3 max-w-xl rounded-card border border-dashed border-line-strong px-4 py-2.5 text-[13px] text-ink-2">
+                {x('d9SpecimenRedraw', { who: returned.who, concierge: returned.concierge })}{' '}
+                <Link to="/console/coach?desk=concierge" className="text-ink underline underline-offset-4 focus-ring">{x('d9OpenConcierge')}</Link>
+              </p>
+            ) : (
+              <p className="mt-3 max-w-xl rounded-card border border-dashed border-line-strong px-4 py-2.5 text-[13px] text-ink-2">
+                {x('d9SpecimenSign', { who: meera.name })}{' '}
+                <Link to="/console/clinical" className="text-ink underline underline-offset-4 focus-ring">{x('d9OpenPortal')}</Link>
+              </p>
+            )
           )}
           <MethodLine className="mt-3" method="v1.0" grade={gradeOf} takenOn={own ? rec!.takenOn ?? DAY90_DATES.day90 : DAY90_DATES.day90} next={NEXT_MEASURE} signedBy={grade === 'signed' ? signer : undefined} />
         </div>
@@ -214,7 +224,7 @@ export default function Day90() {
             <Hourglass size={18} aria-hidden className="mt-0.5 shrink-0 text-ink-3" />
             <div>
               <Eyebrow>{x('d9CardTitle')}</Eyebrow>
-              <p className="mt-2 text-[16px] text-ink-2">{x('d9CardPending', { who: signer })}</p>
+              <p className="mt-2 text-[16px] text-ink-2">{nums(returned ? x('d9CardReturned', { who: returned.who }) : x('d9CardPending', { who: signer }))}</p>
             </div>
           </Card>
         ) : (
@@ -273,7 +283,7 @@ export default function Day90() {
             </div>
           </div>
           <p className="mt-4 text-[1.35rem] font-light leading-snug text-ink">{pick(DAY90_SPECIMEN_TEXT.person, DAY90_SPECIMEN.person)}</p>
-          <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px] text-ink-2"><CalendarClock size={15} aria-hidden /> <span className="num">{when(slot)}</span> <span>{c('d9CallMeta')}</span></p>
+          <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px] text-ink-2"><CalendarClock size={15} aria-hidden /> <span className="num">{when(slot)}</span> <span>{nums(c('d9CallMeta'))}</span></p>
           {picking && (
             <fieldset className="mt-4 space-y-2">
               <legend className="eyebrow mb-2 text-ink-3">{c('d9Choose')}</legend>
@@ -332,7 +342,7 @@ export default function Day90() {
 
       <div className="mt-8 flex flex-col items-center gap-3 text-center">
         <DaybreakButton onClick={() => setOpen(true)} className="w-full sm:w-auto sm:min-w-[18rem]">{c('d9SeeChanged')}</DaybreakButton>
-        <p className="text-[14px] text-ink-3">{c('d9TermByTerm', { x: c(grade === 'signed' ? 'd9xSigned' : grade === 'awaiting' ? 'd9xProv' : 'd9xMethod') })}</p>
+        <p className="text-[14px] text-ink-3">{nums(c('d9TermByTerm', { x: c(grade === 'signed' ? 'd9xSigned' : grade === 'awaiting' ? 'd9xProv' : 'd9xMethod') }))}</p>
       </div>
 
       {/* ─── The next ninety days ───────────────────────────────────────── */}
@@ -355,9 +365,9 @@ export default function Day90() {
             <li key={s.title} className="flex gap-4">
               <span className="num mt-0.5 w-6 shrink-0 text-[13px] text-ink-3">{String(i + 1).padStart(2, '0')}</span>
               <div className="min-w-0">
-                <p className="eyebrow flex items-center gap-2 text-ink-3"><TermDot term={s.term} size={8} /> {pick(nt?.day, s.day)}</p>
-                <p className="mt-1 text-[17px] text-ink">{pick(nt?.title, s.title)}</p>
-                <p className="mt-1 text-[14px] text-ink-2">{pick(nt?.detail, s.detail)}</p>
+                <p className="eyebrow flex items-center gap-2 text-ink-3"><TermDot term={s.term} size={8} /> {nums(pick(nt?.day, s.day))}</p>
+                <p className="mt-1 text-[17px] text-ink">{nums(pick(nt?.title, s.title))}</p>
+                <p className="mt-1 text-[14px] text-ink-2">{nums(pick(nt?.detail, s.detail))}</p>
               </div>
             </li>
             )
@@ -403,10 +413,21 @@ export default function Day90() {
   )
 }
 
-function GradeStatus({ grade, signer, signedOn }: { grade: GradeState; signer: string; signedOn: string }) {
+function GradeStatus({ grade, signer, signedOn, returned }: { grade: GradeState; signer: string; signedOn: string; returned: ReturnType<typeof useReturned> }) {
   const x = useX()
   const { t: c } = useCore()
   const fmtDate = useFmtDate()
+  // Returned to the lab by the physician: who, why, what happens next (back to awaiting after the redraw).
+  if (returned)
+    return (
+      <div role="status" className="mt-5 flex max-w-xl items-start gap-2.5 rounded-card border border-line px-4 py-2.5 text-[14px] text-ink-2">
+        <FlaskConical size={15} aria-hidden className="mt-1 shrink-0" />
+        <span>
+          {returned.at && <span className="eyebrow mb-1 block text-ink-3">{x('rmReturnedEyebrow', { date: fmtDate(returned.at) })}</span>}
+          {nums(x('rmReturnedBody', { who: returned.who, reason: returned.reason, concierge: returned.concierge }))} {x('rmReturnedNext', { who: returned.who, concierge: returned.concierge })}
+        </span>
+      </div>
+    )
   if (grade === 'index')
     return (
       <p className="mt-5 flex items-start gap-2 text-[14px] text-ink-2">

@@ -20,7 +20,8 @@ import { useCountUp } from './CountUp'
 // clockwise from Healthspan, and the whole bloom takes exactly 960 ms on the brand easing
 // (each petal 480 ms, 96 ms apart: 5 × 96 + 480 = 960) while the centre Index counts up to its
 // value over the same 960 ms. Under reduced motion the finished Wheel fades in over 120 ms.
-// A member under 18 is never scored: inside the member app the Wheel then draws no values.
+// A member under 18 is never scored: inside the member app the Wheel then draws no values,
+// unless it is marked `specimen` (figures that are not the member's own).
 
 /** Per-petal duration and stagger, in seconds: the last petal lands at exactly 0.96 s. */
 const PETAL = DUR.step / 1000
@@ -43,11 +44,14 @@ interface Props {
   guide?: boolean
   /** The Day-0 terms, drawn as a 14% Ink outline inside each petal. */
   baseline?: TermScore[] | null
+  /** Specimen figures, not the member's own (the Method's worked example, a cohort Wheel):
+   *  drawn in full for a minor too. */
+  specimen?: boolean
 }
 
-export function JoyspanWheel({ terms: scored, size = 240, value: scoredValue, showLabels = false, highlight = null, onSelect, animate = true, guide = true, baseline: scoredBaseline = null }: Props) {
+export function JoyspanWheel({ terms: scored, size = 240, value: scoredValue, showLabels = false, highlight = null, onSelect, animate = true, guide = true, baseline: scoredBaseline = null, specimen = false }: Props) {
   const reduce = useReduceMotion()
-  const hidden = useScoresHidden()
+  const hidden = useScoresHidden(specimen)
   // A minor's Wheel keeps its six petals but carries no value, band or Day-0 outline.
   const terms = hidden ? scored.map((t) => ({ ...t, value: null })) : scored
   const value = hidden ? (scoredValue === undefined ? undefined : null) : scoredValue
@@ -136,7 +140,8 @@ export function JoyspanWheel({ terms: scored, size = 240, value: scoredValue, sh
                 cy={c}
                 initial={animate && !reduce ? { r: inner } : false}
                 animate={{ r: fillTo }}
-                transition={{ duration: PETAL, delay: i * STAGGER, ease: [0.2, 0, 0, 1] }}
+                // Under reduced motion a changed score (the Method's sliders) lands at once: no grow.
+                transition={reduce ? { duration: 0 } : { duration: PETAL, delay: i * STAGGER, ease: [0.2, 0, 0, 1] }}
               />
             </clipPath>
             <path d={full} fill={v === null ? 'none' : SOFT[k]} stroke={v === null ? 'var(--ink-3)' : termColor[k]} strokeOpacity={v === null ? 0.6 : 0.35} strokeDasharray={v === null ? '3 3' : undefined} strokeWidth={0.8} />

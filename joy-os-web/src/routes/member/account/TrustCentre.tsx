@@ -11,11 +11,11 @@ import { METHODS } from '@/domain/indexEngine'
 import type { Consent } from '@/domain/types'
 import { CLAIMS_LOG, DEFAULT_NOMINEE, EXPORTS_PAST, SPECIMEN_NOW } from './_data'
 import { Checkbox, Field, Section, Segmented, Select, Toggle } from './_parts'
-import { inputCls, rich, syncWhatsAppChannel, useMemberProfile, usePersisted, useToast } from './_util'
+import { inputCls, nums, rich, syncWhatsAppChannel, useMemberProfile, usePersisted, useToast } from './_util'
 import { AbhaCard } from './_abha'
 import { ARTEFACT_VERSION, CONSENT_SEED, latestFor, makeEvent, type ConsentAction, type ConsentEvent, type ConsentHistory } from './_consent'
 import { StepUp } from './_stepup'
-import { CONSENT_DEVICE, EXTRA_DEVICE_CONSENTS, disconnectForConsent, type ConsentRecord } from './_links'
+import { CALENDAR_NAME, CALENDAR_NONE, CONSENT_DEVICE, EXTRA_DEVICE_CONSENTS, calendarProvider, disconnectForConsent, type ConsentRecord } from './_links'
 import { useMemberAccessLog, type MemberAccess } from './_access'
 import { useDict, useTermText } from '@/lib/i18n'
 import { useScoresHidden } from '@/lib/minor'
@@ -42,7 +42,9 @@ export default function TrustCentre() {
   const consents: ConsentRecord = { ...stored, c_wa: { ...stored.c_wa, on: wa.consented } }
   const insurer: InsurerState = consents.c_star?.on ? 'granted' : ins.state === 'declined' ? 'declined' : 'not-granted'
   // Device consents beyond the specimen list appear once the member has connected that device.
-  const list = useMemo(() => [...CONSENTS, ...EXTRA_DEVICE_CONSENTS.filter((c) => stored[c.id])], [stored])
+  // The calendar row names the calendar Freedom's time audit connected, or says none is.
+  const calendar = calendarProvider(stored)
+  const list = useMemo(() => [...CONSENTS, ...EXTRA_DEVICE_CONSENTS.filter((c) => stored[c.id])].map((c) => (c.id === 'c_cal' ? { ...c, name: calendar ? CALENDAR_NAME[calendar] : CALENDAR_NONE } : c)), [stored, calendar])
   // Every grant and withdrawal is kept as an event with the artefact version (consent_event).
   const [history, setHistory] = usePersisted<ConsentHistory>('consent-history', CONSENT_SEED)
   const record = (ref: string, action: ConsentAction) => setHistory((h) => ({ events: [...h.events, makeEvent(ref, action, 'trust')] }))
@@ -51,6 +53,9 @@ export default function TrustCentre() {
     // A device consent is given in the device's own connect flow (purposes, then the vendor's
     // sign-in); withdrawing it here disconnects the device and it stops syncing.
     if (CONSENT_DEVICE[id] && on) { nav(`/app/devices?connect=${CONSENT_DEVICE[id]}`); return }
+    // The calendar consent is given by connecting a calendar in Freedom's time audit. With one
+    // still connected (withdrawn here earlier), giving it again simply resumes the reads.
+    if (id === 'c_cal' && on && !calendar) { nav('/app/spaces/freedom#time-audit'); return }
     setStored((s) => ({ ...s, [id]: { ...s[id], on, pending: true } }))
     if (id === 'c_wa') { setWa({ consented: on }); syncWhatsAppChannel(on) }
     if (CONSENT_DEVICE[id] && !on) disconnectForConsent(id)
@@ -70,7 +75,7 @@ export default function TrustCentre() {
       <PageHeader
         eyebrow={t('eyebrow')}
         title={rich(t('title'), { em: <em className="font-serif">{t('titleEm')}</em> })}
-        lead={t('lead')}
+        lead={nums(t('lead'))}
         actions={<Link to="/app/method" className="inline-flex h-11 items-center gap-2 rounded-full border border-line-strong bg-paper-raised px-4 text-[15px] font-medium text-ink hover:bg-paper-sunk focus-ring">{t('theMethod')} <ArrowRight size={15} /></Link>}
       />
 
@@ -121,9 +126,9 @@ function Summary({ given, total, log }: { given: number; total: number; log: Mem
       {items.map(({ icon: Icon, label, value, sub }) => (
         <Card as="li" key={label} className="flex flex-col">
           <Icon size={18} className="text-ink-3" />
-          <span className="eyebrow mt-4 text-ink-3">{label}</span>
+          <span className="eyebrow mt-4 text-ink-3">{nums(label)}</span>
           <span className="num mt-1 text-[2rem] font-light leading-tight text-ink">{value}</span>
-          <span className="mt-1 text-[13px] text-ink-2">{sub}</span>
+          <span className="mt-1 text-[13px] text-ink-2">{nums(sub)}</span>
         </Card>
       ))}
     </ul>
@@ -172,9 +177,9 @@ function AccessLog({ log, onAsk }: { log: MemberAccess[]; onAsk: (who: string) =
             rowKey={(r) => r.id}
             columns={[
               { key: 'at', header: t('when'), render: (r) => <span className="num whitespace-nowrap text-ink-2">{r.at}</span> },
-              { key: 'who', header: t('who'), render: (r) => <span className="whitespace-nowrap"><span className="block text-ink">{dx(r.who)}</span><span className="text-[13px] text-ink-3">{dx(r.role)}{r.live && <> · <span className="eyebrow">{t('thisSession')}</span></>}</span></span> },
-              { key: 'what', header: t('what'), render: (r) => <span className="text-ink-2">{dx(r.what)}</span>, className: 'min-w-[180px]' },
-              { key: 'purpose', header: t('why'), render: (r) => <span className="text-ink-2">{dx(r.purpose)}</span>, className: 'min-w-[200px]' },
+              { key: 'who', header: t('who'), render: (r) => <span className="whitespace-nowrap"><span className="block text-ink">{dx(r.who)}</span><span className="text-[13px] text-ink-3">{nums(dx(r.role))}{r.live && <> · <span className="eyebrow">{t('thisSession')}</span></>}</span></span> },
+              { key: 'what', header: t('what'), render: (r) => <span className="text-ink-2">{nums(dx(r.what))}</span>, className: 'min-w-[180px]' },
+              { key: 'purpose', header: t('why'), render: (r) => <span className="text-ink-2">{nums(dx(r.purpose))}</span>, className: 'min-w-[200px]' },
               { key: 'ask', header: '', align: 'right', render: (r) => asked.has(r.id) ? <span className="inline-flex items-center gap-1 whitespace-nowrap px-2 py-1 text-[13px] text-ink-3"><Check size={13} /> {rich(t('asked'), { n: <span className="num">7</span> })}</span> : <button onClick={() => ask(r)} className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-[13px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring" aria-label={t('askWhyAria', { who: dx(r.who) })}><HelpCircle size={14} /> {t('askWhy')}</button> },
             ]}
           />
@@ -192,7 +197,7 @@ function Consents({ list, state, history, setConsent, onChange }: { list: Consen
   const apply = (c: Consent, v: boolean) => {
     setConsent(c.id, v)
     // Giving a device consent opens the device's connect flow instead; it says so itself.
-    if (v && CONSENT_DEVICE[c.id]) return
+    if (v && (CONSENT_DEVICE[c.id] || (c.id === 'c_cal' && !calendarProvider(state)))) return
     onChange(t(v ? 'consentOn' : CONSENT_DEVICE[c.id] ? 'deviceOff' : 'consentOff', { name: dx(c.name) }))
   }
   const groups = (['core', 'device', 'calendar', 'whatsapp', 'cohort', 'partner'] as const).map((g) => ({ g, items: list.filter((c) => c.scope === g) })).filter((x) => x.items.length)
@@ -221,14 +226,15 @@ function Consents({ list, state, history, setConsent, onChange }: { list: Consen
                       label={dx(c.name)}
                       description={
                         <>
-                          {dx(c.purpose)}
+                          {nums(dx(c.purpose))}
                           {c.scope === 'device' && s.purposes && (
                             <span className="mt-1 block text-[13px] text-ink-2">{t('chosenFor', { spaces: s.purposes.map((p) => tt.space(p === 'ease' ? 'B' : 'H')).join(' · ') })}</span>
                           )}
                           {c.scope === 'device' && !s.on && <span className="mt-1 block text-[13px] text-ink-2">{t('deviceGive')}</span>}
+                          {c.id === 'c_cal' && !calendarProvider(state) && <span className="mt-1 block text-[13px] text-ink-2">{t('calGive', { space: tt.space('F') })}</span>}
                           <span className="mt-1 block text-[13px] text-ink-3">
                             {s.pending ? (
-                              <span className="inline-flex items-center gap-1 text-ink-2"><Check size={13} /> {t('changeRecorded')}</span>
+                              <span className="inline-flex items-center gap-1 text-ink-2"><Check size={13} /> {nums(t('changeRecorded'))}</span>
                             ) : s.on && last?.action === 'granted' ? (
                               rich(t('givenOn'), { date: <span className="num">{fmtDate(last.at.slice(0, 10))}</span> })
                             ) : s.on && c.since ? (
@@ -256,13 +262,13 @@ function Consents({ list, state, history, setConsent, onChange }: { list: Consen
         {confirm && (
           <>
             <p className="text-[17px] text-ink-2">
-              {confirm.scope === 'device'
+              {nums(confirm.scope === 'device'
                 ? t('wDevice', { name: dx(confirm.name) })
                 : confirm.id === 'c_care'
                   ? t('wCare')
                   : confirm.id === 'c_data'
                     ? t('wData')
-                    : t('wPub')}
+                    : t('wPub'))}
             </p>
             <p className="mt-3 text-[15px] text-ink-2">{t('giveAgain')}</p>
             <div className="mt-6 flex justify-end gap-2">
@@ -277,7 +283,7 @@ function Consents({ list, state, history, setConsent, onChange }: { list: Consen
 }
 
 const ACTION_LABEL: Record<ConsentAction, keyof typeof TRUST> = { granted: 'actGranted', withdrawn: 'actWithdrawn', declined: 'actDeclined' }
-const VIA_LABEL: Record<ConsentEvent['via'], keyof typeof TRUST> = { setup: 'viaSetup', trust: 'viaTrust', whatsapp: 'viaWhatsapp', reply: 'viaReply', update: 'viaUpdate', devices: 'viaDevices' }
+const VIA_LABEL: Record<ConsentEvent['via'], keyof typeof TRUST> = { setup: 'viaSetup', trust: 'viaTrust', whatsapp: 'viaWhatsapp', reply: 'viaReply', update: 'viaUpdate', devices: 'viaDevices', body: 'viaBody', freedom: 'viaFreedom' }
 const LOG_SHORT = 6
 
 /** Consent history: every grant and withdrawal (consent_event), newest first, with the artefact version. */
@@ -288,7 +294,7 @@ function ConsentLog({ history }: { history: ConsentHistory }) {
   const rows = useMemo(() => [...history.events].reverse().sort((a, b) => b.at.localeCompare(a.at)), [history])
   const live = rows.filter((e) => e.live).length
   const shown = all ? rows : rows.slice(0, LOG_SHORT)
-  const name = (ref: string) => ref === 'research' ? t('researchLabel') : ref === 'insurer' ? t('insurerName') : dx([...CONSENTS, ...EXTRA_DEVICE_CONSENTS].find((c) => c.id === ref)?.name ?? ref)
+  const name = (ref: string) => ref === 'research' ? t('researchLabel') : ref === 'insurer' ? t('insurerName') : ref === 'c_cal' ? t('scopeCalendar') : dx([...CONSENTS, ...EXTRA_DEVICE_CONSENTS].find((c) => c.id === ref)?.name ?? ref)
   return (
     <Section id="consent-history" className="mt-16" eyebrow={t('histEyebrow')} title={rich(t('histTitle'), { em: <em className="font-serif">{t('histEm')}</em> })} lead={t('histLead')} aside={<SpecimenTag />}>
       <Card>
@@ -361,7 +367,7 @@ function ExportCard({ list, consents, onDone }: { list: Consent[]; consents: Con
     <Card className="flex flex-col">
       <div className="flex items-center gap-2"><FileJson size={18} className="text-ink-3" /><p className="eyebrow text-ink-3">{t('export')}</p></div>
       <p className="mt-3 text-[1.25rem] font-light text-ink">{t('exportTitle')}</p>
-      <p className="mt-2 text-[15px] text-ink-2">{t(hidden ? 'exportBodyMinor' : 'exportBody')}</p>
+      <p className="mt-2 text-[15px] text-ink-2">{nums(t(hidden ? 'exportBodyMinor' : 'exportBody'))}</p>
       <div className="mt-5">
         <p className="mb-2 text-[15px] text-ink">{t('format')}</p>
         <Segmented label={t('exportFormat')} value={format} onChange={setFormat} items={[{ value: 'fhir', label: t('fhir') }, { value: 'json', label: 'JSON' }]} />
@@ -384,9 +390,9 @@ function ExportCard({ list, consents, onDone }: { list: Consent[]; consents: Con
             </ol>
             <p className="mt-3 inline-flex items-center gap-1.5 text-[13px] text-ink-3"><ShieldCheck size={13} /> {t('stepUpDone')}</p>
             <p className="mt-1 text-[14px] text-ink-2">
-              {status === 'ready'
+              {nums(status === 'ready'
                 ? downloaded ? t('downloadedFile', { file: format === 'fhir' ? t('fhir') : t('jsonFile') }) : t('fileReady', { file: format === 'fhir' ? t('fhir') : t('jsonFile') })
-                : t('requestedBy', { a: fmtDate('2027-01-28'), b: fmtDate('2027-01-31') })}
+                : t('requestedBy', { a: fmtDate('2027-01-28'), b: fmtDate('2027-01-31') }))}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               {status === 'ready' ? (
@@ -402,7 +408,7 @@ function ExportCard({ list, consents, onDone }: { list: Consent[]; consents: Con
       <div className="mt-auto pt-5">
         <p className="eyebrow border-t border-line pt-4 text-ink-3">{t('earlier')}</p>
         {EXPORTS_PAST.map((x) => (
-          <p key={x.id} className="mt-2 text-[14px] text-ink-2"><span className="num">{fmtDate(x.requested)}</span> · {dx(x.format)} · <span className="num">{x.size}</span> · {dx(x.status)}</p>
+          <p key={x.id} className="mt-2 text-[14px] text-ink-2"><span className="num">{fmtDate(x.requested)}</span> · {nums(dx(x.format))} · <span className="num">{x.size}</span> · {dx(x.status)}</p>
         ))}
       </div>
       <Sheet open={stepUp} onClose={() => setStepUp(false)} title={t('suExportTitle')} side="center">
@@ -429,16 +435,16 @@ function DeleteCard() {
       <div className="flex items-center gap-2"><Trash2 size={18} className="text-ink-3" /><p className="eyebrow text-ink-3">{t('delete')}</p></div>
       <p className="mt-3 text-[1.25rem] font-light text-ink">{t('deleteTitle')}</p>
       <ul className="mt-3 space-y-2 text-[15px] text-ink-2">
-        <li className="flex gap-2"><Check size={16} className="mt-1 shrink-0 text-ink-3" /> {t('del1')}</li>
-        <li className="flex gap-2"><Check size={16} className="mt-1 shrink-0 text-ink-3" /> {t('del2')}</li>
-        <li className="flex gap-2"><Check size={16} className="mt-1 shrink-0 text-ink-3" /> {t('del3')}</li>
+        <li className="flex gap-2"><Check size={16} className="mt-1 shrink-0 text-ink-3" /> {nums(t('del1'))}</li>
+        <li className="flex gap-2"><Check size={16} className="mt-1 shrink-0 text-ink-3" /> {nums(t('del2'))}</li>
+        <li className="flex gap-2"><Check size={16} className="mt-1 shrink-0 text-ink-3" /> {nums(t('del3'))}</li>
       </ul>
       {scheduled ? (
         <div className="mt-6 rounded-card border border-line-strong p-4" role="status">
           <p className="text-[16px] text-ink">{rich(t('erasureScheduled'), { when: <><span className="num">{fmtDate('2027-01-29')}</span>, <span className="num">17:40</span></> })}</p>
-          <p className="mt-1 text-[14px] text-ink-2">{t('changeMind')}</p>
+          <p className="mt-1 text-[14px] text-ink-2">{nums(t('changeMind'))}</p>
           <Button size="sm" variant="secondary" className="mt-3" onClick={() => setScheduled(false)}>{t('cancelErasure')}</Button>
-          <p className="mt-3 text-[13px] text-ink-3">{t('linkWorks')}</p>
+          <p className="mt-3 text-[13px] text-ink-3">{nums(t('linkWorks'))}</p>
         </div>
       ) : (
         <div className="mt-auto flex flex-wrap gap-2 pt-6">
@@ -450,8 +456,8 @@ function DeleteCard() {
       <Sheet open={step !== 'closed'} onClose={close} title={t('eraseTitle')} side="center">
         {step === 'explain' && (
           <div className="space-y-4">
-            <p className="text-[17px] text-ink-2">{t('eraseBody')}</p>
-            <p className="text-[15px] text-ink-2">{t('copyFirst')}</p>
+            <p className="text-[17px] text-ink-2">{nums(t('eraseBody'))}</p>
+            <p className="text-[15px] text-ink-2">{nums(t('copyFirst'))}</p>
             <Checkbox checked={understood} onChange={setUnderstood}>{t('understand')}</Checkbox>
             {tried && !understood && <p role="alert" className="text-[14px] text-error">{t('confirmUnderstand')}</p>}
             <div className="flex justify-end gap-2 pt-2">
@@ -494,7 +500,7 @@ function NomineeCard({ onSaved }: { onSaved: (m: string) => void }) {
     <Card className="flex flex-col">
       <div className="flex items-center gap-2"><UserRound size={18} className="text-ink-3" /><p className="eyebrow text-ink-3">{t('nominee')}</p></div>
       <p className="mt-3 text-[1.25rem] font-light text-ink">{t('nomineeTitle')}</p>
-      <p className="mt-2 text-[15px] text-ink-2">{t('nomineeBody')}</p>
+      <p className="mt-2 text-[15px] text-ink-2">{nums(t('nomineeBody'))}</p>
       {!editing ? (
         <div className="mt-5 flex items-center justify-between gap-3 rounded-card bg-paper-sunk p-4">
           <div>
@@ -573,11 +579,11 @@ function Aggregates({ insurer, onDecide, onChange }: { insurer: InsurerState; on
           </div>
           <p className="mt-3 text-[16px] text-ink">{t('insurersTitle')}</p>
           <p className="mt-1 text-[14px] text-ink-2">
-            {insurer === 'granted'
+            {nums(insurer === 'granted'
               ? t('insGrantedBody')
               : insurer === 'declined'
                 ? t('insDeclinedBody')
-                : t('insAskedBody')}
+                : t('insAskedBody'))}
           </p>
           <div className="mt-auto pt-4">
             <Button size="sm" variant="secondary" onClick={() => setReview(true)}>{insurer === 'not-granted' ? t('reviewStar') : t('changeAnswer')}</Button>
@@ -586,18 +592,18 @@ function Aggregates({ insurer, onDecide, onChange }: { insurer: InsurerState; on
         <Card tone="sunk">
           <Lock size={18} className="text-ink-3" />
           <p className="mt-3 text-[16px] text-ink">{t('venuesTitle')}</p>
-          <p className="mt-1 text-[14px] text-ink-2">{t('venuesBody')}</p>
+          <p className="mt-1 text-[14px] text-ink-2">{nums(t('venuesBody'))}</p>
         </Card>
       </div>
       <Sheet open={review} onClose={() => setReview(false)} title={t('starTitle')} side="center">
-        <p className="text-[17px] text-ink-2">{t('starBody')}</p>
+        <p className="text-[17px] text-ink-2">{nums(t('starBody'))}</p>
         <dl className="mt-5 grid gap-3 rounded-card bg-paper-sunk p-4 text-[15px]">
           <div className="flex justify-between gap-4"><dt className="text-ink-2">{t('wouldSee')}</dt><dd className="text-right text-ink">{t('groupAverages')}</dd></div>
           <div className="flex justify-between gap-4"><dt className="text-ink-2">{t('smallestGroup')}</dt><dd className="text-right text-ink">{rich(t('peopleNoCell'), { a: <span className="num">{TENANT.minCohort}</span>, b: <span className="num">{TENANT.minCell}</span> })}</dd></div>
-          <div className="flex justify-between gap-4"><dt className="text-ink-2">{t('never')}</dt><dd className="text-right text-ink">{t('neverList')}</dd></div>
+          <div className="flex justify-between gap-4"><dt className="text-ink-2">{t('never')}</dt><dd className="text-right text-ink">{nums(t('neverList'))}</dd></div>
           <div className="flex justify-between gap-4"><dt className="text-ink-2">{t('premium')}</dt><dd className="text-right text-ink">{t('notAffected')}</dd></div>
         </dl>
-        <p className="mt-4 text-[14px] text-ink-3">{t('withdrawAnyTime')}</p>
+        <p className="mt-4 text-[14px] text-ink-3">{nums(t('withdrawAnyTime'))}</p>
         <div className="mt-6 flex flex-wrap justify-end gap-2">
           {insurer !== 'not-granted' && <Button variant="ghost" onClick={() => decide('not-granted')}>{t('undecided')}</Button>}
           <Button variant="secondary" onClick={() => decide('declined')}>{t('decline')}</Button>
@@ -627,10 +633,10 @@ function MethodAndClaims() {
             {Object.entries(METHODS).map(([v, m]) => (
               <li key={v} className="flex items-center justify-between gap-3 py-3">
                 <span>
-                  <span className="block text-[15px] text-ink">{dx(m.label)}</span>
+                  <span className="block text-[15px] text-ink">{nums(dx(m.label))}</span>
                   <span className="num text-[13px] text-ink-3">λ = {m.lambda} · {m.published.includes('-') ? fmtDate(m.published) : m.published}</span>
                 </span>
-                <Pill tone={m.status === 'In use' ? 'positive' : 'neutral'}>{dx(m.status)}</Pill>
+                <Pill tone={m.status === 'In use' ? 'positive' : 'neutral'}>{nums(dx(m.status))}</Pill>
               </li>
             ))}
           </ul>
@@ -641,8 +647,8 @@ function MethodAndClaims() {
             {CLAIMS_LOG.map((c) => (
               <li key={c.claim} className="flex flex-col gap-2 p-5 sm:flex-row sm:items-start sm:justify-between md:px-6">
                 <div>
-                  <p className={clsx('text-[16px]', c.state === 'Refused' ? 'text-ink-2 line-through decoration-line-strong' : 'text-ink')}>{dx(c.claim)}</p>
-                  <p className="mt-1 text-[14px] text-ink-2">{dx(c.note)}</p>
+                  <p className={clsx('text-[16px]', c.state === 'Refused' ? 'text-ink-2 line-through decoration-line-strong' : 'text-ink')}>{nums(dx(c.claim))}</p>
+                  <p className="mt-1 text-[14px] text-ink-2">{nums(dx(c.note))}</p>
                   <p className="eyebrow mt-1.5 text-ink-3">{dx(c.by)} · <span className="num">{fmtDate(c.on)}</span></p>
                 </div>
                 <Pill tone={tone(c.state)} className="self-start">{dx(c.state)}</Pill>
@@ -669,8 +675,8 @@ function Residency() {
           ].map(({ icon: Icon, k, v, s }) => (
             <div key={k}>
               <dt className="eyebrow flex items-center gap-1.5 text-ink-3"><Icon size={13} /> {k}</dt>
-              <dd className="mt-2 text-[16px] text-ink">{v}</dd>
-              <dd className="mt-0.5 text-[13px] text-ink-2">{s}</dd>
+              <dd className="mt-2 text-[16px] text-ink">{nums(v)}</dd>
+              <dd className="mt-0.5 text-[13px] text-ink-2">{nums(s)}</dd>
             </div>
           ))}
         </dl>

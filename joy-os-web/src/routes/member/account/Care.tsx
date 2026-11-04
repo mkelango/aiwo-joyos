@@ -8,7 +8,7 @@ import { Avatar, Button, Card, EmptyState, PageHeader, Pill, Sheet } from '@/com
 import { MEMBER, TEAM } from '@/data/member'
 import { CARE_LADDER, CLINICIANS, CONSULTS, ERX, PAST_CONSULTS, PEOPLE_DETAIL, RESULTS, THREADS } from './_data'
 import { Checkbox, Field, LinkButton, Section, Segmented, Select, TeleManasStrip } from './_parts'
-import { inputCls, rich, useMemberProfile, usePersisted, useToast } from './_util'
+import { inputCls, nums, rich, useMemberProfile, usePersisted, useToast } from './_util'
 import { useDict } from '@/lib/i18n'
 import { CARE, useData } from './_i18n'
 import { interceptsCrisis, useApp } from '@/lib/store'
@@ -77,7 +77,7 @@ export default function Care() {
                     <p className="eyebrow mt-0.5 text-ink-3">{dx(p.role)}{d.clinical ? t('clinicalSuffix') : ''}</p>
                   </div>
                 </div>
-                <p className="mt-4 text-[15px] leading-relaxed text-ink-2">{dx(d.line)}</p>
+                <p className="mt-4 text-[15px] leading-relaxed text-ink-2">{nums(dx(d.line))}</p>
                 <dl className="mt-4 space-y-2 border-t border-line pt-4 text-[14px]">
                   <div className="flex justify-between gap-3"><dt className="text-ink-3">{t('next')}</dt><dd className="text-right text-ink"><span className="num">{dx(d.next)}</span><span className="block text-[13px] text-ink-2">{dx(d.nextKind)}</span></dd></div>
                   <div className="flex justify-between gap-3"><dt className="text-ink-3">{t('speaks')}</dt><dd className="text-right text-ink-2">{dx(d.languages)}</dd></div>
@@ -87,7 +87,7 @@ export default function Care() {
                   <LinkButton to={`/app/care/messages?p=${p.id}`} size="sm" className="w-full">
                     <MessageCircle size={15} /> {t('messageTo', { name: p.name.startsWith('Dr') ? `Dr ${p.name.split(' ')[1]}` : p.name.split(' ')[0] })}
                   </LinkButton>
-                  <p className="mt-2 text-center text-[13px] text-ink-3">{dx(d.replies)}</p>
+                  <p className="mt-2 text-center text-[13px] text-ink-3">{nums(dx(d.replies))}</p>
                 </div>
               </Card>
             )
@@ -101,7 +101,7 @@ export default function Care() {
       <div className="mt-16 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
         <Section id="consults" eyebrow={t('consults')} title={t('comingUp')}>
           {consults.length === 0 && (
-            <EmptyState illustration="circle" title={t('noConsults')} body={t('noConsultsBody')} action={<Button variant="secondary" onClick={() => findClinician('Psychologist')}>{t('findClinician')}</Button>} />
+            <EmptyState illustration="circle" title={t('noConsults')} body={nums(t('noConsultsBody'))} action={<Button variant="secondary" onClick={() => findClinician('Psychologist')}>{t('findClinician')}</Button>} />
           )}
           <ul className="space-y-4">
             <AnimatePresence initial={false}>
@@ -122,11 +122,11 @@ export default function Care() {
                     <span className="flex items-center gap-1.5"><CalendarClock size={16} className="text-ink-3" /> <span className="num">{dx(c.when)} · {c.time}</span></span>
                     <span className="flex items-center gap-1.5 text-ink-2"><Video size={16} className="text-ink-3" /> {dx(c.mode)} · {rich(t('minutes'), { n: <span className="num">{c.minutes}</span> })}</span>
                   </p>
-                  <p className="mt-3 text-[14px] text-ink-2">{dx(c.prep)}</p>
+                  <p className="mt-3 text-[14px] text-ink-2">{nums(dx(c.prep))}</p>
                   <div className="mt-4 flex flex-wrap gap-2">
                     {c.status === 'confirmed' ? (
                       <>
-                        <Button size="sm" variant="secondary" disabled title={t('opensTitle')}><Video size={15} /> {t('joinOpens')}</Button>
+                        <Button size="sm" variant="secondary" disabled title={t('opensTitle')}><Video size={15} /> {nums(t('joinOpens'))}</Button>
                         <Button size="sm" variant="ghost" onClick={() => setRoom(c)}>{t('demoRoom')}</Button>
                       </>
                     ) : (
@@ -143,7 +143,7 @@ export default function Care() {
             <p className="flex items-start gap-2 text-[14px] leading-relaxed text-ink-2">
               <ShieldCheck size={16} className="mt-0.5 shrink-0 text-ink-3" />
               <span>
-                <b className="font-medium text-ink">{t('tpgBold')}</b> {t('tpgRest')}
+                <b className="font-medium text-ink">{nums(t('tpgBold'))}</b> {t('tpgRest')}
               </span>
             </p>
           </div>
@@ -155,7 +155,7 @@ export default function Care() {
               {PAST_CONSULTS.map((c) => (
                 <li key={c.id} className="flex flex-wrap items-baseline justify-between gap-2 py-3">
                   <span className="text-[15px] text-ink">{dx(c.title)} <span className="text-ink-3">· {person(c.with).name}</span></span>
-                  <span className="text-[13px] text-ink-3"><span className="num">{dx(c.when)}</span> · {dx(c.note)}</span>
+                  <span className="text-[13px] text-ink-3"><span className="num">{dx(c.when)}</span> · {nums(dx(c.note))}</span>
                 </li>
               ))}
             </ul>
@@ -305,7 +305,7 @@ function CareLadder({ onFind }: { onFind: (r: 'Psychologist' | 'Physician') => v
           <motion.div key={rung.key} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }} className="hidden items-center justify-between gap-6 pt-5 md:flex" aria-live="polite">
             <div>
               <p className="eyebrow text-ink-3">{statusText(rung.status)} · {dx(rung.name)}</p>
-              <p className="mt-1 text-[16px] text-ink">{dx(rung.what)}</p>
+              <p className="mt-1 text-[16px] text-ink">{nums(dx(rung.what))}</p>
               <p className="text-[14px] text-ink-2">{dx(rung.who)}</p>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
@@ -334,7 +334,7 @@ function CareLadder({ onFind }: { onFind: (r: 'Psychologist' | 'Physician') => v
                   </button>
                   {open && (
                     <div className="mt-2">
-                      <p className="text-[14px] text-ink-2">{dx(r.what)}</p>
+                      <p className="text-[14px] text-ink-2">{nums(dx(r.what))}</p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         {RUNG_NEXT[r.key]?.map((n) => <Button key={n.label} size="sm" variant="secondary" onClick={() => go(n)}>{dx(n.label)}</Button>)}
                       </div>
@@ -347,7 +347,7 @@ function CareLadder({ onFind }: { onFind: (r: 'Psychologist' | 'Physician') => v
         </ol>
         <p className="mt-5 flex items-start gap-2 border-t border-line pt-4 text-[14px] text-ink-2">
           <Info size={15} className="mt-0.5 shrink-0 text-ink-3" />
-          <span>{t('rungsUsed', { n: hereIdx + 1 })}</span>
+          <span>{nums(t('rungsUsed', { n: hereIdx + 1 }))}</span>
         </p>
       </Card>
     </Section>
@@ -361,7 +361,7 @@ function Results() {
   return (
     <Section id="results" eyebrow={t('results')} title={t('resultsTitle')}>
       <p className="-mt-2 mb-4 flex flex-wrap items-center gap-1.5 text-[13px] text-ink-3">
-        <FlaskConical size={14} /> {t('pLab')} <ArrowRight size={12} /> {t('pPipe')} <ArrowRight size={12} /> {t('pSign')} <ArrowRight size={12} /> {t('pYou')}
+        <FlaskConical size={14} /> {t('pLab')} <ArrowRight size={12} /> {nums(t('pPipe'))} <ArrowRight size={12} /> {t('pSign')} <ArrowRight size={12} /> {t('pYou')}
       </p>
       <ul className="space-y-3">
         {RESULTS.map((r) => {
@@ -404,7 +404,7 @@ function Results() {
                       <tbody>
                         {r.markers.map((m) => (
                           <tr key={m.name} className="border-b border-line last:border-0">
-                            <td className="py-2.5 pr-3 text-ink">{dx(m.name)}</td>
+                            <td className="py-2.5 pr-3 text-ink">{nums(dx(m.name))}</td>
                             <td className="num py-2.5 pr-3 text-right text-ink">{m.value} <span className="text-ink-3">{m.unit}</span></td>
                             <td className="num py-2.5 pr-3 text-right text-ink-2">{m.range}</td>
                             <td className="py-2.5 text-right">{m.flag === 'watch' && <span className="eyebrow text-ink-2">{t('toDiscuss')}</span>}</td>
@@ -415,7 +415,7 @@ function Results() {
                   </div>
                   {r.note && (
                     <blockquote className="mt-4 rounded-card bg-paper-sunk p-4 text-[15px] leading-relaxed text-ink">
-                      {r.note}
+                      {nums(r.note)}
                     </blockquote>
                   )}
                   <p className="eyebrow mt-3 text-ink-3">{rich(t('signedLine'), { by: r.signedBy, date: <span className="num">{fmtDate(r.signedOn!)}</span> })}</p>
@@ -446,8 +446,8 @@ function Prescriptions() {
             <li key={rx.id} className="grid gap-3 p-5 md:grid-cols-[auto_1fr_auto] md:items-start md:gap-6 md:px-6">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-paper-sunk text-ink-2"><PillIcon size={18} /></span>
               <div>
-                <p className="text-[17px] text-ink">{rx.drug}</p>
-                <p className="mt-0.5 text-[15px] text-ink-2">{dx(rx.sig)}</p>
+                <p className="text-[17px] text-ink">{nums(rx.drug)}</p>
+                <p className="mt-0.5 text-[15px] text-ink-2">{nums(dx(rx.sig))}</p>
                 <p className="mt-2 text-[13px] text-ink-3">
                   <Stethoscope size={13} className="mr-1 inline" /> {rx.by} · {t('reg')} <span className="num">{rx.reg}</span> · {dx(rx.check)}
                 </p>

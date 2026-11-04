@@ -20,6 +20,7 @@ import { useCommon, useTx } from '@/screens/b/i18n/common'
 import { LAB_TEXT, TAKE } from '@/screens/b/i18n/indexTake'
 import { useIsMinor } from '@/lib/minor'
 import { txFor } from '@/screens/a/i18n'
+import { MonoNums } from '@/lib/monoNums'
 
 // DAY 90 (Memo p.18 screen 04; Playbook p39): the re-measure where the number went down.
 // Warm Ink ground in both schemes. A fall is a sentence and a named person, never red,
@@ -59,10 +60,10 @@ function Day90Gate() {
         eyebrow={t('minorEyebrow')}
         title={
           <>
-            {t('minorA')}<Serif>{t('minorSerif')}</Serif>{t('minorB')}
+            <MonoNums text={t('minorA')} /><Serif>{t('minorSerif')}</Serif><MonoNums text={t('minorB')} />
           </>
         }
-        lead={t('minorLead')}
+        lead={<Body tone="ink2"><MonoNums text={t('minorLead')} /></Body>}
       />
       <DaybreakButton onPress={() => router.replace('/')}>{tc('backToday')}</DaybreakButton>
     </Screen>
@@ -158,7 +159,7 @@ function Day90() {
             {t('inviteA')}<Serif>{t('inviteSerif')}</Serif>{t('inviteB')}
           </Title>
           <Body size={19} style={{ lineHeight: 28 }}>
-            {t('inviteLead')}
+            <MonoNums text={t('inviteLead')} />
           </Body>
         </View>
         <View style={{ backgroundColor: INK.paperRaised, borderRadius: radius.card, padding: 20, gap: space.s2 }}>
@@ -168,16 +169,16 @@ function Day90() {
               <Mono size={15} tone="ink3" style={{ width: 20, paddingTop: 2 }}>
                 {String(i + 1)}
               </Mono>
-              <Body style={{ flex: 1 }}>{t(k)}</Body>
+              <Body style={{ flex: 1 }}><MonoNums text={t(k)} /></Body>
             </View>
           ))}
-          <Meta>{t('inviteWindow', { opens: fmtDate(REMEASURE_DATES.opens), day90: fmtDate(REMEASURE_DATES.day90) })}</Meta>
+          <Meta><MonoNums text={t('inviteWindow', { opens: fmtDate(REMEASURE_DATES.opens), day90: fmtDate(REMEASURE_DATES.day90) })} /></Meta>
           <DaybreakButton icon="arrow-right" onPress={() => router.push('/index-take?grade=clinical')}>
             {draftStarted ? t('pickUp') : t('begin')}
           </DaybreakButton>
         </View>
         <View style={{ borderWidth: 1, borderStyle: 'dashed', borderColor: INK.lineStrong, borderRadius: radius.card, padding: 12 }}>
-          <Meta size={14}>{t('inviteSpecimen')}</Meta>
+          <Meta size={14}><MonoNums text={t('inviteSpecimen')} /></Meta>
         </View>
         <Button variant="ghost" icon="eye" onPress={() => setPreview(true)} style={{ alignSelf: 'flex-start' }}>
           {t('previewSpecimen')}
@@ -199,7 +200,7 @@ function Day90() {
             {t('awaitA')}<Serif>{t('awaitSerif')}</Serif>{t('awaitB')}
           </Title>
           <Body size={19} style={{ lineHeight: 28 }}>
-            {t('awaitLead', { time })}
+            <MonoNums text={t('awaitLead', { time })} />
           </Body>
         </View>
         <View style={{ backgroundColor: INK.paperRaised, borderRadius: radius.card, padding: 20, gap: space.s2 }}>
@@ -207,7 +208,7 @@ function Day90() {
             <Avatar person={meera} size={48} />
             <View style={{ flex: 1, gap: 2 }}>
               <Body weight="semibold">{meera.name}</Body>
-              <Meta>{t('awaitEyebrow')}</Meta>
+              <Meta><MonoNums text={t('awaitEyebrow')} /></Meta>
             </View>
             <Icon name="clock" size={18} color={INK.ink2} />
           </View>
@@ -215,7 +216,7 @@ function Day90() {
           <Meta>{rm.labs && rm.labs.length ? t('awaitLabs', { list: rm.labs.map((n) => (lang === 'en' ? n : LAB_TEXT[n]?.[lang] ?? n)).join(', ') }) : t('awaitNoLabs')}</Meta>
           <MethodLine method="v1.0" grade="clinical" />
         </View>
-        <Meta>{t('awaitWhile')}</Meta>
+        <Meta><MonoNums text={t('awaitWhile')} /></Meta>
         <Button variant="ghost" icon="sun" onPress={() => router.replace('/')} style={{ alignSelf: 'flex-start' }}>
           {tc('backToday')}
         </Button>
@@ -290,7 +291,7 @@ function Day90() {
         <JoyspanWheel terms={termsNow} baseline={before.terms} size={220} value={toV} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <View style={{ width: 18, height: 0, borderTopWidth: 1.5, borderColor: INK.wheelGhost }} />
-          <Meta size={13}>{kit(lang, 'wheelGhost')}</Meta>
+          <Meta size={13}><MonoNums text={kit(lang, 'wheelGhost')} /></Meta>
         </View>
       </View>
 
@@ -300,10 +301,10 @@ function Day90() {
           <Avatar person={meera} size={48} />
           <View style={{ flex: 1, gap: 2 }}>
             <Body weight="semibold">{meera.name}</Body>
-            <Meta>{t('physician')}</Meta>
+            <Meta><MonoNums text={t('physician')} /></Meta>
           </View>
         </View>
-        <Body>{ax(DAY90_SPECIMEN.person)}</Body>
+        <Body><MonoNums text={ax(DAY90_SPECIMEN.person)} /></Body>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Icon name="phone" size={15} color={INK.ink2} />
           <Mono tone="ink2" size={15} style={{ flexShrink: 1 }}>
@@ -312,7 +313,7 @@ function Day90() {
         </View>
         {confirmed ? (
           <View accessibilityLiveRegion="polite" style={{ gap: 4 }}>
-            <Body weight="medium">{t('confirmed', { when: whenLong })}</Body>
+            <Body weight="medium"><MonoNums text={t('confirmed', { when: whenLong })} /></Body>
             <Button
               variant="link"
               onPress={() => {
@@ -345,7 +346,7 @@ function Day90() {
       {/* What moved */}
       <View style={{ gap: space.s1 }}>
         <Eyebrow {...H2}>{t('whatMoved')}</Eyebrow>
-        <Meta>{t('likeForLike')}</Meta>
+        <Meta><MonoNums text={t('likeForLike')} /></Meta>
         <View style={{ borderTopWidth: 1, borderTopColor: INK.line }}>
           {ORDER.map((k) => {
             const now = termsNow.find((x) => x.key === k)!
@@ -392,15 +393,15 @@ function Day90() {
       {/* The next ninety days */}
       <View style={{ gap: space.s2 }}>
         <Eyebrow {...H2}>{t('next90')}</Eyebrow>
-        <Meta>{t('draftedFor')}</Meta>
+        <Meta><MonoNums text={t('draftedFor')} /></Meta>
         {NEXT_90.map((n) => (
           <View key={n.day + n.title} style={{ flexDirection: 'row', gap: 14 }}>
             <Mono size={13} tone="ink3" style={lang === 'en' ? { width: 56, paddingTop: 3 } : { width: 84, paddingTop: 3 }}>
               {ax(n.day)}
             </Mono>
             <View style={{ flex: 1, gap: 2 }}>
-              <Body weight="medium">{ax(n.title)}</Body>
-              <Meta>{ax(n.detail)}</Meta>
+              <Body weight="medium"><MonoNums text={ax(n.title)} /></Body>
+              <Meta><MonoNums text={ax(n.detail)} /></Meta>
               {n.day === 'Day 60' ? (
                 <ArrowLink icon="compass" onPress={() => router.push('/cation/wealthcation')}>
                   {t('seeWealth')}
@@ -412,7 +413,7 @@ function Day90() {
         <View style={{ borderTopWidth: 1, borderTopColor: INK.line, paddingTop: space.s2, gap: space.s1 }} accessibilityLiveRegion="polite">
           {planState === 'open' ? (
             <>
-              <Meta>{t('feelRight', { day: tx(SLOT_TEXT[slot].day, when.long.split(' · ')[0]) })}</Meta>
+              <Meta><MonoNums text={t('feelRight', { day: tx(SLOT_TEXT[slot].day, when.long.split(' · ')[0]) })} /></Meta>
               <View style={{ flexDirection: 'row', gap: space.s1, flexWrap: 'wrap' }}>
                 <Button variant="secondary" icon="check" onPress={() => setPlanState('agreed')}>
                   {t('looksRight')}
@@ -447,7 +448,7 @@ function Day90() {
       </View>
 
       <View style={{ gap: space.s1, borderTopWidth: 1, borderTopColor: INK.line, paddingTop: space.s2 }}>
-        <Meta>{t('nothingCounts')}</Meta>
+        <Meta><MonoNums text={t('nothingCounts')} /></Meta>
         <Button variant="ghost" icon="book-open" onPress={() => router.push('/index-result')} style={{ alignSelf: 'flex-start' }}>
           {t('howMade')}
         </Button>
@@ -476,10 +477,10 @@ function Day90() {
             </Button>
           }
         >
-          <Meta>{t('thirty')}</Meta>
+          <Meta><MonoNums text={t('thirty')} /></Meta>
           <Segmented value={pick} onChange={setPick} items={SLOTS.map((x) => ({ value: x.value, label: slotLabel(x.value) }))} style={{ flexWrap: 'wrap' }} />
-          <Body>{tx(SLOT_TEXT[pick].long, SLOTS.find((x) => x.value === pick)!.long)}</Body>
-          <Meta tone="ink3">{t('noneWork')}</Meta>
+          <Body><MonoNums text={tx(SLOT_TEXT[pick].long, SLOTS.find((x) => x.value === pick)!.long)} /></Body>
+          <Meta tone="ink3"><MonoNums text={t('noneWork')} /></Meta>
         </Sheet>
       </InkSurface.Provider>
     </InkScreen>

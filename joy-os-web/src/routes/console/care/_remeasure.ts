@@ -21,15 +21,23 @@ import { CLINICAL_RECORDS } from './_data'
 // specimen. While any term is not yet measured the Index is withheld and cannot be signed; the
 // member measures it later in the app and the record comes back complete. A record taken with
 // no wearable connected carries `surveyOnly`, and the portal says so beside the draft.
+//
+// A physician may return the draft instead of signing it. The portal then writes status
+// 'returned' with returnedBy, returnReason, returnNote and returnedAt to the same record, so the
+// member's Day 90 says who returned it and why, and raises a home redraw on the concierge desk.
+// When the lab receives the redraw the record goes back to 'awaiting' (redrawReceivedAt set) and
+// the draft is first in the sign-off queue again. An Undo does the same, with no redraw.
 
 export const REMEASURE_KEY = 'joyos:core:clinical-remeasure'
+/** How the member's re-measure reads in the sign-off queue (and names its redraw order). */
+export const REMEASURE_OCCASION = 'Day 90 re-measure · Clinical grade · from the app'
 const CORE_EVT = 'joyos:core-change'
 const CORE_FIELD = 'clinical-remeasure'
 const STATUS_FIELDS = ['status', 'state', 'stage', 'step'] as const
 const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 
 type Raw = Record<string, unknown>
-export type RemeasurePhase = 'none' | 'in-progress' | 'pending' | 'signed'
+export type RemeasurePhase = 'none' | 'in-progress' | 'pending' | 'returned' | 'signed'
 
 export type Remeasure = {
   phase: RemeasurePhase
@@ -49,6 +57,8 @@ export type Remeasure = {
   submittedMs: number | null
   signedBy: string | null
   signedMs: number | null
+  /** While returned: who sent it back, why, and when (console clock). */
+  returned: { by: string; reason: string; note: string; ms: number | null } | null
 }
 
 let cache: { raw: string | null; value: Remeasure } | null = null
@@ -80,6 +90,7 @@ function phaseOf(r: Raw | null): RemeasurePhase {
   if (!r) return 'none'
   const s = statusOf(r)?.value ?? ''
   if (r.signed === true || r.signedAt || r.signedBy || /^signed|issued|card|complete|done/.test(s)) return 'signed'
+  if (s === 'returned') return 'returned'
   if (/await|submit|pending|sign|review|queue/.test(s) || r.submitted === true || r.submittedAt || r.completedAt) return 'pending'
   return s ? 'in-progress' : 'none'
 }
@@ -144,6 +155,7 @@ function parse(rawStr: string | null): Remeasure {
     submittedMs: msOf(raw?.submittedAt) ?? msOf(raw?.completedAt) ?? msOf(raw?.takenAt) ?? msOf(raw?.at),
     signedBy: str(raw?.signedBy),
     signedMs: msOf(raw?.signedAt),
+    returned: phaseOf(raw) === 'returned' ? { by: str(raw?.returnedBy) ?? 'The physician', reason: str(raw?.returnReason) ?? 'Returned to the lab', note: str(raw?.returnNote) ?? '', ms: msOf(raw?.returnedAt) } : null,
   }
 }
 
@@ -181,7 +193,7 @@ function write(next: Raw) {
 
 /**
  * The member's flow runs on its own specimen clock (moved onto the Day 76 window when the
- * invite opens), so the signature is dated on the day the assessment was taken, at the
+ * invite opens), so a signature (or a return) is dated on the day the assessment was taken, at the
  * console clock's time of day, and never before the submission.
  */
 function signedAtFor(cur: Remeasure, ms: number) {
@@ -201,6 +213,33 @@ export const remeasure = {
     if (!cur.raw || cur.phase !== 'pending' || cur.missing.length > 0) return false
     const field = statusOf(cur.raw)?.field ?? 'status'
     write({ ...cur.raw, [field]: 'signed', signed: true, signedBy: by, signedAt: signedAtFor(cur, ms), ...(index !== null ? { signedIndex: index } : {}) })
+    return true
+  },
+  /** Return the draft to the lab: the member's record says so, with who, why and when. */
+  returnDraft(by: string, reason: string, note: string, ms: number) {
+    const cur = snapshot()
+    if (!cur.raw || cur.phase !== 'pending') return false
+    const field = statusOf(cur.raw)?.field ?? 'status'
+    const { redrawReceivedAt: _r, ...rest } = cur.raw
+    void _r
+    write({ ...rest, [field]: 'returned', returnedBy: by, returnReason: reason, returnNote: note, returnedAt: signedAtFor(cur, ms) })
+    return true
+  },
+  /**
+   * Back to awaiting sign-off: the lab received the redraw (redrawAt given; the return is kept
+   * in priorReturns, so the record shows it happened), or the physician undid the return.
+   */
+  requeue(redrawAt?: number) {
+    const cur = snapshot()
+    if (!cur.raw || cur.phase !== 'returned') return false
+    const field = statusOf(cur.raw)?.field ?? 'status'
+    const { returnedBy, returnReason, returnNote, returnedAt, ...rest } = cur.raw
+    const prior = Array.isArray(cur.raw.priorReturns) ? (cur.raw.priorReturns as unknown[]) : []
+    write({
+      ...rest,
+      [field]: 'awaiting',
+      ...(redrawAt !== undefined ? { redrawReceivedAt: new Date(redrawAt).toISOString(), priorReturns: [...prior, { by: returnedBy, reason: returnReason, note: returnNote, at: returnedAt }] } : {}),
+    })
     return true
   },
 }

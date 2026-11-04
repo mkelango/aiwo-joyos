@@ -1,15 +1,15 @@
 import { router } from 'expo-router'
 import { useState } from 'react'
 import { Platform, Pressable, View } from 'react-native'
-import { ArrowLink, BandLabel, Body, Button, Card, DaybreakButton, Eyebrow, Icon, LoopRing, Meta, MethodLine, Mono, Numeral, Pill, Screen, ScreenHeader, SectionTitle, Serif, Sheet, SpecimenTag, Title, fmtDate } from '@/components'
-import { INDEX_HISTORY, MEMBER } from '@/shared/member'
+import { ArrowLink, BandLabel, Body, Button, Card, DaybreakButton, EmptyIllustration, Eyebrow, Icon, LoopRing, Meta, MethodLine, Mono, Numeral, Pill, Screen, ScreenHeader, SectionTitle, Serif, Sheet, SpecimenTag, Title, fmtDate } from '@/components'
+import { MEMBER } from '@/shared/member'
 import { CATIONS } from '@/shared/platform'
 import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
-import { FLAGSHIP_NEXT, PASSPORT, SALONS, SESSIONS_OPEN } from '@/screens/b/journeyData'
+import { FLAGSHIP_NEXT, PASSPORT, SALONS, SESSIONS_OPEN, passportFor } from '@/screens/b/journeyData'
 import { accountStore, useStore } from '@/screens/b/bStore'
-import { Done, KeyValue, PrimaryChip, SpecimenQR, fmtWhen, memberOnly, useAccount } from '@/screens/b/parts'
-import { useCationRequests } from '@/screens/a/local'
+import { Done, KeyValue, PrimaryChip, SpecimenQR, fmtWhen, memberOnly, useAccount, useAccountCationRequests, useAccountIndex, useFigures } from '@/screens/b/parts'
+import { MonoNums } from '@/lib/monoNums'
 import { useIsMinor } from '@/lib/minor'
 import { useDict, useT } from '@/lib/i18n'
 import { PASSPORT_T, STAMP_KIND, ENTITLEMENT_TEXT, SALON_TITLE } from '@/screens/b/i18n/journey'
@@ -22,6 +22,8 @@ import { useCommon, useTx } from '@/screens/b/i18n/common'
 // salons (Circles), ’cation requests (’Cation) and the next flagship edition (Events).
 // The card can go in the phone's wallet (specimen), and the Index can be hidden from this screen.
 // Under 18 nothing is scored, so the card carries no Index at all.
+// Everything here is the signed-in account's own (L2): its Passport number, its latest Index (a
+// re-take on this phone included), its stamps and ’cation requests, and what its plan opens.
 
 type Stamp = {
   id: string
@@ -48,21 +50,28 @@ function Passport() {
   const [acct, setAcct] = useStore(accountStore)
   const [qrOpen, setQrOpen] = useState(false)
   const [stamp, setStamp] = useState<Stamp | null>(null)
-  const latest = INDEX_HISTORY[0]
+  // The account's own latest Index: a re-take on this phone first, else its record; none if it has none.
+  const latest = useAccountIndex()
   const minor = useIsMinor()
   const hideIndex = !!acct.passportHideIndex
   const wallet = acct.passportWallet ?? null
-  const { requests } = useCationRequests()
+  const requests = useAccountCationRequests()
   const t = useDict(PASSPORT_T)
+  const fig = useFigures()
   // The holder is the account signed in (M1).
   const account = useAccount()
+  const pp = passportFor(account.id, account.aiwoId)
+  const isArjun = account.id === 'arjun'
+  // Circle membership is the specimen member's; Plus features come with Plus or Patron.
+  const opens = PASSPORT.entitlements.filter((e) => (e.needs === 'circle' ? isArjun : acct.plan !== 'Free'))
   const tc = useCommon()
   const tx = useTx()
   const tg = useT()
   const kind = (k: string) => tx(STAMP_KIND[k], k)
 
   const stamps: Stamp[] = [
-    ...PASSPORT.stamps.map((s) => ({ id: s.id, place: s.place, what: s.what, when: fmtWhen(s), kind: s.kind, term: s.term, done: s.done, to: s.done ? '/cation' : '/events' })),
+    // The specimen stamps are Arjun's: the flagship ’cation and his Chennai Session.
+    ...(isArjun ? PASSPORT.stamps : []).map((s) => ({ id: s.id, place: s.place, what: s.kind === 'House' ? t('session') : s.what, when: fmtWhen(s), kind: s.kind, term: s.term, done: s.done, to: s.done ? '/cation' : '/events' })),
     ...acct.bookings.map((b) => {
       const ses = SESSIONS_OPEN.find((x) => x.id === b.id)
       return { id: b.ref, place: ses ? t('passAt', { where: ses.where, ref: b.ref }) : t('pass', { ref: b.ref }), what: ses ? t('sessionCity', { city: ses.city }) : t('session'), when: ses ? fmtWhen(ses) : fmtDate(b.at), kind: 'Session', term: 'ALL' as const, done: false, to: '/events' }
@@ -104,20 +113,20 @@ function Passport() {
             <Title size={26}>{account.name}</Title>
             <Mono tone="ink">{account.aiwoId}</Mono>
           </View>
-          <SpecimenQR seed={PASSPORT.number} size={88} label={t('qrA11y', { n: PASSPORT.number })} />
+          <SpecimenQR seed={pp.number} size={88} label={t('qrA11y', { n: pp.number })} />
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s3, rowGap: space.s1 }}>
           <View style={{ gap: 2 }}>
             <Eyebrow>{t('number')}</Eyebrow>
-            <Mono tone="ink">{PASSPORT.number}</Mono>
+            <Mono tone="ink">{pp.number}</Mono>
           </View>
           <View style={{ gap: 2 }}>
             <Eyebrow>{t('since')}</Eyebrow>
-            <Mono tone="ink">{fmtDate(PASSPORT.issued)}</Mono>
+            <Mono tone="ink">{fmtDate(pp.issued)}</Mono>
           </View>
           <View style={{ gap: 2 }}>
             <Eyebrow>{t('issuedAt')}</Eyebrow>
-            <Meta tone="ink">{PASSPORT.issuedAt}</Meta>
+            <Meta tone="ink">{pp.issuedAt ?? t('issuedApp')}</Meta>
           </View>
         </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -159,8 +168,15 @@ function Passport() {
         {minor ? (
           // Under 18 (Architecture p26): no Index, band or method line, and nothing to hide or show.
           <Card tone="sunk" style={{ gap: space.s1 }}>
-            <Eyebrow>{t('minorEyebrow')}</Eyebrow>
-            <Body>{t('minorBody')}</Body>
+            <Eyebrow>{fig(t('minorEyebrow'))}</Eyebrow>
+            <Body><MonoNums text={t('minorBody')} /></Body>
+          </Card>
+        ) : !latest ? (
+          // No Index on this account yet (Lakshmi, or a member who has not taken it on this phone).
+          <Card tone="sunk" style={{ gap: space.s1 }}>
+            <Body>{t('noIndex')}</Body>
+            <Meta size={14}>{t('noIndexBody')}</Meta>
+            <ArrowLink onPress={() => router.push('/index-take')}>{t('takeIndex')}</ArrowLink>
           </Card>
         ) : hideIndex ? (
           <Card tone="sunk" style={{ gap: space.s1 }}>
@@ -193,18 +209,34 @@ function Passport() {
 
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{t('sameNinety')}</SectionTitle>
-        <Card tone="raised" style={{ flexDirection: 'row', alignItems: 'center', gap: space.s2 }}>
-          <LoopRing day={MEMBER.dayOfLoop} size={72} />
-          <View style={{ flex: 1, gap: 4 }}>
-            <Body>{tg('dayOf', { n: MEMBER.dayOfLoop })}</Body>
-            <Meta>{t('started', { date: fmtDate(MEMBER.loopStarted) })}</Meta>
-          </View>
-        </Card>
+        {isArjun ? (
+          <Card tone="raised" style={{ flexDirection: 'row', alignItems: 'center', gap: space.s2 }}>
+            <LoopRing day={MEMBER.dayOfLoop} size={72} />
+            <View style={{ flex: 1, gap: 4 }}>
+              <Body>
+                <MonoNums text={tg('dayOf', { n: MEMBER.dayOfLoop })} />
+              </Body>
+              <Meta><MonoNums text={t('started', { date: fmtDate(MEMBER.loopStarted) })} /></Meta>
+            </View>
+          </Card>
+        ) : (
+          // Another account's ninety days are its own: they start with its first Index.
+          <Card tone="sunk" style={{ gap: 4 }}>
+            <Body><MonoNums text={latest && !minor ? t('loopFrom', { date: fmtDate(latest.takenOn) }) : t('loopNotYet')} /></Body>
+          </Card>
+        )}
       </View>
 
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{t('stamps')}</SectionTitle>
         <Body tone="ink2">{t('stampsBody')}</Body>
+        {stamps.length === 0 ? (
+          <Card tone="sunk" style={{ gap: space.s1, alignItems: 'flex-start' }}>
+            <EmptyIllustration kind="occasions" />
+            <Meta>{t('noStamps')}</Meta>
+            <ArrowLink onPress={() => router.push('/events')}>{t('events')}</ArrowLink>
+          </Card>
+        ) : null}
         {stamps.map((s) => (
           <Pressable
             key={s.id}
@@ -229,26 +261,35 @@ function Passport() {
 
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{t('opens')}</SectionTitle>
-        <Card tone="raised" style={{ gap: 0 }}>
-          {PASSPORT.entitlements.map((e, i) => {
-            const et = ENTITLEMENT_TEXT[e.label]
-            const detail = tx(et?.detail, e.detail)
-            return (
-            <KeyValue key={e.label} k={tx(et?.label, e.label)} last={i === PASSPORT.entitlements.length - 1}>
-              <Meta tone="ink">{e.used ? `${detail} · ${e.label === 'Joyspan Sessions' ? t('booked', { n: Math.min(4, 1 + acct.bookings.length) }) : tx(et?.used, e.used)}` : detail}</Meta>
-            </KeyValue>
-            )
-          })}
-        </Card>
+        {opens.length ? (
+          <Card tone="raised" style={{ gap: 0 }}>
+            {opens.map((e, i) => {
+              const et = ENTITLEMENT_TEXT[e.label]
+              // Arjun's circle meets on Mondays with Priya; another account's is formed for it later.
+              const detail = !isArjun && e.label === 'Circle of eight' ? t('circleToForm') : tx(et?.detail, e.detail)
+              return (
+              <KeyValue key={e.label} k={tx(et?.label, e.label)} last={i === opens.length - 1}>
+                <Meta tone="ink">
+                  <MonoNums text={e.used ? `${detail} · ${e.label === 'Joyspan Sessions' ? t('booked', { n: Math.min(4, 1 + acct.bookings.length) }) : tx(et?.used, e.used)}` : detail} />
+                </Meta>
+              </KeyValue>
+              )
+            })}
+          </Card>
+        ) : (
+          <Card tone="sunk">
+            <Meta>{t('entFree')}</Meta>
+          </Card>
+        )}
         <ArrowLink onPress={() => router.push('/events')}>{t('events')}</ArrowLink>
         <ArrowLink onPress={() => router.push('/membership')}>{t('membership')}</ArrowLink>
       </View>
 
       <Sheet open={qrOpen} onClose={() => setQrOpen(false)} title={t('checkin')} footer={<Button variant="secondary" block onPress={() => setQrOpen(false)}>{tc('done')}</Button>}>
         <View style={{ alignItems: 'center', gap: space.s2, paddingVertical: space.s1 }}>
-          <SpecimenQR seed={PASSPORT.number} size={260} label={t('checkinA11y', { name: account.name, n: PASSPORT.number })} />
+          <SpecimenQR seed={pp.number} size={260} label={t('checkinA11y', { name: account.name, n: pp.number })} />
           <Title size={24} align="center">{account.name}</Title>
-          <Mono tone="ink">{PASSPORT.number}</Mono>
+          <Mono tone="ink">{pp.number}</Mono>
           <Meta align="center">{t('brightness')}</Meta>
         </View>
       </Sheet>

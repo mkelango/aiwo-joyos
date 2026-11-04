@@ -4,6 +4,7 @@ import { Card, Eyebrow, Meta, type CardTone } from '@/components'
 import { useTheme } from '@/theme/ThemeProvider'
 import type { Lang } from '@/lib/store'
 import { H2, H3 } from '../local'
+import { monoNums } from '../parts'
 import { localDate } from '../i18n'
 
 /** A tool block inside a space: mono kicker, one sentence that says what it shows, content. */
@@ -16,7 +17,7 @@ export function ToolCard({ title, aside, lead, children, tone = 'raised' }: { ti
           <Eyebrow {...H3} style={{ flexShrink: 1 }}>{title}</Eyebrow>
           {aside}
         </View>
-        {lead ? <Meta>{lead}</Meta> : null}
+        {lead ? <Meta>{monoNums(lead)}</Meta> : null}
       </View>
       {children}
     </Card>

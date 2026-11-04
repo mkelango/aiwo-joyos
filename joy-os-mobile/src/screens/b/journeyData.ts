@@ -1,5 +1,6 @@
 import type { TermKey } from '@/shared/types'
 import { CATIONS } from '@/shared/platform'
+import { SPECIMEN_NOW } from './accountData'
 
 // Lane data for ’Cation, Practice, Circles and Events (Memo p.20–21).
 // SPECIMEN — shaped like the future API; never a real member.
@@ -269,14 +270,28 @@ export const PASSPORT = {
     { id: 's1', place: 'Fairmont Mumbai', what: 'Joycation · AIWO Joyspan 2027', when: '31 Dec 2026 – 5 Jan 2027', date: '2026-12-31', to: '2027-01-05' as string | undefined, kind: '’Cation', term: 'ALL' as const, done: true },
     { id: 's2', place: 'Joyspan House Chennai', what: 'Joyspan Session', when: 'Sat 20 Feb 2027', date: '2027-02-20', to: undefined as string | undefined, kind: 'House', term: 'R' as TermKey, done: false },
   ],
+  // needs: what opens it. 'plus' comes with Joy OS Plus (and Patron); 'circle' with Circle membership.
   entitlements: [
-    { label: 'Named coach and concierge', detail: 'Priya Natarajan · Ravi Shankar', used: null as null | string },
-    { label: 'Quarterly Index', detail: 'Next re-measure opens Day 76', used: '1 of 4 this year' },
-    { label: 'Joyspan Sessions', detail: 'Any city, any House', used: '1 of 4 booked' },
-    { label: 'Circle of eight', detail: 'Mondays 7 pm with Priya', used: null },
-    { label: 'The Joyspiration Practice', detail: 'All eight weeks, audio offline', used: null },
-    { label: 'Joyspan House access', detail: 'Chennai · Mumbai opens FY28', used: null },
+    { label: 'Named coach and concierge', detail: 'Priya Natarajan · Ravi Shankar', used: null as null | string, needs: 'circle' as PassportNeed },
+    { label: 'Quarterly Index', detail: 'Next re-measure opens Day 76', used: '1 of 4 this year', needs: 'circle' as PassportNeed },
+    { label: 'Joyspan Sessions', detail: 'Any city, any House', used: '1 of 4 booked', needs: 'circle' as PassportNeed },
+    { label: 'Circle of eight', detail: 'Mondays 7 pm with Priya', used: null, needs: 'plus' as PassportNeed },
+    { label: 'The Joyspiration Practice', detail: 'All eight weeks, audio offline', used: null, needs: 'plus' as PassportNeed },
+    { label: 'Joyspan House access', detail: 'Chennai · Mumbai opens FY28', used: null, needs: 'circle' as PassportNeed },
   ],
+}
+
+export type PassportNeed = 'plus' | 'circle'
+
+/**
+ * Each account's own Passport (L2). Arjun's was issued at the flagship; Lakshmi's when her son
+ * became her helper; the account made in onboarding gets one in the app the day it joins, its
+ * number taken from its AIWO ID.
+ */
+export function passportFor(account: 'arjun' | 'lakshmi' | 'new', aiwoId: string): { number: string; issued: string; issuedAt: string | null } {
+  if (account === 'arjun') return { number: PASSPORT.number, issued: PASSPORT.issued, issuedAt: PASSPORT.issuedAt }
+  if (account === 'lakshmi') return { number: 'JP-2027-0311', issued: '2027-01-08', issuedAt: null }
+  return { number: `JP-2027-${aiwoId.replace(/[^A-Z0-9]/gi, '').slice(-4).toUpperCase()}`, issued: SPECIMEN_NOW, issuedAt: null }
 }
 
 // ─── The Joyspiration Practice ────────────────────────────────────────────

@@ -21,7 +21,7 @@ export const CONSENT_ARTEFACTS: Record<'care' | 'data' | 'publishing', { version
 }
 
 export type ConsentAction = 'granted' | 'withdrawn' | 'declined'
-export type ConsentVia = 'setup' | 'trust' | 'whatsapp' | 'reply' | 'update' | 'devices'
+export type ConsentVia = 'setup' | 'trust' | 'whatsapp' | 'reply' | 'update' | 'devices' | 'body' | 'freedom'
 export interface ConsentEvent {
   id: string
   /** A consent id from CONSENTS (or a device consent from _links), or 'research' for the Trust
@@ -65,11 +65,20 @@ export function makeEvent(ref: string, action: ConsentAction, via: ConsentVia): 
   return { id: `ce${Date.now()}${Math.random().toString(36).slice(2, 6)}`, ref, action, version: ARTEFACT_VERSION[ref] ?? 'v1', at: consentNow(), via, live: true }
 }
 
+/** The stored history over the specimen seed, for screens that do not hold it. */
+export function readConsentHistory(): ConsentHistory {
+  try {
+    const raw = localStorage.getItem(KEY)
+    return raw ? { ...CONSENT_SEED, ...JSON.parse(raw) } : CONSENT_SEED
+  } catch {
+    return CONSENT_SEED
+  }
+}
+
 /** Append one event from a screen that does not hold the history (the WhatsApp page). */
 export function recordConsentEvent(ref: string, action: ConsentAction, via: ConsentVia) {
   try {
-    const raw = localStorage.getItem(KEY)
-    const cur: ConsentHistory = raw ? { ...CONSENT_SEED, ...JSON.parse(raw) } : CONSENT_SEED
+    const cur = readConsentHistory()
     localStorage.setItem(KEY, JSON.stringify({ events: [...cur.events, makeEvent(ref, action, via)] }))
     window.dispatchEvent(new CustomEvent(ACCT_CHANGED, { detail: 'consent-history' }))
   } catch {

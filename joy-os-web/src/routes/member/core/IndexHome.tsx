@@ -12,7 +12,7 @@ import { termByKey, termColor } from '@/data/terms'
 import { METHODS, bandFor, joyspanIndex, lowestTerm } from '@/domain/indexEngine'
 import type { IndexScore, TermKey } from '@/domain/types'
 import { HISTORY_METHOD, METHOD_V10_PUBLISHED, NOT_YET_EXAMPLE, TERM_DETAIL } from './_data'
-import { KV, PrintOnly, TICK, TOOLTIP_STYLE } from './_parts'
+import { KV, PrintOnly, TICK, TOOLTIP_STYLE, nums } from './_parts'
 import { useMeasured, useSignalsDown, type Amendment, type MeasuredIndex } from './_store'
 import { OWN_DAY90_ID, useIndexHistory } from './_latest'
 import type { SittingResult } from './_scoring'
@@ -168,7 +168,7 @@ export default function IndexHome() {
             // The member's own re-measure moved the lowest term: its one next step, not today's specimen action.
             <div className="mt-5 rounded-card border border-line bg-paper-raised p-4">
               <TermChip term={lowest.key} withSpace />
-              <p className="mt-3 text-[17px] text-ink">{x(`ns${lowest.key}`)}</p>
+              <p className="mt-3 text-[17px] text-ink">{nums(x(`ns${lowest.key}`))}</p>
             </div>
           ) : (
           <div className="mt-5 rounded-card border border-line bg-paper-raised p-4">
@@ -176,8 +176,8 @@ export default function IndexHome() {
               <TermChip term={TODAY_ACTION.term} withSpace />
               <span className="num text-[13px] text-ink-3">{c('min', { n: TODAY_ACTION.minutes })}</span>
             </div>
-            <p className="mt-3 text-[17px] text-ink">{pick(at?.title, TODAY_ACTION.title)} {pick(at?.detail, TODAY_ACTION.detail)}</p>
-            <p className="mt-2 text-[14px] text-ink-2">{pick(at?.why, TODAY_ACTION.why)}</p>
+            <p className="mt-3 text-[17px] text-ink">{nums(`${pick(at?.title, TODAY_ACTION.title)} ${pick(at?.detail, TODAY_ACTION.detail)}`)}</p>
+            <p className="mt-2 text-[14px] text-ink-2">{nums(pick(at?.why, TODAY_ACTION.why))}</p>
           </div>
           )}
           <p className="mt-4 text-[15px] text-ink-2">
@@ -208,7 +208,7 @@ export default function IndexHome() {
             <Eyebrow>{c('ixWhenDown')}</Eyebrow>
             <p className="mt-3 text-[17px] text-ink">{c('ixWhenDownBody')}</p>
             <Link to="/app/index/day-90" className="mt-4 inline-flex items-center gap-1.5 text-[15px] text-ink underline-offset-4 hover:underline focus-ring">
-              {c('ixSeeDay90')} <ArrowRight size={15} />
+              {nums(c('ixSeeDay90'))} <ArrowRight size={15} />
             </Link>
           </Card>
       </div>
@@ -250,7 +250,7 @@ function TermDetailPanel({ termKey }: { termKey: TermKey }) {
               <BandLabel band={score.band} />
             </span>
           </div>
-          <p className="mt-3 text-[17px] text-ink-2">{pick(dt?.sentence, detail.sentence)}</p>
+          <p className="mt-3 text-[17px] text-ink-2">{nums(pick(dt?.sentence, detail.sentence))}</p>
 
           <div className="mt-5 rounded-card bg-paper-sunk px-4 py-3">
             <p className="eyebrow text-ink-3">{c('ixFormula', { method: method(latest.method) })}</p>
@@ -271,7 +271,7 @@ function TermDetailPanel({ termKey }: { termKey: TermKey }) {
               <Pill tone={detail.confidence === 'High' ? 'ink' : 'neutral'}>{c('ixConfidence', { c: c(CONFIDENCE_KEY[detail.confidence]) })}</Pill>
             </div>
             {detail.signalSources.length > 0 ? (
-              <p className="mt-2 text-[13px] text-ink-3">{detail.signalSources.map((src) => pick(SIGNAL_SOURCE_TEXT[src], src)).join(' · ')}</p>
+              <p className="mt-2 text-[13px] text-ink-3">{nums(detail.signalSources.map((src) => pick(SIGNAL_SOURCE_TEXT[src], src)).join(' · '))}</p>
             ) : (
               <p className="mt-2 text-[13px] text-ink-3">{c('noWearable', { term: name(termKey) })}</p>
             )}
@@ -299,7 +299,7 @@ function TermDetailPanel({ termKey }: { termKey: TermKey }) {
               {detail.moved.map((m, i) => (
                 <li key={m} className="flex gap-2.5 text-[15px] text-ink">
                   <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-ink-3" aria-hidden />
-                  <span className="min-w-0 break-words">{pick(dt?.moved[i], m)}</span>
+                  <span className="min-w-0 break-words">{nums(pick(dt?.moved[i], m))}</span>
                 </li>
               ))}
             </ul>
@@ -382,8 +382,8 @@ function FormulaCard() {
             {rich(c('fxTry'), { b: <b className="font-medium text-ink">{c('fxTryB')}</b> })}
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="secondary" onClick={() => bump(latest.lowestTerm, 'lowest')}>{c('fxPlus10', { term: name(latest.lowestTerm) })}</Button>
-            <Button size="sm" variant="secondary" onClick={() => bump(highest, 'highest')}>{c('fxPlus10', { term: name(highest) })}</Button>
+            <Button size="sm" variant="secondary" onClick={() => bump(latest.lowestTerm, 'lowest')}>{nums(c('fxPlus10', { term: name(latest.lowestTerm) }))}</Button>
+            <Button size="sm" variant="secondary" onClick={() => bump(highest, 'highest')}>{nums(c('fxPlus10', { term: name(highest) }))}</Button>
             <Button size="sm" variant="ghost" onClick={reset} disabled={!changed && Object.keys(bumped).length === 0} aria-label={c('fxResetAria')}>
               <RotateCcw size={14} /> {c('fxReset')}
             </Button>
@@ -421,8 +421,8 @@ function FormulaCard() {
           ) : changed ? (
             <>
               {rich(c('fxSandboxLine'), { v: <span className="num text-ink">{live.value}</span>, d: <Delta value={live.value - real.value} />, r: <span className="num">{real.value}</span>, term: name(lowestNow) })}
-              {bumped.lowest !== undefined && c('fxNowTry', { term: name(highest) })}
-              {bumped.highest !== undefined && c('fxNowTry', { term: name(latest.lowestTerm) })}
+              {bumped.lowest !== undefined && nums(c('fxNowTry', { term: name(highest) }))}
+              {bumped.highest !== undefined && nums(c('fxNowTry', { term: name(latest.lowestTerm) }))}
             </>
           ) : (
             c('fxHint')
@@ -615,11 +615,11 @@ function MeasuredBanner({ m, onClear }: { m: MeasuredIndex; onClear: () => void 
                   <Delta value={m.value - latest.value} />
                 </>
               )}
-              <span className="text-[15px] text-ink-2">{rich(c('mbVs'), { v: <span className="num">{latest.value}</span>, date: fmtDate(latest.takenOn) })}</span>
+              <span className="text-[15px] text-ink-2">{rich(c('mbVs'), { v: <span className="num">{latest.value}</span>, date: <span className="num">{fmtDate(latest.takenOn)}</span> })}</span>
             </div>
             <p className="mt-1 text-[15px] text-ink-2">
               {rich(c('lowestTermIs'), { term: <span className="text-ink">{name(m.lowestTerm)}</span> })}{' '}
-              {m.preview ? c('mbKept') : c('mbAwaiting')}
+              {nums(m.preview ? c('mbKept') : c('mbAwaiting'))}
             </p>
             {missing.length > 0 && (
               <p className="mt-2 flex flex-wrap items-center gap-2 text-[14px] text-ink-2">
@@ -655,7 +655,7 @@ function MeasuredBanner({ m, onClear }: { m: MeasuredIndex; onClear: () => void 
             </Link>
           ) : (
             <Link to="/app/index/day-90" className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line-strong px-3 text-[14px] text-ink hover:bg-paper-sunk focus-ring">
-              {c('mbSeeDay90')} <ArrowRight size={14} />
+              {nums(c('mbSeeDay90'))} <ArrowRight size={14} />
             </Link>
           )}
           {confirming ? (
@@ -758,10 +758,10 @@ function PrintedForYou() {
   return (
     <Card tone="sunk">
       <Eyebrow>{x('prTitle')}</Eyebrow>
-      <p className="mt-3 text-[15px] text-ink-2">{x('prBody')}</p>
+      <p className="mt-3 text-[15px] text-ink-2">{nums(x('prBody'))}</p>
       <div className="mt-4 flex flex-col gap-2">
         <Link to="/app/day-40" className="inline-flex items-center gap-2 text-[15px] text-ink underline-offset-4 hover:underline focus-ring">
-          <FileText size={15} aria-hidden /> {sh('day40')} <ArrowRight size={14} />
+          <FileText size={15} aria-hidden /> {nums(sh('day40'))} <ArrowRight size={14} />
         </Link>
         <Link to="/app/letter" className="inline-flex items-center gap-2 text-[15px] text-ink underline-offset-4 hover:underline focus-ring">
           <Mail size={15} aria-hidden /> {sh('letter')} <ArrowRight size={14} />

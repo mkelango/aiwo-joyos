@@ -3,7 +3,7 @@ import { View } from 'react-native'
 import { Body, Eyebrow, Meta } from '@/components'
 import { useTheme } from '@/theme/ThemeProvider'
 import { useA } from './i18n'
-import { Provenance } from './parts'
+import { monoNums, Provenance } from './parts'
 
 // VIVA run inside a room or a tool (Memo p.27): the member asks, VIVA "drafts" for a moment, then
 // the specimen draft appears with its provenance and who reviews it. Nothing leaves the phone.
@@ -45,11 +45,11 @@ export function VivaExchange({ state, turn }: { state: 'idle' | 'drafting' | 'sh
         <Eyebrow>{t('VIVA is drafting…')}</Eyebrow>
       ) : (
         <View style={{ gap: 8, backgroundColor: c.paperSunk, borderRadius: radius.card, borderBottomLeftRadius: 6, padding: 14 }}>
-          <Body>{turn.text}</Body>
-          {turn.tool ? <Provenance tool={turn.tool} /> : <Meta size={13} tone="ink3">{t('Drafted by VIVA · method v1.0 · no diagnosis, no advice')}</Meta>}
+          <Body>{monoNums(turn.text)}</Body>
+          {turn.tool ? <Provenance tool={turn.tool} /> : <Meta size={13} tone="ink3">{monoNums(t('Drafted by VIVA · method v1.0 · no diagnosis, no advice'))}</Meta>}
           {turn.reviewer ? (
             <Meta size={13} tone="ink3">
-              {turn.reviewer}
+              {monoNums(turn.reviewer)}
             </Meta>
           ) : null}
         </View>

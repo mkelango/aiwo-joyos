@@ -54,6 +54,16 @@
   --wheel-guide: rgb(28 19 20 / 0.12);
   --wheel-ghost: rgb(28 19 20 / 0.14); /* the Day-0 outline, 14% Ink (Playbook p45) */
 
+  /* Non-term data series (Playbook p39, p62): the Spectrum is for the six terms only, so a
+     biomarker, a sleep stage or a signal is drawn in Ink, Slate, Mist or Bronze. Ink is the
+     lead series; Slate and Bronze the second and third; Mist is a fill, band or ghost line,
+     never a thin line on Paper (1.6:1). Use lib/viz.ts VIZ in charts. */
+  --viz-ink: #1c1314;
+  --viz-slate: #5e6b73; /* 5.3:1 on Paper */
+  --viz-bronze: #7b4f36; /* 6.8:1 on Paper */
+  --viz-mist: #c4d1d7;
+  --viz-mist-soft: #e6edf0;
+
   /* Change states (Playbook p39): a rise is Jade with ↑ and the value; a fall is Ink with ↓,
      never red. --rise is the Jade mark itself; --rise-ink is Jade at text contrast (AA). */
   --rise: #1f8a68;
@@ -127,6 +137,11 @@
   --term-b: #e3a86e; /* the minus on dark grounds */
   --wheel-guide: rgb(242 238 232 / 0.14);
   --wheel-ghost: rgb(242 238 232 / 0.22);
+  --viz-ink: #f2eee8;
+  --viz-slate: #9aa7ae; /* Slate lifted for warm Ink: 7.4:1 */
+  --viz-bronze: #c39274; /* Bronze lifted for warm Ink: 6.7:1 */
+  --viz-mist: #c4d1d7;
+  --viz-mist-soft: #2c3336;
   --rise: #5fc6a0;
   --rise-ink: #5fc6a0;
   --minus-amber: #e3a86e;

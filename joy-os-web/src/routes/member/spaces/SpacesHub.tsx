@@ -6,14 +6,14 @@ import { Link } from 'react-router-dom'
 import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
 import { BandLabel, Delta, Eyebrow, MethodLine, SpecimenTag, TermDot } from '@/components/joy/primitives'
 import { Card, PageHeader, Pill } from '@/components/ui'
-import { INDEX_HISTORY } from '@/data/member'
 import { TERMS, termByKey, termColor } from '@/data/terms'
 import type { TermKey } from '@/domain/types'
-import { ROOM_PLAIN, ROOM_VERDICT, actionsFor } from './_data'
+import { ROOM_PLAIN, actionsFor, roomVerdict } from './_data'
 import { Reveal, TermRule, softColor } from './_SpaceShell'
-import { useSpaceText } from './_i18n'
+import { mono, useSpaceText } from './_i18n'
 import { useIsMinor } from '@/lib/minor'
-import { SABBATH_DAYS, SABBATH_KEY, nextSabbathOn, readSpaceState, type SabbathPlan } from './_state'
+import { useIndexHistory } from '@/routes/member/core/_latest'
+import { SABBATH_DAYS, SABBATH_KEY, nextSabbathOn, readSpaceState, useCalendarConnected, type SabbathPlan } from './_state'
 
 // SPACES HUB (Memo p.19): six rooms, named in plain words. Each with its Spectrum
 // colour and name, score, band, delta and framework. The Wheel selects a petal.
@@ -21,8 +21,11 @@ import { SABBATH_DAYS, SABBATH_KEY, nextSabbathOn, readSpaceState, type SabbathP
 // Under 18 nothing is scored (the minors gate): no Index, Wheel values, scores, bands or
 // deltas; the Wheel stays empty, each room says so, and no room is ranked as the lowest.
 export default function SpacesHub() {
-  const latest = INDEX_HISTORY[0]
+  // The latest Index: a signed Day-90 re-measure moves the petals and the lowest term (core/_latest).
+  const { latest } = useIndexHistory()
   const minor = useIsMinor()
+  // A verdict learned from the calendar waits for a connected calendar (see _data ROOM_VERDICT_NO_CAL).
+  const calendar = useCalendarConnected()
   // A minor's Wheel: every petal unscored (drawn as an outline), no numeral in the centre.
   const wheelTerms = useMemo(() => (minor ? latest.terms.map((x) => ({ ...x, value: null, delta: undefined })) : latest.terms), [minor, latest.terms])
   // Without scores there is no lowest term to start from; Pleasure opens the hub instead.
@@ -43,7 +46,7 @@ export default function SpacesHub() {
       <PageHeader
         eyebrow={t('hub.eyebrow')}
         title={<>{r('hub.title', { e: <em>{t('hub.titleE')}</em> })}</>}
-        lead={minor ? t('mn.hubLead') : t('hub.lead')}
+        lead={mono(minor ? t('mn.hubLead') : t('hub.lead'))}
         actions={<Link to={`/app/spaces/${lowTerm.slug}`} className="btn-daybreak focus-ring">{minor ? t('hub.open', { space: tt.space(lowest) }) : t('hub.startHereSpace', { space: tt.space(lowest) })} <ArrowRight size={18} /></Link>}
       />
 
@@ -61,7 +64,7 @@ export default function SpacesHub() {
         <Card className="grid gap-8 md:grid-cols-[auto_minmax(0,1fr)] md:items-center md:gap-10">
           <div className="flex flex-col items-center">
             <JoyspanWheel terms={wheelTerms} size={260} value={minor ? undefined : latest.value} showLabels highlight={selected} onSelect={setSelected} />
-            <p className="mt-2 max-w-[30ch] text-center text-[13px] text-ink-3">{minor ? t('mn.wheel') : t('hub.tapPetal', { ease: tt.space('B') })}</p>
+            <p className="mt-2 max-w-[30ch] text-center text-[13px] text-ink-3">{mono(minor ? t('mn.wheel') : t('hub.tapPetal', { ease: tt.space('B') }))}</p>
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -76,9 +79,9 @@ export default function SpacesHub() {
                   {sel.name !== sel.space && <span className="text-[15px] text-ink-3">· {tt.name(selected)}</span>}
                   {selected === lowest && !minor && <Pill tone="daybreak" className="ml-1">{t('hub.startHere')}</Pill>}
                 </div>
-                <p className="mt-1 text-[15px] text-ink-2">{d(ROOM_PLAIN[selected])}</p>
+                <p className="mt-1 text-[15px] text-ink-2">{mono(d(ROOM_PLAIN[selected]))}</p>
                 {minor ? (
-                  <p className="mt-5 rounded-2xl bg-paper-sunk px-4 py-3 text-[15px] text-ink-2">{t('mn.title')}</p>
+                  <p className="mt-5 rounded-2xl bg-paper-sunk px-4 py-3 text-[15px] text-ink-2">{mono(t('mn.title'))}</p>
                 ) : (
                   <div className="mt-5 flex items-end gap-4">
                     <span className="num text-[4.5rem] font-light leading-[0.85] text-ink">{selected === 'B' ? '−' : ''}{selScore.value}</span>
@@ -88,12 +91,12 @@ export default function SpacesHub() {
                     </span>
                   </div>
                 )}
-                <p className="mt-4 max-w-[52ch] text-[17px] text-ink">{minor ? t(`mn.lead.${selected}`) : d(ROOM_VERDICT[selected])}</p>
+                <p className="mt-4 max-w-[52ch] text-[17px] text-ink">{minor ? t(`mn.lead.${selected}`) : d(roomVerdict(selected, calendar))}</p>
                 <TermRule term={selected} className="my-5 max-w-[12rem]" />
-                <p className="break-words text-[14px] text-ink-2"><span className="eyebrow mr-2 text-ink-3">{t('sh.framework')}</span>{d(sel.framework)}</p>
-                <p className="mt-2 text-[14px] text-ink-2"><span className="eyebrow mr-2 text-ink-3">{t('hub.firstStep')}</span>{d(firstAction.title)}</p>
+                <p className="break-words text-[14px] text-ink-2"><span className="eyebrow mr-2 text-ink-3">{t('sh.framework')}</span>{mono(d(sel.framework))}</p>
+                <p className="mt-2 text-[14px] text-ink-2"><span className="eyebrow mr-2 text-ink-3">{t('hub.firstStep')}</span>{mono(d(firstAction.title))}</p>
                 <Link to={`/app/spaces/${sel.slug}`} className="mt-5 inline-flex items-center gap-1.5 text-[16px] text-ink underline-offset-4 hover:underline focus-ring rounded">
-                  {t('hub.open', { space: tt.space(selected) })} <ArrowRight size={16} />
+                  {mono(t('hub.open', { space: tt.space(selected) }))} <ArrowRight size={16} />
                 </Link>
               </motion.div>
             </AnimatePresence>
@@ -105,7 +108,7 @@ export default function SpacesHub() {
       <section className="mt-12" aria-labelledby="rooms">
         <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
           <h2 id="rooms" className="eyebrow text-ink-3">{t('hub.rooms')}</h2>
-          {minor ? <p className="text-[13px] text-ink-3">{t('mn.body')}</p> : <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />}
+          {minor ? <p className="text-[13px] text-ink-3">{mono(t('mn.body'))}</p> : <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />}
         </div>
         <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {TERMS.map((t, i) => {
@@ -131,9 +134,9 @@ export default function SpacesHub() {
                       </div>
                       {isLow && <Pill tone="daybreak" className="shrink-0">{tx('hub.startHere')}</Pill>}
                     </div>
-                    <p className="mt-3 text-[15px] text-ink-2">{d(ROOM_PLAIN[t.key])}</p>
+                    <p className="mt-3 text-[15px] text-ink-2">{mono(d(ROOM_PLAIN[t.key]))}</p>
                     {minor ? (
-                      <p className="mt-5 text-[14px] text-ink-3">{tx('mn.room')}</p>
+                      <p className="mt-5 text-[14px] text-ink-3">{mono(tx('mn.room'))}</p>
                     ) : (
                       <>
                         <div className="mt-5 flex items-end gap-3">
@@ -148,9 +151,9 @@ export default function SpacesHub() {
                         </div>
                       </>
                     )}
-                    <p className="mt-4 break-words text-[13px] leading-snug text-ink-3">{d(t.framework)}</p>
+                    <p className="mt-4 break-words text-[13px] leading-snug text-ink-3">{mono(d(t.framework))}</p>
                     <span className="mt-auto flex items-center gap-1.5 pt-5 text-[14px] text-ink">
-                      {tx('hub.enter', { space: tt.space(t.key) })} <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
+                      {mono(tx('hub.enter', { space: tt.space(t.key) }))} <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
                     </span>
                   </Link>
               </motion.li>
@@ -165,17 +168,17 @@ export default function SpacesHub() {
         <Card tone="sunk">
           <Watch size={18} className="text-ink-2" aria-hidden />
           <h3 className="mt-3 text-[17px] font-normal text-ink">{t('hub.c1t')}</h3>
-          <p className="mt-1.5 text-[15px] text-ink-2">{t('hub.c1b', { body: tt.space('H'), pleasure: tt.space('D'), ease: tt.space('B') })}</p>
+          <p className="mt-1.5 text-[15px] text-ink-2">{mono(t('hub.c1b', { body: tt.space('H'), pleasure: tt.space('D'), ease: tt.space('B') }))}</p>
         </Card>
         <Card tone="sunk">
           <Lock size={18} className="text-ink-2" aria-hidden />
           <h3 className="mt-3 text-[17px] font-normal text-ink">{t('hub.c2t')}</h3>
-          <p className="mt-1.5 text-[15px] text-ink-2">{t('hub.c2b', { purpose: tt.space('P'), people: tt.space('R'), freedom: tt.space('F') })}</p>
+          <p className="mt-1.5 text-[15px] text-ink-2">{mono(t('hub.c2b', { purpose: tt.space('P'), people: tt.space('R'), freedom: tt.space('F') }))}</p>
         </Card>
         <Card tone="sunk">
           <span className="flex items-center gap-1.5" aria-hidden><TermDot term="B" size={14} /><span className="num text-ink-2">−</span></span>
-          <h3 className="mt-3 text-[17px] font-normal text-ink">{t('hub.c3t', { ease: tt.space('B') })}</h3>
-          <p className="mt-1.5 text-[15px] text-ink-2">{t('hub.c3b', { bname: tt.name('B'), ease: tt.space('B') })}</p>
+          <h3 className="mt-3 text-[17px] font-normal text-ink">{mono(t('hub.c3t', { ease: tt.space('B') }))}</h3>
+          <p className="mt-1.5 text-[15px] text-ink-2">{mono(t('hub.c3b', { bname: tt.name('B'), ease: tt.space('B') }))}</p>
         </Card>
       </section>
     </div>

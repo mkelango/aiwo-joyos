@@ -520,7 +520,91 @@ export const XTRA = {
     ta: 'எதுவும் அனுப்பப்படவில்லை. நீங்கள் எழுதியது கனமாகத் தெரிகிறது; எனவே உதவி இப்போது திறந்துள்ளது. உங்கள் வார்த்தைகள் பெட்டியிலேயே இருக்கும்; சேமிக்கப்படாது.',
     hi: 'कुछ नहीं भेजा गया। आपने जो लिखा वह भारी लगता है, इसलिए मदद अभी खुली है। आपके शब्द बॉक्स में ही हैं और सहेजे नहीं गए।',
   },
+
+  // ─── Today's action follows the latest Index ─────────────────────────────
+  tdWhyOwn: {
+    en: '{term} is your lowest term on your Day-90 re-measure, signed by {who}. This is its one next step.',
+    ta: '{who} கையொப்பமிட்ட உங்கள் நாள்-90 மறு அளவீட்டில் {term} மிகக் குறைந்த அம்சம். இது அதற்கான ஒரே அடுத்த படி.',
+    hi: '{who} के हस्ताक्षर वाले आपके दिन-90 दोबारा माप में {term} सबसे कम पहलू है। यह उसका एक अगला कदम है।',
+  },
+  tdFit: { en: '{n} minutes, {when}, {who}.', ta: '{n} நிமிடங்கள், {when}, {who}.', hi: '{n} मिनट, {when}, {who}।' },
+  tdTodMorning: { en: 'in the morning', ta: 'காலையில்', hi: 'सुबह' },
+  tdTodAfternoon: { en: 'in the afternoon', ta: 'மதியம்', hi: 'दोपहर में' },
+  tdTodEvening: { en: 'in the evening', ta: 'மாலையில்', hi: 'शाम को' },
+  tdTodAny: { en: 'at any time of day', ta: 'நாளின் எந்த நேரத்திலும்', hi: 'दिन में किसी भी समय' },
+  tdFitKavya: { en: 'with Kavya, who is linked to your account', ta: 'உங்கள் கணக்குடன் இணைக்கப்பட்ட Kavya உடன்', hi: 'Kavya के साथ, जो आपके खाते से जुड़ी हैं' },
+  tdFitSolo: { en: 'on your own', ta: 'நீங்கள் தனியாக', hi: 'अकेले' },
+  tdFitCal: {
+    en: 'Your connected calendar (consented) is clear after {t} pm; sunset is at {s}.',
+    ta: 'இணைக்கப்பட்ட உங்கள் நாட்காட்டி (ஒப்புதலுடன்) இரவு {t} மணிக்குப் பிறகு காலியாக உள்ளது; சூரிய அஸ்தமனம் {s}.',
+    hi: 'आपका जुड़ा हुआ कैलेंडर (सहमति से) शाम {t} बजे के बाद खाली है; सूर्यास्त {s} पर।',
+  },
+  tdFitNoCal: {
+    en: 'No calendar is connected, so Joy OS does not know your free time: the time is yours to choose.',
+    ta: 'நாட்காட்டி எதுவும் இணைக்கப்படவில்லை; எனவே உங்கள் ஓய்வு நேரம் Joy OS-க்குத் தெரியாது: நேரத்தை நீங்களே தேர்ந்தெடுங்கள்.',
+    hi: 'कोई कैलेंडर जुड़ा नहीं है, इसलिए Joy OS को आपका ख़ाली समय नहीं पता: समय आप ख़ुद चुनें।',
+  },
+  tdPoolSubReplaced: {
+    en: 'Your coach chose today’s action above, so the one it replaced waits here. Any one is enough, and “not today” is always allowed.',
+    ta: 'மேலே உள்ள இன்றைய செயலை உங்கள் பயிற்சியாளர் தேர்ந்தெடுத்தார்; அது மாற்றிய செயல் இங்கே காத்திருக்கிறது. ஏதேனும் ஒன்று போதும்; “இன்று வேண்டாம்” என்று சொல்ல எப்போதும் அனுமதி உண்டு.',
+    hi: 'ऊपर का आज का काम आपके कोच ने चुना है, इसलिए जिसे उसने बदला वह यहाँ रखा है। कोई एक काफ़ी है, और “आज नहीं” कहना हमेशा ठीक है।',
+  },
+  tdPoolSubMixed: {
+    en: 'You added most of these; the one your coach’s choice replaced waits here too. Any one is enough, and “not today” is always allowed.',
+    ta: 'இவற்றில் பெரும்பாலானவற்றை நீங்கள் சேர்த்தீர்கள்; உங்கள் பயிற்சியாளரின் தேர்வு மாற்றிய செயலும் இங்கே காத்திருக்கிறது. ஏதேனும் ஒன்று போதும்; “இன்று வேண்டாம்” என்று சொல்ல எப்போதும் அனுமதி உண்டு.',
+    hi: 'इनमें से ज़्यादातर आपने जोड़े हैं; आपके कोच की पसंद ने जिसे बदला, वह भी यहाँ रखा है। कोई एक काफ़ी है, और “आज नहीं” कहना हमेशा ठीक है।',
+  },
+  tdPoolReplaced: {
+    en: 'The engine’s choice for today, before your coach changed it',
+    ta: 'பயிற்சியாளர் மாற்றும் முன், இன்றைக்கான இயந்திரத்தின் தேர்வு',
+    hi: 'कोच के बदलने से पहले, आज के लिए इंजन की पसंद',
+  },
+  vvIndexAsk: { en: 'Why is my Index {v}?', ta: 'என் குறியீடு ஏன் {v}?', hi: 'मेरा इंडेक्स {v} क्यों है?' },
+  vvActionAsk: { en: 'Why “{title}” today?', ta: 'இன்று ஏன் “{title}”?', hi: 'आज “{title}” क्यों?' },
+  rtActionCoach: {
+    en: 'Today’s action was chosen by your coach{who}: {title} Why: {reason} The engine’s choice is still in your pool for today. “Not today” is always allowed.',
+    ta: 'இன்றைய செயலை உங்கள் பயிற்சியாளர்{who} தேர்ந்தெடுத்தார்: {title} காரணம்: {reason} இயந்திரத்தின் தேர்வு இன்றைய உங்கள் தொகுப்பில் இன்னும் உள்ளது. “இன்று வேண்டாம்” என்று எப்போதும் சொல்லலாம்.',
+    hi: 'आज का काम आपके कोच{who} ने चुना है: {title} वजह: {reason} इंजन की पसंद आज भी आपकी सूची में है। “आज नहीं” कहना हमेशा ठीक है।',
+  },
+
+  // ─── The re-measure returned to the lab (clinical portal → member) ───────
+  rmReturnedEyebrow: { en: 'Re-measure · returned to the lab · {date}', ta: 'மறு அளவீடு · ஆய்வகத்துக்குத் திருப்பி அனுப்பப்பட்டது · {date}', hi: 'दोबारा माप · लैब को लौटाया गया · {date}' },
+  rmReturnedBody: {
+    en: '{who} returned your Day-90 draft to the lab: {reason}. Your concierge, {concierge}, is arranging a home redraw. When the lab has the new sample, the draft goes back to {who} to sign.',
+    ta: '{who} உங்கள் நாள்-90 வரைவை ஆய்வகத்துக்குத் திருப்பி அனுப்பினார்: {reason}. உங்கள் கன்சியர்ஜ் {concierge} வீட்டில் மீண்டும் இரத்த மாதிரி எடுக்க ஏற்பாடு செய்கிறார். புதிய மாதிரி ஆய்வகத்துக்குக் கிடைத்ததும், வரைவு கையொப்பத்துக்காக மீண்டும் {who} இடம் செல்லும்.',
+    hi: '{who} ने आपका दिन-90 ड्राफ़्ट लैब को लौटा दिया: {reason}। आपके कंसीयर्ज {concierge} घर पर दोबारा ख़ून का नमूना लेने की व्यवस्था कर रहे हैं। लैब को नया नमूना मिलते ही ड्राफ़्ट हस्ताक्षर के लिए फिर {who} के पास जाएगा।',
+  },
+  rmReturnedNext: {
+    en: 'Your numbers stay provisional until {who} signs. Nothing is needed from you until {concierge} gets in touch about the time.',
+    ta: '{who} கையொப்பமிடும் வரை உங்கள் எண்கள் தற்காலிகமானவை. நேரம் குறித்து {concierge} தொடர்பு கொள்ளும் வரை நீங்கள் எதுவும் செய்ய வேண்டியதில்லை.',
+    hi: '{who} के हस्ताक्षर तक आपकी संख्याएँ अस्थायी हैं। समय के बारे में {concierge} के संपर्क करने तक आपको कुछ नहीं करना है।',
+  },
+  rmReasonNone: { en: 'no reason recorded', ta: 'காரணம் பதிவு செய்யப்படவில்லை', hi: 'कोई कारण दर्ज नहीं' },
+  rmRedrawIn: {
+    en: 'The redraw is in. Your draft is back with {who} to sign.',
+    ta: 'மீண்டும் எடுத்த மாதிரி வந்துவிட்டது. உங்கள் வரைவு கையொப்பத்துக்காக மீண்டும் {who} இடம் உள்ளது.',
+    hi: 'दोबारा लिया गया नमूना आ गया है। आपका ड्राफ़्ट हस्ताक्षर के लिए फिर {who} के पास है।',
+  },
+  rmMessageConcierge: { en: 'Message {who}', ta: '{who}-க்குச் செய்தி அனுப்பவும்', hi: '{who} को संदेश भेजें' },
+  d9CardReturned: {
+    en: 'The card waits for the redraw and for {who} to sign.',
+    ta: 'அட்டை, மீண்டும் எடுக்கும் மாதிரிக்கும் {who} கையொப்பத்துக்கும் காத்திருக்கிறது.',
+    hi: 'कार्ड दोबारा नमूने और {who} के हस्ताक्षर का इंतज़ार कर रहा है।',
+  },
+  d9SpecimenRedraw: {
+    en: 'Specimen: {concierge} marks the home redraw received from the concierge desk; the draft then goes back into {who}’s sign-off queue.',
+    ta: 'மாதிரி: {concierge} கன்சியர்ஜ் மேசையிலிருந்து வீட்டு மாதிரி கிடைத்ததாகக் குறிப்பார்; அதன் பிறகு வரைவு மீண்டும் {who} அவர்களின் கையொப்ப வரிசைக்குச் செல்லும்.',
+    hi: 'नमूना: {concierge} कंसीयर्ज डेस्क से घर का नमूना मिलने का निशान लगाते हैं; फिर ड्राफ़्ट वापस {who} की हस्ताक्षर सूची में जाता है।',
+  },
+  d9OpenConcierge: { en: 'Open the concierge desk', ta: 'கன்சியர்ஜ் மேசையைத் திறக்கவும்', hi: 'कंसीयर्ज डेस्क खोलें' },
 } satisfies Dict
+
+/** The clinical portal's return reasons (console/care/_data.ts RETURN_REASONS), in the member's language. */
+export const RETURN_REASON_TEXT: Record<string, { en: string; ta: string; hi: string }> = {
+  'Repeat test needed': { en: 'a repeat test is needed', ta: 'பரிசோதனையை மீண்டும் செய்ய வேண்டும்', hi: 'जाँच दोबारा करनी है' },
+  'Lab value looks implausible': { en: 'a lab value looks implausible', ta: 'ஒரு ஆய்வக மதிப்பு நம்பத்தகுந்ததாகத் தெரியவில்லை', hi: 'लैब का एक मान सही नहीं लगता' },
+  'An input is missing': { en: 'an input is missing', ta: 'ஒரு உள்ளீடு விடுபட்டுள்ளது', hi: 'एक इनपुट छूट गया है' },
+}
 
 /**
  * Instrument licence attributions (Take the Index intro). Authors and bodies stay as

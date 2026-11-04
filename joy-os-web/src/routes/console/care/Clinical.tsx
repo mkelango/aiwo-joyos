@@ -13,11 +13,11 @@ import {
   CLINICAL_RECORDS, CLOSE_OUTCOMES, EXTRA_FORMULARY, EXTRA_INTERACTIONS, FORMULARY, MD_CONFIG, MEERA, MEMBER_IDS, RETURN_REASONS, SCREEN_ROUTES, SCREEN_ROUTE_OWNER,
   type SafetyAlert,
 } from './_data'
-import { REDRAW, clinical, recordOf, stampOf, useClinicalState, type ClinicalAudit, type Draft, type MdActive, type MdHistory, type Order, type Screen, type RemeasureWork, type Sent, type SignItem, type SoapNote } from './_clinicalStore'
+import { REDRAW, clinical, recordOf, redrawTestFor, stampOf, useClinicalState, type ClinicalAudit, type Draft, type MdActive, type MdHistory, type Order, type Screen, type RemeasureWork, type Sent, type SignItem, type SoapNote } from './_clinicalStore'
 import { PreviewBanner, useConsoleAccess } from './_gate'
 import { recordSessionRead } from './_memberShare'
 import { CLINICAL_PURPOSES, ReasonGate } from './_purpose'
-import { remeasure, useRemeasure, type Remeasure } from './_remeasure'
+import { REMEASURE_OCCASION, remeasure, useRemeasure, type Remeasure } from './_remeasure'
 import { AccessNote, CardHead, Kpi, PriorityTag, ScrollTabs, SlaChip, areaCls, fieldCls, fmtClock, fmtDuration, fmtOpened, labelCls, parseIst, useConsoleNow, useTabParam } from './_parts'
 
 // CLINICAL PORTAL (Memo p.24, p.27; Architecture p6, p8, p18): P0/P1 safety board with SLAs,
@@ -40,13 +40,13 @@ function reachOf(a: SafetyAlert) {
 const RM_ID = 'rm-member'
 
 function remeasureItem(rm: Remeasure, work: RemeasureWork): SignItem | null {
-  if (rm.phase !== 'pending' && rm.phase !== 'signed') return null
+  if (rm.phase !== 'pending' && rm.phase !== 'returned' && rm.phase !== 'signed') return null
   const rec = CLINICAL_RECORDS[rm.memberId]
   return {
     id: RM_ID,
     member: rm.member,
     memberId: rm.memberId,
-    occasion: 'Day 90 re-measure · Clinical grade · from the app',
+    occasion: REMEASURE_OCCASION,
     method: rm.method,
     engine: rm.engine,
     drafted: rm.submittedMs ? fmtOpened(stampOf(rm.submittedMs)) : 'from the app',
@@ -55,7 +55,8 @@ function remeasureItem(rm: Remeasure, work: RemeasureWork): SignItem | null {
     labs: rec ? rec.labs.map((l) => ({ name: l.name, value: String(l.series[l.series.length - 1]), unit: l.unit, ref: l.ref, flag: l.flag })) : [],
     notes: work.notes,
     signed: rm.phase === 'signed' ? `Signed · ${rm.signedBy ?? MEERA.name}${rm.signedMs ? ` · ${fmtClock(rm.signedMs)}` : ''}` : null,
-    returned: rm.phase === 'signed' ? null : work.returned,
+    // A return lives on the member's own record, so their Day 90 reads it too.
+    returned: rm.returned ? { reason: rm.returned.reason, note: rm.returned.note, at: rm.returned.ms ? fmtClock(rm.returned.ms) : '' } : null,
     missing: rm.missing,
     surveyOnly: rm.surveyOnly,
   }
@@ -156,6 +157,9 @@ export default function Clinical() {
     if (rmItem && r) {
       // Signing writes the signed state back to the member's own record.
       if (r.signed && !rmItem.signed) remeasure.sign(signerOf(r.signed), now, joyspanIndex(rm.terms, rm.method)?.value ?? null)
+      // A return (and its undo) is written to the member's record: their Day 90 says who returned it and why.
+      if (r.returned && !rmItem.returned) remeasure.returnDraft(acc.chosen ? acc.person : MEERA.name, r.returned.reason, r.returned.note, now)
+      if (!r.returned && rmItem.returned) remeasure.requeue()
       if (r.notes !== rmItem.notes || r.returned !== rmItem.returned) clinical.setRemeasure({ notes: r.notes, returned: r.returned })
     }
     clinical.setSignoffs(() => next.filter((x) => x.id !== RM_ID))
@@ -544,6 +548,14 @@ function RemeasureNote({ rm }: { rm: Remeasure }) {
       </p>
     )
   }
+  if (rm.phase === 'returned' && rm.returned) {
+    return (
+      <p role="status" className="mb-4 flex items-start gap-2.5 rounded-card border border-line-strong bg-paper-raised px-4 py-3 text-[15px] text-ink">
+        <Undo2 size={17} className="mt-0.5 shrink-0" aria-hidden />
+        <span>{rm.member}’s Day-90 draft was returned to the lab by {rm.returned.by}{rm.returned.ms ? <> at <span className="num">{fmtClock(rm.returned.ms)}</span></> : null} · {rm.returned.reason.toLowerCase()}. {first}’s Day-90 card says so, with the reason, and that a home redraw comes next. When the lab receives the redraw the draft comes back to this queue to sign.{so}</span>
+      </p>
+    )
+  }
   if (rm.phase === 'signed') {
     return (
       <p role="status" className="mb-4 flex items-start gap-2.5 rounded-card bg-paper-sunk px-4 py-3 text-[15px] text-ink">
@@ -566,7 +578,7 @@ function termList(keys: TermKey[]) {
 }
 
 /** A returned draft becomes a home redraw on the concierge desk (_concierge.tsx reads REDRAW). */
-const redrawTest = (item: SignItem) => `Redraw for sign-off · ${item.occasion}`
+const redrawTest = (item: SignItem) => redrawTestFor(item.occasion)
 
 function SignOff({ items, setItems, now, onOpen, canActOn, log }: { items: SignItem[]; setItems: (f: (s: SignItem[]) => SignItem[]) => void; now: number; onOpen: (id: string) => void; canActOn: CanActOn; log: Log }) {
   const [sel, setSel] = useState(items[0]?.id)
@@ -730,7 +742,7 @@ function SignOff({ items, setItems, now, onOpen, canActOn, log }: { items: SignI
           <div role="status" className="mt-6 flex flex-col gap-3 rounded-lg border border-line-strong p-4 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-[15px] text-ink">Returned to the lab and concierge · {item.returned.reason.toLowerCase()}.</p>
-              <p className="mt-0.5 text-[14px] text-ink-2">“{item.returned.note}” Nothing is shown to {item.member.split(' ')[0]} until a new draft is signed.</p>
+              <p className="mt-0.5 text-[14px] text-ink-2">“{item.returned.note}” {item.id === RM_ID ? <>{item.member.split(' ')[0]}’s Day-90 card says it was returned, why, and that a redraw comes next; no score is shown until a draft is signed.</> : <>Nothing is shown to {item.member.split(' ')[0]} until a new draft is signed.</>} When the concierge marks the redraw received by the lab, it comes back here to sign.</p>
               {redraw && <p className="mt-1 text-[13px] text-ink-3">Home redraw on the concierge desk · {redraw.status}</p>}
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
@@ -968,7 +980,7 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts, log, audit, on
               <YAxis domain={rec.chart.domain} tickLine={false} axisLine={false} tick={{ fontFamily: 'var(--font-mono)', fontSize: 11, fill: 'var(--ink-3)' }} />
               <ReferenceLine y={rec.chart.target} stroke="var(--ink-3)" strokeDasharray="4 4" label={{ value: rec.chart.targetLabel, position: 'insideTopRight', fill: 'var(--ink-3)', fontSize: 11, fontFamily: 'var(--font-mono)' }} />
               <Tooltip contentStyle={{ background: 'var(--paper-raised)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 13 }} />
-              <Line type="monotone" dataKey="value" name={rec.chart.lab} stroke="var(--term-h)" strokeWidth={2} dot={{ r: 4, fill: 'var(--term-h)' }} isAnimationActive={false} />
+              <Line type="monotone" dataKey="value" name={rec.chart.lab} stroke="var(--ink)" strokeWidth={2} dot={{ r: 4, fill: 'var(--ink)' }} isAnimationActive={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>

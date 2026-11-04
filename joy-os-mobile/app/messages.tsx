@@ -11,11 +11,14 @@ import { useDict, useLang } from '@/lib/i18n'
 import { MSG, REPLIES_TEXT, SUBJECT_T } from '@/screens/b/i18n/messages'
 import { parseIsoDate } from '@/components/MethodLine'
 import { ROLE, useTx } from '@/screens/b/i18n/common'
+import { MonoNums } from '@/lib/monoNums'
 
 // MESSAGES (Care bridge): every thread with a named person. VIVA may draft; a person signs.
 // Three views on one route: the inbox, a thread (?t=<id>) and a new message (?compose=1&to=<person>).
 // Free text passes the crisis intercept before anything else. Sent messages are kept on the
 // phone until they sync. One Daybreak per view: New message · Send · Send message.
+// Other screens write here too (bStore postMemberMessage: VIVA's routing, Body's "Ask about
+// this"): the message lands in the account's thread with that person, with what it is about.
 
 const shortName = (name: string) => (name.startsWith('Dr') ? `Dr ${name.split(' ')[1]}` : name.split(' ')[0])
 const person = (id: string) => TEAM.find((p) => p.id === id)!
@@ -93,7 +96,7 @@ function Inbox() {
       />
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s1 }}>
         <SectionTitle>{t('threads')}</SectionTitle>
-        <Meta size={14}>{unread ? t('newReplies', { n: unread }) : t('allRead')}</Meta>
+        <Meta size={14}>{unread ? <MonoNums text={t('newReplies', { n: unread })} /> : t('allRead')}</Meta>
       </View>
       {all.length === 0 ? (
         <Card tone="sunk" style={{ gap: space.s1, alignItems: 'flex-start' }}>
@@ -124,7 +127,9 @@ function Inbox() {
                   {th.clinical ? <Eyebrow>{t('clinical')}</Eyebrow> : null}
                   {un ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.daybreak }} /> : null}
                 </View>
-                <Meta tone="ink">{pt.subject(th)}</Meta>
+                <Meta tone="ink">
+                  <MonoNums text={pt.subject(th)} />
+                </Meta>
                 <Meta size={14} numberOfLines={2}>
                   {last.from === 'me' ? t('you', { body: last.body }) : last.body}
                 </Meta>
@@ -143,7 +148,7 @@ function Inbox() {
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <Icon name="shield" size={15} color={c.ink3} />
         <Meta size={14} tone="ink3" style={{ flex: 1 }}>
-          {t('notEmergency')}
+          <MonoNums text={t('notEmergency')} />
         </Meta>
       </View>
     </Screen>
@@ -205,11 +210,12 @@ function ThreadView({ id }: { id: string }) {
           const mine = m.from === 'me'
           return (
             <View key={m.id} style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '88%', gap: 4 }}>
-              <View style={{ backgroundColor: mine ? c.ink : c.paperRaised, borderWidth: mine ? 0 : 1, borderColor: c.line, borderRadius: radius.card, padding: 14 }}>
+              <View style={{ backgroundColor: mine ? c.ink : c.paperRaised, borderWidth: mine ? 0 : 1, borderColor: c.line, borderRadius: radius.card, padding: 14, gap: 4 }}>
+                {m.subject && m.subject !== thread.subject ? <Eyebrow color={mine ? c.paper : undefined}>{m.subject}</Eyebrow> : null}
                 <Body color={mine ? c.paper : c.ink}>{m.body}</Body>
               </View>
               <Meta size={12} tone="ink3" align={mine ? 'right' : 'left'}>
-                {stamp(m.at)}
+                <Mono size={12} tone="ink3">{stamp(m.at)}</Mono>
                 {m.signed ? t('signed', { name: m.signed }) : ''}
                 {m.drafted ? t('drafted') : ''}
                 {mine && m.id.startsWith('s') ? t('sentOffline') : ''}
@@ -321,7 +327,9 @@ function Compose({ initialTo }: { initialTo: string }) {
                     <Body weight="medium">{tp.name}</Body>
                     {pd.clinical ? <Pill>{t('clinical')}</Pill> : null}
                   </View>
-                  <Meta size={14}>{`${pt.role(tp.role)} · ${pt.replies(tp.id)}`}</Meta>
+                  <Meta size={14}>
+                    <MonoNums text={`${pt.role(tp.role)} · ${pt.replies(tp.id)}`} />
+                  </Meta>
                 </View>
               }
             />
@@ -336,7 +344,9 @@ function Compose({ initialTo }: { initialTo: string }) {
       {d?.clinical ? (
         <Card tone="sunk" padding={14} style={{ flexDirection: 'row', gap: 10 }}>
           <Icon name="lock" size={16} color={c.ink2} />
-          <Meta style={{ flex: 1 }}>{t('clinicalTo', { name: p!.name, replies: pt.replies(p!.id) })}</Meta>
+          <Meta style={{ flex: 1 }}>
+            <MonoNums text={t('clinicalTo', { name: p!.name, replies: pt.replies(p!.id) })} />
+          </Meta>
         </Card>
       ) : null}
       <Field

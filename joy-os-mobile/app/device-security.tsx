@@ -9,6 +9,7 @@ import { KeyValue } from '@/screens/b/parts'
 import { sessionStore, useStore } from '@/screens/b/bStore'
 import { SECURITY } from '@/screens/b/i18n/security'
 import { useTheme } from '@/theme/ThemeProvider'
+import { MonoNums } from '@/lib/monoNums'
 
 // THIS PHONE'S SECURITY (Architecture p21, client security: "jailbreak and root signals (warn,
 // not block)"). Reached from the app-wide banner when a signal is found, from Sign in and from the
@@ -40,7 +41,7 @@ export default function DeviceSecurity() {
             {t('titleB')}
           </>
         }
-        lead={t('lead')}
+        lead={<Body tone="ink2"><MonoNums text={t('lead')} /></Body>}
       />
 
       <Card tone="raised" style={{ gap: space.s1 }}>
@@ -69,7 +70,7 @@ export default function DeviceSecurity() {
           {(['means1', 'means2', 'means3'] as const).map((k) => (
             <View key={k} style={{ flexDirection: 'row', gap: 10 }}>
               <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: c.ink2, marginTop: 10 }} />
-              <Body style={{ flex: 1 }}>{t(k)}</Body>
+              <Body style={{ flex: 1 }}><MonoNums text={t(k)} /></Body>
             </View>
           ))}
           {session.signedIn ? (
@@ -78,7 +79,7 @@ export default function DeviceSecurity() {
             </ArrowLink>
           ) : (
             <View style={{ gap: 4 }}>
-              <Meta tone="ink">{t('lockSignedOut')}</Meta>
+              <Meta tone="ink"><MonoNums text={t('lockSignedOut')} /></Meta>
               <ArrowLink icon="log-in" onPress={() => router.push('/signin')}>
                 {t('lockSignIn')}
               </ArrowLink>
@@ -87,15 +88,15 @@ export default function DeviceSecurity() {
         </Card>
       ) : (
         <Card tone="sunk" style={{ gap: 4 }}>
-          <Body weight="medium">{t('okTitle')}</Body>
-          <Meta>{t('okBody')}</Meta>
+          <Body weight="medium"><MonoNums text={t('okTitle')} /></Body>
+          <Meta><MonoNums text={t('okBody')} /></Meta>
         </Card>
       )}
 
       {deviceAtRisk ? (
         rootedAck ? (
           <View style={{ gap: 4 }} accessibilityLiveRegion="polite">
-            <Meta tone="ink">{t('acked')}</Meta>
+            <Meta tone="ink"><MonoNums text={t('acked')} /></Meta>
             <Button variant="link" onPress={() => setRootedAck(false)}>
               {t('showAgain')}
             </Button>

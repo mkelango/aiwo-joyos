@@ -1,8 +1,9 @@
-import { useCallback, useSyncExternalStore } from 'react'
+import { useCallback, useMemo, useSyncExternalStore } from 'react'
 import type { LedgerEntry, MethodVersion, TermKey, TermScore } from '@/domain/types'
 import { LEDGER, LEDGER_WEEK, MEMBER } from '@/data/member'
 import { DAY90_DATES, LEDGER_WEEK_ENTRIES } from './_data'
 import { DEVICES } from '@/routes/member/account/_data'
+import { useNbaOverride } from '@/routes/console/care/_memberShare'
 
 // Lane-local persisted state for the member core (Today, Index, Ledger, VIVA).
 // Per-viewer conveniences in localStorage, every access wrapped in try/catch so the
@@ -244,7 +245,12 @@ export function amendedAnswers(answers: Record<string, number>, amendments: Amen
 // sign-off queue and, when the physician signs, writes status 'signed' with signedBy and
 // signedAt back to the same record. Nothing here sets signedBy or submittedAt early,
 // because the portal reads either as a stage.
-export type RemeasureStatus = 'invited' | 'in-progress' | 'awaiting' | 'signed'
+// A physician can instead return the draft to the lab: the portal writes status 'returned'
+// with returnedBy, returnReason and returnedAt and puts a home redraw on the concierge desk;
+// when the concierge marks the redraw received, the portal sets the record back to 'awaiting'
+// (redrawReceivedAt set, the return moved to priorReturns) and it is in the sign-off queue
+// again. The member side only reads those fields.
+export type RemeasureStatus = 'invited' | 'in-progress' | 'awaiting' | 'returned' | 'signed'
 export interface ClinicalRemeasure {
   status: RemeasureStatus
   memberId: string
@@ -281,6 +287,17 @@ export interface ClinicalRemeasure {
   amendments?: Amendment[]
   /** Signatures withdrawn by a correction after sign-off: the physician signs the amended record again. */
   priorSignatures?: { by: string; at: string; index?: number }[]
+  // Set by the clinical portal when the physician returns the draft to the lab (status 'returned'):
+  returnReason?: string
+  returnedAt?: string
+  /** The physician who returned it, when the portal names them (else the signing physician). */
+  returnedBy?: string
+  /** The portal's note for the lab and the concierge (kept for the care team, not shown here). */
+  returnNote?: string
+  /** Set by the portal when the concierge marks the home redraw received (back to 'awaiting'). */
+  redrawReceivedAt?: string
+  /** Earlier returns, kept by the portal when the record goes back to 'awaiting'. */
+  priorReturns?: { by?: string; reason?: string; note?: string; at?: string }[]
   // Set by the clinical portal on sign-off:
   signed?: boolean
   signedBy?: string
@@ -296,8 +313,9 @@ export const REMEASURE_TAKEN = addDays(DAY90_DATES.day0, 78)
 
 /**
  * A correction or a term measured later, appended to the Clinical-grade record: re-scored,
- * the first score kept, back to 'awaiting'. A signature already given is withdrawn into
- * priorSignatures, so the physician signs the amended record again.
+ * the first score kept, back to 'awaiting' (still 'returned' while a redraw is out). A
+ * signature already given is withdrawn into priorSignatures, so the physician signs the
+ * amended record again.
  */
 export function amendRemeasure(prev: ClinicalRemeasure, added: Amendment[], r: { value: number | null; engine: { gm: number; burden: number }; terms: TermScore[]; lowest: TermKey }, skipped?: TermKey[]): ClinicalRemeasure {
   const { signed: _s, signedBy, signedAt, signedIndex, ...rest } = prev
@@ -306,7 +324,8 @@ export function amendRemeasure(prev: ClinicalRemeasure, added: Amendment[], r: {
   const at = added[added.length - 1]?.at ?? new Date().toISOString()
   return {
     ...rest,
-    status: 'awaiting',
+    // A draft returned to the lab stays returned: a corrected answer does not replace the redraw.
+    status: prev.status === 'returned' ? 'returned' : 'awaiting',
     original: prev.original ?? { value: prev.value ?? null, terms: prev.terms ?? [], lowestTerm: prev.lowestTerm ?? r.lowest },
     value: r.value,
     gm: r.engine.gm,
@@ -360,9 +379,10 @@ export function useSignalsDown() {
 }
 
 // ─── The coach's override of the next-best action ───────────────────────────
-// Written by the coach console (joyos:coach:nba-override, { memberId, action, reason, by, at });
-// Today shows it for this member as today's action, marked as chosen by the coach.
-const OVERRIDE_KEY = 'joyos:coach:nba-override'
+// Written by the coach console through its own helpers (console/care/_memberShare.ts,
+// joyos:coach:nba-override, kept per member); Today reads only this member's override with
+// useNbaOverride(memberId) and shows it as today's action, marked as chosen by the coach.
+// Another member's override never reaches this screen.
 export interface CoachOverride {
   memberId: string
   action: string
@@ -371,38 +391,13 @@ export interface CoachOverride {
   at: string
   term?: TermKey
 }
-function readOverrideRaw(): string | null {
-  try {
-    return localStorage.getItem(OVERRIDE_KEY)
-  } catch {
-    return null
-  }
-}
-function subscribeAny(cb: () => void) {
-  window.addEventListener('storage', cb)
-  window.addEventListener(EVT, cb)
-  window.addEventListener('focus', cb)
-  return () => {
-    window.removeEventListener('storage', cb)
-    window.removeEventListener(EVT, cb)
-    window.removeEventListener('focus', cb)
-  }
-}
-let overrideCache: { raw: string | null; value: CoachOverride | null } = { raw: null, value: null }
-/** The coach's override for this member, or null (another member's override is not ours). */
+/** The coach's override for this member, or null. */
 export function useCoachOverride(): CoachOverride | null {
-  const raw = useSyncExternalStore(subscribeAny, readOverrideRaw, () => null)
-  if (overrideCache.raw === raw) return overrideCache.value
-  let value: CoachOverride | null = null
-  try {
-    const v = raw ? (JSON.parse(raw) as Partial<CoachOverride>) : null
-    if (v && v.memberId === MEMBER.id && typeof v.action === 'string' && v.action.trim())
-      value = { memberId: v.memberId, action: v.action, reason: typeof v.reason === 'string' ? v.reason : '', by: typeof v.by === 'string' ? v.by : '', at: typeof v.at === 'string' ? v.at : '', term: v.term }
-  } catch {
-    value = null
-  }
-  overrideCache = { raw, value }
-  return value
+  const o = useNbaOverride(MEMBER.id)
+  return useMemo(() => {
+    if (!o || typeof o.action !== 'string' || !o.action.trim()) return null
+    return { memberId: o.memberId, action: o.action, reason: typeof o.reason === 'string' ? o.reason : '', by: typeof o.by === 'string' ? o.by : '', at: typeof o.at === 'string' ? o.at : '', term: o.term }
+  }, [o])
 }
 
 // ─── Pleasure follow-ups (the Pleasure space's records, read-only here) ─────
@@ -420,6 +415,16 @@ export interface PlannedPleasureRow {
   what: string
   minutes: number
   with?: string
+}
+function subscribeAny(cb: () => void) {
+  window.addEventListener('storage', cb)
+  window.addEventListener(EVT, cb)
+  window.addEventListener('focus', cb)
+  return () => {
+    window.removeEventListener('storage', cb)
+    window.removeEventListener(EVT, cb)
+    window.removeEventListener('focus', cb)
+  }
 }
 function readSpacesRaw(key: string): string | null {
   try {

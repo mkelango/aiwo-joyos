@@ -1,14 +1,27 @@
 import { useState, type ReactNode } from 'react'
-import { Pressable, ScrollView, StyleSheet, TextInput, View, type StyleProp, type TextInputProps, type TextStyle, type ViewStyle } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text as RNText, TextInput, View, type StyleProp, type TextInputProps, type TextStyle, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, Defs, Line, Path, Rect } from 'react-native-svg'
-import { Body, Eyebrow, HatchPattern, Icon, InkSurface, Meta, Mono, TermDot, useSvgId, type IconName } from '@/components'
+import { Body, Eyebrow, HatchPattern, Icon, InkSurface, Meta, Mono, ScriptText, TermDot, useSvgId, type IconName } from '@/components'
 import type { TermKey } from '@/shared/types'
+import { splitNums } from '@/lib/monoNums'
 import { useTheme } from '@/theme/ThemeProvider'
 import { fonts, palettes } from '@/theme/tokens'
 import { useA } from './i18n'
 
 // Lane A helpers: sparkline, chips, text field, provenance, Ink ground screen.
+
+/**
+ * Numbers are Mono (Playbook p40), also inside a sentence: each run of digits (with its : . and ,)
+ * takes IBM Plex Mono at the surrounding size and colour; the words keep the surrounding face.
+ * Put the result inside Body, Meta or Title: "Non-HDL 146 mg/dL", "Lights out by 22:30".
+ */
+export function monoNums(text: string): ReactNode {
+  // The shared splitter (src/lib/monoNums): a digit that is part of a name (PHQ-4, LE8, D3) stays.
+  const runs = splitNums(text)
+  if (!runs.some((r) => r.n)) return text
+  return runs.map((r, i) => (r.n ? <RNText key={i} style={{ fontFamily: fonts.mono, fontVariant: ['tabular-nums'] }}>{r.t}</RNText> : r.t))
+}
 
 /** Line chart for a short series — one term colour, mono end labels, no gridlines. */
 export function Sparkline({
@@ -94,7 +107,7 @@ export function Chip({ label, selected, onPress, icon, accessibilityHint }: { la
     >
       {selected ? <Icon name="check" size={15} color={c.paper} /> : icon ? <Icon name={icon} size={15} color={c.ink2} /> : null}
       <Meta color={selected ? c.paper : c.ink} style={{ flexShrink: 1 }}>
-        {label}
+        {monoNums(label)}
       </Meta>
     </Pressable>
   )
@@ -192,7 +205,7 @@ export function BarRow({ label, labelText, value, max, color, suffix = '', note,
     <View style={{ gap: 6 }} accessible accessibilityLabel={`${spoken}, ${value}${suffix}${note ? `, ${note}` : ''}`}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
         <Meta tone="ink" style={{ flex: 1 }}>
-          {label}
+          {typeof label === 'string' ? monoNums(label) : label}
         </Meta>
         <Mono tone="ink">{`${value}${suffix}`}</Mono>
       </View>
@@ -210,7 +223,7 @@ export function BarRow({ label, labelText, value, max, color, suffix = '', note,
           <View style={{ width: `${pct}%`, height: '100%', borderRadius: 4, backgroundColor: color }} />
         )}
       </View>
-      {note ? <Meta tone="ink3" size={14}>{note}</Meta> : null}
+      {note ? <Meta tone="ink3" size={14}>{monoNums(note)}</Meta> : null}
     </View>
   )
 }
@@ -241,7 +254,7 @@ export function OptionRow({ label, selected, onPress, index }: { label: string; 
       <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: selected ? c.ink : c.lineStrong, alignItems: 'center', justifyContent: 'center' }}>
         {selected ? <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: c.ink }} /> : null}
       </View>
-      <Body style={{ flex: 1 }}>{label}</Body>
+      <Body style={{ flex: 1 }}>{monoNums(label)}</Body>
       {index !== undefined ? <Mono size={13} tone="ink3">{String(index)}</Mono> : null}
     </Pressable>
   )
@@ -280,10 +293,10 @@ export function IconButton({ icon, label, onPress, tone = 'plain', disabled }: {
 export function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, minHeight: 32 }} accessible accessibilityLabel={`${label}, ${value}${sub ? `, ${sub}` : ''}`}>
-      <Meta style={{ flex: 1 }}>{label}</Meta>
+      <Meta style={{ flex: 1 }}>{monoNums(label)}</Meta>
       <View style={{ alignItems: 'flex-end' }}>
         <Mono tone="ink">{value}</Mono>
-        {sub ? <Meta size={13} tone="ink3">{sub}</Meta> : null}
+        {sub ? <Meta size={13} tone="ink3">{monoNums(sub)}</Meta> : null}
       </View>
     </View>
   )
@@ -330,8 +343,8 @@ export function NotScored({ body, children }: { body: string; children?: ReactNo
         <Icon name="shield" size={16} color={c.ink2} />
         <Eyebrow tone="ink2" style={{ flexShrink: 1 }}>{t('Under 18 · not scored')}</Eyebrow>
       </View>
-      <Body size={22} weight="medium">{t('Not scored while under 18.')}</Body>
-      <Body tone="ink2">{body}</Body>
+      <Body size={22} weight="medium">{monoNums(t('Not scored while under 18.'))}</Body>
+      <Body tone="ink2">{monoNums(body)}</Body>
       {children}
     </View>
   )
@@ -341,7 +354,8 @@ export function NotScored({ body, children }: { body: string; children?: ReactNo
  * The verse of the Practice register (Playbook p63): the Thirukkural, kural 39 (Arattuppal · Aran
  * Valiyuruttal), public domain, the same kural as the web. Set in Tamil with the English beneath, in
  * every language. The Tamil stays upright (a slanted Tamil would be a fake oblique) in the script's
- * sans; the English beneath is the quotation register, Newsreader italic, whatever the language.
+ * sans, Mukta Malar, in any app language (both script sets load at start); the English beneath is
+ * the quotation register, Newsreader italic, whatever the language.
  */
 export const KURAL = {
   n: 39,
@@ -352,14 +366,16 @@ export const KURAL = {
 export function Verse() {
   const { c, space } = useTheme()
   const { t } = useA()
+  // Tamil is set one step larger with +10% leading (Playbook p40) in every app language:
+  // ScriptText gives the step and the leading once, whatever the language.
   return (
     <View style={{ gap: space.s1 + 4 }} accessibilityRole="summary">
       <Eyebrow>{t('Thirukkural · kural {n}', { n: KURAL.n })}</Eyebrow>
       <View style={{ gap: 2 }} accessibilityLanguage="ta">
         {KURAL.ta.map((l) => (
-          <Body key={l} size={21} weight="light">
+          <ScriptText key={l} script="ta" size={21} weight="light">
             {l}
-          </Body>
+          </ScriptText>
         ))}
       </View>
       <View style={{ gap: 0 }} accessibilityLanguage="en">

@@ -6,6 +6,7 @@ import { JoyOsLockup } from '@/components/joy/Brand'
 import { TermDot } from '@/components/joy/primitives'
 import type { Band, Grade, MethodVersion, TermKey } from '@/domain/types'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
+import { SpecimenScoreScope } from '@/lib/minor'
 import { ThemeToggle } from '@/layouts/shared'
 import { E, dateLocale } from './_i18n'
 
@@ -42,16 +43,37 @@ export function Section({ id, eyebrow, title, lead, children, className }: { id?
   return (
     <section id={id} aria-labelledby={id ? `${id}-h` : undefined} className={clsx('mt-16 scroll-mt-24 border-t border-line pt-12 first-of-type:mt-0 md:mt-20 md:pt-16', className)}>
       <div className="mb-8 max-w-3xl break-words">
-        <p className="eyebrow mb-3 text-ink-3">{eyebrow}</p>
-        <h2 id={id ? `${id}-h` : undefined} className="text-[1.65rem] font-light leading-tight text-ink md:text-[2rem]">{title}</h2>
-        {lead && <p className="mt-3 text-[17px] leading-relaxed text-ink-2">{lead}</p>}
+        <p className="eyebrow mb-3 text-ink-3">{nums(eyebrow)}</p>
+        <h2 id={id ? `${id}-h` : undefined} className="text-[1.65rem] font-light leading-tight text-ink md:text-[2rem]">{typeof title === 'string' ? nums(title) : title}</h2>
+        {lead && <p className="mt-3 text-[17px] leading-relaxed text-ink-2">{typeof lead === 'string' ? nums(lead) : lead}</p>}
       </div>
       {children}
     </section>
   )
 }
 
-/** Fill a translated template, placing each {var} as a node (a styled span, a link, an <em>). */
+// A number in running text: digits with their decimal, time or ratio separators, a sign, a
+// percent and a range ("0–100", "06:42", "48%", "−3"). Words around it stay in the sans.
+const NUM_RE = /[−+]?\d+(?:[.,:/]\d+)*%?(?:\s?[–-]\s?\d+(?:[.,:/]\d+)*%?)?/g
+
+/** Set every number inside a sentence in the Mono (Playbook: Mono for every number). */
+export function nums(text: string): ReactNode {
+  if (!/\d/.test(text)) return text
+  const out: ReactNode[] = []
+  let last = 0
+  let k = 0
+  for (const m of text.matchAll(NUM_RE)) {
+    const at = m.index ?? 0
+    if (at > last) out.push(text.slice(last, at))
+    out.push(<span key={k++} className="num">{m[0]}</span>)
+    last = at + m[0].length
+  }
+  if (last < text.length) out.push(text.slice(last))
+  return out
+}
+
+/** Fill a translated template, placing each {var} as a node (a styled span, a link, an <em>).
+ *  Numbers written into the template itself ("Day 90", "24 hours") are set in the Mono too. */
 export function rich(template: string, vars: Record<string, ReactNode>): ReactNode[] {
   const out: ReactNode[] = []
   const re = /\{(\w+)\}/g
@@ -59,12 +81,22 @@ export function rich(template: string, vars: Record<string, ReactNode>): ReactNo
   let k = 0
   let m: RegExpExecArray | null
   while ((m = re.exec(template))) {
-    if (m.index > last) out.push(template.slice(last, m.index))
+    if (m.index > last) out.push(<Fragment key={k++}>{nums(template.slice(last, m.index))}</Fragment>)
     out.push(<Fragment key={k++}>{m[1] in vars ? vars[m[1]] : m[0]}</Fragment>)
     last = re.lastIndex
   }
-  if (last < template.length) out.push(template.slice(last))
+  if (last < template.length) out.push(<Fragment key={k++}>{nums(template.slice(last))}</Fragment>)
   return out
+}
+
+/**
+ * Specimen figures inside the member app: the method's worked example and the published
+ * cohort results are not the member's own scores, so a minor still sees them (lib/minor:
+ * pages showing other people's scores stay untouched). This switches the member score scope
+ * back off for its subtree (lib/minor SpecimenScoreScope).
+ */
+export function SpecimenScores({ children }: { children: ReactNode }) {
+  return <SpecimenScoreScope>{children}</SpecimenScoreScope>
 }
 
 /** Band words for the current language: label (chips, lists) or the in-sentence form. */
@@ -104,7 +136,7 @@ export function LMethodLine({ method, grade, takenOn, className }: { method: Met
   const parts = [t('ml_method', { m: method })]
   if (grade) parts.push(t(grade === 'check' ? 'ml_check' : grade === 'index' ? 'ml_index' : 'ml_clinical'))
   if (takenOn) parts.push(t('ml_measured', { d: fmt(takenOn, { day: '2-digit', month: 'short', year: 'numeric' }) }))
-  return <p className={clsx('eyebrow text-ink-3', className)}>{parts.join(' · ')}</p>
+  return <p className={clsx('eyebrow text-ink-3', className)}>{nums(parts.join(' · '))}</p>
 }
 
 /** Translated twin of the shared SpecimenTag. */

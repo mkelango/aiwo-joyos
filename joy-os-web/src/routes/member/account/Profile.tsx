@@ -11,7 +11,7 @@ import { useApp, type Lang } from '@/lib/store'
 import { AbhaCard } from './_abha'
 import { DEFAULT_EMERGENCY, DEFAULT_NOMINEE, DEVICES, HOUSEHOLD_MINOR } from './_data'
 import { Checkbox, Field, LinkButton, Section, Select } from './_parts'
-import { inputCls, readPersisted, rich, usePersisted, useToast } from './_util'
+import { inputCls, nums, readPersisted, rich, usePersisted, useToast } from './_util'
 import { PROF, useData } from './_i18n'
 import { finishedOnboarding, setupContact } from './_onboarding'
 import { termByKey } from '@/data/terms'
@@ -145,7 +145,7 @@ export default function Profile() {
                     <Avatar person={p} size={40} />
                     <span className="min-w-0 flex-1">
                       <span className="block text-[16px] text-ink">{p.name}</span>
-                      <span className="text-[14px] text-ink-2">{dx(p.role)}</span>
+                      <span className="text-[14px] text-ink-2">{nums(dx(p.role))}</span>
                     </span>
                     <span className="text-[13px] text-ink-3">{p.id === 'h_kavya' ? t('ownIndex') : p.id === 'h_lakshmi' ? (elderHelper ? t('herHelper') : t('suNoHelper')) : t('notScored')}</span>
                   </li>

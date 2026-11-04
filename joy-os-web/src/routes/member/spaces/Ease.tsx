@@ -8,7 +8,7 @@ import { Button, Pill, Sheet, Tabs } from '@/components/ui'
 import { TEAM } from '@/data/member'
 import { BURDEN_PARTS, JOURNAL_START, KEEP_MEANING_START, SCREEN_FORMS, SCREEN_HISTORY, SCREEN_META, SPACE_TODAY, WIND_DOWN, type Screen } from './_data'
 import { SpaceShell, ToolCard, useCrisisGuard } from './_SpaceShell'
-import { useSpaceText, type SpKey } from './_i18n'
+import { mono, useSpaceText, type SpKey } from './_i18n'
 import { useSpaceState } from './_state'
 import { INSTRUMENT_NOTE } from '@/lib/i18n'
 import { useIsMinor } from '@/lib/minor'
@@ -63,14 +63,14 @@ function TalkNowSheet({ open, onClose }: { open: boolean; onClose: () => void })
         <a href="tel:14416" className="flex items-center justify-between rounded-card bg-ink px-5 py-4 text-paper focus-ring">
           <span>
             <span className="block text-[17px] font-medium">Tele-MANAS · <span className="num">14416</span></span>
-            <span className="block text-[14px] opacity-90">{t('ease.tn.free')}</span>
+            <span className="block text-[14px] opacity-90">{mono(t('ease.tn.free'))}</span>
           </span>
           <Phone size={20} aria-hidden />
         </a>
         <Link to="/app/care/messages" onClick={onClose} className="flex items-center justify-between rounded-card border border-line px-5 py-4 text-ink focus-ring">
           <span>
-            <span className="block text-[16px]">{t('c.messageX', { name: sanjay.name })}</span>
-            <span className="block text-[14px] text-ink-2">{t('ease.tn.replies', { role: d(sanjay.role) })}</span>
+            <span className="block text-[16px]">{mono(t('c.messageX', { name: sanjay.name }))}</span>
+            <span className="block text-[14px] text-ink-2">{mono(t('ease.tn.replies', { role: d(sanjay.role) }))}</span>
           </span>
           <MessageCircle size={18} aria-hidden />
         </Link>
@@ -93,19 +93,19 @@ function LowerIsBetter() {
   // Under 18 nothing is scored: the loads and their weights stay, their values do not.
   const minor = useIsMinor()
   return (
-    <ToolCard eyebrow={t('ease.lb.eyebrow')} title={<>{r('ease.lb.title', { e: <em>{t('ease.lb.titleE')}</em> })}</>} sub={t('ease.lb.sub', { bname: tt.name('B') })}>
+    <ToolCard eyebrow={t('ease.lb.eyebrow')} title={<>{r('ease.lb.title', { e: <em>{t('ease.lb.titleE')}</em> })}</>} sub={mono(t('ease.lb.sub', { bname: tt.name('B') }))}>
       <ul className="grid gap-4 sm:grid-cols-5">
         {BURDEN_PARTS.map((p) => (
           <li key={p.key}>
             <div className="flex flex-wrap items-baseline justify-between gap-x-2">
-              <span className="min-w-0 break-words text-[14px] text-ink">{d(p.key)}</span>
+              <span className="min-w-0 break-words text-[14px] text-ink">{mono(d(p.key))}</span>
               <span className="num text-[13px] text-ink-3">×{p.weight.toFixed(2)}</span>
             </div>
             <div className="mt-2 flex h-20 flex-col justify-end overflow-hidden rounded-xl bg-paper-sunk" aria-hidden>
               {!minor && <div className="hatch-b w-full rounded-xl" style={{ height: `${p.value}%` }} />}
             </div>
             {minor ? (
-              <span className="mt-1.5 block text-[13px] text-ink-3">{t('mn.room')}</span>
+              <span className="mt-1.5 block text-[13px] text-ink-3">{mono(t('mn.room'))}</span>
             ) : (
               <span className="num mt-1.5 block text-[1.3rem] font-light text-ink" aria-label={t('ease.lb.aria', { k: d(p.key), v: p.value })}>−{p.value}</span>
             )}
@@ -184,7 +184,7 @@ function SecondArrow() {
             {reflect === shown.id && (
               <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-3 rounded-xl border border-line p-4">
                 <p className="text-[15px] leading-relaxed text-ink">
-                  {t('ease.sa.reflection', { p: shown.problem.replace(/\.$/, ''), a: shown.arrow.replace(/\.$/, '') })}
+                  {mono(t('ease.sa.reflection', { p: shown.problem.replace(/\.$/, ''), a: shown.arrow.replace(/\.$/, '') }))}
                 </p>
                 <p className="eyebrow mt-3 break-words text-ink-3">{t('ease.sa.drafted')}</p>
               </motion.div>
@@ -205,7 +205,7 @@ function SecondArrow() {
               </ul>
               {entries.length > LIMIT && (
                 <button type="button" onClick={() => setShowAll((v) => !v)} className="mt-2 rounded text-[13px] text-ink underline-offset-4 hover:underline focus-ring">
-                  {showAll ? t('ease.sa.showFewer') : t('ease.sa.showAll', { n: entries.length })}
+                  {showAll ? t('ease.sa.showFewer') : mono(t('ease.sa.showAll', { n: entries.length }))}
                 </button>
               )}
             </div>
@@ -276,7 +276,7 @@ function Screens({ history, setHistory }: { history: History; setHistory: Dispat
   const [answers, setAnswers] = useState<(number | null)[]>([])
   const [pain, setPain] = useState<number | null>(null)
   const [err, setErr] = useState<{ k: SpKey; v?: Record<string, number> } | null>(null)
-  const { t, d, r, lang, dm } = useSpaceText()
+  const { t, d, r, lang, dm, dn } = useSpaceText()
   const label = (x: Screen) => (x === 'Pain' ? t('ease.pain') : x)
   const [justTook, setJustTook] = useState<Screen | null>(null)
   const meta = SCREEN_META[screen]
@@ -309,7 +309,7 @@ function Screens({ history, setHistory }: { history: History; setHistory: Dispat
       eyebrow={t('ease.sc.eyebrow')}
       title={t('ease.sc.title')}
       sub={t('ease.sc.sub')}
-      aside={<Pill tone="neutral"><ShieldCheck size={12} aria-hidden /> {t('ease.sc.pill')}</Pill>}
+      aside={<Pill tone="neutral"><ShieldCheck size={12} aria-hidden /> {mono(t('ease.sc.pill'))}</Pill>}
     >
       <Tabs value={screen} onChange={(v) => { setScreen(v); setTaking(false); setErr(null); setJustTook(null) }} className="max-w-full self-start overflow-x-auto" items={(Object.keys(SCREEN_META) as Screen[]).map((s) => ({ value: s, label: label(s) }))} />
       <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -327,7 +327,7 @@ function Screens({ history, setHistory }: { history: History; setHistory: Dispat
             {h.map((x, i) => <span key={x.date + i} className="eyebrow flex-1 text-center text-ink-3">{dm(x.date)}</span>)}
           </div>
           <ul className="mt-5 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-ink-3" aria-label={t('ease.sc.bands')}>
-            {meta.bands.map((b, i) => <li key={b.label}><span className="num">{i === 0 ? 0 : meta.bands[i - 1].upTo + 1}–{b.upTo}</span> {d(b.label)}</li>)}
+            {meta.bands.map((b, i) => <li key={b.label}><span className="num">{i === 0 ? 0 : meta.bands[i - 1].upTo + 1}–{b.upTo}</span> {mono(d(b.label))}</li>)}
           </ul>
         </div>
 
@@ -336,20 +336,20 @@ function Screens({ history, setHistory }: { history: History; setHistory: Dispat
             {!taking ? (
               <motion.div key="result" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex h-full flex-col">
                 {justTook === screen && <p role="status" className="mb-4 flex items-center gap-2 text-[14px] text-ink-2"><Check size={14} className="shrink-0" aria-hidden /> {t(replaced ? 'ease.sc.replaced' : 'ease.sc.saved')}</p>}
-                <Eyebrow>{t('c.latest', { d: fmtDate(latest.date) })}</Eyebrow>
+                <Eyebrow>{mono(t('c.latest', { d: fmtDate(latest.date) }))}</Eyebrow>
                 <div className="mt-2 flex items-end gap-3">
                   <span className="num text-[3.5rem] font-light leading-none text-ink">{latest.score}</span>
-                  <span className="mb-1 min-w-0 text-[15px] text-ink-3">{t('ease.sc.ofMax', { max: meta.max, label: d(band.label) })}</span>
+                  <span className="mb-1 min-w-0 text-[15px] text-ink-3">{mono(t('ease.sc.ofMax', { max: meta.max, label: d(band.label) }))}</span>
                 </div>
-                <p className="mt-4 rounded-xl bg-paper-sunk p-4 text-[17px] text-ink">{d(band.copy)}</p>
-                <p className="eyebrow mt-2 text-ink-3">{t('ease.sc.copy', { screen: label(screen) })}</p>
+                <p className="mt-4 rounded-xl bg-paper-sunk p-4 text-[17px] text-ink">{mono(d(band.copy))}</p>
+                <p className="eyebrow mt-2 text-ink-3">{mono(t('ease.sc.copy', { screen: label(screen) }))}</p>
                 {band.route && (
                   <p className="mt-3 flex items-start gap-2 rounded-xl border border-line-strong p-3.5 text-[15px] text-ink"><Stethoscope size={16} className="mt-0.5 shrink-0" aria-hidden /> {t(routeFor(screen, latest.score).copy)}</p>
                 )}
                 <div className="mt-auto flex flex-wrap items-center gap-3 pt-5">
                   {takenToday
-                    ? <><Link to="/app/care/messages" className="inline-flex items-center gap-1.5 rounded text-[15px] text-ink underline-offset-4 hover:underline focus-ring">{t('ease.sc.message')} <ArrowRight size={15} /></Link><Button size="sm" variant="ghost" onClick={start}>{t('ease.sc.retake')}</Button><span className="w-full text-[14px] text-ink-3">{t('ease.sc.next', { screen: label(screen), cad: d(meta.cadence.toLowerCase()) })}</span></>
-                    : <><Button variant="ink" onClick={start} className="!whitespace-normal">{r('ease.sc.take', { screen: label(screen), n: <span className="num">{form.minutes}</span> })}</Button><span className="text-[14px] text-ink-3">{t('ease.sc.cad', { cad: d(meta.cadence) })}</span></>}
+                    ? <><Link to="/app/care/messages" className="inline-flex items-center gap-1.5 rounded text-[15px] text-ink underline-offset-4 hover:underline focus-ring">{t('ease.sc.message')} <ArrowRight size={15} /></Link><Button size="sm" variant="ghost" onClick={start}>{t('ease.sc.retake')}</Button><span className="w-full text-[14px] text-ink-3">{mono(t('ease.sc.next', { screen: label(screen), cad: d(meta.cadence.toLowerCase()) }))}</span></>
+                    : <><Button variant="ink" onClick={start} className="!whitespace-normal">{r('ease.sc.take', { screen: label(screen), n: <span className="num">{form.minutes}</span> })}</Button><span className="text-[14px] text-ink-3">{mono(t('ease.sc.cad', { cad: d(meta.cadence) }))}</span></>}
                 </div>
               </motion.div>
             ) : (
@@ -395,7 +395,7 @@ function Screens({ history, setHistory }: { history: History; setHistory: Dispat
                   <Button type="submit" variant="ink">{t('ease.sc.see')}</Button>
                   <Button variant="ghost" onClick={cancel}>{t('c.cancel')}</Button>
                 </div>
-                <p className="mt-3 text-[12px] text-ink-3">{form.source}</p>
+                <p className="mt-3 text-[12px] text-ink-3">{dn(form.source)}</p>
               </motion.form>
             )}
           </AnimatePresence>
@@ -460,7 +460,7 @@ function SleepPlan({ isi }: { isi: number }) {
       <p className="mt-3 text-[15px] text-ink-2" aria-live="polite">
         {valid
           ? r('ease.sp.bed', { bed: <span className="num text-ink">{bed}</span>, w: <span className="num text-ink">{sleepWindow}</span> })
-          : <span id="sp-err" role="alert" className="text-error">{t('ease.sp.errTime')}</span>}
+          : <span id="sp-err" role="alert" className="text-error">{mono(t('ease.sp.errTime'))}</span>}
       </p>
       <ol className="relative mt-5 space-y-1 border-l border-line pl-5">
         {WIND_DOWN.map((w, i) => (
@@ -469,8 +469,8 @@ function SleepPlan({ isi }: { isi: number }) {
             <label className="flex cursor-pointer items-start gap-3 rounded-xl px-2 py-2 hover:bg-paper-sunk">
               <span className="num w-12 shrink-0 pt-0.5 text-[14px] text-ink-3">{addMins(windDown, w.offset)}</span>
               <span className="flex-1">
-                <span className={clsx('block text-[15px]', done.includes(i) ? 'text-ink-3 line-through' : 'text-ink')}>{d(w.title)}</span>
-                <span className="block text-[13px] text-ink-3">{d(w.detail)}</span>
+                <span className={clsx('block text-[15px]', done.includes(i) ? 'text-ink-3 line-through' : 'text-ink')}>{mono(d(w.title))}</span>
+                <span className="block text-[13px] text-ink-3">{mono(d(w.detail))}</span>
               </span>
               <input type="checkbox" checked={done.includes(i)} onChange={() => setDone((d) => (d.includes(i) ? d.filter((x) => x !== i) : [...d, i]))} className="mt-1 h-4 w-4 accent-[color:var(--ink)]" aria-label={t('ease.sp.done', { title: d(w.title) })} />
             </label>
@@ -549,7 +549,7 @@ function ClinicianRouting({ tasks, onTalk }: { tasks: RoutingTask[]; onTalk: () 
         {[sanjay, meera].map((p) => (
           <li key={p.id} className="flex items-center gap-3 rounded-2xl bg-paper-raised p-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line bg-paper-sunk font-mono text-[12px] text-ink" aria-hidden>{p.initials}</span>
-            <span className="min-w-0 flex-1"><span className="block text-[15px] text-ink">{p.name}</span><span className="block text-[13px] text-ink-3">{d(p.role)}</span></span>
+            <span className="min-w-0 flex-1"><span className="block text-[15px] text-ink">{p.name}</span><span className="block text-[13px] text-ink-3">{mono(d(p.role))}</span></span>
             <Link to="/app/care/messages" aria-label={t('c.messageX', { name: p.name })} className="rounded-full p-2 text-ink-2 hover:bg-paper-sunk focus-ring"><MessageCircle size={16} /></Link>
           </li>
         ))}
@@ -557,9 +557,9 @@ function ClinicianRouting({ tasks, onTalk }: { tasks: RoutingTask[]; onTalk: () 
       <dl className="mt-5 space-y-2.5 text-[14px]">
         {rules.map((rule) => (
           <div key={rule.when} className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-start gap-2">
-            <dt className="min-w-0 text-ink">{rule.when}</dt>
+            <dt className="min-w-0 text-ink">{mono(rule.when)}</dt>
             <ArrowRight size={14} className="mt-1 text-ink-3" aria-hidden />
-            <dd className="min-w-0 text-ink-2">{rule.then}</dd>
+            <dd className="min-w-0 text-ink-2">{mono(rule.then)}</dd>
           </div>
         ))}
       </dl>
@@ -571,8 +571,8 @@ function ClinicianRouting({ tasks, onTalk }: { tasks: RoutingTask[]; onTalk: () 
             const st = states[task.id]?.status
             return (
               <li key={task.id} className="rounded-xl border border-line-strong bg-paper-raised p-3 text-[14px]">
-                <span className="flex items-center justify-between gap-2 text-ink"><span>{label(task.screen)} <span className="num">{task.score}</span> · {d(rt.who)}</span><span className="num shrink-0 text-[12px] text-ink-3">{dm(task.on)}</span></span>
-                <span className="mt-0.5 block text-[13px] text-ink-2">{t('ease.cr.task', { within: d(rt.within) })}</span>
+                <span className="flex items-center justify-between gap-2 text-ink"><span>{label(task.screen)} <span className="num">{task.score}</span> · {mono(d(rt.who))}</span><span className="num shrink-0 text-[12px] text-ink-3">{dm(task.on)}</span></span>
+                <span className="mt-0.5 block text-[13px] text-ink-2">{mono(t('ease.cr.task', { within: d(rt.within) }))}</span>
                 <span className="mt-1 block text-[13px] text-ink-3" role="status">{st === 'callRequested' ? t('ease.cr.soonerDone', { who: d(rt.who) }) : t('ease.cr.waiting')}</span>
                 <span className="mt-2.5 flex flex-wrap gap-2">
                   {st !== 'callRequested' && <Button size="sm" variant="ghost" onClick={() => setTask(task.id, { status: 'callRequested' })}><Phone size={13} /> {t('ease.cr.sooner')}</Button>}
@@ -588,9 +588,9 @@ function ClinicianRouting({ tasks, onTalk }: { tasks: RoutingTask[]; onTalk: () 
             const rt = routeFor(task.screen, task.score)
             return (
               <li key={task.id} className="rounded-xl bg-paper-raised p-3 text-[14px]">
-                <span className="flex items-center justify-between gap-2 text-ink"><span><span className="num">{task.screen === 'Pain' ? label(task.screen) : task.screen} {task.score}</span> · {d(rt.who)}</span><span className="num shrink-0 text-[12px] text-ink-3">{fmtDate(task.on)}</span></span>
+                <span className="flex items-center justify-between gap-2 text-ink"><span><span className="num">{task.screen === 'Pain' ? label(task.screen) : task.screen} {task.score}</span> · {mono(d(rt.who))}</span><span className="num shrink-0 text-[12px] text-ink-3">{fmtDate(task.on)}</span></span>
                 <span className="mt-0.5 flex flex-wrap items-center justify-between gap-2 text-[13px] text-ink-2">
-                  {t('ease.cr.closedBy', { who: d(rt.who) })}
+                  {mono(t('ease.cr.closedBy', { who: d(rt.who) }))}
                   <button type="button" onClick={() => setTask(task.id, null)} className="rounded text-ink underline-offset-4 hover:underline focus-ring">{t('ease.cr.reopen')}</button>
                 </span>
               </li>
@@ -599,7 +599,7 @@ function ClinicianRouting({ tasks, onTalk }: { tasks: RoutingTask[]; onTalk: () 
           {ROUTED_BEFORE.map((rb) => (
             <li key={rb.on + rb.what} className="rounded-xl bg-paper-raised p-3 text-[14px]">
               <span className="flex items-center justify-between gap-2 text-ink"><span><span className="num">{rb.what}</span> · {rb.who}</span><span className="num shrink-0 text-[12px] text-ink-3">{fmtDate(rb.on)}</span></span>
-              <span className="mt-0.5 block text-[13px] text-ink-2">{d(rb.outcome)}</span>
+              <span className="mt-0.5 block text-[13px] text-ink-2">{mono(d(rb.outcome))}</span>
             </li>
           ))}
         </ul>

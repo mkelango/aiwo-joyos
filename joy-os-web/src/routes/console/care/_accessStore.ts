@@ -15,6 +15,15 @@ export const ASSIGNED_MEMBERS = 'My assigned members only'
 export const AGGREGATES_ONLY = 'Aggregates only (k ≥ 10)'
 export const SCOPES = [STRUCTURE_ONLY, NAMED_MEMBER, ASSIGNED_MEMBERS, AGGREGATES_ONLY]
 /**
+ * The control plane's just-in-time scopes. A read grant opens /console/ops to look and never
+ * acts; a write grant acts there (flags, kill switches, drills, rota, reviews, rights jobs),
+ * every action carrying the grant's reference. Neither acts on any other console.
+ */
+export const OPS_JIT_READ = 'ops-jit-read'
+export const OPS_JIT_WRITE = 'ops-jit-write'
+export const OPS_JIT_SCOPES = [OPS_JIT_READ, OPS_JIT_WRITE]
+const OPS_SCOPE_LABEL: Record<string, string> = { [OPS_JIT_READ]: 'Production read · look only', [OPS_JIT_WRITE]: 'Production write · acts on the control plane' }
+/**
  * Consoles whose every action lands on one member's record. There an aggregates-only grant
  * looks but never acts; on the platform consoles (tenant, science, ops, exec) it may act,
  * since the work there is on aggregates.
@@ -43,6 +52,22 @@ const DURATION_MS: Record<string, number> = { '1 hour': 3600_000, '4 hours': 4 *
 export const DECLINE_REASONS = ['Purpose not covered by your relationship to these members', 'A narrower scope would do; ask again for one named member', 'Covered by the assigned team tonight']
 
 export type AccessStatus = 'pending' | 'granted' | 'declined' | 'withdrawn' | 'revoked'
+/**
+ * One line of the access audit: every request and every decision on it, with who took it, in
+ * what role, and when (console clock). Append-only: a reset of the specimen keeps it.
+ */
+export type AccessAudit = {
+  id: string
+  ms: number
+  ref: string
+  /** The console the request is for. */
+  to: string
+  label: string
+  event: 'requested' | 'approved' | 'declined' | 'withdrawn' | 'revoked'
+  who: string
+  role: string
+  what: string
+}
 export type AccessRequest = {
   ref: string
   to: string
@@ -69,16 +94,16 @@ export type AccessRequest = {
   expiresAt?: number
 }
 
-type State = { requests: AccessRequest[]; seq: number }
+type State = { requests: AccessRequest[]; seq: number; audit: AccessAudit[] }
 const KEY = 'joyos:care:access:v1'
 
 function load(): State {
-  const fresh: State = { requests: [], seq: 4127 }
+  const fresh: State = { requests: [], seq: 4127, audit: [] }
   try {
     const raw = sessionStorage.getItem(KEY)
     if (!raw) return fresh
     const p = JSON.parse(raw) as Partial<State>
-    return { requests: Array.isArray(p.requests) ? p.requests : [], seq: typeof p.seq === 'number' ? p.seq : fresh.seq }
+    return { requests: Array.isArray(p.requests) ? p.requests : [], seq: typeof p.seq === 'number' ? p.seq : fresh.seq, audit: Array.isArray(p.audit) ? p.audit : [] }
   } catch {
     return fresh
   }
@@ -106,6 +131,11 @@ export function useAccessRequests() {
   return useSyncExternalStore(subscribe, () => state.requests, () => state.requests)
 }
 
+/** The access audit, newest first: every request, approval, decline, withdrawal and revocation. */
+export function useAccessAudit() {
+  return useSyncExternalStore(subscribe, () => state.audit, () => state.audit)
+}
+
 /** Whether a grant is still running on the console clock. */
 export const isLive = (r: AccessRequest, now: number) => r.status === 'granted' && (r.expiresAt ?? 0) > now
 /**
@@ -117,6 +147,9 @@ export const isLive = (r: AccessRequest, now: number) => r.status === 'granted' 
  */
 export function grantActs(r: AccessRequest, memberId?: string | null) {
   if (r.scope === STRUCTURE_ONLY) return false
+  // The control plane's JIT: write acts on /console/ops (never on a member), read only looks.
+  if (r.scope === OPS_JIT_WRITE) return !memberId && r.to === '/console/ops'
+  if (r.scope === OPS_JIT_READ) return false
   if (r.scope === AGGREGATES_ONLY) return !memberId && !MEMBER_CONSOLES.includes(r.to)
   if (r.scope === NAMED_MEMBER) return !!memberId && !!r.memberId && memberId === r.memberId
   if (r.scope === ASSIGNED_MEMBERS) return !!memberId && assignedIds(r).includes(memberId)
@@ -129,11 +162,11 @@ export const assignedIds = (r: Pick<AccessRequest, 'role' | 'memberIds'>) => r.m
 
 /** The scope as written on a request or grant: "One named member · Arjun Rao (m_0001)". */
 export const scopeLabel = (r: Pick<AccessRequest, 'scope' | 'memberId' | 'memberName' | 'memberIds' | 'assignedLabel'>) =>
-  r.scope === NAMED_MEMBER && r.memberId
+  OPS_SCOPE_LABEL[r.scope] ?? (r.scope === NAMED_MEMBER && r.memberId
     ? `${r.scope} · ${r.memberName ?? r.memberId} (${r.memberId})`
     : r.scope === ASSIGNED_MEMBERS && r.memberIds
       ? `${r.scope} · ${r.memberIds.length} ${r.memberIds.length === 1 ? 'member' : 'members'}${r.assignedLabel ? ` · ${r.assignedLabel}` : ''}`
-      : r.scope
+      : r.scope)
 
 /** The request that currently stands for this console and role: pending, or a grant still running. */
 export function standingRequest(list: AccessRequest[], to: string, role: Role, now: number) {
@@ -155,6 +188,14 @@ export function statusLabel(r: AccessRequest, now: number) {
 
 export const clockOf = (ms: number) => fmtClock(ms)
 
+/** Who decides a request: the DPO, or for the control plane the second engineer on call. */
+const deciderOf = (to: string) => (to === '/console/ops' ? { who: 'Second engineer on call', role: 'Control plane · approver' } : { who: 'DPO · Data Protection Office', role: 'DPO' })
+
+/** One access-audit line for a request, on the console clock. */
+function auditLine(r: AccessRequest, event: AccessAudit['event'], by: { who: string; role: string }, what: string, ms: number, n: number): AccessAudit {
+  return { id: `acc-au-${n}-${ms.toString(36)}`, ms, ref: r.ref, to: r.to, label: r.label, event, who: by.who, role: by.role, what }
+}
+
 export const access = {
   /** Send a request. Refused (returns null) while one already stands for the same console and role. */
   request(r: Omit<AccessRequest, 'ref' | 'sentAt' | 'status'>): AccessRequest | null {
@@ -164,34 +205,51 @@ export const access = {
     // An assigned-members request is fixed to the members assigned to the requester when sent.
     const assigned = r.scope === ASSIGNED_MEMBERS && !r.memberIds ? assignedTo(r.role) : null
     const req: AccessRequest = { ...r, ...(assigned ? { memberIds: assigned.ids, assignedLabel: assigned.label } : {}), ref, sentAt: now, status: 'pending' }
-    emit({ requests: [req, ...state.requests], seq: state.seq + 1 })
+    const line = auditLine(req, 'requested', { who: req.person, role: req.roleLabel }, `Requested ${req.label} · ${scopeLabel(req)} · ${req.duration} · ${req.purpose}`, now, state.audit.length + 1)
+    emit({ requests: [req, ...state.requests], seq: state.seq + 1, audit: [line, ...state.audit] })
     return req
   },
-  /** The DPO (or, for the control plane, the second engineer) decides. Specimen: the reviewer plays them. */
+  /**
+   * The DPO (or, for the control plane, the second engineer) decides. Specimen: the reviewer
+   * plays them, and the audit line names the decider, never the requester.
+   */
   decide(ref: string, decision: 'granted' | 'declined', reason?: string) {
     const now = consoleNowMs()
-    emit({
-      ...state,
-      requests: state.requests.map((r) => {
-        if (r.ref !== ref || r.status !== 'pending') return r
-        const decidedBy = r.to === '/console/ops' ? 'Second engineer on call' : 'DPO · Data Protection Office'
-        return decision === 'granted'
-          ? { ...r, status: 'granted', decidedAt: now, decidedBy, expiresAt: now + (DURATION_MS[r.duration] ?? 3600_000) }
-          : { ...r, status: 'declined', decidedAt: now, decidedBy, reason: reason ?? DECLINE_REASONS[0] }
-      }),
-    })
+    const cur = state.requests.find((r) => r.ref === ref && r.status === 'pending')
+    if (!cur) return
+    const by = deciderOf(cur.to)
+    const next: AccessRequest = decision === 'granted'
+      ? { ...cur, status: 'granted', decidedAt: now, decidedBy: by.who, expiresAt: now + (DURATION_MS[cur.duration] ?? 3600_000) }
+      : { ...cur, status: 'declined', decidedAt: now, decidedBy: by.who, reason: reason ?? DECLINE_REASONS[0] }
+    const what = decision === 'granted' ? `Approved ${ref} for ${cur.person} · ${scopeLabel(cur)} · ${cur.duration}` : `Declined ${ref} for ${cur.person} · ${next.reason}`
+    emit({ ...state, requests: state.requests.map((r) => (r.ref === ref ? next : r)), audit: [auditLine(cur, decision === 'granted' ? 'approved' : 'declined', by, what, now, state.audit.length + 1), ...state.audit] })
   },
+  /** The requester withdraws a request still waiting. */
   withdraw(ref: string) {
     const now = consoleNowMs()
-    emit({ ...state, requests: state.requests.map((r) => (r.ref === ref && r.status === 'pending' ? { ...r, status: 'withdrawn', decidedAt: now } : r)) })
+    const cur = state.requests.find((r) => r.ref === ref && r.status === 'pending')
+    if (!cur) return
+    emit({
+      ...state,
+      requests: state.requests.map((r) => (r.ref === ref ? { ...r, status: 'withdrawn', decidedAt: now } : r)),
+      audit: [auditLine(cur, 'withdrawn', { who: cur.person, role: cur.roleLabel }, `Withdrew ${ref} before a decision`, now, state.audit.length + 1), ...state.audit],
+    })
   },
-  /** End a grant early. */
-  revoke(ref: string) {
+  /** End a grant early. The holder ends it unless someone else is named (the DPO, the second engineer). */
+  revoke(ref: string, by?: { who: string; role: string }) {
     const now = consoleNowMs()
-    emit({ ...state, requests: state.requests.map((r) => (r.ref === ref && r.status === 'granted' ? { ...r, status: 'revoked', decidedAt: now, expiresAt: now } : r)) })
+    const cur = state.requests.find((r) => r.ref === ref && r.status === 'granted')
+    if (!cur) return
+    const actor = by ?? { who: cur.person, role: cur.roleLabel }
+    emit({
+      ...state,
+      requests: state.requests.map((r) => (r.ref === ref ? { ...r, status: 'revoked', decidedAt: now, expiresAt: now } : r)),
+      audit: [auditLine(cur, 'revoked', actor, `Ended grant ${ref} before expiry`, now, state.audit.length + 1), ...state.audit],
+    })
   },
+  /** Back to no requests. The audit is append-only, so it stays, and references are never reused. */
   reset() {
-    emit({ requests: [], seq: 4127 })
+    emit({ requests: [], seq: state.seq, audit: state.audit })
   },
 }
 

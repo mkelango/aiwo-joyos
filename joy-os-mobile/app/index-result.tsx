@@ -40,6 +40,7 @@ import { joyspanIndex } from '@/shared/indexEngine'
 import { measuredScore, type MeasuredIndex } from '@/shared/indexScoring'
 import { useSignOffTimer, useSubmittedIndex } from '@/lib/indexRecord'
 import { useIsMinor } from '@/lib/minor'
+import { MonoNums } from '@/lib/monoNums'
 import { useSignalsDown } from '@/screens/b/bStore'
 import { INK } from '@/screens/a/parts'
 import { INSTR_TEXT } from '@/screens/b/i18n/method'
@@ -85,10 +86,10 @@ function IndexResultGate() {
         eyebrow={t('minorEyebrow')}
         title={
           <>
-            {t('minorA')}<Serif>{t('minorSerif')}</Serif>{t('minorB')}
+            <MonoNums text={t('minorA')} /><Serif>{t('minorSerif')}</Serif><MonoNums text={t('minorB')} />
           </>
         }
-        lead={t('minorLead')}
+        lead={<Body tone="ink2"><MonoNums text={t('minorLead')} /></Body>}
       />
       <View style={{ gap: space.s1 }}>
         <DaybreakButton onPress={() => router.replace('/')}>{tc('backToday')}</DaybreakButton>
@@ -153,20 +154,20 @@ function IndexResult() {
             {t('titleA')}<Serif>{t('titleSerif')}</Serif>{t('titleB')}
           </>
         }
-        lead={t('lead')}
+        lead={<Body tone="ink2"><MonoNums text={t('lead')} /></Body>}
       />
 
       {measured ? (
         <Card tone="soft" style={{ gap: space.s1 }}>
           <Eyebrow tone="daybreak">{t('phoneMeasured', { date: fmtDate(measured.at) })}</Eyebrow>
-          <Meta>{t('phoneBody')}</Meta>
-          {submitted && submitted.amendments.length ? <Meta tone="ink">{t('corrected', { n: submitted.amendments.length })}</Meta> : null}
+          <Meta><MonoNums text={t('phoneBody')} /></Meta>
+          {submitted && submitted.amendments.length ? <Meta tone="ink"><MonoNums text={t('corrected', { n: submitted.amendments.length })} /></Meta> : null}
           <ArrowLink icon="edit-3" onPress={() => router.push('/index-take?amend=1')}>
             {t('correct')}
           </ArrowLink>
           {confirmClear ? (
             <View style={{ gap: 4 }} accessibilityLiveRegion="polite">
-              <Meta tone="ink">{t('clearQ')}</Meta>
+              <Meta tone="ink"><MonoNums text={t('clearQ')} /></Meta>
               <View style={{ flexDirection: 'row', gap: space.s1, flexWrap: 'wrap' }}>
                 <Button
                   variant="ghost"
@@ -196,7 +197,7 @@ function IndexResult() {
       {rm.stage === 'awaiting' ? (
         <Card tone="sunk" style={{ gap: space.s1 }}>
           <Eyebrow tone="daybreak">{t('awaitEyebrow')}</Eyebrow>
-          <Meta tone="ink">{t('awaitBody')}</Meta>
+          <Meta tone="ink"><MonoNums text={t('awaitBody')} /></Meta>
           <ArrowLink icon="clock" onPress={() => router.push('/day-90')}>
             {t('awaitLink')}
           </ArrowLink>
@@ -219,17 +220,17 @@ function IndexResult() {
             {so ? <Pill>{t('surveyOnly')}</Pill> : null}
           </View>
         </View>
-        {so ? <Meta size={14}>{t('surveyOnlyBody')}</Meta> : null}
+        {so ? <Meta size={14}><MonoNums text={t('surveyOnlyBody')} /></Meta> : null}
         {signalsDown ? (
           <View style={{ gap: 4 }}>
-            <Meta size={14} tone="ink">{t('signalsDownNote')}</Meta>
+            <Meta size={14} tone="ink"><MonoNums text={t('signalsDownNote')} /></Meta>
             <ArrowLink icon="watch" onPress={() => router.push('/devices')}>
               {t('openDevices')}
             </ArrowLink>
           </View>
         ) : null}
         <Body tone="ink2">
-          {t(latest.value > previous.value ? 'upFrom' : latest.value < previous.value ? 'downFrom' : 'sameAs', { prev: previous.value, month: new Date(previous.takenOn).toLocaleDateString(locale, { month: 'long' }), name: tt.name(latest.lowestTerm) })}
+          <MonoNums text={t(latest.value > previous.value ? 'upFrom' : latest.value < previous.value ? 'downFrom' : 'sameAs', { prev: previous.value, month: new Date(previous.takenOn).toLocaleDateString(locale, { month: 'long' }), name: tt.name(latest.lowestTerm) })} />
         </Body>
         <Divider />
         <View style={{ gap: 8 }} accessible accessibilityLabel={t('howA11y', { gm: calc.gm, burden: calc.burden, v: latest.value })}>
@@ -242,7 +243,7 @@ function IndexResult() {
             <Mono tone="ink" size={17} weight="medium">{`${(calc.gm - calc.burden).toFixed(1)} → ${calc.value}`}</Mono>
           </View>
           <Meta size={14}>
-            {t('howBody')}
+            <MonoNums text={t('howBody')} />
           </Meta>
         </View>
         <MethodLine method={latest.method} grade={latest.grade} next={latest.nextMeasure} signedBy={latest.grade === 'clinical' ? latest.signedBy : undefined} />
@@ -257,7 +258,7 @@ function IndexResult() {
         {latest.id !== INDEX_HISTORY[0].id ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'center' }}>
             <View style={{ width: 18, height: 0, borderTopWidth: 1.5, borderColor: c.wheelGhost }} />
-            <Meta size={13}>{kit(lang, 'wheelGhost')}</Meta>
+            <Meta size={13}><MonoNums text={kit(lang, 'wheelGhost')} /></Meta>
           </View>
         ) : null}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }} accessibilityRole="tablist">
@@ -294,7 +295,7 @@ function IndexResult() {
               <BandLabel band={s.band} />
             </View>
           </View>
-          <Body>{ax(detail.sentence)}</Body>
+          <Body><MonoNums text={ax(detail.sentence)} /></Body>
 
           <View style={{ gap: 8 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
@@ -319,7 +320,7 @@ function IndexResult() {
             </View>
             {so ? (
               <Meta size={14} tone="ink3">
-                {t('surveyOnlyBody')}
+                <MonoNums text={t('surveyOnlyBody')} />
               </Meta>
             ) : detail.signalSources.length ? (
               <Meta size={14} tone="ink3">
@@ -327,7 +328,7 @@ function IndexResult() {
               </Meta>
             ) : (
               <Meta size={14} tone="ink3">
-                {t('answersOnly')}
+                <MonoNums text={t('answersOnly')} />
               </Meta>
             )}
           </View>
@@ -340,7 +341,7 @@ function IndexResult() {
                   <TermDot term={sel} size={6} />
                 </View>
                 <Body tone="ink2" style={{ flex: 1 }}>
-                  {ax(m)}
+                  <MonoNums text={ax(m)} />
                 </Body>
               </View>
             ))}
@@ -357,7 +358,7 @@ function IndexResult() {
       {/* The six terms, by band */}
       <Card tone="raised" style={{ gap: space.s2 }}>
         <Eyebrow {...H2}>{t('bandsTitle')}</Eyebrow>
-        <Meta size={14}>{t('bandsBody')}</Meta>
+        <Meta size={14}><MonoNums text={t('bandsBody')} /></Meta>
         <View style={{ gap: space.s1 }}>
           {latest.terms.map((x) => {
             const inv = x.key === 'B'
@@ -395,21 +396,21 @@ function IndexResult() {
       {nextStep ? (
         <Card tone="sunk" style={{ gap: space.s2 }}>
           <Eyebrow tone="daybreak" {...H2}>{t('nextEyebrow', { space: tt.space(low) })}</Eyebrow>
-          <Body size={20}>{t('lowestIs', { name: tt.name(low), v: `${low === 'B' ? '−' : ''}${lowScore.value}` })}</Body>
+          <Body size={20}><MonoNums text={t('lowestIs', { name: tt.name(low), v: `${low === 'B' ? '−' : ''}${lowScore.value}` })} /></Body>
           <Card tone="raised" style={{ gap: space.s1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
               <TermChip term={low} withSpace={termByKey(low).name !== termByKey(low).space} />
               <Mono size={13} tone="ink3">{t('minutes', { n: nextStep.minutes })}</Mono>
             </View>
-            <Body weight="medium">{ax(nextStep.title)}</Body>
-            <Meta tone="ink">{ax(nextStep.detail)}</Meta>
-            <Meta size={14}>{ax(nextStep.why)}</Meta>
+            <Body weight="medium"><MonoNums text={ax(nextStep.title)} /></Body>
+            <Meta tone="ink"><MonoNums text={ax(nextStep.detail)} /></Meta>
+            <Meta size={14}><MonoNums text={ax(nextStep.why)} /></Meta>
           </Card>
           {isPlanned ? (
             <View style={{ gap: 4 }} accessibilityLiveRegion="polite">
               <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
                 <Icon name="check" size={18} color={c.ink} />
-                <Body style={{ flex: 1 }}>{t('planned')}</Body>
+                <Body style={{ flex: 1 }}><MonoNums text={t('planned')} /></Body>
               </View>
               <View style={{ flexDirection: 'row', gap: space.s1, flexWrap: 'wrap' }}>
                 <Button variant="secondary" size="sm" icon="sun" onPress={() => router.replace('/')}>
@@ -449,19 +450,19 @@ function IndexResult() {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s2, rowGap: 6 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <HistoryGlyph kind="index" />
-            <Meta size={13}>{t('indexGrade')}</Meta>
+            <Meta size={13}><MonoNums text={t('indexGrade')} /></Meta>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <HistoryGlyph kind="clinical" />
-            <Meta size={13}>{t('legClinical')}</Meta>
+            <Meta size={13}><MonoNums text={t('legClinical')} /></Meta>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <HistoryGlyph kind="method" />
-            <Meta size={13}>{t('legMethod', { date: fmtDate(METHOD_V10_PUBLISHED) })}</Meta>
+            <Meta size={13}><MonoNums text={t('legMethod', { date: fmtDate(METHOD_V10_PUBLISHED) })} /></Meta>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <HistoryGlyph kind="next" />
-            <Meta size={13}>{t('legNext')}</Meta>
+            <Meta size={13}><MonoNums text={t('legNext')} /></Meta>
           </View>
         </View>
         <View>
@@ -478,7 +479,7 @@ function IndexResult() {
                   style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, minHeight: 56, opacity: pressed ? 0.7 : 1 })}
                 >
                   <View style={{ flex: 1, gap: 2 }}>
-                    <Body>{fmtDate(h.takenOn)}</Body>
+                    <Body><MonoNums text={fmtDate(h.takenOn)} /></Body>
                     <Meta size={14} tone="ink3">
                       {h.id === 'ix_phone' ? t('onPhone') : h.grade === 'clinical' ? t('clinicalSigned', { by: h.signedBy ?? '' }) : t('indexGrade')} · {methodOf(h)} · <Mono size={14} tone="ink3">{h.engineBuild.replace('engine ', '')}</Mono>
                       {h.surveyOnly ? ` · ${t('historySurvey')}` : ''}
@@ -508,7 +509,7 @@ function IndexResult() {
         </View>
         {rows.some((h) => HISTORY_METHOD[h.id]?.pilot) ? (
           <Meta size={13} tone="ink3">
-            {t('pilotNote')}
+            <MonoNums text={t('pilotNote')} />
           </Meta>
         ) : null}
         <ArrowLink icon="moon" onPress={() => router.push('/day-90')}>
@@ -520,7 +521,7 @@ function IndexResult() {
       <Card tone="outline" style={{ gap: space.s2 }}>
         <Eyebrow {...H2}>{t('nextMeasure')}</Eyebrow>
         <Body>
-          {t('nextA', { d: MEMBER.dayOfLoop })}<Mono tone="ink">{fmtDate(latest.nextMeasure)}</Mono>{t('nextB')}
+          <MonoNums text={t('nextA', { d: MEMBER.dayOfLoop })} /><Mono tone="ink">{fmtDate(latest.nextMeasure)}</Mono><MonoNums text={t('nextB')} />
         </Body>
         <View style={{ gap: space.s1 }}>
           <Button variant="secondary" icon="refresh-cw" block onPress={() => router.push('/index-take')} accessibilityHint={t('reHint')}>
@@ -538,7 +539,7 @@ function IndexResult() {
       {/* Print artefacts (Memo p17): the Index card, the Day-40 page, the Joyspan Letter */}
       <Card tone="raised" style={{ gap: space.s1 }}>
         <Eyebrow {...H2}>{t('onPaper')}</Eyebrow>
-        <Meta>{t('onPaperBody')}</Meta>
+        <Meta><MonoNums text={t('onPaperBody')} /></Meta>
         <ArrowLink icon="file-text" onPress={() => router.push('/day-40')}>
           {t('day40Link')}
         </ArrowLink>
@@ -556,7 +557,7 @@ function IndexResult() {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s2 }}>
           <JoyspanWheel terms={NOT_YET_EXAMPLE} size={96} animate={false} />
           <Meta style={{ flex: 1 }}>
-            {t('notYetBody')}
+            <MonoNums text={t('notYetBody')} />
           </Meta>
         </View>
       </Card>
@@ -578,7 +579,7 @@ function IndexResult() {
               <Body weight="medium" align="center">
                 {cardSaved === 'photos' ? t('savedPhotos') : t('printOpened')}
               </Body>
-              <Meta align="center">{t('cardCarries')}</Meta>
+              <Meta align="center"><MonoNums text={t('cardCarries')} /></Meta>
               <Button variant="link" onPress={() => setCardSaved(null)}>
                 {t('anotherWay')}
               </Button>
@@ -602,7 +603,7 @@ function IndexResult() {
           )
         }
       >
-        <Meta>{t('cardBody')}</Meta>
+        <Meta><MonoNums text={t('cardBody')} /></Meta>
         {/* The Index card (Playbook p59): ten fields on the Paper front, the mark on both faces,
             and a Daybreak painted edge down the long side (the card stands tall in the sheet). */}
         <Eyebrow>{t('cardFront')}</Eyebrow>
@@ -646,7 +647,7 @@ function IndexResult() {
             {nextStep ? (
               <View style={{ gap: 4 }}>
                 <Eyebrow>{t('cardNextStep')}</Eyebrow>
-                <Body size={15}>{t('cardStepLine', { name: tt.name(low), step: ax(nextStep.title) })}</Body>
+                <Body size={15}><MonoNums text={t('cardStepLine', { name: tt.name(low), step: ax(nextStep.title) })} /></Body>
               </View>
             ) : null}
             {/* 09 the next measure date · 10 the signing physician, by name */}

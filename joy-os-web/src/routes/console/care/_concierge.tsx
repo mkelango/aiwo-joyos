@@ -105,6 +105,11 @@ export function ConciergeDesk({ deskSwitch }: { deskSwitch: ReactNode }) {
     if (!canAct) return
     setDraw(d, { ...drawOf(d), status: 'at-lab', at: clock }, `Received by the lab partner ${clock} · result to the clinician`)
     log(`Sample for ${d.member} received by the lab partner`, 'Home-draw dispatch')
+    // A redraw for a returned draft: the new result is in, so the draft re-queues for signature.
+    if (isRedraw(d)) {
+      const order = (records[d.memberId]?.orders ?? []).find((o) => orderKey(d.memberId, o) === d.id)
+      if (order) clinical.redrawReceived(d.memberId, order.test, { who: actor, role: access.chosen ? access.roleLabel : 'Concierge' })
+    }
   }
 
   // ── Bookings

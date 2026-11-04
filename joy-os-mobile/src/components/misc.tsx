@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 import type { Person } from '../shared/types'
+import { MonoNums } from '../lib/monoNums'
 import { useTheme } from '../theme/ThemeProvider'
 import { Icon, type IconName } from './Icon'
 import { Body, Meta } from './Text'
@@ -48,7 +49,7 @@ export function Pill({ children, tone = 'neutral', style }: { children: string; 
       ]}
     >
       <Text maxFontSizeMultiplier={1.6} style={{ fontFamily: fonts.sansSemi, fontSize: 13 * textScale, color: tn.fg }}>
-        {children}
+        <MonoNums text={children} />
       </Text>
     </View>
   )
@@ -103,7 +104,7 @@ export function Segmented<T extends string>({ value, onChange, items, style }: {
                   : { fontFamily: on ? fonts.sansSemi : fonts.sans, fontSize: 15 * textScale, color: on ? c.ink : c.ink2 }
               }
             >
-              {it.label}
+              {NUMERIC.test(it.label) ? it.label : <MonoNums text={it.label} />}
             </Text>
           </Pressable>
         )
@@ -127,7 +128,7 @@ export function ListRow({ title, sub, leading, trailing, icon, onPress, accessib
       {icon ? <Icon name={icon} size={18} color={c.ink2} /> : null}
       <View style={{ flex: 1, gap: 2 }}>
         <Body>{title}</Body>
-        {sub ? <Meta>{sub}</Meta> : null}
+        {sub ? <Meta><MonoNums text={sub} /></Meta> : null}
       </View>
       {trailing}
       {onPress ? <Icon name="chevron-right" size={18} color={c.ink3} /> : null}

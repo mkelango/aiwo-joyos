@@ -12,7 +12,7 @@ import type { Band, TermKey, TermScore } from '@/domain/types'
 import { BAND_PETAL, BAND_PETAL_BURDEN, CHECK_STATEMENTS, COUNTRIES, EMAIL_RE, SCALE, SCALE_BURDEN, checkBand, checkStanding, countryName, phoneError, type CountryCode } from './_data'
 import { CK, E } from './_i18n'
 import { CHECK_KEY, CHECK_PROGRESS_KEY, checkAsksPhone, readJSON, removeKey, writeJSON, type CheckProgress, type SavedCheck } from './_store'
-import { FlowTopBar, JoyspanCredit, LMethodLine, LTermChip, rich, useBand, useFmtDate } from './_parts'
+import { FlowTopBar, JoyspanCredit, LMethodLine, LTermChip, nums, rich, useBand, useFmtDate } from './_parts'
 
 // THE JOYSPAN CHECK (Memo p.10, Grade 1): 18 statements, free, five minutes, no login.
 // Bands only (steady · uneven · thin), never a number. The lowest term is named with
@@ -527,7 +527,7 @@ function Result({ answers, savedAt, contact, onRemoveContact, onRestart, onSaved
       ? t('reasonB')
       : result.sharing.every((r) => Math.abs(r.standing - result.lowestStanding) < 0.01)
         ? t('reasonFirst')
-        : t('reasonLowest', { n: result.sharing.length + 1 })
+        : rich(t('reasonLowest'), { n: <span className="num">{result.sharing.length + 1}</span> })
   const easeThin = result.rows.find((r) => r.key === 'B')?.band === 'thin'
   const count = (b: Band) => result.rows.filter((r) => r.band === b).length
   // The full timestamp, so the method line shows the member's local date (not the UTC one).
@@ -555,7 +555,7 @@ function Result({ answers, savedAt, contact, onRemoveContact, onRestart, onSaved
         </p>
         {result.sharing.length > 0 && (
           <p className="mt-3 text-[17px] leading-relaxed text-ink">
-            {t(result.sharing.length > 1 ? 'rShareMany' : 'rShareOne', { names: joinNames(sharingNames, te('and')), band: band.inline(result.lowestBand), space: lowestSpace, reason: tieReason })}
+            {rich(t(result.sharing.length > 1 ? 'rShareMany' : 'rShareOne'), { names: nums(joinNames(sharingNames, te('and'))), band: band.inline(result.lowestBand), space: lowestSpace, reason: typeof tieReason === 'string' ? nums(tieReason) : tieReason })}
           </p>
         )}
       </header>
@@ -632,7 +632,7 @@ function Result({ answers, savedAt, contact, onRemoveContact, onRestart, onSaved
               <Phone size={18} aria-hidden />
               <span>
                 <span className="block text-[16px] font-medium">Tele-MANAS · <span className="num">14416</span></span>
-                <span className="block text-[13px] opacity-80">{t('teleSub')}</span>
+                <span className="block text-[13px] opacity-80">{nums(t('teleSub'))}</span>
               </span>
             </a>
           </div>
@@ -650,17 +650,17 @@ function Result({ answers, savedAt, contact, onRemoveContact, onRestart, onSaved
 
           <Card className="flex flex-col border-daybreak/40" tone="raised">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <Eyebrow tone="daybreak">{t('door2Eyebrow')}</Eyebrow>
+              <Eyebrow tone="daybreak">{nums(t('door2Eyebrow'))}</Eyebrow>
               <span className="text-[13px] text-ink-3"><span className="num">≈ 20</span> {t('min')}</span>
             </div>
             <p className="mt-3 text-[1.35rem] font-light leading-snug text-ink">{t('door2H')}</p>
             <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
-              {t('door2B')}
+              {nums(t('door2B'))}
             </p>
             <ul className="mt-4 space-y-1.5 text-[14px] text-ink-2">
               <li className="flex gap-2"><CheckIcon size={16} className="mt-0.5 shrink-0 text-ink" aria-hidden /> {t('door2L1')}</li>
               <li className="flex gap-2"><CheckIcon size={16} className="mt-0.5 shrink-0 text-ink" aria-hidden /> {t('door2L2')}</li>
-              <li className="flex gap-2"><CheckIcon size={16} className="mt-0.5 shrink-0 text-ink" aria-hidden /> {t('door2L3')}</li>
+              <li className="flex gap-2"><CheckIcon size={16} className="mt-0.5 shrink-0 text-ink" aria-hidden /> <span>{nums(t('door2L3'))}</span></li>
             </ul>
             <div className="mt-auto pt-6">
               <DaybreakButton onClick={() => nav('/onboarding')} className="w-full">
@@ -670,7 +670,7 @@ function Result({ answers, savedAt, contact, onRemoveContact, onRestart, onSaved
           </Card>
 
           <Card className="flex flex-col">
-            <Eyebrow>{t('door3Eyebrow')}</Eyebrow>
+            <Eyebrow>{nums(t('door3Eyebrow'))}</Eyebrow>
             <p className="mt-3 text-[1.35rem] font-light leading-snug text-ink">{t('door3H')}</p>
             <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
               {t('door3B')}
@@ -734,7 +734,7 @@ function LetterDoor({ lowestName }: { lowestName: string }) {
 
   return (
     <Card className="flex flex-col">
-      <Eyebrow>{t('lEyebrow')}</Eyebrow>
+      <Eyebrow>{nums(t('lEyebrow'))}</Eyebrow>
       <p className="mt-3 text-[1.35rem] font-light leading-snug text-ink">{t('lH')}</p>
       <AnimatePresence mode="wait" initial={false}>
         {!sent ? (

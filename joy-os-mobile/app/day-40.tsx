@@ -15,6 +15,7 @@ import type { TermKey } from '@/shared/types'
 import { txFor } from '@/screens/a/i18n'
 import { useLang } from '@/lib/i18n'
 import { useTheme } from '@/theme/ThemeProvider'
+import { MonoNums } from '@/lib/monoNums'
 
 // THE DAY-40 PAGE (Memo p17: "print: the Index card, the Day-40 page, the Joyspan Letter").
 // One printed page at Day 40 of the ninety: the loop so far, the Day-0 Wheel (there is no new
@@ -55,10 +56,10 @@ function Day40() {
             {t('titleB')}
           </>
         }
-        lead={t('lead')}
+        lead={<Body tone="ink2"><MonoNums text={t('lead')} /></Body>}
       />
       <View style={{ borderWidth: 1, borderStyle: 'dashed', borderColor: c.lineStrong, borderRadius: radius.card, padding: 12 }}>
-        <Meta size={14}>{t('preview', { date: fmtDate(DAY40_DATES.day40), n: MEMBER.dayOfLoop })}</Meta>
+        <Meta size={14}><MonoNums text={t('preview', { date: fmtDate(DAY40_DATES.day40), n: MEMBER.dayOfLoop })} /></Meta>
       </View>
 
       {/* The page */}
@@ -72,7 +73,7 @@ function Day40() {
                 Joy OS
               </Eyebrow>
             </View>
-            <Body weight="semibold">{t('pageHead', { name: me.name })}</Body>
+            <Body weight="semibold"><MonoNums text={t('pageHead', { name: me.name })} /></Body>
             <Mono size={13} tone="ink3">{fmtDate(DAY40_DATES.day40)}</Mono>
           </View>
           <View style={{ alignItems: 'center', gap: 4 }}>
@@ -83,18 +84,18 @@ function Day40() {
 
         {minor ? (
           <View style={{ backgroundColor: c.paperSunk, borderRadius: radius.card, padding: space.s2 }}>
-            <Meta tone="ink">{t('minorNote')}</Meta>
+            <Meta tone="ink"><MonoNums text={t('minorNote')} /></Meta>
           </View>
         ) : (
           <View style={{ alignItems: 'center', gap: space.s1 }}>
             <JoyspanWheel terms={day0.terms} size={200} value={day0.value} animate={false} />
-            <Meta align="center">{t('wheelNote', { date: fmtDate(day0.takenOn) })}</Meta>
+            <Meta align="center"><MonoNums text={t('wheelNote', { date: fmtDate(day0.takenOn) })} /></Meta>
           </View>
         )}
 
         <View style={{ gap: space.s1 }}>
           <Eyebrow {...H2}>{t('signalsTitle')}</Eyebrow>
-          <Meta size={14}>{t('signalsNote')}</Meta>
+          <Meta size={14}><MonoNums text={t('signalsNote')} /></Meta>
           {ORDER.map((k) => (
             <View key={k} style={{ flexDirection: 'row', gap: 10, paddingVertical: 4 }}>
               <View style={{ paddingTop: 7 }}>
@@ -102,7 +103,7 @@ function Day40() {
               </View>
               <View style={{ flex: 1, gap: 2 }}>
                 <Body weight="medium">{tt.space(k)}</Body>
-                <Meta tone="ink">{tx(DAY40_SIGNALS[k], DAY40_SIGNALS[k].en)}</Meta>
+                <Meta tone="ink"><MonoNums text={tx(DAY40_SIGNALS[k], DAY40_SIGNALS[k].en)} /></Meta>
               </View>
             </View>
           ))}
@@ -111,7 +112,7 @@ function Day40() {
         <Divider />
         <View style={{ gap: space.s1 }}>
           <Eyebrow {...H2} tone="daybreak">{t('focusTitle')}</Eyebrow>
-          <Body>{minor ? t('minorFocus') : t('focusBody', { space: tt.space(low) })}</Body>
+          <Body><MonoNums text={minor ? t('minorFocus') : t('focusBody', { space: tt.space(low) })} /></Body>
           <Body size={20}>
             <Serif>{txFor(lang, TODAY_ACTION.title)}</Serif>
           </Body>
@@ -119,7 +120,7 @@ function Day40() {
             <Numeral size={34} weight="light">
               {ledger.length}
             </Numeral>
-            <Meta style={{ flex: 1 }}>{t('ledgerKept')}</Meta>
+            <Meta style={{ flex: 1 }}><MonoNums text={t('ledgerKept')} /></Meta>
           </View>
         </View>
 
@@ -128,7 +129,7 @@ function Day40() {
             <Avatar person={priya} size={36} />
             <Eyebrow style={{ flex: 1 }}>{t('fromCoach')}</Eyebrow>
           </View>
-          <Body>{`“${DAY40_COACH_NOTE}”`}</Body>
+          <Body><MonoNums text={`“${DAY40_COACH_NOTE}”`} /></Body>
         </View>
 
         <View style={{ gap: space.s1 }}>
@@ -149,7 +150,7 @@ function Day40() {
               <Mono size={14} tone="ink" style={{ minWidth: 64 }}>
                 {t('dayN', { d })}
               </Mono>
-              <Body style={{ flex: 1 }}>{label}</Body>
+              <Body style={{ flex: 1 }}><MonoNums text={label} /></Body>
               <Mono size={13} tone="ink3">{fmtDate(date)}</Mono>
             </View>
           ))}

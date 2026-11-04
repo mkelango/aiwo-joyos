@@ -4,7 +4,7 @@ import Svg, { Circle, Text as SvgText } from 'react-native-svg'
 import { Body, Button, Divider, Eyebrow, Icon, Meta, Mono, Sheet, Toggle } from '@/components'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { useLocal } from '@/screens/a/local'
-import { IconButton, TextField } from '@/screens/a/parts'
+import { IconButton, monoNums, TextField } from '@/screens/a/parts'
 import { CONTRIBUTIONS, IKIGAI_START, SPACE_TODAY, STATEMENT_START, TOMORROW_ANSWERS } from '@/screens/a/spacesData'
 import { useTheme } from '@/theme/ThemeProvider'
 import { useA } from '../i18n'
@@ -109,7 +109,7 @@ function IkigaiMap() {
               <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: kept[i] ? c.ink : c.lineStrong, backgroundColor: kept[i] ? c.ink : undefined, alignItems: 'center', justifyContent: 'center' }}>
                 {kept[i] ? <Icon name="check" size={14} color={c.paper} /> : null}
               </View>
-              <Body style={{ flex: 1 }}>{a}</Body>
+              <Body style={{ flex: 1 }}>{monoNums(a)}</Body>
             </Pressable>
           ))}
         </View>
@@ -122,7 +122,7 @@ function IkigaiMap() {
                 {shortDate(x.date, lang)}
               </Mono>
               <Meta style={{ flex: 1 }}>
-                <Meta tone="ink">{x.what}</Meta> · {tx(x.who)}
+                <Meta tone="ink">{monoNums(x.what)}</Meta> · {tx(x.who)}
               </Meta>
             </View>
           ))}
@@ -201,7 +201,7 @@ function TomorrowQuestion() {
               {shortDate(a.date, lang)}
             </Mono>
             <Meta tone="ink" style={{ flex: 1 }}>
-              {a.text}
+              {monoNums(a.text)}
             </Meta>
           </View>
         ))}
@@ -260,7 +260,7 @@ function Statement() {
         </Meta>
       ) : null}
       <Meta size={14} tone="ink3">
-        {t('Last read on Day 1 · next on Day 90')}
+        {monoNums(t('Last read on Day 1 · next on Day 90'))}
       </Meta>
       <Sheet
         open={editOpen}
@@ -407,7 +407,7 @@ function CareerVenn() {
           </View>
           {err ? (
             <Meta tone="ink" accessibilityLiveRegion="polite">
-              {err}
+              {monoNums(err)}
             </Meta>
           ) : null}
           <View style={{ backgroundColor: c.paperSunk, borderRadius: radius.card, padding: space.s2, gap: 6 }}>
@@ -426,7 +426,7 @@ function CareerVenn() {
               </View>
             ) : (
               <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space.s1 }}>
-                <Body style={{ flexShrink: 1 }}>{overlap}</Body>
+                <Body style={{ flexShrink: 1 }}>{monoNums(overlap)}</Body>
                 <Button variant="link" size="sm" onPress={() => (setOverlapDraft(overlap), setEditOverlap(true))} accessibilityLabel={t('Change where all four overlap')}>
                   {t('Change')}
                 </Button>

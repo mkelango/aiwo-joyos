@@ -11,6 +11,7 @@ import {
   Divider,
   Eyebrow,
   Icon,
+  JoyIcon,
   Meta,
   MethodLine,
   Mono,
@@ -31,10 +32,11 @@ import { useTheme } from '@/theme/ThemeProvider'
 import { PRACTICE_CONTENT, PRACTICE_PULSE } from '@/screens/b/journeyData'
 import { practiceStore, useStore } from '@/screens/b/bStore'
 import { PrimaryChip } from '@/screens/b/parts'
-import { AudioPlayer } from '@/screens/a/audio'
+import { AudioPlayer, audioMB, useOfflineAudio } from '@/screens/a/audio'
 import { Rich, useA } from '@/screens/a/i18n'
 import { useLocal } from '@/screens/a/local'
-import { NotScored, Verse } from '@/screens/a/parts'
+import { NotScored, Verse, monoNums } from '@/screens/a/parts'
+import { useApp } from '@/lib/store'
 import { useIsMinor } from '@/lib/minor'
 import { SPACE_TODAY, SPACE_TODAY_INDEX } from '@/screens/a/spacesData'
 import type { TermKey } from '@/shared/types'
@@ -71,6 +73,12 @@ export default function Practice() {
   // Earlier days this week come from the specimen; today is yours; later days are still to come.
   const practised = DAYS.map((_, i) => (i === todayIdx ? doneToday : i < todayIdx ? PRACTISED[i] : false))
   const maxPulse = 3.5
+  // Weeks saved for offline (the Mentor's audio, kept on this phone by the player's switch).
+  const { weeks: offlineWeeks } = useOfflineAudio()
+  const { offline: noSignal } = useApp()
+  const savedWeeks = PRACTICE_WEEKS.filter((w) => (offlineWeeks[String(w.week)] ?? 0) >= 100).map((w) => w.week)
+  const sizeOf = (n: number) => audioMB(PRACTICE_CONTENT.find((p) => p.week === n)?.seconds ?? 0)
+  const savedMB = Math.round(savedWeeks.reduce((a, n) => a + sizeOf(n), 0) * 10) / 10
 
   return (
     <Screen inTabs top={<AppBar />}>
@@ -86,12 +94,14 @@ export default function Practice() {
           const st = w.week < CURRENT ? 'done' : w.week === CURRENT ? 'now' : 'next'
           // Earlier weeks count as practised unless the member un-marked them in the week screen.
           const kept = prac.weeks.includes(w.week) || (st === 'done' && !prac.unmarked.includes(w.week))
+          const onPhone = savedWeeks.includes(w.week)
+          const state = st === 'now' ? `${t('This week')}${kept ? t(', practised') : ''}` : st === 'next' ? (kept ? t('Upcoming, practised ahead') : t('Upcoming')) : kept ? t('Practised') : t('Earlier week, not marked')
           return (
             <Pressable
               key={w.week}
               onPress={() => router.push(`/practice/${w.week}`)}
               accessibilityRole="link"
-              accessibilityLabel={t('Week {n}, {title}. {state}', { n: w.week, title: tx(w.title), state: st === 'now' ? `${t('This week')}${kept ? t(', practised') : ''}` : st === 'next' ? (kept ? t('Upcoming, practised ahead') : t('Upcoming')) : kept ? t('Practised') : t('Earlier week, not marked') })}
+              accessibilityLabel={`${t('Week {n}, {title}. {state}', { n: w.week, title: tx(w.title), state })}${onPhone ? t('. Audio saved for offline, {mb} MB.', { mb: sizeOf(w.week) }) : ''}`}
               style={({ pressed }) => ({
                 width: 148,
                 minHeight: 112,
@@ -110,18 +120,37 @@ export default function Practice() {
                 {kept ? <Icon name="check" size={14} color={c.ink2} /> : w.term === 'ALL' ? <Eyebrow size={11}>{t('All')}</Eyebrow> : <TermDot term={w.term} />}
               </View>
               <Meta tone={st === 'next' ? 'ink2' : 'ink'} size={14}>
-                {tx(w.title)}
+                {monoNums(tx(w.title))}
               </Meta>
+              {onPhone ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 'auto' }}>
+                  <Icon name="download" size={12} color={c.ink3} />
+                  <Mono size={12} tone="ink3">{`${sizeOf(w.week)} MB`}</Mono>
+                </View>
+              ) : null}
             </Pressable>
           )
         })}
       </ScrollView>
+      {savedWeeks.length || noSignal ? (
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }} accessibilityLiveRegion="polite">
+          <Icon name={noSignal ? 'wifi-off' : 'download'} size={14} color={c.ink3} />
+          <Meta size={14} style={{ flex: 1 }}>
+            {monoNums(
+              [
+                savedWeeks.length ? t('Saved for offline: {weeks} · {mb} MB on this phone.', { weeks: savedWeeks.map((n) => `W${n}`).join(', '), mb: savedMB }) : t('No week is saved for offline yet.'),
+                noSignal ? t('You are offline: saved weeks play, the others need a connection.') : '',
+              ].filter(Boolean).join(' '),
+            )}
+          </Meta>
+        </View>
+      ) : null}
 
       {/* The Mentor's audio */}
       <Card tone="raised" style={{ gap: space.s2 }}>
         <View style={{ gap: 6 }}>
           <Eyebrow>{t('Week {n} · the Mentor’s voice · 5 min', { n: CURRENT })}</Eyebrow>
-          <Title size={24}>{tx(content.audioTitle)}</Title>
+          <Title size={24}>{monoNums(tx(content.audioTitle))}</Title>
           <Meta size={14}>{t('C. Sivasankaran, Mentor, AIWO Limited · English')}</Meta>
           <PrimaryChip primary={week.term} />
         </View>
@@ -133,7 +162,7 @@ export default function Practice() {
         <Eyebrow tone="daybreak">{t('Today’s practice')}</Eyebrow>
         {!doneToday ? (
           <>
-            <Title size={24}>{tx(content.daily)}</Title>
+            <Title size={24}>{monoNums(tx(content.daily))}</Title>
             <DaybreakButton onPress={() => setDoneToday(true)} accessibilityHint={t('Marks today’s practice as kept. You can undo it.')}>
               {t('Practised today')}
             </DaybreakButton>
@@ -175,9 +204,9 @@ export default function Practice() {
           <Icon name="book" size={16} color={c.ink2} />
           <Eyebrow style={{ flexShrink: 1 }}>{t('Science note · from the faculty')}</Eyebrow>
         </View>
-        <Title size={22}>{tx(content.science.title)}</Title>
-        <Body tone="ink2">{tx(content.science.body)}</Body>
-        <Meta tone="ink">{tx(content.science.faculty)}</Meta>
+        <Title size={22}>{monoNums(tx(content.science.title))}</Title>
+        <Body tone="ink2">{monoNums(tx(content.science.body))}</Body>
+        <Meta tone="ink">{monoNums(tx(content.science.faculty))}</Meta>
         <Mono size={12} tone="ink3">
           {content.science.ref}
         </Mono>
@@ -193,7 +222,7 @@ export default function Practice() {
         ].map(([k, v], i) => (
           <View key={k} style={{ gap: 4, paddingVertical: 10, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: c.line }}>
             <Eyebrow tone="ink2">{k}</Eyebrow>
-            <Body>{tx(v)}</Body>
+            <Body>{monoNums(tx(v))}</Body>
           </View>
         ))}
       </Card>
@@ -202,7 +231,7 @@ export default function Practice() {
       <Card tone="raised" style={{ gap: space.s1 + 4 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
           <Eyebrow style={{ flexShrink: 1 }}>{t('Weekly circle · {when}', { when: tx(CIRCLE.when) })}</Eyebrow>
-          <Icon name="users" size={16} color={c.ink3} />
+          <JoyIcon name="circle" size={18} color={c.ink3} />
         </View>
         <Meta>{t('This week’s prompt, from Priya')}</Meta>
         <Title size={22}>
@@ -293,8 +322,8 @@ export default function Practice() {
           })}
           <Meta style={{ marginTop: space.s2 }}>
             {measured
-              ? t('Re-taken {date} on this phone, with the same method. Shown as it is, whether it rose or fell.', { date: fmtDate(measured.at, lang) })
-              : t('The after column fills when you re-take the Index in Week 8. It will be shown whether it rises or falls, with the same method.')}
+              ? monoNums(t('Re-taken {date} on this phone, with the same method. Shown as it is, whether it rose or fell.', { date: fmtDate(measured.at, lang) }))
+              : monoNums(t('The after column fills when you re-take the Index in Week 8. It will be shown whether it rises or falls, with the same method.'))}
           </Meta>
           <MethodLine style={{ marginTop: space.s1 }} method={before.method} grade={before.grade} takenOn={before.takenOn} next={before.nextMeasure} />
         </Card>
@@ -324,13 +353,13 @@ export default function Practice() {
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <TermDot term="D" />
-            <Meta size={14} style={{ flexShrink: 1 }}>{t('Daily Pleasure · Joy Ledger density · W4 so far')}</Meta>
+            <Meta size={14} style={{ flexShrink: 1 }}>{monoNums(t('Daily Pleasure · Joy Ledger density · W4 so far'))}</Meta>
           </View>
         </Card>
       </View>
 
       <View style={{ gap: space.s1 }}>
-        <Meta tone="ink3" size={14}>{t('On Joy OS Plus for anyone; in full inside Mindcation; a taste in every Joycation. English first; Tamil and Hindi at J3.')}</Meta>
+        <Meta tone="ink3" size={14}>{monoNums(t('On Joy OS Plus for anyone; in full inside Mindcation; a taste in every Joycation. English first; Tamil and Hindi at J3.'))}</Meta>
         <ArrowLink onPress={() => router.push(`/practice/${CURRENT}`)}>{t('Week {n} in full, with reflection', { n: CURRENT })}</ArrowLink>
       </View>
     </Screen>

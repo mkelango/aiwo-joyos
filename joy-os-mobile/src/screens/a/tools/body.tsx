@@ -3,10 +3,10 @@ import { useState } from 'react'
 import { Pressable, View } from 'react-native'
 import { ArrowLink, Body, Button, Divider, Eyebrow, Icon, Meta, Mono, Pill, Segmented, SpecimenTag, TermChip, Toggle, fmtDate } from '@/components'
 import { useDict } from '@/lib/i18n'
-import { BarRow, Chip, Sparkline, TextField } from '@/screens/a/parts'
+import { BarRow, Chip, Sparkline, TextField, monoNums } from '@/screens/a/parts'
 import { BIOMARKERS, CAPACITY, CAPACITY_AT, LE8, LE8_SERIES, PANEL_META, SIGNALS, SPACE_TODAY, type Le8Key, type Le8Status, type Marker } from '@/screens/a/spacesData'
 import { DEVICES as LINKABLE } from '@/screens/b/accountData'
-import { devicesStore, useStore } from '@/screens/b/bStore'
+import { devicesStore, postMemberMessage, threadHref, useStore } from '@/screens/b/bStore'
 import { DEV, DEVICE_NOTE, SIGNAL_TEXT } from '@/screens/b/i18n/devices'
 import type { L3 } from '@/screens/b/i18n/common'
 import { useTheme } from '@/theme/ThemeProvider'
@@ -22,6 +22,9 @@ import { ToolCard, ToolsHeading, shortDate } from './common'
 // Devices read the same record /devices writes (Lane B devicesStore), so a link or unlink there
 // shows here at once. LE8 readings and capacity results the member adds are kept on the phone.
 // VIVA's explain_biomarker runs inside the vault: open a marker, ask, and read the plain words.
+// Charts here plot signals and readings, not terms: they are drawn in the neutrals (Ink, Slate,
+// Bronze; Playbook p39, p62), never in Jade. "Ask about this" and "Add to my Day 45 review" post
+// to the physician's thread in Messages (Lane B messagesStore), so the question is there to read.
 
 export function BodyTools() {
   const { t } = useA()
@@ -77,7 +80,7 @@ function Devices() {
                   </View>
                   <Meta size={14}>{reads}</Meta>
                   <Meta size={14} tone="ink3">
-                    {last}
+                    {monoNums(last)}
                   </Meta>
                 </View>
                 <Pill tone="ink">{t('Connected')}</Pill>
@@ -102,10 +105,9 @@ function Devices() {
 }
 
 function Signals() {
-  const { c, term, space } = useTheme()
+  const { c, space, vizSeries } = useTheme()
   const { t, date } = useA()
   const ouraLinked = useLinked().some((d) => d.id === 'oura' && d.state === 'connected')
-  const col = term('H').main
   const first = SIGNALS[0]
   const last = SIGNALS[SIGNALS.length - 1]
   const avg = (k: 'hrv' | 'rhr' | 'regularity', from: number, to: number) => {
@@ -120,7 +122,7 @@ function Signals() {
   return (
     <ToolCard title={t('Signal trends · 28 days')} aside={<TermChip term="H" />} lead={t('Three features from your ring, one line each. Features, never a vendor score.')}>
       <View style={{ gap: space.s3 }}>
-        {rows.map((r) => {
+        {rows.map((r, ri) => {
           const a = avg(r.k, 0, 7)
           const b = avg(r.k, 21, 28)
           const d = Math.round((b - a) * 10) / 10
@@ -139,11 +141,11 @@ function Signals() {
                   </Mono>
                 </View>
               </View>
-              <Meta size={14}>{r.sentence}</Meta>
+              <Meta size={14}>{monoNums(r.sentence)}</Meta>
               <Sparkline
                 values={SIGNALS.map((s) => s[r.k])}
                 labels={[date(first.label), date(last.label)]}
-                color={col}
+                color={vizSeries(ri)}
                 height={64}
                 label={t('{name}, 28 days from {from} to {to}: first-week average {a} {unit}, last-week average {b} {unit}.', { name: r.name, from: date(first.label), to: date(last.label), a, b, unit: r.unit })}
               />
@@ -159,7 +161,7 @@ function Signals() {
       </View>
       {ouraLinked ? null : (
         <Meta tone="ink" accessibilityLiveRegion="polite">
-          {t('Your Oura Ring is not linked now. These are the last 28 days it sent; new nights wait until you link it again.')}
+          {monoNums(t('Your Oura Ring is not linked now. These are the last 28 days it sent; new nights wait until you link it again.'))}
         </Meta>
       )}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -232,7 +234,7 @@ function series<T extends Point>(base: readonly Point[], mine: T[] | undefined):
 }
 
 function Le8() {
-  const { c, term } = useTheme()
+  const { c, viz } = useTheme()
   const { t, tx, lang } = useA()
   // Under 18 nothing is scored (the minors gate): the readings are kept, with no score or average.
   const minor = useIsMinor()
@@ -246,7 +248,6 @@ function Le8() {
   })
   const total = Math.round(rows.reduce((a, b) => a + b.score, 0) / rows.length)
   const watch = rows.filter((x) => x.status === 'watch').map((x) => (lang === 'en' ? x.name.toLowerCase() : tx(x.name)))
-  const col = term('H')
   const save = (k: Le8Key, p: Point) =>
     setMine((all) => ({ ...all, [k]: [...(all[k] ?? []).filter((y) => y.at !== p.at), { ...p, id: `le8-${k}-${Date.now()}` }] }))
   const remove = (k: Le8Key, id: string) => setMine((all) => ({ ...all, [k]: (all[k] ?? []).filter((y) => y.id !== id) }))
@@ -269,15 +270,15 @@ function Le8() {
             <View key={x.key} style={{ gap: 4 }}>
               {minor ? (
                 <View style={{ gap: 2 }}>
-                  <Body>{tx(x.name)}</Body>
-                  <Meta size={14}>{`${le8Reading(x.key, x.last, t)} · ${x.last.mine ? t('Entered by you') : lang === 'en' ? x.source : tx(x.source)}`}</Meta>
+                  <Body>{monoNums(tx(x.name))}</Body>
+                  <Meta size={14}>{monoNums(`${le8Reading(x.key, x.last, t)} · ${x.last.mine ? t('Entered by you') : lang === 'en' ? x.source : tx(x.source)}`)}</Meta>
                 </View>
               ) : (
                 <BarRow
                   label={tx(x.name)}
                   value={x.score}
                   max={100}
-                  color={x.status === 'watch' ? c.lineStrong : col.main}
+                  color={x.status === 'watch' ? c.lineStrong : viz.ink}
                   note={`${le8Reading(x.key, x.last, t)} · ${x.last.mine ? t('Entered by you') : lang === 'en' ? x.source : tx(x.source)}${x.status === 'watch' ? t(' · worth watching') : x.status === 'ideal' ? t(' · ideal') : ''}`}
                 />
               )}
@@ -299,7 +300,7 @@ function Le8() {
         })}
       </View>
       <Meta size={14} tone="ink3">
-        {t('American Heart Association · Life’s Essential 8 · self-report with device and clinic readings')}
+        {monoNums(t('American Heart Association · Life’s Essential 8 · self-report with device and clinic readings'))}
       </Meta>
     </ToolCard>
   )
@@ -349,7 +350,7 @@ const LE8_FIELDS: Record<Exclude<Le8Key, 'nicotine'>, { label: Parameters<T>[0];
 }
 
 function Le8Detail({ k, name, pts, onSave, onRemove }: { k: Le8Key; name: string; pts: Shown[]; onSave: (p: Point) => void; onRemove: (id: string) => void }) {
-  const { c, term, space } = useTheme()
+  const { c, viz, space } = useTheme()
   const { t, tx, lang } = useA()
   const fields = k === 'nicotine' ? [] : LE8_FIELDS[k]
   const [draft, setDraft] = useState<string[]>(() => fields.map((f) => f.initial ?? ''))
@@ -386,12 +387,12 @@ function Le8Detail({ k, name, pts, onSave, onRemove }: { k: Le8Key; name: string
 
   return (
     <View style={{ gap: space.s2, backgroundColor: c.paperSunk, borderRadius: 12, padding: 14 }}>
-      <Meta tone="ink2">{tx(LE8_IDEAL[k])}</Meta>
+      <Meta tone="ink2">{monoNums(tx(LE8_IDEAL[k]))}</Meta>
       {pts.length > 1 && !minor ? (
         <Sparkline
           values={scores}
           labels={[shortDate(pts[0].at, lang), shortDate(pts[pts.length - 1].at, lang)]}
-          color={term('H').main}
+          color={viz.ink}
           height={56}
           min={0}
           max={100}
@@ -409,7 +410,7 @@ function Le8Detail({ k, name, pts, onSave, onRemove }: { k: Le8Key; name: string
                 <Mono size={12} tone="ink3">
                   {`${shortDate(p.at, lang)}${p.mine ? ` · ${t('Entered by you')}` : ''}`}
                 </Mono>
-                <Meta tone="ink">{reading}</Meta>
+                <Meta tone="ink">{monoNums(reading)}</Meta>
               </View>
               {minor ? null : <Mono tone="ink">{String(s)}</Mono>}
               {p.mine && p.id ? (
@@ -455,7 +456,7 @@ function Le8Detail({ k, name, pts, onSave, onRemove }: { k: Le8Key; name: string
         <View accessibilityLiveRegion="polite" style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
           <Icon name="info" size={16} color={c.ink} />
           <Meta tone="ink" style={{ flex: 1 }}>
-            {err}
+            {monoNums(err)}
           </Meta>
         </View>
       ) : null}
@@ -463,7 +464,7 @@ function Le8Detail({ k, name, pts, onSave, onRemove }: { k: Le8Key; name: string
         <Button icon="plus" onPress={submit}>
           {t('Save reading')}
         </Button>
-        {saved ? <Meta accessibilityLiveRegion="polite">{saved}</Meta> : null}
+        {saved ? <Meta accessibilityLiveRegion="polite">{monoNums(saved)}</Meta> : null}
       </View>
       <Meta size={14} tone="ink3">
         {t('Kept on this phone. Scored by the AHA method; your coach sees the trend.')}
@@ -505,7 +506,7 @@ function Vault() {
           />
         </Meta>
         <Meta size={14} tone="ink3">
-          {t('{lab}. VIVA explains a marker; it never diagnoses.', { lab: tx(PANEL_META.lab) })}
+          {monoNums(t('{lab}. VIVA explains a marker; it never diagnoses.', { lab: tx(PANEL_META.lab) }))}
         </Meta>
       </View>
     </ToolCard>
@@ -548,7 +549,7 @@ function MarkerRow({ m, first, open, onToggle }: { m: Marker; first: boolean; op
         <View style={{ flex: 1, gap: 2 }}>
           <Body weight="medium">{name}</Body>
           <Meta size={14} tone="ink3">
-            {t('{panel} · range {range}', { panel: tx(m.panel), range: m.range })}
+            {monoNums(t('{panel} · range {range}', { panel: tx(m.panel), range: m.range }))}
           </Meta>
         </View>
         <View style={{ alignItems: 'flex-end', gap: 4 }}>
@@ -566,8 +567,8 @@ function MarkerRow({ m, first, open, onToggle }: { m: Marker; first: boolean; op
       </Pressable>
       {open ? (
         <View style={{ gap: 8 }}>
-          <Body tone="ink2">{tx(m.plain)}</Body>
-          <Meta size={14}>{m.prev === null ? t('Measured once; no earlier reading.') : t('Last panel {p} {unit}; {change}.', { p: m.prev, unit: m.unit, change: delta! === 0 ? t('unchanged') : t(delta! > 0 ? 'up {n}' : 'down {n}', { n: Math.abs(delta!) }) })}</Meta>
+          <Body tone="ink2">{monoNums(tx(m.plain))}</Body>
+          <Meta size={14}>{m.prev === null ? t('Measured once; no earlier reading.') : monoNums(t('Last panel {p} {unit}; {change}.', { p: m.prev, unit: m.unit, change: delta! === 0 ? t('unchanged') : t(delta! > 0 ? 'up {n}' : 'down {n}', { n: Math.abs(delta!) }) }))}</Meta>
           <VivaExchange state={viva.state} turn={viva.turn} />
           {viva.state === 'idle' ? (
             <Button size="sm" variant="ghost" icon="message-circle" onPress={explain} style={{ alignSelf: 'flex-start' }}>
@@ -636,7 +637,7 @@ function Capacity() {
             <View key={x.key} style={{ gap: 6 }}>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
                 <Body weight="medium" style={{ flex: 1 }}>
-                  {tx(x.name)}
+                  {monoNums(tx(x.name))}
                 </Body>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }} accessible accessibilityLabel={t('{last} {unit}, previously {prev}', { last: last.v, unit: x.unit, prev: prev.v })}>
                   <Mono tone="ink" size={22} weight="light">
@@ -660,7 +661,7 @@ function Capacity() {
               <Mono size={12} tone="ink3">
                 {t('Results · {list}', { list: pts.slice(-4).map((p) => `${shortDate(p.at, lang)} ${fmt(p.v, x.unit)}`).join(' · ') })}
               </Mono>
-              {how === x.key ? <Meta tone="ink">{tx(x.how)}</Meta> : null}
+              {how === x.key ? <Meta tone="ink">{monoNums(tx(x.how))}</Meta> : null}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 20 }}>
                 <Pressable
                   onPress={() => setHow(how === x.key ? null : x.key)}
@@ -698,14 +699,14 @@ function Capacity() {
                   />
                   {x.key === 'gait' && typed !== null && typed >= f.min && typed <= f.max ? (
                     <Meta size={14} tone="ink2">
-                      {t('That is {v} m/s.', { v: round(4 / typed, 2) })}
+                      {monoNums(t('That is {v} m/s.', { v: round(4 / typed, 2) }))}
                     </Meta>
                   ) : null}
                   {err ? (
                     <View accessibilityLiveRegion="polite" style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
                       <Icon name="info" size={16} color={c.ink} />
                       <Meta tone="ink" style={{ flex: 1 }}>
-                        {err}
+                        {monoNums(err)}
                       </Meta>
                     </View>
                   ) : null}
@@ -719,7 +720,7 @@ function Capacity() {
                       </Button>
                     ) : null}
                   </View>
-                  {saved ? <Meta accessibilityLiveRegion="polite">{saved}</Meta> : null}
+                  {saved ? <Meta accessibilityLiveRegion="polite">{monoNums(saved)}</Meta> : null}
                 </View>
               ) : null}
             </View>
@@ -752,6 +753,12 @@ function DailyStack() {
     { id: 's_mg', kind: 'supplement', label: 'AIWO Daily Magnesium', dose: '200 mg', why: t('At 21:00 · part of your wind-down') },
   ]
   const toggle = (id: string) => setDone({ on: SPACE_TODAY, ids: today.includes(id) ? today.filter((x) => x !== id) : [...today, id] })
+  // The question goes to the physician's thread in Messages, in the member's words, once per item.
+  const ask = (i: StackItem) => {
+    if (asked.includes(i.id)) return
+    postMemberMessage({ to: 'physician', from: 'member', subject: t('About {x}', { x: i.label }), body: t('Could you tell me more about {x} ({dose}) in my protocol? I would like to understand why it is there and how long to take it.', { x: i.label, dose: i.dose ?? '' }) })
+    setAsked((a) => [...a, i.id])
+  }
   const n = items.filter((i) => today.includes(i.id)).length
   const row = (i: StackItem) => {
     const on = today.includes(i.id)
@@ -772,7 +779,7 @@ function DailyStack() {
           </View>
           <View style={{ flex: 1, gap: 2 }}>
             <Body tone={on ? 'ink2' : 'ink'}>
-              {i.label}
+              {monoNums(i.label)}
               {i.dose ? (
                 <>
                   {' · '}
@@ -781,18 +788,21 @@ function DailyStack() {
               ) : null}
             </Body>
             <Meta size={14} tone="ink3">
-              {i.why}
+              {monoNums(i.why)}
             </Meta>
           </View>
         </Pressable>
         {i.kind === 'supplement' ? (
           <View style={{ paddingLeft: 34 }}>
             {asked.includes(i.id) ? (
-              <Meta size={14} tone="ink2" accessibilityLiveRegion="polite">
-                {t('Asked · {name} replies within a working day', { name: doc })}
-              </Meta>
+              <View style={{ gap: 2 }} accessibilityLiveRegion="polite">
+                <Meta size={14} tone="ink2">
+                  {monoNums(t('Asked in Messages · {name} replies within a working day', { name: doc }))}
+                </Meta>
+                <ArrowLink onPress={() => router.push(threadHref('physician'))}>{t('Open the thread')}</ArrowLink>
+              </View>
             ) : (
-              <Button variant="link" size="sm" onPress={() => setAsked((a) => [...a, i.id])} accessibilityLabel={t('Ask {name} about {x}', { name: doc, x: i.label })}>
+              <Button variant="link" size="sm" onPress={() => ask(i)} accessibilityLabel={t('Ask {name} about {x}', { name: doc, x: i.label })}>
                 {t('Ask about this')}
               </Button>
             )}
@@ -838,9 +848,9 @@ function DailyStack() {
         <Meta style={{ flex: 1 }}>{t('Protocol-only. AIWO Daily reaches you only when your physician adds it to your protocol, against a signed panel. There is no shop here, and nothing is sold to you on this screen.')}</Meta>
       </View>
       <Meta size={14} tone="ink3">
-        {t('Reviewed at Day 45 · re-tested at Day 90')} · {t('Only {name} changes the stack. Ask, and the question goes to your care team.', { name: doc })}
+        {monoNums(t('Reviewed at Day 45 · re-tested at Day 90'))} · {t('Only {name} changes the stack. Ask, and the question goes to your care team.', { name: doc })}
       </Meta>
-      <ArrowLink icon="message-circle" onPress={() => router.push('/messages?t=t_meera')}>
+      <ArrowLink icon="message-circle" onPress={() => router.push(threadHref('physician'))}>
         {t('Message {name}', { name: doc })}
       </ArrowLink>
     </ToolCard>
@@ -856,6 +866,12 @@ function BiologicalAge() {
   // A specimen switch shows the card as it reads once the physician has signed the estimate.
   const [signedView, setSignedView] = useLocal('bioAgeSignedView', false)
   const doc = PANEL_META.signedBy
+  // The request reaches the physician's thread in Messages; the agenda is hers to set.
+  const addToReview = () => {
+    if (asked) return
+    postMemberMessage({ to: 'physician', from: 'member', subject: t('Day 45 review: biological age'), body: t('Please add my biological age estimate to the agenda for my Day 45 review. Once you have signed it, I would like to go through it with you.') })
+    setAsked(true)
+  }
   const steps = [
     { done: true, label: t('Clinical panel drawn · {d}', { d: shortDate(PANEL_META.drawn, lang) }) },
     { done: true, label: t('Panel signed · {d}', { d: shortDate(PANEL_META.signed, lang) }) },
@@ -873,8 +889,8 @@ function BiologicalAge() {
               {t('years · an estimate, with its range')}
             </Meta>
           </View>
-          <Body>{t('Signed by {name} at your Day 45 review.', { name: doc })}</Body>
-          <Meta>{t('An estimate from your panel and capacity, never a promise or a target. {name} walks you through what moves it; the number itself is not something to chase.', { name: doc })}</Meta>
+          <Body>{monoNums(t('Signed by {name} at your Day 45 review.', { name: doc }))}</Body>
+          <Meta>{monoNums(t('An estimate from your panel and capacity, never a promise or a target. {name} walks you through what moves it; the number itself is not something to chase.', { name: doc }))}</Meta>
         </View>
       ) : (
         <View style={{ gap: space.s1 }}>
@@ -892,17 +908,18 @@ function BiologicalAge() {
           <View key={s.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             {s.done ? <Icon name="check" size={15} color={c.ink} /> : <View style={{ width: 9, height: 9, marginHorizontal: 3, borderRadius: 5, borderWidth: 1, borderColor: c.lineStrong }} />}
             <Meta tone={s.done ? 'ink' : 'ink3'} style={{ flex: 1 }}>
-              {s.label}
+              {monoNums(s.label)}
             </Meta>
           </View>
         ))}
       </View>
       {signedView ? null : asked ? (
-        <Meta tone="ink2" accessibilityLiveRegion="polite">
-          {t('Added to the agenda for your Day 45 review with Dr Meera.')}
-        </Meta>
+        <View style={{ gap: 2 }} accessibilityLiveRegion="polite">
+          <Meta tone="ink2">{monoNums(t('Sent to {name} in Messages, to put on the agenda for your Day 45 review.', { name: doc }))}</Meta>
+          <ArrowLink onPress={() => router.push(threadHref('physician'))}>{t('Open the thread')}</ArrowLink>
+        </View>
       ) : (
-        <Button size="sm" variant="secondary" icon="plus" onPress={() => setAsked(true)} style={{ alignSelf: 'flex-start' }}>
+        <Button size="sm" variant="secondary" icon="plus" onPress={addToReview} style={{ alignSelf: 'flex-start' }}>
           {t('Add to my Day 45 review')}
         </Button>
       )}

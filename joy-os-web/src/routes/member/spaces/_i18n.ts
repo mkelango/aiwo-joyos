@@ -150,7 +150,6 @@ export const SP = {
   'body.dev.share': { en: 'Share {name}', ta: '{name} பகிர்', hi: '{name} साझा करें' },
   'body.dev.linkingBtn': { en: 'Linking', ta: 'இணைக்கிறது', hi: 'लिंक हो रहा है' },
   'body.dev.link': { en: 'Link', ta: 'இணை', hi: 'लिंक करें' },
-  'body.dev.consent': { en: 'Consented {d}. Withdraw any time in the {link}; sync stops within 24 hours.', ta: '{d} அன்று ஒப்புதல் அளித்தீர்கள். எப்போது வேண்டுமானாலும் {link} திரும்பப் பெறலாம்; 24 மணி நேரத்துக்குள் ஒத்திசைவு நின்றுவிடும்.', hi: '{d} को सहमति दी। कभी भी {link} में वापस लें; 24 घंटे में सिंक रुक जाएगा।' },
   'body.le8.title': { en: 'Eight things the heart cares about', ta: 'இதயம் கவனிக்கும் எட்டு விஷயங்கள்', hi: 'आठ चीज़ें जिनकी दिल को परवाह है' },
   'body.le8.sub': { en: 'Half of your Body score. Each is scored 0–100; together they make your LE8.', ta: 'உங்கள் உடல் மதிப்பெண்ணில் பாதி. ஒவ்வொன்றும் 0–100; எல்லாம் சேர்ந்து உங்கள் LE8.', hi: 'आपके शरीर स्कोर का आधा। हर एक 0–100 पर; सब मिलकर आपका LE8 बनाते हैं।' },
   'body.le8.composite': { en: 'LE8 composite', ta: 'LE8 கூட்டு', hi: 'LE8 कुल' },
@@ -275,7 +274,6 @@ export const SP = {
   'body.sig.mean': { en: '28-day mean', ta: '28 நாள் சராசரி', hi: '28 दिन का औसत' },
   'body.sig.lastNight': { en: 'Last night', ta: 'நேற்று இரவு', hi: 'कल रात' },
   'body.sig.readingIt': { en: 'Reading it', ta: 'இதைப் புரிந்துகொள்ள', hi: 'इसे कैसे पढ़ें' },
-  'body.sig.from': { en: 'From Oura Ring Gen 4 via Terra · features computed by AIWO · ', ta: 'Oura Ring Gen 4-இலிருந்து Terra வழியாக · அம்சங்களை AIWO கணக்கிட்டது · ', hi: 'Oura Ring Gen 4 से Terra के ज़रिए · फ़ीचर AIWO ने निकाले · ' },
   'body.sig.pill': { en: 'Sleep regularity drift flags a coach call after 14 days', ta: 'தூக்க ஒழுங்கு 14 நாட்கள் சரிந்தால் பயிற்சியாளர் அழைப்பு', hi: 'नींद की नियमितता 14 दिन तक घटे तो कोच का कॉल' },
   // ─── Purpose ─────────────────────────────────────────────────────────────
   'pur.title': { en: 'Small reasons to get up, and one {e}', ta: 'எழுந்திருக்கச் சிறிய காரணங்கள், ஒரு {e}', hi: 'उठने की छोटी वजहें, और एक {e}' },
@@ -577,8 +575,6 @@ export const SP = {
   'pl.title': { en: 'Joy, noticed and {e}', ta: 'மகிழ்ச்சி, கவனிக்கப்பட்டு, {e}', hi: 'खुशी, जो देखी गई और {e}' },
   'pl.titleE': { en: 'kept', ta: 'காக்கப்பட்டு', hi: 'सहेजी गई' },
   'pl.lg.eyebrow': { en: 'Joy Ledger · this week', ta: 'ஜாய் லெட்ஜர் · இந்த வாரம்', hi: 'जॉय लेजर · इस हफ़्ते' },
-  'pl.lg.title': { en: 'Joy came most from {e} and food', ta: 'மகிழ்ச்சி அதிகம் {e} உணவிலிருந்தும் வந்தது', hi: 'खुशी सबसे ज़्यादा {e} और खाने से आई' },
-  'pl.lg.titleE': { en: 'people', ta: 'மனிதர்களிடமிருந்தும்', hi: 'लोगों' },
   'pl.lg.sub': { en: '{n} joy moments tagged across three ten-second prompts a day. Counted, never scored against you.', ta: 'நாளுக்கு மூன்று பத்து விநாடிக் கேள்விகளில் {n} மகிழ்ச்சித் தருணங்கள் குறிக்கப்பட்டன. எண்ணப்படுகின்றன, உங்களுக்கு எதிராக மதிப்பிடப்படுவதில்லை.', hi: 'रोज़ के तीन दस-सेकंड वाले सवालों में {n} खुशी के पल दर्ज हुए। गिने जाते हैं, आपके ख़िलाफ़ कभी नहीं आँके जाते।' },
   'pl.lg.perTag': { en: 'Moments per tag, this week.', ta: 'இந்த வாரம், ஒவ்வொரு குறிச்சொல்லுக்குமான தருணங்கள்.', hi: 'इस हफ़्ते, हर टैग के पल।' },
   'pl.lg.perTagAria': { en: 'Joy moments per tag', ta: 'குறிச்சொல் வாரியான மகிழ்ச்சித் தருணங்கள்', hi: 'टैग के हिसाब से खुशी के पल' },
@@ -758,8 +754,6 @@ export const SP = {
   'body.dev.disconnectQ': { en: 'Disconnect {name}?', ta: '{name}-ஐத் துண்டிக்கவா?', hi: '{name} डिस्कनेक्ट करें?' },
   'body.dev.disconnectBody': { en: 'New readings stop at once. What is already in your record stays, and you can link it again any time.', ta: 'புதிய அளவீடுகள் உடனே நின்றுவிடும். ஏற்கெனவே உங்கள் பதிவில் உள்ளவை அப்படியே இருக்கும்; எப்போது வேண்டுமானாலும் மீண்டும் இணைக்கலாம்.', hi: 'नई रीडिंग तुरंत रुक जाएँगी। जो आपके रिकॉर्ड में पहले से है, वह बना रहेगा, और आप कभी भी इसे फिर से लिंक कर सकते हैं।' },
   'body.dev.keep': { en: 'Keep it linked', ta: 'இணைப்பில் வைத்திரு', hi: 'लिंक रहने दें' },
-  'body.dev.disconnected': { en: '{name} disconnected.', ta: '{name} துண்டிக்கப்பட்டது.', hi: '{name} डिस्कनेक्ट हो गया।' },
-  'body.dev.linked': { en: '{name} linked. First sync in a few minutes.', ta: '{name} இணைக்கப்பட்டது. சில நிமிடங்களில் முதல் ஒத்திசைவு.', hi: '{name} लिंक हो गया। कुछ मिनट में पहला सिंक।' },
   'body.dev.lastSync': { en: 'Last sync {when}', ta: 'கடைசி ஒத்திசைவு {when}', hi: 'आख़िरी सिंक {when}' },
   'body.le8.log': { en: 'Log a reading', ta: 'அளவீட்டைப் பதிவு செய்', hi: 'रीडिंग दर्ज करें' },
   'body.le8.save': { en: 'Save reading', ta: 'அளவீட்டைச் சேமி', hi: 'रीडिंग सहेजें' },
@@ -857,6 +851,38 @@ export const SP = {
   'pl.pp.addYourself': { en: 'To have it in {cal} too, add it yourself:', ta: 'இது {cal}-இலும் வேண்டுமென்றால், நீங்களே சேருங்கள்:', hi: 'इसे {cal} में भी रखना हो तो ख़ुद जोड़िए:' },
   'pl.pp.appOnlyB': { en: 'Joy OS will not offer calendar details for planned pleasures.', ta: 'திட்டமிட்ட மகிழ்ச்சிகளுக்கு Joy OS காலண்டர் விவரங்களைக் காட்டாது.', hi: 'तय किए आनंद के लिए Joy OS कैलेंडर के विवरण नहीं दिखाएगा।' },
   'pl.pp.appOnlyUndo': { en: 'Show calendar details again', ta: 'காலண்டர் விவரங்களை மீண்டும் காட்டு', hi: 'कैलेंडर के विवरण फिर दिखाएँ' },
+  // ─── Body · device link, consent per device (shares /app/devices and the Trust centre) ───
+  'body.dev.consentEach': { en: 'Each device has its own consent. Withdraw any time in the {link}; sync stops within {h} hours.', ta: 'ஒவ்வொரு சாதனத்துக்கும் தனி ஒப்புதல் உண்டு. எப்போது வேண்டுமானாலும் {link} திரும்பப் பெறலாம்; {h} மணி நேரத்துக்குள் ஒத்திசைவு நின்றுவிடும்.', hi: 'हर डिवाइस की अपनी सहमति है। कभी भी {link} में वापस लें; {h} घंटे में सिंक रुक जाएगा।' },
+  'body.dev.consentOn': { en: 'Consent given {d}', ta: '{d} அன்று ஒப்புதல் அளித்தீர்கள்', hi: '{d} को सहमति दी' },
+  'body.dev.feeds': { en: 'Feeds {list}', ta: 'தரவு தருவது: {list}', hi: 'जानकारी देता है: {list}' },
+  'body.dev.withdrawn': { en: 'Consent withdrawn {d}', ta: '{d} அன்று ஒப்புதல் திரும்பப் பெறப்பட்டது', hi: '{d} को सहमति वापस ली गई' },
+  'body.dev.withdrawnOn': { en: 'You withdrew this consent on {d}. Linking gives it again, for the purposes you choose.', ta: 'இந்த ஒப்புதலை {d} அன்று திரும்பப் பெற்றீர்கள். இணைத்தால், நீங்கள் தேர்ந்தெடுக்கும் நோக்கங்களுக்கு அது மீண்டும் அளிக்கப்படும்.', hi: 'आपने यह सहमति {d} को वापस ली थी। लिंक करने पर यह आपके चुने मक़सदों के लिए फिर से दी जाएगी।' },
+  'body.dev.linkName': { en: 'Link {name}', ta: '{name}-ஐ இணை', hi: '{name} लिंक करें' },
+  'body.dev.linkedConsent': { en: '{name} linked. Your consent and its purposes are recorded in the Trust centre.', ta: '{name} இணைக்கப்பட்டது. உங்கள் ஒப்புதலும் அதன் நோக்கங்களும் நம்பிக்கை மையத்தில் பதிவாகின.', hi: '{name} लिंक हो गया। आपकी सहमति और उसके मक़सद ट्रस्ट सेंटर में दर्ज हो गए।' },
+  'body.dev.disconnectedConsent': { en: '{name} disconnected. Its consent is withdrawn, and the Trust centre records it.', ta: '{name} துண்டிக்கப்பட்டது. அதன் ஒப்புதல் திரும்பப் பெறப்பட்டது; நம்பிக்கை மையத்தில் அது பதிவானது.', hi: '{name} डिस्कनेक्ट हो गया। इसकी सहमति वापस ली गई, और ट्रस्ट सेंटर में यह दर्ज है।' },
+
+  // ─── Body · signals follow the device record ─────────────────────────────
+  'body.sig.fromX': { en: 'From {name} {via} · features computed by AIWO · ', ta: '{name}-இலிருந்து, {via} · அம்சங்களை AIWO கணக்கிட்டது · ', hi: '{name} से, {via} · फ़ीचर AIWO ने निकाले · ' },
+  'body.sig.noneT': { en: 'No signals are coming in', ta: 'எந்தச் சிக்னலும் வரவில்லை', hi: 'कोई सिग्नल नहीं आ रहा' },
+  'body.sig.noneB': { en: 'No ring or band is linked for {space}, so nothing is read and there is no trend to show. {space} still draws on Life’s Essential 8, your panel and the capacity battery.', ta: '{space} இடத்துக்கு எந்த மோதிரமும் பட்டையும் இணைக்கப்படவில்லை; அதனால் எதுவும் படிக்கப்படுவதில்லை, காட்டுவதற்குப் போக்கும் இல்லை. {space} இடம் Life’s Essential 8, உங்கள் பேனல், திறன் சோதனை ஆகியவற்றை இன்னும் பயன்படுத்துகிறது.', hi: '{space} के लिए कोई रिंग या बैंड लिंक नहीं है, इसलिए कुछ नहीं पढ़ा जाता और दिखाने को कोई रुझान नहीं है। {space} अब भी Life’s Essential 8, आपके पैनल और क्षमता जाँच पर चलता है।' },
+  'body.sig.pausedT': { en: 'Sharing from {name} is paused', ta: '{name}-இலிருந்து பகிர்வு இடைநிறுத்தப்பட்டுள்ளது', hi: '{name} से साझा करना रुका हुआ है' },
+  'body.sig.pausedB': { en: 'Nothing new is read while it is paused, so there is no trend to show. Turn sharing back on in the device card above.', ta: 'இடைநிறுத்தத்தில் இருக்கும்போது புதிதாக எதுவும் படிக்கப்படுவதில்லை, அதனால் காட்டுவதற்குப் போக்கு இல்லை. மேலே உள்ள சாதன அட்டையில் பகிர்வை மீண்டும் இயக்குங்கள்.', hi: 'रुका रहने पर कुछ नया नहीं पढ़ा जाता, इसलिए दिखाने को कोई रुझान नहीं है। ऊपर डिवाइस कार्ड में साझा करना फिर से चालू कीजिए।' },
+  'body.sig.notBodyT': { en: '{name} is not shared with {space}', ta: '{name} {space} இடத்துடன் பகிரப்படவில்லை', hi: '{name} {space} के साथ साझा नहीं है' },
+  'body.sig.notBodyB': { en: 'You chose only {ease} when you linked it, so {space} reads none of its signals. To change that, disconnect it and link it again.', ta: 'இணைக்கும்போது நீங்கள் {ease} மட்டுமே தேர்ந்தெடுத்தீர்கள், அதனால் {space} அதன் சிக்னல்கள் எதையும் படிப்பதில்லை. அதை மாற்ற, துண்டித்து மீண்டும் இணையுங்கள்.', hi: 'लिंक करते समय आपने सिर्फ़ {ease} चुना था, इसलिए {space} इसके कोई सिग्नल नहीं पढ़ता। इसे बदलने के लिए डिस्कनेक्ट करके फिर से लिंक कीजिए।' },
+  'body.sig.waitT': { en: '{name} is linked. Its first nights are on the way', ta: '{name} இணைக்கப்பட்டது. அதன் முதல் இரவுகள் வந்துகொண்டிருக்கின்றன', hi: '{name} लिंक हो गया। इसकी पहली रातें आ रही हैं' },
+  'body.sig.waitB': { en: 'A trend needs {n} nights of its own readings, so none is drawn yet. Nothing from another device is shown in its place.', ta: 'ஒரு போக்குக்கு அதன் சொந்த அளவீடுகளில் {n} இரவுகள் தேவை, அதனால் இன்னும் எதுவும் வரையப்படவில்லை. அதன் இடத்தில் வேறு சாதனத்தின் தரவு காட்டப்படுவதில்லை.', hi: 'रुझान के लिए इसकी अपनी {n} रातों की रीडिंग चाहिए, इसलिए अभी कुछ नहीं बना। इसकी जगह किसी और डिवाइस का डेटा नहीं दिखाया जाता।' },
+  'body.sig.stale': { en: '{name} has not synced since {when}. The trend stops at the last sync, and last night has no reading yet.', ta: '{when} முதல் {name} ஒத்திசைக்கப்படவில்லை. போக்கு கடைசி ஒத்திசைவில் நிற்கிறது; நேற்றிரவுக்கு இன்னும் அளவீடு இல்லை.', hi: '{name} {when} से सिंक नहीं हुआ। रुझान आख़िरी सिंक पर रुकता है, और कल रात की रीडिंग अभी नहीं है।' },
+  'body.sig.noReading': { en: 'No reading', ta: 'அளவீடு இல்லை', hi: 'रीडिंग नहीं' },
+  'body.sig.devices': { en: 'Devices and data quality', ta: 'சாதனங்களும் தரவுத் தரமும்', hi: 'डिवाइस और डेटा की गुणवत्ता' },
+
+  // ─── Shell · today's own action is never offered again ───────────────────
+  'sh.isToday': { en: 'This is today’s action', ta: 'இதுவே இன்றைய செயல்', hi: 'यही आज का काम है' },
+
+  // ─── Pleasure · the Ledger headline follows the week's counts ────────────
+  'pl.lg.titleTwo': { en: 'Joy came most from {a} and {b}', ta: 'மகிழ்ச்சி அதிகம் வந்தது: {a}, {b}', hi: 'खुशी सबसे ज़्यादा यहाँ से आई: {a} और {b}' },
+  'pl.lg.titleOne': { en: 'Joy came most from {a}', ta: 'மகிழ்ச்சி அதிகம் வந்தது: {a}', hi: 'खुशी सबसे ज़्यादा यहाँ से आई: {a}' },
+  'pl.lg.titleEven': { en: 'Joy came evenly from {n} places this week', ta: 'இந்த வாரம் மகிழ்ச்சி {n} இடங்களிலிருந்து சமமாக வந்தது', hi: 'इस हफ़्ते खुशी {n} जगहों से बराबर आई' },
+  'pl.lg.titleNone': { en: 'No joy moments yet this week', ta: 'இந்த வாரம் இன்னும் மகிழ்ச்சித் தருணங்கள் இல்லை', hi: 'इस हफ़्ते अभी कोई खुशी का पल नहीं' },
 } satisfies Dict
 
 // ─── Data text, keyed by the English it replaces ───────────────────────────
@@ -942,6 +968,7 @@ export const DT: Record<string, T2> = {
   'Notice three things.': { ta: 'மூன்று விஷயங்களைக் கவனியுங்கள்.', hi: 'तीन चीज़ों पर ध्यान दीजिए।' },
   'Savouring interventions raise positive affect (Bryant & Veroff, 2007).': { ta: 'ரசித்தல் பயிற்சிகள் நேர்மறை உணர்வை உயர்த்துகின்றன (Bryant & Veroff, 2007).', hi: 'रस लेने के अभ्यास अच्छे भाव बढ़ाते हैं (Bryant & Veroff, 2007)।' },
   'Daily Pleasure is your lowest term. Your calendar is clear after 7 pm and Kavya is home.': { ta: 'தினசரி மகிழ்ச்சி உங்கள் மிகக் குறைந்த கூறு. இரவு 7 மணிக்குப் பிறகு உங்கள் காலண்டர் காலியாக உள்ளது, Kavya-வும் வீட்டில் இருக்கிறார்.', hi: 'रोज़ का आनंद आपका सबसे कम पहलू है। शाम 7 बजे के बाद आपका कैलेंडर ख़ाली है और Kavya घर पर हैं।' },
+  'Daily Pleasure is your lowest term. A small pleasure, noticed slowly, is the gentlest way to lift it.': { ta: 'தினசரி மகிழ்ச்சி உங்கள் மிகக் குறைந்த கூறு. மெதுவாகக் கவனித்து அனுபவிக்கும் ஒரு சிறு மகிழ்ச்சியே அதை உயர்த்தும் மென்மையான வழி.', hi: 'रोज़ का आनंद आपका सबसे कम पहलू है। धीरे से महसूस किया गया एक छोटा-सा आनंद इसे बढ़ाने का सबसे नरम तरीका है।' },
   'Plan one pleasure for this evening.': { ta: 'இன்று மாலைக்கு ஒரு மகிழ்ச்சியைத் திட்டமிடுங்கள்.', hi: 'आज शाम के लिए एक आनंद तय कीजिए।' },
   'Put it in your calendar like a meeting.': { ta: 'ஒரு மீட்டிங் போல அதை உங்கள் காலண்டரில் சேருங்கள்.', hi: 'इसे मीटिंग की तरह अपने कैलेंडर में डालिए।' },
   'Planned pleasant activities (behavioural activation).': { ta: 'திட்டமிட்ட இனிய செயல்கள் (நடத்தைச் செயல்படுத்தல்).', hi: 'पहले से तय सुखद काम (बिहेवियरल एक्टिवेशन)।' },
@@ -1275,6 +1302,14 @@ export const DT: Record<string, T2> = {
   'Entered by you': { ta: 'நீங்கள் உள்ளிட்டது', hi: 'आपने दर्ज किया' },
   // Ease · routing
   'Call today': { ta: 'இன்றே அழைப்பு', hi: 'आज ही फ़ोन' },
+  // Ease · screen-form source and licence lines
+  'PHQ-4 · Kroenke et al., 2009 · public domain': { ta: 'PHQ-4 · Kroenke et al., 2009 · பொதுக் களம்', hi: 'PHQ-4 · Kroenke et al., 2009 · सार्वजनिक डोमेन' },
+  'Insomnia Severity Index · Morin et al., 2001 · licensed for Joy OS': { ta: 'Insomnia Severity Index · Morin et al., 2001 · Joy OS-க்கு உரிமம் பெற்றது', hi: 'Insomnia Severity Index · Morin et al., 2001 · Joy OS के लिए लाइसेंस प्राप्त' },
+  'PSS-4 · Cohen et al., 1983 · free for non-commercial and clinical use': { ta: 'PSS-4 · Cohen et al., 1983 · வணிக நோக்கமற்ற, கிளினிக்கல் பயன்பாட்டுக்கு இலவசம்', hi: 'PSS-4 · Cohen et al., 1983 · ग़ैर-व्यावसायिक और क्लिनिकल उपयोग के लिए मुफ़्त' },
+  'Numeric rating scale, 0–10': { ta: 'எண் மதிப்பீட்டு அளவுகோல், 0–10', hi: 'अंकों वाला पैमाना, 0–10' },
+  // Freedom · lines that stand in while no calendar is connected
+  'Freedom fell after a heavy quarter. Connect a calendar and the time audit will show whose time your week was.': { ta: 'கடினமான ஒரு காலாண்டுக்குப் பிறகு சுதந்திரம் குறைந்தது. ஒரு காலண்டரை இணைத்தால், உங்கள் வாரம் யாருடைய நேரமாக இருந்தது என்று நேரக் கணக்கெடுப்பு காட்டும்.', hi: 'भारी तिमाही के बाद स्वतंत्रता घटी। कैलेंडर जोड़ें, तो समय का हिसाब दिखाएगा कि आपका हफ़्ता किसका समय था।' },
+  'An hour named as yours is the smallest way back to your own time.': { ta: 'உங்களுடையது என்று பெயரிடப்பட்ட ஒரு மணி நேரமே, உங்கள் சொந்த நேரத்துக்குத் திரும்பும் மிகச் சிறிய வழி.', hi: 'आपके नाम किया एक घंटा अपने समय की ओर लौटने का सबसे छोटा रास्ता है।' },
 }
 
 /** Short and long weekday names, keyed by the English three-letter form. */
@@ -1295,12 +1330,30 @@ export function rich(s: string, vars: Record<string, ReactNode>): ReactNode[] {
   let last = 0
   let m: RegExpExecArray | null
   while ((m = re.exec(s))) {
-    if (m.index > last) out.push(s.slice(last, m.index))
+    if (m.index > last) out.push(lit(s.slice(last, m.index), out.length))
     out.push(m[1] in vars ? createElement(Fragment, { key: `v${out.length}` }, vars[m[1]]) : m[0])
     last = re.lastIndex
   }
-  if (last < s.length) out.push(s.slice(last))
+  if (last < s.length) out.push(lit(s.slice(last), out.length))
   return out
+}
+
+/** The literal text around the placeholders keeps its own numbers in Mono ('{n} of 3', 'Day 90'). */
+function lit(s: string, i: number): ReactNode {
+  if (!/\d/.test(s)) return s
+  return createElement('span', { key: `l${i}` }, ...s.split(NUM_RE).map((part, j) => (j % 2 === 1 ? createElement('span', { key: j, className: 'num' }, part) : part)))
+}
+
+/**
+ * Numbers in Mono (Playbook p40), also inside a sentence or a translated line: every number
+ * (146, 06:42, 2,000, 1.73, −17, the 9 of Ikigai-9) becomes a .num span, as the instrument
+ * names in the shell already do.
+ */
+const NUM_RE = /(−?\d+(?:[.,:]\d+)*)/
+export function mono(s: string): ReactNode {
+  if (!/\d/.test(s)) return s
+  // One wrapping span, so a flex row still sees a single item.
+  return createElement('span', null, ...s.split(NUM_RE).map((part, i) => (i % 2 === 1 ? createElement('span', { key: i, className: 'num' }, part) : part)))
 }
 
 export type SpKey = keyof typeof SP & string
@@ -1362,5 +1415,8 @@ export function useSpaceText() {
   const wdm = (iso: string) => fmtWeekdayDayMonth(iso, lang)
   /** Short month alone ('Jan') for a calendar day. */
   const mon = (iso: string) => fmtParts(iso, lang, { month: 'short' })
-  return { lang, t, tt, d, r, day, dm, my, clock, wdm, mon }
+  /** Like t and d, with every number in the line set in Mono. */
+  const tn = (key: SpKey, vars?: Record<string, string | number>) => mono(t(key, vars))
+  const dn = (en: string) => mono(d(en))
+  return { lang, t, tt, d, r, day, dm, my, clock, wdm, mon, tn, dn }
 }

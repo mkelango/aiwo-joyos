@@ -5,17 +5,21 @@ import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } fr
 import { Link, useSearchParams } from 'react-router-dom'
 import { DaybreakButton, Eyebrow, TermDot } from '@/components/joy/primitives'
 import { Avatar, Button, Card, PageHeader, Pill, SectionTitle } from '@/components/ui'
-import { INDEX_HISTORY, TEAM, TODAY_ACTION } from '@/data/member'
+import { TEAM, TODAY_ACTION } from '@/data/member'
 import { useMemberName } from '@/lib/memberName'
 import { CIRCLE, PRACTICE_WEEKS } from '@/data/platform'
 import { joyspanIndex } from '@/domain/indexEngine'
-import type { TermKey } from '@/domain/types'
+import type { Action, IndexScore, TermKey } from '@/domain/types'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { TERM_DETAIL, VIVA_MEMORY, type MemoryItem } from './_data'
-import { HumanWritten, Provenance, Switch } from './_parts'
-import { useLocal } from './_store'
+import { HumanWritten, Provenance, Switch, nums } from './_parts'
+import { useCoachOverride, useLocal, type CoachOverride } from './_store'
+import { todayActionFor, useActionText, useIndexHistory } from './_latest'
+import { SIGNER } from './_remeasure'
+import { COACH_ACTION_TEXT, COACH_REASON_TEXT } from './_extra'
+import { CURATED_ACTIONS } from '@/routes/console/care/_data'
 import { useBandText } from '@/components/joy/primitives'
-import { ACTION_TEXT, GUARDRAIL_TEXT, MEMORY_TEXT, PRACTICE_TITLE, TERM_DETAIL_TEXT, TOOL_TEXT, rich, useCore } from './_i18n'
+import { GUARDRAIL_TEXT, MEMORY_TEXT, PRACTICE_TITLE, TERM_DETAIL_TEXT, TOOL_TEXT, asSentence, rich, useCore } from './_i18n'
 import { useX } from './_i18nX'
 import { useIsMinor } from '@/lib/minor'
 import { careThreadHref, postCareMessage } from '@/routes/member/account/_careInbox'
@@ -65,6 +69,16 @@ const MEMORY_ON: Record<TermKey, boolean> = { H: true, P: true, R: true, F: true
 let seq = 0
 const greeting = (h = new Date().getHours()) => (h < 5 ? 'vvHello' : h < 12 ? 'vvMorning' : h < 17 ? 'vvAfternoon' : 'vvEvening')
 type Core = ReturnType<typeof useCore>
+/** What VIVA knows about today: the Index the member sees (useIndexHistory) and today's action. */
+interface Today {
+  latest: IndexScore
+  own: boolean
+  action: Action
+  override: CoachOverride | null
+  /** The coach's action as Today titles it (a curated action by id or title, else as written). */
+  coachTitle: string
+  atx: ReturnType<typeof useActionText>
+}
 type Band = (b: Parameters<ReturnType<typeof useBandText>>[0]) => string
 const mid = () => `m${Date.now()}-${seq++}`
 
@@ -76,6 +90,16 @@ export default function Viva() {
   const minor = useIsMinor()
   const who = useMemberName()
   const band = useBandText()
+  // The same Index and action Today and My Index show: the signed Day-90 re-measure once there is one.
+  const { latest, own } = useIndexHistory()
+  const override = useCoachOverride()
+  const atx = useActionText()
+  const action = todayActionFor(latest.lowestTerm)
+  const curated = override ? CURATED_ACTIONS.find((a) => a.id === override.action || a.title === override.action) : undefined
+  const coachTitle = override ? curated?.title ?? override.action : ''
+  // The term today's action belongs to, as Today's eyebrow names it.
+  const actionTerm = override ? curated?.term ?? override.term ?? action.term : action.term
+  const today: Today = { latest, own, action, override, coachTitle, atx }
   const inputId = useId()
   const [params, setParams] = useSearchParams()
   const [unavailable, setUnavailable] = useState(false)
@@ -136,8 +160,16 @@ export default function Viva() {
   }, [])
 
   /** What a tool card asks, shown and routed (a minor's Index tool asks about the method). */
-  const askOf = (tool: (typeof TOOLS)[number]): [string, string] =>
-    minor && tool.id === 'index_explainer' ? [x('vvMinorAsk'), MINOR_INDEX_ASK] : [pick(TOOL_TEXT[tool.id]?.ask, tool.ask), tool.ask]
+  const askOf = (tool: (typeof TOOLS)[number]): [string, string] => {
+    if (tool.id === 'index_explainer') return minor ? [x('vvMinorAsk'), MINOR_INDEX_ASK] : [x('vvIndexAsk', { v: latest.value }), `Why is my Index ${latest.value}?`]
+    // The verandah tea is asked by name; any other action today (the coach's, or the next step
+    // for a lowest term the signed re-measure moved) is asked about by its own title.
+    if (tool.id === 'next_best_action' && (override || action.id !== TODAY_ACTION.id)) {
+      const title = (override ? pick(COACH_ACTION_TEXT[coachTitle], coachTitle) : atx(action, 'title')).replace(/[.।]$/, '')
+      return [x('vvActionAsk', { title }), 'Why today’s action?']
+    }
+    return [pick(TOOL_TEXT[tool.id]?.ask, tool.ask), tool.ask]
+  }
 
   /** `text` is what the member sees; `routeText` (English) is what the scripted router reads. */
   const respond = (text: string, routeText = text) => {
@@ -155,7 +187,7 @@ export default function Viva() {
     }
     setMsgs((m) => [...m, mine])
     setTyping(true)
-    const reply = route(routeText, memoryOn, memory, core, band, x, minor)
+    const reply = route(routeText, memoryOn, memory, core, band, x, minor, today)
     if (reply.extra === 'route-adviser') reply.question = text
     // No diagnosis: the question goes to Dr Meera's Care thread, as the reply says (K1).
     if (reply.extra === 'route-meera') postCareMessage({ to: 'physician', from: 'viva', subject: x('vvDxSubject'), body: text, ref: 'viva:no-diagnosis' })
@@ -226,10 +258,10 @@ export default function Viva() {
                   >
                     <span className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                       <t.icon size={18} className="text-ink-2" aria-hidden />
-                      {t.term && <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-ink-3"><TermDot term={t.term} size={8} /> {space(t.term)}</span>}
+                      {(() => { const k = t.id === 'next_best_action' ? actionTerm : t.term; return k && <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-ink-3"><TermDot term={k} size={8} /> {space(k)}</span> })()}
                     </span>
                     <span className="mt-3 break-words text-[15px] font-medium text-ink">{methodOnly ? x('vvMinorAskTitle') : pick(tt?.title, t.title)}</span>
-                    <span className="mt-1 break-words text-[13px] leading-snug text-ink-2">{methodOnly ? x('vvMinorDoes') : pick(tt?.does, t.does)}</span>
+                    <span className="mt-1 break-words text-[13px] leading-snug text-ink-2">{nums(methodOnly ? x('vvMinorDoes') : pick(tt?.does, t.does))}</span>
                     <span className="num mt-3 break-all text-[11px] text-ink-3">{t.id}</span>
                   </button>
                 </li>
@@ -334,7 +366,7 @@ export default function Viva() {
                         checked={memoryOn[k]}
                         onChange={(v) => setMemoryOn((m) => ({ ...m, [k]: v }))}
                         label={<span className="flex items-center gap-2"><TermDot term={k} /> {sp}</span>}
-                        description={memoryOn[k] ? c(items.length === 1 ? 'vvRemembered1' : 'vvRememberedN', { n: items.length }) : c('vvMemOff')}
+                        description={memoryOn[k] ? rich(c(items.length === 1 ? 'vvRemembered1' : 'vvRememberedN'), { n: <span className="num">{items.length}</span> }) : c('vvMemOff')}
                       />
                     )}
                     {!locked && memoryOn[k] && items.length > 0 && (
@@ -396,7 +428,7 @@ export default function Viva() {
               ].map(([h, b], i) => (
                 <li key={h} className="flex gap-3">
                   <span className="num w-4 shrink-0 text-ink-3">{i + 1}</span>
-                  <span><b className="font-medium text-ink">{h}{core.lang === 'hi' ? '।' : '.'}</b> {b}</span>
+                  <span><b className="font-medium text-ink">{h}{core.lang === 'hi' ? '।' : '.'}</b> {nums(b)}</span>
                 </li>
               ))}
             </ol>
@@ -429,8 +461,8 @@ function MemoryRow({ item, onForget }: { item: MemoryItem; onForget: () => void 
   return (
     <li className="flex items-start justify-between gap-3 rounded-lg bg-paper-sunk px-3 py-2.5">
       <div className="min-w-0">
-        <p className="text-[14px] text-ink">{text}</p>
-        <p className="mt-0.5 text-[12px] text-ink-3">{pick(mt?.source, item.source)}</p>
+        <p className="text-[14px] text-ink">{nums(text)}</p>
+        <p className="mt-0.5 text-[12px] text-ink-3">{nums(pick(mt?.source, item.source))}</p>
       </div>
       <Button variant="ghost" size="sm" onClick={onForget} aria-label={c('vvForgetAria', { text })} className="!h-8 !min-h-8 shrink-0 !px-2.5 !text-[13px]">
         <Trash2 size={13} /> {c('vvForget')}
@@ -447,7 +479,7 @@ function Bubble({ m, onAdd }: { m: Msg; onAdd: (m: Msg) => void }) {
   if (m.from === 'me')
     return (
       <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="flex justify-end">
-        <p className="max-w-[85%] rounded-2xl rounded-br-md bg-ink px-4 py-2.5 text-[16px] text-paper">{m.text}</p>
+        <p className="max-w-[85%] rounded-2xl rounded-br-md bg-ink px-4 py-2.5 text-[16px] text-paper">{nums(m.text)}</p>
       </motion.div>
     )
   if (m.from === 'system') {
@@ -458,7 +490,7 @@ function Bubble({ m, onAdd }: { m: Msg; onAdd: (m: Msg) => void }) {
           {crisis ? <ShieldAlert size={14} aria-hidden /> : <AlertTriangle size={14} aria-hidden />}
           <span className="eyebrow">{crisis ? c('vvCrisisTag') : c('vvUnavailTag')}</span>
         </p>
-        <p className="mt-1.5 text-[16px] text-ink">{m.text}</p>
+        <p className="mt-1.5 text-[16px] text-ink">{nums(m.text)}</p>
         {m.extra === 'relay' && m.relay && <Relay text={m.relay} />}
       </motion.div>
     )
@@ -468,13 +500,13 @@ function Bubble({ m, onAdd }: { m: Msg; onAdd: (m: Msg) => void }) {
       {m.kind === 'suffering' ? (
         <div className="rounded-2xl rounded-bl-md border border-line bg-paper px-4 py-3">
           <p className="eyebrow text-ink-3">{c('vvPassage', { space: space('B') })}</p>
-          <p className="mt-1.5 text-[16px] leading-relaxed text-ink">{m.text}</p>
+          <p className="mt-1.5 text-[16px] leading-relaxed text-ink">{nums(m.text)}</p>
           <HumanWritten by="Dr Sanjay Menon" className="mt-3" />
         </div>
       ) : (
         <div className={clsx('rounded-2xl rounded-bl-md px-4 py-3', m.kind === 'refusal' ? 'border border-line bg-paper' : 'bg-paper-sunk')}>
           {m.kind === 'refusal' && <p className="eyebrow mb-1.5 text-ink-3">{c('vvOutside')}</p>}
-          <p className="text-[16px] leading-relaxed text-ink">{m.text}</p>
+          <p className="text-[16px] leading-relaxed text-ink">{nums(m.text)}</p>
           {m.extra && m.extra !== 'relay' && <Extra kind={m.extra} question={m.question} onAdd={onAdd} />}
         </div>
       )}
@@ -511,10 +543,11 @@ function Relay({ text }: { text: string }) {
 function Extra({ kind, question, onAdd }: { kind: Exclude<NonNullable<Msg['extra']>, 'relay'>; question?: string; onAdd: (m: Msg) => void }): ReactNode {
   const { t: c, space } = useCore()
   const minor = useIsMinor()
+  // The tiles are the Index VIVA just explained: the member's own signed re-measure once there is one.
+  const { latest } = useIndexHistory()
   if (kind === 'index') {
     // Never a term score for a member under 18.
     if (minor) return null
-    const latest = INDEX_HISTORY[0]
     return (
       <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
         {latest.terms.map((t) => (
@@ -579,10 +612,10 @@ function AdviserNote({ question, onAdd }: { question?: string; onAdd: (m: Msg) =
 }
 
 // ─── Scripted router (no live model in this front end) ──────────────────────
-function route(text: string, memoryOn: Record<TermKey, boolean>, memory: Record<TermKey, MemoryItem[]>, core: Core, band: Band, x: ReturnType<typeof useX>, minor: boolean): Msg {
+function route(text: string, memoryOn: Record<TermKey, boolean>, memory: Record<TermKey, MemoryItem[]>, core: Core, band: Band, x: ReturnType<typeof useX>, minor: boolean, today: Today): Msg {
   const { t: c, lang, name, pick, when } = core
   const t = text.toLowerCase()
-  const latest = INDEX_HISTORY[0]
+  const { latest, own, action, override, coachTitle, atx } = today
   const viva = (tool: string, body: string, extra?: Msg['extra'], kind: Kind = 'reply'): Msg => ({ id: mid(), from: 'viva', kind, tool, text: body, extra })
   // VIVA only quotes a memory while its space's switch is on AND the item is still kept.
   const remembers = (k: TermKey, ...ids: string[]) => memoryOn[k] && (memory[k] ?? []).some((m) => ids.includes(m.id))
@@ -615,7 +648,7 @@ function route(text: string, memoryOn: Record<TermKey, boolean>, memory: Record<
         v: latest.terms.find((s) => s.key === 'H')!.value ?? '',
       }),
     )
-  if (/\b(index|score|64|lowest|wheel|band)\b/.test(t)) {
+  if (/\b(index|score|lowest|wheel|band)\b/.test(t) || new RegExp(`\\b${latest.value}\\b`).test(t)) {
     if (minor) return viva('index_explainer', x('rtIndexMinor'))
     const e = joyspanIndex(latest.terms)!
     const lifted = joyspanIndex(latest.terms.map((s) => (s.key === latest.lowestTerm ? { ...s, value: (s.value ?? 0) + 10 } : s)))!
@@ -634,9 +667,12 @@ function route(text: string, memoryOn: Record<TermKey, boolean>, memory: Record<
     )
   }
   if (/\b(why|today|action|verandah|tea)\b/.test(t) && !/savour/.test(t)) {
-    const at = ACTION_TEXT[TODAY_ACTION.id]
-    const title = pick(at?.title, TODAY_ACTION.title)
-    return viva('next_best_action', c('rtAction', { why: pick(at?.why, TODAY_ACTION.why), title: lang === 'en' ? title.toLowerCase() : title, detail: pick(at?.detail, TODAY_ACTION.detail), evidence: pick(at?.evidence, TODAY_ACTION.evidence) }))
+    // The coach's choice, when the coach replaced the engine's action today (as Today shows it).
+    if (override)
+      return viva('next_best_action', x('rtActionCoach', { who: override.by ? `, ${override.by}` : '', title: asSentence(pick(COACH_ACTION_TEXT[coachTitle], coachTitle), lang), reason: asSentence(pick(COACH_REASON_TEXT[override.reason], override.reason), lang) }))
+    const title = atx(action, 'title')
+    const why = own && action.id !== TODAY_ACTION.id ? x('tdWhyOwn', { term: name(latest.lowestTerm), who: latest.signedBy ?? SIGNER.name }) : atx(action, 'why')
+    return viva('next_best_action', c('rtAction', { why, title: lang === 'en' ? title.charAt(0).toLowerCase() + title.slice(1) : title, detail: atx(action, 'detail'), evidence: atx(action, 'evidence') }))
   }
   if (/\b(purpose|ikigai|tomorrow|meaning)\b/.test(t))
     return viva(

@@ -79,6 +79,7 @@ export const MEMBERSHIP = {
   paidA: { en: 'Paid. ', ta: 'செலுத்தப்பட்டது. ', hi: 'भुगतान हो गया। ' },
   paidBody: { en: 'February is paid. Invoice {id} is in your list. Nothing changed while it was pending.', ta: 'பிப்ரவரி செலுத்தப்பட்டது. ரசீது {id} உங்கள் பட்டியலில் உள்ளது. நிலுவையில் இருந்தபோது எதுவும் மாறவில்லை.', hi: 'फ़रवरी का भुगतान हो गया। इनवॉइस {id} आपकी सूची में है। बाक़ी रहने के दौरान कुछ नहीं बदला।' },
   dueBy: { en: 'Retrying · due by {date}', ta: 'மீண்டும் முயற்சிக்கிறது · {date}-க்குள் செலுத்த வேண்டும்', hi: 'फिर कोशिश जारी · {date} तक देय' },
+  dueByUnpaid: { en: 'Unpaid · due by {date}', ta: 'செலுத்தப்படவில்லை · {date}-க்குள் செலுத்த வேண்டும்', hi: 'बाक़ी · {date} तक देय' },
   payNow: { en: 'Pay now', ta: 'இப்போது செலுத்து', hi: 'अभी भुगतान करें' },
   share: { en: 'Share', ta: 'பகிர்', hi: 'शेयर करें' },
   print: { en: 'Print', ta: 'அச்சிடு', hi: 'प्रिंट करें' },
@@ -99,6 +100,23 @@ export const MEMBERSHIP = {
   resumed: { en: 'Membership resumed. Nothing was lost while it was paused.', ta: 'உறுப்பினர் நிலை மீண்டும் தொடங்கியது. இடைநிறுத்தத்தின்போது எதுவும் இழக்கப்படவில்லை.', hi: 'सदस्यता फिर शुरू हुई। रुके रहने के दौरान कुछ नहीं खोया।' },
   specimenWord: { en: 'specimen', ta: 'மாதிரி', hi: 'नमूना' },
   pausedPill: { en: 'Paused', ta: 'இடைநிறுத்தம்', hi: 'रुकी हुई' },
+  // The plan's own entitlements, invoices per account, and grace for a yearly Patron renewal
+  noInvoices: { en: 'No invoices on this account yet. The first one appears here with its GST.', ta: 'இந்தக் கணக்கில் இன்னும் ரசீதுகள் இல்லை. முதல் ரசீது அதன் GST உடன் இங்கே தோன்றும்.', hi: 'इस खाते पर अभी कोई इनवॉइस नहीं। पहला इनवॉइस अपने GST के साथ यहाँ दिखेगा।' },
+  noMethodPlan: { en: 'No payment method on file yet. The first invoice comes with a Razorpay link; cards and UPI are entered only there.', ta: 'இன்னும் கட்டண முறை சேமிக்கப்படவில்லை. முதல் ரசீது Razorpay இணைப்புடன் வரும்; கார்டுகளும் UPI-யும் அங்கே மட்டுமே உள்ளிடப்படும்.', hi: 'अभी कोई भुगतान तरीका दर्ज नहीं। पहला इनवॉइस Razorpay लिंक के साथ आता है; कार्ड और UPI सिर्फ़ वहीं डाले जाते हैं।' },
+  demoGraceFree: { en: 'Joy OS (free) bills nothing, so there is no payment to miss.', ta: 'Joy OS (இலவசம்) எதற்கும் கட்டணம் வசூலிப்பதில்லை, அதனால் தவறவிட எந்தக் கட்டணமும் இல்லை.', hi: 'Joy OS (मुफ़्त) कुछ बिल नहीं करता, इसलिए कोई भुगतान छूट नहीं सकता।' },
+  demoGraceNoMethod: { en: 'There is no payment method on file yet, so nothing can fail to go through.', ta: 'இன்னும் கட்டண முறை சேமிக்கப்படவில்லை, அதனால் எதுவும் தோல்வியடைய முடியாது.', hi: 'अभी कोई भुगतान तरीका दर्ज नहीं, इसलिए कुछ भी असफल नहीं हो सकता।' },
+  demoGracePaidPatron: { en: 'The Patron renewal is paid, so the grace state is over.', ta: 'Patron புதுப்பிப்பு செலுத்தப்பட்டுவிட்டது, எனவே சலுகைக் காலம் முடிந்தது.', hi: 'Patron का नवीनीकरण चुका दिया गया, इसलिए मोहलत ख़त्म हो गई।' },
+  graceTitlePatron: { en: 'Your Patron renewal invoice is still unpaid. Nothing changes until ', ta: 'உங்கள் Patron புதுப்பிப்பு ரசீது இன்னும் செலுத்தப்படவில்லை. இது வரை எதுவும் மாறாது: ', hi: 'आपका Patron नवीनीकरण इनवॉइस अभी बाक़ी है। इस तारीख़ तक कुछ नहीं बदलेगा: ' },
+  graceBodyPatron: { en: 'Your household, ’cation and charter carry on as normal. After that, Patron steps down to Joy OS (free); your Index, Ledger and Trust centre never do.', ta: 'உங்கள் குடும்பம், ’கேஷன், சாசனம் வழக்கம்போல் தொடரும். அதன் பிறகு Patron, Joy OS (இலவசம்) ஆக மாறும்; உங்கள் குறியீடு, லெட்ஜர், நம்பிக்கை மையம் ஒருபோதும் நிற்காது.', hi: 'आपका परिवार, ’केशन और चार्टर पहले की तरह चलते रहेंगे। उसके बाद Patron, Joy OS (मुफ़्त) पर आ जाता है; आपका इंडेक्स, लेजर और ट्रस्ट सेंटर कभी नहीं रुकते।' },
+  payLink: { en: 'Pay {amount} on Razorpay', ta: 'Razorpay-இல் {amount} செலுத்தவும்', hi: 'Razorpay पर {amount} दें' },
+  payUpiAmount: { en: 'Pay {amount} by UPI', ta: 'UPI மூலம் {amount} செலுத்தவும்', hi: 'UPI से {amount} दें' },
+  payBodyLink: { en: 'Razorpay opens its own page for {amount}, the Patron renewal: net banking or a card, entered only there. Joy OS never sees your bank or card details.', ta: 'Patron புதுப்பிப்புக்கான {amount}-க்கு Razorpay தன் சொந்தப் பக்கத்தைத் திறக்கும்: நெட் பேங்கிங் அல்லது கார்டு, அங்கே மட்டுமே உள்ளிடப்படும். Joy OS உங்கள் வங்கி அல்லது கார்டு விவரங்களை ஒருபோதும் பார்க்காது.', hi: 'Patron नवीनीकरण के {amount} के लिए Razorpay अपना पेज खोलता है: नेट बैंकिंग या कार्ड, सिर्फ़ वहीं डाले जाते हैं। Joy OS आपके बैंक या कार्ड का ब्योरा कभी नहीं देखता।' },
+  patronByLink: { en: 'The yearly Patron renewal is beyond a UPI autopay mandate, so it comes as a Razorpay invoice link instead.', ta: 'வருடாந்திர Patron புதுப்பிப்பு UPI தானியங்கு கட்டண வரம்புக்கு மேல், எனவே அது Razorpay ரசீது இணைப்பாக வரும்.', hi: 'सालाना Patron नवीनीकरण UPI ऑटोपे मैंडेट की सीमा से ऊपर है, इसलिए यह Razorpay इनवॉइस लिंक के रूप में आता है।' },
+  payBodyUpi: { en: 'A collect request goes to {upi} for {amount}, February. Approve it in your UPI app; Joy OS never sees your UPI PIN.', ta: 'பிப்ரவரிக்கான {amount}-க்கு {upi}-க்கு ஒரு கோரிக்கை செல்லும். உங்கள் UPI செயலியில் அதை அங்கீகரியுங்கள்; Joy OS உங்கள் UPI PIN-ஐ ஒருபோதும் பார்க்காது.', hi: '{amount}, फ़रवरी के लिए {upi} पर एक कलेक्ट रिक्वेस्ट जाएगी। उसे अपने UPI ऐप में मंज़ूर करें; Joy OS आपका UPI PIN कभी नहीं देखता।' },
+  approvingCard: { en: 'Waiting for Razorpay to confirm…', ta: 'Razorpay உறுதிசெய்யக் காத்திருக்கிறது…', hi: 'Razorpay की पुष्टि का इंतज़ार…' },
+  sendCard: { en: 'Pay on Razorpay (specimen)', ta: 'Razorpay-இல் செலுத்து (மாதிரி)', hi: 'Razorpay पर दें (नमूना)' },
+  paidBodyPatron: { en: 'The Patron renewal is paid. Invoice {id} is in your list. Nothing changed while it was pending.', ta: 'Patron புதுப்பிப்பு செலுத்தப்பட்டது. ரசீது {id} உங்கள் பட்டியலில் உள்ளது. நிலுவையில் இருந்தபோது எதுவும் மாறவில்லை.', hi: 'Patron का नवीनीकरण चुका दिया गया। इनवॉइस {id} आपकी सूची में है। बाक़ी रहने के दौरान कुछ नहीं बदला।' },
+  patronRenewal: { en: 'Patron · {from} to {to}', ta: 'Patron · {from} முதல் {to} வரை', hi: 'Patron · {from} से {to} तक' },
 } satisfies Dict
 
 export const CADENCE: Record<string, L3> = {
@@ -122,7 +140,7 @@ export const PLAN_POINT: Record<string, L3> = {
   'Priority Houses and Residences': { en: 'Priority Houses and Residences', ta: 'Houses, Residences-இல் முன்னுரிமை', hi: 'Houses और Residences में प्राथमिकता' },
   'Named coach and concierge': { en: 'Named coach and concierge', ta: 'குறிப்பிட்ட பயிற்சியாளரும் கான்சியர்ஜும்', hi: 'तय कोच और कंसीयर्ज' },
   'Quarterly Index': { en: 'Quarterly Index', ta: 'காலாண்டு குறியீடு', hi: 'तिमाही इंडेक्स' },
-  'Joyspan Sessions': { en: 'Joyspan Sessions', ta: 'ஜாய்ஸ்பான் Sessions', hi: 'जॉयस्पैन Sessions' },
+  'Joyspan Sessions': { en: 'Joyspan Sessions', ta: 'ஜாய்ஸ்பான் அமர்வுகள்', hi: 'जॉयस्पैन सेशन' },
   'The ninety days, continued': { en: 'The ninety days, continued', ta: 'தொண்ணூறு நாட்கள், தொடர்ச்சியாக', hi: 'नब्बे दिन, जारी' },
 }
 
@@ -139,6 +157,7 @@ export const ENTITLEMENT_USE: Record<string, L3> = {
 export const INVOICE_ITEM: Record<string, L3> = {
   'INV-2027-000531': { en: 'Joy OS Plus · February', ta: 'Joy OS Plus · பிப்ரவரி', hi: 'Joy OS Plus · फ़रवरी' },
   'INV-2027-000418': { en: 'Joy OS Plus · January', ta: 'Joy OS Plus · ஜனவரி', hi: 'Joy OS Plus · जनवरी' },
+  'INV-2027-000422': { en: 'Joy OS Plus · January', ta: 'Joy OS Plus · ஜனவரி', hi: 'Joy OS Plus · जनवरी' },
   'INV-2026-011872': { en: 'Circle membership · 2027', ta: 'Circle உறுப்பினர் கட்டணம் · 2027', hi: 'Circle सदस्यता · 2027' },
   'INV-2026-011203': { en: 'Joy OS Plus · December', ta: 'Joy OS Plus · டிசம்பர்', hi: 'Joy OS Plus · दिसंबर' },
   'INV-2026-010554': { en: 'Joy OS Plus · November', ta: 'Joy OS Plus · நவம்பர்', hi: 'Joy OS Plus · नवंबर' },
@@ -149,4 +168,6 @@ export const PAY_WORD: Record<string, L3> = {
   Card: { en: 'Card', ta: 'கார்டு', hi: 'कार्ड' },
   UPI: { en: 'UPI', ta: 'UPI', hi: 'UPI' },
   Retrying: { en: 'Retrying', ta: 'மீண்டும் முயற்சிக்கிறது', hi: 'फिर कोशिश जारी' },
+  Unpaid: { en: 'Unpaid', ta: 'செலுத்தப்படவில்லை', hi: 'बाक़ी' },
+  'Razorpay link': { en: 'Razorpay link', ta: 'Razorpay இணைப்பு', hi: 'Razorpay लिंक' },
 }

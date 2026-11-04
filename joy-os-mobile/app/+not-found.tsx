@@ -7,6 +7,7 @@ import { sessionStore, useStore } from '@/screens/b/bStore'
 import { useDict } from '@/lib/i18n'
 import { NOT_FOUND } from '@/screens/b/i18n/entry'
 import { useCommon } from '@/screens/b/i18n/common'
+import { MonoNums } from '@/lib/monoNums'
 
 // NOT FOUND: an address the app does not have (an old link, a typo, a retired page). Said
 // plainly, with the way home and the few places people usually mean. There is no public site,
@@ -34,7 +35,7 @@ export default function NotFound() {
         <Title size={34} accessibilityRole="header">
           {t('titleA')}<Serif>{t('titleSerif')}</Serif>{t('titleB')}
         </Title>
-        <Body tone="ink2">{t('lead')}</Body>
+        <Body tone="ink2"><MonoNums text={t('lead')} /></Body>
       </View>
 
       <Card tone="sunk" padding={16} style={{ gap: 4 }}>
@@ -67,7 +68,7 @@ export default function NotFound() {
           {tc('crisis')}
         </Button>
         <Meta size={13} tone="ink3" align="center">
-          {t('footer')}
+          <MonoNums text={t('footer')} />
         </Meta>
       </View>
     </Screen>

@@ -12,7 +12,7 @@ import { termByKey } from '@/data/terms'
 import { lowestTerm } from '@/domain/indexEngine'
 import type { TermKey } from '@/domain/types'
 import { COACH_CASELOAD, CURATED_ACTIONS, DAY_N, OVERRIDE_REASONS, PRIYA, digestFor, type CoachDigest } from './_data'
-import { PreviewBanner, actorOf, useConsoleAccess } from './_gate'
+import { PreviewBanner, actorOf, useConsoleAccess, withGrant } from './_gate'
 import { APP_MEMBER_ID, clearNbaOverride, recordSessionRead, useNbaOverride, writeNbaOverride } from './_memberShare'
 import { AccessNote, AuditList, CardHead, ConsoleTermChip, SlaChip, areaCls, fieldCls, fmtClock, labelCls, parseIst, useConsoleNow, type AuditEvent } from './_parts'
 import { useClinicalState } from './_clinicalStore'
@@ -57,15 +57,16 @@ export default function CoachMember() {
 function ReasonedDigest({ d }: { d: CoachDigest }) {
   const navigate = useNavigate()
   const now = useConsoleNow()
-  const actor = actorOf(useConsoleAccess('/console/coach', d.id))
+  const acc = useConsoleAccess('/console/coach', d.id)
+  const actor = actorOf(acc)
   const [params] = useSearchParams()
   const [reason, setReason] = useState<string | null>(null)
   if (reason) return <Digest d={d} reason={reason} onChangeReason={() => setReason(null)} />
   const suggested = params.get('task') ? 'Drift task follow-up' : DAY_N.some((x) => d.day >= x.window[0] && d.day <= x.window[1]) ? 'Day-N review or call preparation' : 'Weekly digest review'
   const open = (purpose: string) => {
-    coach.updateMember(d.id, (w) => ({ ...w, audit: [{ at: `${TODAY} · ${fmtClock(now)}`, who: auditWho(actor), what: 'Opened member digest (term scores, bands, Ledger counts)', purpose: `coach_digest · ${purpose} · Care consent v3 (granted ${d.consentGranted})` }, ...(w.audit ?? [])] }))
+    coach.updateMember(d.id, (w) => ({ ...w, audit: [{ at: `${TODAY} · ${fmtClock(now)}`, who: auditWho(actor), what: 'Opened member digest (term scores, bands, Ledger counts)', purpose: withGrant(`coach_digest · ${purpose} · Care consent v3 (granted ${d.consentGranted})`, acc) }, ...(w.audit ?? [])] }))
     // The read and its reason reach the member's "Who has seen my data".
-    recordSessionRead({ who: actor.who, role: actor.role, console: 'coach', reason: purpose, memberId: d.id })
+    recordSessionRead({ who: actor.who, role: actor.role, console: 'coach', reason: withGrant(purpose, acc), memberId: d.id })
     setReason(purpose)
   }
   return (
@@ -148,14 +149,17 @@ function Digest({ d, reason, onChangeReason }: { d: CoachDigest; reason: string;
   const work = members[d.id] ?? {}
   const lowest = lowestTerm(d.terms)
   const stamp = () => `${TODAY} · ${fmtClock(now)}`
-  // Every line names the signed-in role's person, never the coach by default.
-  const addAudit = (e: Omit<AuditEvent, 'at' | 'who'>) => coach.updateMember(d.id, (w) => ({ ...w, audit: [{ at: stamp(), who: auditWho(actor), ...e }, ...(w.audit ?? [])] }))
+  // Every line names the signed-in role's person, never the coach by default, and the grant
+  // reference when the action is taken under one.
+  const addAudit = (e: Omit<AuditEvent, 'at' | 'who'>) => coach.updateMember(d.id, (w) => ({ ...w, audit: [{ at: stamp(), who: auditWho(actor), ...e, purpose: withGrant(e.purpose ?? 'Care', acc) }, ...(w.audit ?? [])] }))
   // The override the member app shows (Today), kept in step with the one on this digest.
   const shared = useNbaOverride(d.id)
 
   // Persisted per-member work (survives returning to the queue).
   const calls = work.calls ?? d.calls
-  const override = work.override ?? (shared?.term ? { title: shared.action, term: shared.term, reason: shared.reason, until: shared.until ?? d.day + 7 } : null)
+  // The shared record is the override: it is what Today shows, kept per member, so this
+  // digest never says "Override active" for an override the member app does not have.
+  const override = shared ? { title: shared.action, term: shared.term ?? d.currentAction.term, reason: shared.reason, until: shared.until ?? d.day + 7 } : null
   const reviewed = work.reviewed ?? true
   const reviewedAt = work.reviewedAt ?? '27 Jan 18:02'
   // The specimen summary was reviewed by the member's coach; any later review names whoever signed in.

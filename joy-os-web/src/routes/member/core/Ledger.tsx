@@ -7,12 +7,12 @@ import { Bar, BarChart, LabelList, ResponsiveContainer, XAxis, YAxis } from 'rec
 import { DaybreakButton, Eyebrow, MethodLine, NotScoredNote, SpecimenTag, TermChip } from '@/components/joy/primitives'
 import { useScoresHidden } from '@/lib/minor'
 import { Button, Card, PageHeader, Pill, SectionTitle } from '@/components/ui'
-import { INDEX_HISTORY, LEDGER, LEDGER_TAGS, MEMBER } from '@/data/member'
+import { LEDGER, LEDGER_TAGS, MEMBER } from '@/data/member'
 import type { LedgerEntry } from '@/domain/types'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { useT } from '@/lib/i18n'
 import { LEDGER_CALENDAR, LEDGER_SCHEDULE, LEDGER_STORY } from './_data'
-import { Provenance, Switch, TICK } from './_parts'
+import { Provenance, Switch, TICK, nums } from './_parts'
 import { SPECIMEN_TODAY, addDays, isSeed, liveLedger, localDay, useKeptPrompts, useLedgerRemoved, useLocal, usePlannedPleasures, weekCounts, weekEntryCount, type ScheduleRow } from './_store'
 import { useX } from './_i18nX'
 import { formulaText } from './_extra'
@@ -21,6 +21,7 @@ import { termByKey } from '@/data/terms'
 import { PLANNED_START } from '@/routes/member/spaces/_data'
 import { useSpaceText } from '@/routes/member/spaces/_i18n'
 import { SCHEDULE_LABEL, STORY_TEXT, fmtLocal, rich, useCore } from './_i18n'
+import { useIndexHistory } from './_latest'
 import type { Lang } from '@/lib/store'
 import { playSound } from '@/lib/sound'
 
@@ -83,7 +84,8 @@ export default function Ledger() {
   const [removed, setRemoved] = useLedgerRemoved()
   const [rows, setRows] = useLocal<ScheduleRow[]>('ledger-schedule', DEFAULT_SCHEDULE)
   const live = useMemo(() => liveLedger(ledger, removed), [ledger, removed])
-  const latest = INDEX_HISTORY[0]
+  // The Daily Pleasure term as My Index shows it (the signed Day-90 re-measure once there is one).
+  const { latest } = useIndexHistory()
   const d = latest.terms.find((t) => t.key === 'D')!
   const { active, current, next } = promptState(rows)
   const prompt: 1 | 2 | 3 = current?.prompt ?? 1
@@ -294,7 +296,7 @@ function PromptCard({ prompt, time, next, live }: { prompt: 1 | 2 | 3; time?: st
             {touched && empty && <p role="alert" className="mt-4 text-[14px] text-error">{c('lgEmpty')}</p>}
 
             <div className="mt-auto flex flex-col gap-2 pt-7 sm:flex-row sm:items-center">
-              <DaybreakButton onClick={save} className="w-full sm:flex-1">{c('lgSave')}</DaybreakButton>
+              <DaybreakButton onClick={save} className="w-full sm:flex-1">{rich(c('lgSave'), { n: <span className="num">10</span> })}</DaybreakButton>
               <Button variant="ghost" onClick={() => setState('later')} className="sm:px-6">{c('lgNotNow')}</Button>
             </div>
           </motion.div>
@@ -316,7 +318,7 @@ function PromptCard({ prompt, time, next, live }: { prompt: 1 | 2 | 3; time?: st
         ) : state === 'held' ? (
           <motion.div key="held" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex flex-1 flex-col" role="status">
             <p className="mt-4 text-[1.6rem] font-light leading-snug text-ink">{c('lgHeld')}</p>
-            <p className="mt-3 text-[15px] text-ink-2">{c('lgHeldNote')}</p>
+            <p className="mt-3 text-[15px] text-ink-2">{nums(c('lgHeldNote'))}</p>
             <div className="mt-auto flex flex-wrap gap-2 pt-6">
               <Button variant="secondary" onClick={() => setCrisisOpen(true)}>{c('lgTalkNow')}</Button>
               <Button variant="ghost" onClick={reset}>{c('lgBackLedger')}</Button>
@@ -497,7 +499,7 @@ function CalendarCard({ live }: { live: LedgerEntry[] }) {
       <div className="mt-4 flex items-center justify-end gap-2 text-[12px] text-ink-3">
         <span>{c('calFewer')}</span>
         {[0, 1, 2, 3].map((n) => <span key={n} className="h-3.5 w-3.5 rounded" style={{ background: shade(n) }} aria-hidden />)}
-        <span>{c('calThree')}</span>
+        <span>{nums(c('calThree'))}</span>
       </div>
     </Card>
   )

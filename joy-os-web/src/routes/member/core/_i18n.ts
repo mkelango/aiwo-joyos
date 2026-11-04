@@ -21,8 +21,21 @@ export function fmtLocal(d: Date, lang: Lang, opts: Intl.DateTimeFormatOptions) 
 }
 
 /**
+ * A figure in running text ("1.9", "−3", "22:00", "Day-90"). A digit that is part of an
+ * instrument's name (PHQ-4, LE8, UCLA-3, v1.0) is not a figure and stays in the sentence's face.
+ */
+const NUMBER_RUN = /((?<![A-Za-z]\d*[.,:]?)(?<![A-Z][-‑])[−+]?\d+(?:[.,:]\d+)*)/
+
+/** Set every figure in a plain string in the mono style (the brand rule); text without digits is returned as is. */
+export function monoFigures(text: string, key: string | number = 'n'): ReactNode {
+  if (!/\d/.test(text)) return text
+  return text.split(NUMBER_RUN).map((p, i) => (i % 2 === 1 ? createElement('span', { key: `${key}-${i}`, className: 'num' }, p) : p))
+}
+
+/**
  * Fill a translated template with React nodes. `{name}` takes nodes[name];
- * `*text*` becomes <em>text</em>.
+ * `*text*` becomes <em>text</em>. Figures written into the template itself ("Day 76",
+ * "Day-90", "48 hours") are set in mono, like the figures passed in as nodes.
  */
 export function rich(s: string, nodes: Record<string, ReactNode> = {}): ReactNode {
   const parts = s.split(/(\{\w+\}|\*[^*]+\*)/)
@@ -31,9 +44,16 @@ export function rich(s: string, nodes: Record<string, ReactNode> = {}): ReactNod
       const k = p.slice(1, -1)
       return createElement(Fragment, { key: i }, k in nodes ? nodes[k] : p)
     }
-    if (p.length > 2 && p.startsWith('*') && p.endsWith('*')) return createElement('em', { key: i }, p.slice(1, -1))
-    return p
+    if (p.length > 2 && p.startsWith('*') && p.endsWith('*')) return createElement('em', { key: i }, monoFigures(p.slice(1, -1), i))
+    return createElement(Fragment, { key: i }, monoFigures(p, i))
   })
+}
+
+/** End a free-written clause (a coach's reason or action) with a full stop, so the next sentence does not run on. */
+export function asSentence(s: string, lang: Lang): string {
+  const t = s.trim()
+  if (!t || /[.!?।”’)]$/.test(t)) return t
+  return t + (lang === 'hi' ? '।' : '.')
 }
 
 export const CORE = {
@@ -191,11 +211,6 @@ export const CORE = {
     hi: 'चुनी हुई 40 {space} गतिविधियाँ, हर एक के दावे जाँचे हुए और प्रमाण के साथ।',
   },
   tdStep3h: { en: 'Fit.', ta: 'பொருத்தம்.', hi: 'मेल।' },
-  tdStep3: {
-    en: 'Calendar clear after 7 pm (consented), Kavya linked, sunset 18:12.',
-    ta: 'இரவு 7 மணிக்குப் பிறகு நாட்காட்டி காலி (ஒப்புதலுடன்), Kavya இணைக்கப்பட்டுள்ளார், சூரிய அஸ்தமனம் 18:12.',
-    hi: 'शाम 7 बजे के बाद कैलेंडर खाली (सहमति से), Kavya जुड़ी हुई हैं, सूर्यास्त 18:12।',
-  },
   tdStep4h: { en: 'One.', ta: 'ஒன்று.', hi: 'एक।' },
   tdStep4: {
     en: 'Shown with one reason. “Not today” is never punished.',
@@ -562,7 +577,7 @@ export const CORE = {
   lgUnreadable: { en: 'That photo could not be read on this device. Try another.', ta: 'இந்தச் சாதனத்தில் அந்தப் புகைப்படத்தைப் படிக்க முடியவில்லை. வேறொன்றை முயலுங்கள்.', hi: 'यह फ़ोटो इस डिवाइस पर पढ़ी नहीं जा सकी। कोई दूसरी आज़माएँ।' },
   lgPhotosStay: { en: 'Photos stay on this phone and are never read by AI.', ta: 'புகைப்படங்கள் இந்த ஃபோனிலேயே இருக்கும்; AI ஒருபோதும் அவற்றைப் படிக்காது.', hi: 'फ़ोटो इसी फ़ोन पर रहती हैं और AI उन्हें कभी नहीं पढ़ता।' },
   lgEmpty: { en: 'Choose a tag, or add a word, to keep this moment.', ta: 'இந்தத் தருணத்தைச் சேமிக்க, ஒரு குறிச்சொல்லைத் தேர்ந்தெடுக்கவும் அல்லது ஒரு சொல் சேர்க்கவும்.', hi: 'यह पल सहेजने के लिए एक टैग चुनें, या एक शब्द जोड़ें।' },
-  lgSave: { en: 'Save · 10 seconds', ta: 'சேமிக்கவும் · 10 வினாடிகள்', hi: 'सहेजें · 10 सेकंड' },
+  lgSave: { en: 'Save · {n} seconds', ta: 'சேமிக்கவும் · {n} வினாடிகள்', hi: 'सहेजें · {n} सेकंड' },
   lgNotNow: { en: 'Not now', ta: 'இப்போது வேண்டாம்', hi: 'अभी नहीं' },
   lgKept: { en: 'Kept. *Thank you.*', ta: 'சேமிக்கப்பட்டது. *நன்றி.*', hi: 'सहेज लिया। *धन्यवाद।*' },
   lgAMoment: { en: 'A moment', ta: 'ஒரு தருணம்', hi: 'एक पल' },
@@ -995,10 +1010,11 @@ export const ACTION_TEXT: Record<string, { title: L; detail: L; why: L; evidence
   a_d_014: {
     title: { en: 'Ten minutes on the verandah with tea.', ta: 'தேநீருடன் வராந்தாவில் பத்து நிமிடங்கள்.', hi: 'चाय के साथ बरामदे में दस मिनट।' },
     detail: { en: 'Notice three things.', ta: 'மூன்று விஷயங்களைக் கவனியுங்கள்.', hi: 'तीन चीज़ों पर ध्यान दें।' },
+    // No calendar fact here: one is stated only while a calendar is connected (Today's step 3).
     why: {
-      en: 'Daily Pleasure is your lowest term. Your calendar is clear after 7 pm and Kavya is home.',
-      ta: 'தினசரி மகிழ்ச்சி உங்கள் மிகக் குறைந்த அம்சம். இரவு 7 மணிக்குப் பிறகு உங்கள் நாட்காட்டி காலியாக உள்ளது, Kavya-வும் வீட்டில் இருக்கிறார்.',
-      hi: 'रोज़ का आनंद आपका सबसे कम पहलू है। शाम 7 बजे के बाद आपका कैलेंडर खाली है और Kavya घर पर हैं।',
+      en: 'Daily Pleasure is your lowest term. Ten unhurried minutes, shared with Kavya, is a small step for it.',
+      ta: 'தினசரி மகிழ்ச்சி உங்கள் மிகக் குறைந்த அம்சம். Kavya-வுடன் பகிரும் பத்து நிதானமான நிமிடங்கள் அதற்கான ஒரு சிறிய படி.',
+      hi: 'रोज़ का आनंद आपका सबसे कम पहलू है। Kavya के साथ बिताए दस इत्मीनान के मिनट उसके लिए एक छोटा कदम हैं।',
     },
     evidence: {
       en: 'Savouring interventions raise positive affect (Bryant & Veroff, 2007).',

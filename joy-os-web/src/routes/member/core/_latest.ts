@@ -1,8 +1,10 @@
 import { useMemo } from 'react'
-import { INDEX_HISTORY, MEMBER } from '@/data/member'
+import { ACTION_LIBRARY, INDEX_HISTORY, MEMBER, TODAY_ACTION } from '@/data/member'
 import { METHODS, bandFor } from '@/domain/indexEngine'
-import type { IndexScore, TermScore } from '@/domain/types'
+import type { Action, IndexScore, TermKey, TermScore } from '@/domain/types'
+import { useSpaceText } from '@/routes/member/spaces/_i18n'
 import { DAY90_DATES } from './_data'
+import { ACTION_TEXT, useCore } from './_i18n'
 import { addDays, useRemeasure, type ClinicalRemeasure } from './_store'
 
 // My Index follows the member's own measurement. Once the Day-90 Clinical-grade re-measure
@@ -48,4 +50,26 @@ export function useIndexHistory() {
     const history = own ? [own, ...INDEX_HISTORY] : INDEX_HISTORY
     return { history, latest: history[0], previous: history[1], own: !!own, signedAt: own ? rec?.signedAt ?? null : null, surveyOnly: own ? !!rec?.surveyOnly : false }
   }, [rec])
+}
+
+// ─── Today's action follows the latest Index ────────────────────────────────
+// The next-best action is the library's one action for the lowest term of the Index the member
+// sees now (useIndexHistory().latest): the specimen's verandah tea while Daily Pleasure is
+// lowest, and the same one next step My Index names (ns<term>) once a signed re-measure moves
+// the lowest term. Today, My Index's "Start" and VIVA's "Why today's action" all read this.
+
+/** The engine's one action for a lowest term. */
+export function todayActionFor(term: TermKey): Action {
+  if (term === TODAY_ACTION.term) return TODAY_ACTION
+  return ACTION_LIBRARY.find((a) => a.term === term) ?? TODAY_ACTION
+}
+
+/** An action's words in the member's language: the core's own text, else the spaces' dictionary. */
+export function useActionText() {
+  const { pick } = useCore()
+  const { d } = useSpaceText()
+  return (a: Action, field: 'title' | 'detail' | 'why' | 'evidence') => {
+    const own = ACTION_TEXT[a.id]
+    return own ? pick(own[field], a[field]) : d(a[field])
+  }
 }

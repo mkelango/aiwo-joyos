@@ -1,20 +1,21 @@
 import { router } from 'expo-router'
 import { useState, type ReactNode } from 'react'
 import { View } from 'react-native'
-import { AiwoMark, ArrowLink, BandLabel, Body, Button, Card, DaybreakButton, EmptyIllustration, Eyebrow, Icon, JoyspanWheel, Meta, MethodLine, Mono, Pill, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, SpecimenTag, TermChip, TermDot, Title, Toggle, fmtDate } from '@/components'
+import { AiwoMark, ArrowLink, BandLabel, Body, Button, Card, DaybreakButton, EmptyIllustration, Eyebrow, Icon, JoyspanWheel, Meta, MethodLine, Mono, Pill, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, SpecimenTag, TermChip, TermDot, Title, fmtDate } from '@/components'
 import { brand } from '@/theme/tokens'
 import { HOUSEHOLD, INDEX_HISTORY, MEMBER, TEAM } from '@/shared/member'
 import { COHORTS, EVENTS } from '@/shared/platform'
 import { useTheme } from '@/theme/ThemeProvider'
-import { EVENT_DATES, FLAGSHIP_NEXT, FLAGSHIP_RECAP, NYE_PROGRAMME, PASSES, PASSPORT, SALONS, SESSIONS_OPEN, SESSION_SCHEDULE, ZONES } from '@/screens/b/journeyData'
+import { EVENT_DATES, FLAGSHIP_NEXT, FLAGSHIP_RECAP, NYE_PROGRAMME, PASSES, SALONS, SESSIONS_OPEN, SESSION_SCHEDULE, ZONES, passportFor } from '@/screens/b/journeyData'
 import { accountStore, occasionsStore, refCode, useStore, type AccountState, type BadgeDiet, type BookedPass } from '@/screens/b/bStore'
-import { Done, Field, FilterChips, KeyValue, SpecimenQR, TimelineStep, fmtWhen, memberOnly, shareOrCopy, useAccount, useCrisisGuard, useSheetCrisisGuard } from '@/screens/b/parts'
+import { Done, Field, FilterChips, KeyValue, SpecimenQR, TimelineStep, fmtWhen, memberOnly, shareOrCopy, useAccount, useCrisisGuard, useSheetCrisisGuard, useFigures, FigureToggle } from '@/screens/b/parts'
 import { useIsMinor } from '@/lib/minor'
 import type { TermKey } from '@/shared/types'
 import { useDict, useTermText } from '@/lib/i18n'
 import { EVENTS_T, PASS_STATUS, EVENT_KIND, PASS_TEXT, RECAP_SESSION_TEXT, SCHEDULE_TEXT, ZONE_TEXT, SESSION_OPEN_TEXT, SALON_TITLE, NYE_TEXT } from '@/screens/b/i18n/journey'
 import { useCommon, useTx } from '@/screens/b/i18n/common'
 import { OCC } from '@/screens/b/i18n/occasions'
+import { MonoNums } from '@/lib/monoNums'
 
 // EVENTS AND PASSES (Memo p.22): your passes with a QR, the day's schedule, Experience Zones
 // by term, the Index issued on site, your Day-90 date, and Sessions open to book.
@@ -27,6 +28,8 @@ import { OCC } from '@/screens/b/i18n/occasions'
 // letterpress on cotton) and the delegate badge (name 22 pt, consent as a word: PHOTOGRAPHY,
 // TABLE, DIET). Both are kept here from Joyspan 2027; the request for the next edition carries the
 // photography consent and diet its badge will print. Under 18 the recap shows no Wheel or Index.
+// The specimen passes, the flagship recap, its Declaration and its invitation and badge are Arjun's
+// (he was there); every other account sees its own passes, bookings and the next edition (L2).
 
 type Open = (typeof SESSIONS_OPEN)[number]
 type PassView = { key: string; code: string; kind: string; name: string; when: string; where: string; gate: string; seat: string; valid: boolean; booked: boolean }
@@ -42,8 +45,6 @@ const around = (filled: string, node: ReactNode): ReactNode => {
 const monoDigits = (text: string, size?: number, color?: string): ReactNode =>
   text.split(/(\d[\d:.]*)/).map((part, i) => (/^\d/.test(part) ? <Mono key={i} size={size} color={color}>{part}</Mono> : part))
 
-/** The badge number is the Joy Passport's own (JP-2027-0142). */
-const PASSPORT_NO = PASSPORT.number.split('-').slice(-1)[0]
 const CONCIERGE = TEAM.find((p) => p.role === 'Concierge')!.name.split(' ')[0]
 const DIETS: BadgeDiet[] = ['Vegetarian', 'Non-vegetarian', 'Vegan', 'Jain']
 const DIET_KEY: Record<BadgeDiet, 'dietVeg' | 'dietNonVeg' | 'dietVegan' | 'dietJain'> = { Vegetarian: 'dietVeg', 'Non-vegetarian': 'dietNonVeg', Vegan: 'dietVegan', Jain: 'dietJain' }
@@ -74,6 +75,7 @@ function Events() {
   const flagship = EVENTS.find((e) => e.kind === 'Flagship')!
   const flagshipIndex = INDEX_HISTORY.find((x) => x.takenOn === FLAGSHIP_RECAP.indexOn) ?? latest
   const t = useDict(EVENTS_T)
+  const fig = useFigures()
   const to = useDict(OCC)
   const [occ] = useStore(occasionsStore)
   const tc = useCommon()
@@ -84,8 +86,10 @@ function Events() {
   const firstOpen = SESSIONS_OPEN.find((s) => !acct.bookings.some((b) => b.id === s.id))
   const toggleCal = (key: string, on: boolean) => setAcct((a) => ({ ...a, calendar: on ? [...a.calendar, key] : a.calendar.filter((k) => k !== key) }))
   const account = useAccount()
+  // Only Arjun was at the flagship: its pass, recap, Declaration and badge are his.
+  const attended = account.id === 'arjun'
 
-  // Passes: the specimen's two, then everything booked on this phone (Sessions here, salons in Circles).
+  // Passes: the specimen's two (Arjun's), then everything booked on this phone (Sessions here, salons in Circles).
   const booked = acct.passes ?? []
   const passViews: PassView[] = [
     ...booked.flatMap<PassView>((p) => {
@@ -98,9 +102,11 @@ function Events() {
       if (!sa) return []
       return [{ key: `b-${p.code}`, code: p.code, kind: 'Salon', name: t('salonName', { title: tx(SALON_TITLE[sa.id], sa.title) }), when: fmtWhen(sa), where: sa.where, gate: t('gateHost'), seat: p.guests === 2 ? t('seatTwo') : t('seatOne'), valid: true, booked: true }]
     }),
-    ...PASSES.map<PassView>((p) => {
+    ...(attended ? PASSES : []).map<PassView>((p) => {
       const ev = EVENTS.find((e) => e.id === p.id)!
-      return { key: p.code, code: p.code, kind: ev.kind, name: ev.name, when: EVENT_DATES[ev.id] ? fmtWhen(EVENT_DATES[ev.id]) : ev.when, where: ev.where, gate: tx(PASS_TEXT[p.id]?.gate, p.gate), seat: tx(PASS_TEXT[p.id]?.seat, p.seat), valid: p.status === 'Valid', booked: false }
+      // A Session is named in the member's language, like the ones booked here; the flagship keeps its name.
+      const name = ev.kind === 'Session' ? t('sessionCity', { city: ev.name.split(' · ')[1] ?? ev.where }) : ev.name
+      return { key: p.code, code: p.code, kind: ev.kind, name, when: EVENT_DATES[ev.id] ? fmtWhen(EVENT_DATES[ev.id]) : ev.when, where: ev.where, gate: tx(PASS_TEXT[p.id]?.gate, p.gate), seat: tx(PASS_TEXT[p.id]?.seat, p.seat), valid: p.status === 'Valid', booked: false }
     }),
   ]
 
@@ -168,6 +174,12 @@ function Events() {
       {/* Passes */}
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{t('yourPasses')}</SectionTitle>
+        {passViews.length === 0 ? (
+          <Card tone="sunk" style={{ gap: space.s1, alignItems: 'flex-start' }}>
+            <EmptyIllustration kind="occasions" />
+            <Meta>{t('noPasses')}</Meta>
+          </Card>
+        ) : null}
         {passViews.map((p) => (
           <Card key={p.key} tone={p.valid ? 'raised' : 'sunk'} style={{ gap: space.s2 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: space.s1 }}>
@@ -225,7 +237,8 @@ function Events() {
 
       {/* Schedule: the member's own, editable, with clashes swapped */}
       <View style={{ gap: space.s2 }}>
-        <SectionTitle>{t('schedule', { date: fmtDate(EVENT_DATES.ev2.date) })}</SectionTitle>
+        {/* SectionTitle takes a string; the same header with its date in Mono. */}
+        <Eyebrow accessibilityRole="header" aria-level={2}>{fig(t('schedule', { date: fmtDate(EVENT_DATES.ev2.date) }))}</Eyebrow>
         <Body tone="ink2">{t('scheduleBody')}</Body>
         <Segmented<'mine' | 'all'>
           value={schedView}
@@ -236,7 +249,7 @@ function Events() {
           ]}
         />
         {swapNote ? (
-          <Meta tone="ink" accessibilityLiveRegion="polite">{swapNote}</Meta>
+          <Meta tone="ink" accessibilityLiveRegion="polite"><MonoNums text={swapNote} /></Meta>
         ) : null}
         <Card tone="raised">
           {schedRows.length === 0 ? (
@@ -265,7 +278,7 @@ function Events() {
                     <Button variant={held ? 'ghost' : 'secondary'} size="sm" icon={held ? 'minus' : 'plus'} accessibilityLabel={`${t('schedA11y', { time: s.time, title })}, ${held ? t('removeFromSched') : t('addToSched')}`} onPress={() => toggleSched(s.i)} style={{ alignSelf: 'flex-start' }}>
                       {held ? t('removeFromSched') : t('addToSched')}
                     </Button>
-                    {held ? <Toggle checked={acct.calendar.includes(key)} onChange={(v) => toggleCal(key, v)} label={t('addCalFor', { time: s.time, where })} /> : null}
+                    {held ? <FigureToggle checked={acct.calendar.includes(key)} onChange={(v) => toggleCal(key, v)} label={t('addCalFor', { time: s.time, where })} /> : null}
                   </View>
                 </TimelineStep>
               )
@@ -295,6 +308,7 @@ function Events() {
       </View>
 
       {/* Recap of the flagship you attended */}
+      {attended ? (
       <View style={{ gap: space.s2 }}>
         <View style={{ gap: 8 }}>
           <SectionTitle>{t('recapTitle', { name: flagship.name })}</SectionTitle>
@@ -304,7 +318,7 @@ function Events() {
           <Eyebrow>{t('indexIssued', { where: flagship.where })}</Eyebrow>
           {minor ? (
             // Under 18 (Architecture p26): no Wheel, Index, band or lowest term.
-            <Body>{t('minorRecap')}</Body>
+            <Body><MonoNums text={t('minorRecap')} /></Body>
           ) : (
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s2, flexWrap: 'wrap' }}>
@@ -314,7 +328,7 @@ function Events() {
                     <Mono size={44} tone="ink">{String(flagshipIndex.value)}</Mono>
                     <BandLabel band={flagshipIndex.band} />
                   </View>
-                  <Meta>{t('measuredBody', { d: fmtDate(flagshipIndex.takenOn), c: fmtDate(FLAGSHIP_RECAP.cardHanded), term: tt.name(flagshipIndex.lowestTerm) })}</Meta>
+                  <Meta><MonoNums text={t('measuredBody', { d: fmtDate(flagshipIndex.takenOn), c: fmtDate(FLAGSHIP_RECAP.cardHanded), term: tt.name(flagshipIndex.lowestTerm) })} /></Meta>
                 </View>
               </View>
               <MethodLine method={flagshipIndex.method} grade={flagshipIndex.grade} takenOn={flagshipIndex.takenOn} next={flagshipIndex.nextMeasure} signedBy={flagshipIndex.signedBy} />
@@ -325,7 +339,7 @@ function Events() {
           <Eyebrow>{t('attended')}</Eyebrow>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Icon name="check" size={15} color={c.ink3} />
-            <Body style={{ flex: 1 }}>{t('circleFormedOn', { d: fmtDate(FLAGSHIP_RECAP.circleFormed) })}</Body>
+            <Body style={{ flex: 1 }}><MonoNums text={t('circleFormedOn', { d: fmtDate(FLAGSHIP_RECAP.circleFormed) })} /></Body>
           </View>
           {FLAGSHIP_RECAP.sessionsAttended.map((x, i) => (
             <View key={x} style={{ flexDirection: 'row', gap: 8 }}>
@@ -333,11 +347,13 @@ function Events() {
               <Body tone="ink2" style={{ flex: 1 }}>{tx(RECAP_SESSION_TEXT[i], x)}</Body>
             </View>
           ))}
-          <Meta size={14} tone="ink3">{t('cohortNote', { n: COHORTS[0]?.n ?? FLAGSHIP_RECAP.guests })}</Meta>
+          <Meta size={14} tone="ink3">{monoDigits(t('cohortNote', { n: COHORTS[0]?.n ?? FLAGSHIP_RECAP.guests }), 14)}</Meta>
         </Card>
       </View>
+      ) : null}
 
       {/* New Year's Eve: the Declaration at 23:50 and the card (Playbook p61) */}
+      {attended ? (
       <NewYearsEve
         flagshipName={flagship.name}
         flagshipWhere={flagship.where}
@@ -346,13 +362,17 @@ function Events() {
         holder={account.name}
         onSign={(name) => setAcct((a) => ({ ...a, declaration: name ? { name, signedAt: new Date().toISOString() } : null }))}
       />
+      ) : null}
 
       {/* The invitation and the delegate badge (Playbook p61) */}
+      {attended ? (
       <InvitationAndBadge
-        invitee={account.id === 'arjun' ? { who: 'Mr and Mrs Rao', two: true } : { who: account.name, two: false }}
+        invitee={{ who: 'Mr and Mrs Rao', two: true }}
         holder={account.name}
         flagshipWhere={flagship.where}
+        badgeNo={passportFor(account.id, account.aiwoId).number.split('-').slice(-1)[0]}
       />
+      ) : null}
 
       {/* The next edition: request a place */}
       <View style={{ gap: space.s2 }}>
@@ -363,11 +383,11 @@ function Events() {
           <Mono tone="ink2">{fmtWhen({ date: FLAGSHIP_NEXT.date, to: FLAGSHIP_NEXT.to })}</Mono>
           <Meta>{FLAGSHIP_NEXT.where}</Meta>
           <Body tone="ink2">{t('flagWhat')}</Body>
-          <Meta size={14} tone="ink3">{t('flagMeta', { date: fmtDate(FLAGSHIP_NEXT.confirmFrom), n: FLAGSHIP_NEXT.guests })}</Meta>
+          <Meta size={14} tone="ink3"><MonoNums text={t('flagMeta', { date: fmtDate(FLAGSHIP_NEXT.confirmFrom), n: FLAGSHIP_NEXT.guests })} /></Meta>
           {req ? (
             <Card tone="sunk" padding={16} style={{ gap: 6 }}>
               <Done>{req.guests === 1 ? t('reqReceived1') : t('reqReceived2')}</Done>
-              <Meta>{t('reqBody', { c: CONCIERGE, date: fmtDate(FLAGSHIP_NEXT.confirmFrom), ref: req.ref })}</Meta>
+              <Meta><MonoNums text={t('reqBody', { c: CONCIERGE, date: fmtDate(FLAGSHIP_NEXT.confirmFrom), ref: req.ref })} /></Meta>
               {req.photo !== undefined || req.diet ? (
                 <Meta size={14} tone="ink2">
                   {t('reqBadge', { photo: req.photo === false ? t('photoNo') : t('photoYes'), diet: t(DIET_KEY[req.diet ?? 'Vegetarian']) })}
@@ -391,7 +411,7 @@ function Events() {
           ) : (
             <>
               {withdrawn ? (
-                <Meta accessibilityLiveRegion="polite">{t('withdrawn', { date: fmtDate(FLAGSHIP_NEXT.confirmFrom) })}</Meta>
+                <Meta accessibilityLiveRegion="polite"><MonoNums text={t('withdrawn', { date: fmtDate(FLAGSHIP_NEXT.confirmFrom) })} /></Meta>
               ) : null}
               <Button
                 variant="secondary"
@@ -410,22 +430,25 @@ function Events() {
         </Card>
       </View>
 
-      {/* Index on site */}
+      {/* Index on site (Arjun's, taken at the flagship); every account reaches its Passport */}
+      {!attended ? <ArrowLink onPress={() => router.push('/passport')}>{t('passport')}</ArrowLink> : null}
+      {attended ? (
       <Card tone="sunk" style={{ gap: space.s1 }}>
         <Eyebrow>{t('onSite')}</Eyebrow>
-        <Body>{t('onSiteBody', { date: fmtDate(latest.takenOn) })}</Body>
+        <Body><MonoNums text={t('onSiteBody', { date: fmtDate(flagshipIndex.takenOn) })} /></Body>
         <Meta>
           {t('day90A')}
           <Mono tone="ink">{fmtDate(latest.nextMeasure)}</Mono>
-          {t('day90B', { n: MEMBER.dayOfLoop })}
+          {monoDigits(t('day90B', { n: MEMBER.dayOfLoop }))}
         </Meta>
         <ArrowLink onPress={() => router.push('/passport')}>{t('passport')}</ArrowLink>
       </Card>
+      ) : null}
 
       {/* Joyspan Occasions */}
       <Card tone="raised" style={{ gap: space.s1 }}>
         <Eyebrow>{to('occLinkEyebrow')}</Eyebrow>
-        <Title size={22}>{to('occLinkTitle')}</Title>
+        <Title size={22}><MonoNums text={to('occLinkTitle')} /></Title>
         <Body tone="ink2">{to('occLinkBody')}</Body>
         {occ.requests.length ? <Pill tone="daybreak">{to('requestedRef', { ref: occ.requests[0].ref })}</Pill> : null}
         <ArrowLink icon="gift" onPress={() => router.push('/occasions')}>
@@ -462,7 +485,7 @@ function Events() {
           )
         })}
         {cancelledNote ? (
-          <Meta accessibilityLiveRegion="polite">{cancelledNote}</Meta>
+          <Meta accessibilityLiveRegion="polite"><MonoNums text={cancelledNote} /></Meta>
         ) : null}
         {firstOpen ? (
           <DaybreakButton icon="calendar" onPress={() => { setBookedRef(null); setBook(firstOpen) }}>
@@ -555,7 +578,7 @@ function Events() {
           </View>
         }
       >
-        {cancelFor ? <Body>{t('cancelBody', { session: t('sessionCity', { city: cancelFor.city }), when: fmtWhen(cancelFor) })}</Body> : null}
+        {cancelFor ? <Body><MonoNums text={t('cancelBody', { session: t('sessionCity', { city: cancelFor.city }), when: fmtWhen(cancelFor) })} /></Body> : null}
       </Sheet>
 
       <Sheet
@@ -756,9 +779,10 @@ function NewYearsEve({ flagshipName, flagshipWhere, lowest, signed, holder, onSi
  * name at 22 pt, then PROGRAMME, TABLE, PHOTOGRAPHY and DIET, with consent written as a word, a
  * photo box and the badge number. Both are keepsakes of the edition attended (specimen).
  */
-function InvitationAndBadge({ invitee, holder, flagshipWhere }: { invitee: { who: string; two: boolean }; holder: string; flagshipWhere: string }) {
+function InvitationAndBadge({ invitee, holder, flagshipWhere, badgeNo }: { invitee: { who: string; two: boolean }; holder: string; flagshipWhere: string; badgeNo: string }) {
   const { c, space, radius } = useTheme()
   const t = useDict(EVENTS_T)
+  const fig = useFigures()
   const tx = useTx()
   const city = flagshipWhere.split(' ').slice(-1)[0]
   const rows: { k: string; v: ReactNode }[] = [
@@ -770,7 +794,7 @@ function InvitationAndBadge({ invitee, holder, flagshipWhere }: { invitee: { who
   return (
     <View style={{ gap: space.s2 }}>
       <View style={{ gap: 8 }}>
-        <SectionTitle>{t('keepsTitle')}</SectionTitle>
+        <Eyebrow accessibilityRole="header" aria-level={2}>{fig(t('keepsTitle'))}</Eyebrow>
         <SpecimenTag />
       </View>
       <Body tone="ink2">{t('keepsBody')}</Body>
@@ -786,7 +810,7 @@ function InvitationAndBadge({ invitee, holder, flagshipWhere }: { invitee: { who
           {invitee.two ? t('invitedTwo', { who: invitee.who }) : t('invitedOne', { who: invitee.who })}
         </Serif>
         <View style={{ width: 3, height: 26, borderRadius: 2, backgroundColor: c.daybreak, transform: [{ rotate: '-24deg' }], marginLeft: 6 }} />
-        <Meta size={13} tone="ink3">{t('inviteFoot')}</Meta>
+        <Meta size={13} tone="ink3"><MonoNums text={t('inviteFoot')} /></Meta>
       </View>
 
       {/* The delegate badge */}
@@ -814,7 +838,7 @@ function InvitationAndBadge({ invitee, holder, flagshipWhere }: { invitee: { who
             </View>
             <Meta size={13} tone="ink2">
               {'No. '}
-              <Mono size={13} tone="ink2">{PASSPORT_NO}</Mono>
+              <Mono size={13} tone="ink2">{badgeNo}</Mono>
             </Meta>
           </View>
         </View>

@@ -127,7 +127,8 @@ export const TODAY_ACTION: Action = {
   timeOfDay: 'evening',
   shared: true,
   evidence: 'Savouring interventions raise positive affect (Bryant & Veroff, 2007).',
-  why: 'Daily Pleasure is your lowest term. Your calendar is clear after 7 pm and Kavya is home.',
+  // No calendar is connected by default (c_cal), so the reason names nothing a calendar would know.
+  why: 'Daily Pleasure is your lowest term. A small pleasure, noticed slowly, is the gentlest way to lift it.',
 }
 
 export const ACTION_LIBRARY: Action[] = [
@@ -185,7 +186,9 @@ export const CONSENTS: Consent[] = [
   { id: 'c_pub', name: 'Publishing', purpose: 'Include me in aggregate, de-identified results', scope: 'cohort', granted: true, since: '2026-07-06' },
   { id: 'c_oura', name: 'Oura via Terra', purpose: 'Sleep, HRV and resting HR for Body, Pleasure and Ease', scope: 'device', granted: true, since: '2026-07-07' },
   { id: 'c_hk', name: 'Apple Health', purpose: 'Steps, workouts, VO₂max; write back mindful minutes', scope: 'device', granted: true, since: '2026-07-07' },
-  { id: 'c_cal', name: 'Google Calendar', purpose: 'Time audit and planned pleasures — summarised, then discarded', scope: 'calendar', granted: true, since: '2027-01-10' },
+  // No calendar is connected until the member connects one in Freedom (account/_links
+  // setCalendarConsent grants c_cal naming the provider, Google, Outlook or Apple).
+  { id: 'c_cal', name: 'Calendar', purpose: 'Time audit and planned pleasures — summarised, then discarded', scope: 'calendar', granted: false },
   { id: 'c_wa', name: 'WhatsApp', purpose: 'Joy Ledger prompts and reminders', scope: 'whatsapp', granted: false },
   { id: 'c_star', name: 'Star Health (insurer)', purpose: 'Aggregate outcomes only, never individual', scope: 'partner', granted: false },
 ]

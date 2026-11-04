@@ -48,6 +48,8 @@ type State = {
   moderation: Record<string, ModerationWork>
   /** score.issued events the coach has seen in the new scores feed. */
   scoresSeen: string[]
+  /** The coach desk's audit: every queue, circle and moderation action, newest first. Append-only. */
+  deskLog: AuditEvent[]
 }
 
 const KEY = 'joyos:care:coach:v2'
@@ -56,7 +58,7 @@ const seedTasks = (): CoachTask[] =>
   DRIFT_TASKS.map((t) => ({ ...t, ...(DRIFT_OVERRIDES[t.id] ?? {}) }))
 
 function load(): State {
-  const fresh: State = { tasks: seedTasks(), members: {}, circles: {}, concierge: emptyConcierge(), moderation: {}, scoresSeen: [] }
+  const fresh: State = { tasks: seedTasks(), members: {}, circles: {}, concierge: emptyConcierge(), moderation: {}, scoresSeen: [], deskLog: [] }
   try {
     const raw = sessionStorage.getItem(KEY)
     if (!raw) return fresh
@@ -69,6 +71,7 @@ function load(): State {
       concierge: c && typeof c === 'object' ? { ...emptyConcierge(), ...c, added: Array.isArray(c.added) ? c.added : [], log: Array.isArray(c.log) ? c.log : [] } : emptyConcierge(),
       moderation: parsed.moderation && typeof parsed.moderation === 'object' ? parsed.moderation : {},
       scoresSeen: Array.isArray(parsed.scoresSeen) ? parsed.scoresSeen : [],
+      deskLog: Array.isArray(parsed.deskLog) ? parsed.deskLog : [],
     }
   } catch {
     return fresh
@@ -124,11 +127,20 @@ export const coach = {
     else delete next[reportId]
     emit({ ...state, moderation: next })
   },
+  /**
+   * Write one coach-desk audit line. An action on one member's record is written to that
+   * member's trail too, so the digest shows it beside the reads.
+   */
+  audit(memberId: string | null, e: AuditEvent) {
+    const members = memberId ? { ...state.members, [memberId]: { ...(state.members[memberId] ?? {}), audit: [e, ...(state.members[memberId]?.audit ?? [])] } } : state.members
+    emit({ ...state, members, deskLog: [e, ...state.deskLog] })
+  },
   seeScores(ids: string[]) {
     emit({ ...state, scoresSeen: Array.from(new Set([...state.scoresSeen, ...ids])) })
   },
+  /** Back to the specimen start. The desk audit is append-only, so it stays. */
   reset() {
-    emit({ tasks: seedTasks(), members: {}, circles: {}, concierge: emptyConcierge(), moderation: {}, scoresSeen: [] })
+    emit({ tasks: seedTasks(), members: {}, circles: {}, concierge: emptyConcierge(), moderation: {}, scoresSeen: [], deskLog: state.deskLog })
   },
 }
 

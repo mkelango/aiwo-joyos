@@ -9,6 +9,7 @@ import { SPECIMEN_NOW } from './accountData'
 import { charterStore, householdKindStore, useStore, type Charter, type HouseholdKind, type Ritual, type RitualCadence } from './bStore'
 import { ChoiceCard, Field, FilterChips, useSheetCrisisGuard } from './parts'
 import { HOUSE } from './i18n/household'
+import { MonoNums } from '@/lib/monoNums'
 import { useCommon } from './i18n/common'
 
 // HOUSEHOLD KIND AND THE FAMILY JOY OFFICE (Arch p.13 household.kind couple | family | fjo;
@@ -123,7 +124,7 @@ export function KindCard({ people, onToast }: { people: number; onToast: (m: str
 }
 
 /** The Family Joy Office panel, shown only for an FJO household. */
-export function FjoOffice({ adults, minor, onToast }: { adults: { name: string; status: 'signed' | 'booked'; on: string }[]; minor: string; onToast: (m: string) => void }) {
+export function FjoOffice({ adults, minor, onToast }: { adults: { name: string; status: 'signed' | 'booked' | 'open'; on?: string }[]; minor: string | null; onToast: (m: string) => void }) {
   const { c, space } = useTheme()
   const t = useDict(HOUSE)
   const [asked, setAsked] = useState(false)
@@ -178,27 +179,33 @@ export function FjoOffice({ adults, minor, onToast }: { adults: { name: string; 
         {adults.map((a) => (
           <View key={a.name} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.line, flexWrap: 'wrap' }}>
             <Body>{a.name}</Body>
-            <Pill tone={a.status === 'signed' ? 'ink' : 'neutral'}>{dated(a.status === 'signed' ? 'fjoSigned' : 'fjoBooked', a.on)}</Pill>
+            <Pill tone={a.status === 'signed' ? 'ink' : 'neutral'}>{a.status === 'open' || !a.on ? t('fjoToBook') : dated(a.status === 'signed' ? 'fjoSigned' : 'fjoBooked', a.on)}</Pill>
           </View>
         ))}
+        {minor ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 12, flexWrap: 'wrap' }}>
           <Body>{minor}</Body>
           <Pill>{t('fjoNever')}</Pill>
         </View>
+        ) : null}
       </Card>
     </View>
   )
 }
 
-/** The Family Joy Charter: shown as written, or as an invitation to write it. */
-export function CharterCard({ isPatron, adults, minor, onToast }: { isPatron: boolean; adults: string[]; minor: string; onToast: (m: string) => void }) {
+/**
+ * The Family Joy Charter: shown as written, or as an invitation to write it. `writer` is the adult
+ * signed in: saving records them as agreed and asks every other adult again.
+ */
+export function CharterCard({ isPatron, adults, writer, minor, onToast }: { isPatron: boolean; adults: string[]; writer: string; minor: string | null; onToast: (m: string) => void }) {
   const { c, space } = useTheme()
   const t = useDict(HOUSE)
   const [kindRec] = useStore(householdKindStore)
   const kind = kindRec.kind
   const [ch, setCh] = useStore(charterStore)
   const [editing, setEditing] = useState(false)
-  const [me, ...others] = adults
+  const me = writer
+  const others = adults.filter((a) => a !== writer)
   const waiting = adults.filter((a) => !ch.agreed.includes(a))
   const days = t('chDays').split(',')
   const agree = (name: string) => {
@@ -254,7 +261,7 @@ export function CharterCard({ isPatron, adults, minor, onToast }: { isPatron: bo
               <View style={{ gap: 4 }} accessibilityLiveRegion="polite">
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Icon name="check" size={14} color={c.ink2} />
-                  <Meta style={{ flexShrink: 1 }}>{t('chWeekNoted', { date: fmtDate(ch.week) })}</Meta>
+                  <Meta style={{ flexShrink: 1 }}><MonoNums text={t('chWeekNoted', { date: fmtDate(ch.week) })} /></Meta>
                 </View>
                 <Button size="sm" variant="ghost" onPress={() => setCh({ ...ch, week: undefined })} style={{ alignSelf: 'flex-start' }}>
                   {t('chWeekUndo')}
@@ -279,7 +286,7 @@ export function CharterCard({ isPatron, adults, minor, onToast }: { isPatron: bo
             {waiting.length === 0 && ch.agreedOn ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Icon name="check" size={14} color={c.ink} />
-                <Meta tone="ink" style={{ flexShrink: 1 }}>{t('chAgreedAll', { date: fmtDate(ch.agreedOn) })}</Meta>
+                <Meta tone="ink" style={{ flexShrink: 1 }}><MonoNums text={t('chAgreedAll', { date: fmtDate(ch.agreedOn) })} /></Meta>
               </View>
             ) : (
               <>
@@ -291,7 +298,7 @@ export function CharterCard({ isPatron, adults, minor, onToast }: { isPatron: bo
                 ))}
               </>
             )}
-            <Meta size={13} tone="ink3">{`${t('chMinor', { name: minor })} ${t('chPrivate')}`}</Meta>
+            <Meta size={13} tone="ink3">{minor ? `${t('chMinor', { name: minor })} ${t('chPrivate')}` : t('chPrivate')}</Meta>
           </View>
           <Button size="sm" variant="secondary" icon="edit-3" onPress={() => setEditing(true)} style={{ alignSelf: 'flex-start' }}>
             {t('chEdit')}

@@ -7,7 +7,7 @@ import { Button, Pill } from '@/components/ui'
 import { MEMBER } from '@/data/member'
 import { CONTRIBUTIONS, IKIGAI_START, SPACE_TODAY, STATEMENT_START, TOMORROW_ANSWERS } from './_data'
 import { SpaceShell, ToolCard, useCrisisGuard, Toggle } from './_SpaceShell'
-import { useSpaceText, type SpKey } from './_i18n'
+import { mono, useSpaceText, type SpKey } from './_i18n'
 import { useSpaceState } from './_state'
 
 // PURPOSE (Memo p.19): the Ikigai map (direction for ten years, contribution,
@@ -132,7 +132,7 @@ function IkigaiMap() {
             <Button variant="ghost" onClick={() => { setEditing(false); setErr({}); setNewAnchor('') }}>{t('c.cancel')}</Button>
           </>
         ) : (
-          <p className="text-[13px] text-ink-3" role="status">{saved ? t('pur.ik.saved') : map.changedOn ? t('pur.ik.changedOn', { d: fmtDate(map.changedOn, lang) }) : t('pur.ik.lastChanged', { d: fmtDate(IKIGAI_CHANGED_ON, lang) })}</p>
+          <p className="text-[13px] text-ink-3" role="status">{saved ? t('pur.ik.saved') : mono(map.changedOn ? t('pur.ik.changedOn', { d: fmtDate(map.changedOn, lang) }) : t('pur.ik.lastChanged', { d: fmtDate(IKIGAI_CHANGED_ON, lang) }))}</p>
         )}
       </div>
     </ToolCard>
@@ -180,7 +180,7 @@ function TomorrowQuestion() {
           <motion.div key="done" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl bg-paper-raised p-4">
             <p className="eyebrow text-daybreak-ink">{t('c.thisWeek')}</p>
             <p className="mt-1.5 text-[17px] text-ink">{thisWeek?.text}</p>
-            {justSaved && <p role="status" className="mt-2 flex items-center gap-1.5 text-[14px] text-ink-2"><Check size={14} className="shrink-0" aria-hidden /> {t('pur.tq.saved')}</p>}
+            {justSaved && <p role="status" className="mt-2 flex items-center gap-1.5 text-[14px] text-ink-2"><Check size={14} className="shrink-0" aria-hidden /> {mono(t('pur.tq.saved'))}</p>}
             <button onClick={change} className="mt-2 text-[14px] text-ink-2 underline underline-offset-4 focus-ring rounded">{t('pur.tq.changeIt')}</button>
           </motion.div>
         )}
@@ -190,7 +190,7 @@ function TomorrowQuestion() {
         <ol className="mt-3 space-y-3">
           {answers.filter((a) => a.week !== 4).map((a) => (
             <li key={a.week} className={clsx('grid gap-3 text-[15px]', lang === 'en' ? 'grid-cols-[3.5rem_1fr]' : 'grid-cols-[4.75rem_1fr]')}>
-              <span className="num text-[13px] text-ink-3">{t('pur.tq.wk', { n: a.week })}<span className="block">{dm(a.date)}</span></span>
+              <span className="num text-[13px] text-ink-3">{mono(t('pur.tq.wk', { n: a.week }))}<span className="block">{dm(a.date)}</span></span>
               <span className="text-ink-2">{a.text}</span>
             </li>
           ))}
@@ -238,7 +238,7 @@ function Statement() {
       {editing ? (
         <div>
           <label>
-            <span className="sr-only">{t('pur.st.label')}</span>
+            <span className="sr-only">{mono(t('pur.st.label'))}</span>
             <textarea rows={8} value={draft} onChange={(e) => setDraft(e.target.value)} aria-invalid={words < 10} aria-describedby="stmt-help" className={clsx(inputCls, 'font-serif text-[18px] leading-relaxed')} />
           </label>
           <div className="mt-1.5 flex justify-between gap-3 text-[13px] text-ink-3">
@@ -264,7 +264,7 @@ function Statement() {
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-[13px] text-ink-3">{revisit.length === checks.length ? t('pur.st.ready') : t('pur.st.opens')}</p>
+            <p className="mt-2 text-[13px] text-ink-3">{mono(revisit.length === checks.length ? t('pur.st.ready') : t('pur.st.opens'))}</p>
           </div>
         </>
       )}
@@ -272,22 +272,22 @@ function Statement() {
         <div className="flex flex-wrap gap-2">
           {editing ? (
             <>
-              <Button variant="ink" onClick={save} disabled={words < 10} aria-describedby="stmt-help">{t('pur.st.saveAs', { v: versions[0].v + 1 })}</Button>
+              <Button variant="ink" onClick={save} disabled={words < 10} aria-describedby="stmt-help">{mono(t('pur.st.saveAs', { v: versions[0].v + 1 }))}</Button>
               <Button variant="ghost" onClick={() => { setDraft(versions[0].text); setEditing(false) }}>{t('c.cancel')}</Button>
             </>
           ) : (
             <Button onClick={() => { setDraft(versions[0].text); setEditing(true); setJustSaved(false) }}><Pencil size={14} /> {t('pur.st.revise')}</Button>
           )}
-          <Button variant="ghost" onClick={() => setShowV((s) => !s)} aria-expanded={showV}><History size={14} /> {t('pur.st.versions', { n: versions.length })}</Button>
+          <Button variant="ghost" onClick={() => setShowV((s) => !s)} aria-expanded={showV}><History size={14} /> {mono(t('pur.st.versions', { n: versions.length }))}</Button>
         </div>
-        <span className="text-[13px] text-ink-3">{t('pur.st.version', { v: versions[0].v, date: fmtDate(versions[0].date) })}</span>
+        <span className="text-[13px] text-ink-3">{mono(t('pur.st.version', { v: versions[0].v, date: fmtDate(versions[0].date) }))}</span>
       </div>
       <AnimatePresence initial={false}>
         {showV && (
           <motion.ol initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mt-4 space-y-3 overflow-hidden">
             {versions.map((v) => (
               <li key={v.v} className="rounded-xl bg-paper-sunk p-3.5 text-[14px]">
-                <span className="eyebrow text-ink-3">{t('pur.st.version', { v: v.v, date: fmtDate(v.date) })}{v.v === 1 ? t('pur.st.atelier') : ''}</span>
+                <span className="eyebrow text-ink-3">{mono(t('pur.st.version', { v: v.v, date: fmtDate(v.date) }))}{v.v === 1 ? t('pur.st.atelier') : ''}</span>
                 <p className="mt-1 line-clamp-2 text-ink-2">{v.text}</p>
               </li>
             ))}
@@ -440,7 +440,7 @@ function CareerVenn() {
                 </ul>
                 <form onSubmit={(e) => { e.preventDefault(); add() }} className="mt-3 flex gap-2">
                   <label className="min-w-0 flex-1">
-                    <span className="sr-only">{t('pur.v.addTo', { label: curLabel.toLowerCase() })}</span>
+                    <span className="sr-only">{mono(t('pur.v.addTo', { label: curLabel.toLowerCase() }))}</span>
                     <input value={v} onChange={(e) => { setV(e.target.value); setErr('') }} placeholder={t('pur.v.addTo', { label: curLabel.toLowerCase() })} aria-invalid={!!err} aria-describedby={err ? 'venn-err' : undefined} className={clsx(inputCls, 'h-11 py-0')} />
                   </label>
                   <Button type="submit" aria-label={t('pur.v.addTo', { label: curLabel })}><Plus size={15} /></Button>

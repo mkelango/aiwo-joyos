@@ -8,7 +8,7 @@ import { Avatar, Button, Card, EmptyState, PageHeader, Pill, Tabs } from '@/comp
 import { TEAM } from '@/data/member'
 import { DEFAULT_NOTIF_PREFS, LEDGER_TIMES, NOTIFICATIONS, NOTIF_TYPES, pushesPerDay, type Notif, type NotifKind, type NotifPrefs } from './_data'
 import { Field, LinkButton, Section, Select, Toggle } from './_parts'
-import { rich, usePersisted, useToast } from './_util'
+import { nums, rich, usePersisted, useToast } from './_util'
 import { useDict } from '@/lib/i18n'
 import { NOTIF, useData } from './_i18n'
 import { ReadAloud } from './_voice'
@@ -224,11 +224,11 @@ function Row({ n, read, muted, onOpen, onRead }: { n: Notif; read: boolean; mute
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-baseline justify-between gap-x-3">
             <span className={clsx('text-[16px]', read || upcoming ? 'text-ink-2' : 'text-ink')}>
-              <span className="sr-only">{read || upcoming ? '' : t('unreadSr')}</span>{dx(n.title)}
+              <span className="sr-only">{read || upcoming ? '' : t('unreadSr')}</span>{nums(dx(n.title))}
             </span>
             <span className="num shrink-0 text-[12px] text-ink-3" title={dx(n.at)}>{dx(n.ago)}</span>
           </span>
-          <span className="mt-0.5 block text-[14px] leading-snug text-ink-2">{dx(n.body)}</span>
+          <span className="mt-0.5 block text-[14px] leading-snug text-ink-2">{nums(dx(n.body))}</span>
           <span className="eyebrow mt-1.5 flex flex-wrap items-center gap-x-2 text-ink-3">
             {dx(KIND_LABEL[n.kind])} · <span className="num normal-case">{dx(n.at)}</span>
             {muted && <span className="normal-case tracking-normal">{t('typeNowOff')}</span>}

@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { Platform, Share, View } from 'react-native'
 import { router } from 'expo-router'
-import { ArrowLink, Body, Button, Card, DaybreakButton, Divider, Eyebrow, Icon, ListRow, Meta, Mono, Numeral, Pill, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, SpecimenTag, Title, Toggle, fmtDate } from '@/components'
+import { ArrowLink, Body, Button, Card, DaybreakButton, Divider, Eyebrow, Icon, Meta, Mono, Numeral, Pill, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, SpecimenTag, Title, Toggle, fmtDate } from '@/components'
 import { useApp } from '@/lib/store'
 import { MEMBER } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
-import { ENTITLEMENTS, GSTIN_AIWO, GST_RATE, INVOICES, SPECIMEN_NOW } from '@/screens/b/accountData'
+import { ENTITLEMENTS, GSTIN_AIWO, GST_RATE, INVOICES, INVOICES_LAKSHMI, SPECIMEN_NOW, UPI_ON_FILE } from '@/screens/b/accountData'
 import { PLANS, inr } from '@/screens/b/_data'
 import { accountStore, refCode, useStore, type Billing } from '@/screens/b/bStore'
-import { CheckLine, ChoiceCard, Done, KeyValue, memberOnly, shareOrCopy } from '@/screens/b/parts'
+import { FigureListRow, CheckLine, ChoiceCard, Done, KeyValue, hasCircle, memberOnly, shareOrCopy, useAccount, useFigures } from '@/screens/b/parts'
+import { MonoNums } from '@/lib/monoNums'
 import { useDict } from '@/lib/i18n'
 import { MEMBERSHIP, CADENCE, PLAN_POINT, ENTITLEMENT_USE, INVOICE_ITEM, PAY_WORD } from '@/screens/b/i18n/membership'
 import { useCommon, useTx } from '@/screens/b/i18n/common'
@@ -19,6 +20,10 @@ import { useCommon, useTx } from '@/screens/b/i18n/common'
 // Store billing (Arch 8b-19; Memo p26): on the native app, Joy OS Plus is bought through Apple or
 // Google in-app purchase where store rules require it; the web build and Patron use Razorpay.
 // Specimen: no store sheet opens and nothing is charged; the plan and who bills it are kept.
+// Everything follows the account and its plan (L2): what is included (Free, Plus, Patron, and
+// Circle only where the account has it), its own invoices and payment method, and the grace
+// state, which bills the plan's own renewal (Plus monthly by UPI autopay; Patron's yearly renewal
+// is beyond a UPI autopay mandate, so it comes as a Razorpay invoice link).
 
 /** The phone's store for Joy OS Plus: the App Store on an iPhone, Google Play on Android, none on the web build. */
 type StoreBilling = Exclude<Billing, 'razorpay'>
@@ -39,7 +44,14 @@ const addMonths = (iso: string, n: number) => {
 const FEB_INVOICE = 'INV-2027-000531'
 const FEB_DUE = '2027-02-01'
 const GRACE_UNTIL = '2027-02-15'
+const GRACE_DAYS = 14
+const addDays = (iso: string, n: number) => {
+  const d = new Date(`${iso}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
 type Invoice = (typeof INVOICES)[number]
+type Entitlement = { name: string; from: string; use: string }
 
 export default memberOnly(Membership)
 
@@ -55,12 +67,12 @@ function Membership() {
   useEffect(() => () => { if (storeTimer.current) clearTimeout(storeTimer.current) }, [])
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const { paymentsGrace, setPaymentsGrace } = useApp()
+  const account = useAccount()
+  const circle = hasCircle(account.id)
   const paidHere = acct.paidInvoices ?? []
-  // Once February is paid the grace state is over; the demo switch can no longer bring it back.
-  const febPaid = paidHere.some((i) => i.id === FEB_INVOICE)
-  const inGrace = paymentsGrace && !febPaid
-  const overdue: Invoice = { id: FEB_INVOICE, date: FEB_DUE, item: 'Joy OS Plus · February', total: 499, method: 'UPI', status: 'Retrying' }
-  const invoiceRows: Invoice[] = [...(inGrace ? [overdue] : []), ...paidHere.map(({ ref: _ref, ...i }) => i), ...INVOICES]
+  // The account's own invoices and payment method (Razorpay UPI), if it has any.
+  const ownInvoices: Invoice[] = account.id === 'arjun' ? INVOICES : account.id === 'lakshmi' ? INVOICES_LAKSHMI : []
+  const upi = UPI_ON_FILE[account.id]
   const [payOpen, setPayOpen] = useState(false)
   const [payStep, setPayStep] = useState<'confirm' | 'approving' | 'paid'>('confirm')
   const payTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -73,19 +85,55 @@ function Membership() {
   const current = PLANS.find((p) => p.key === acct.plan)!
   const pending = acct.planChange
   // Monthly plans renew on the 1st; a yearly plan renews a year after it took effect.
-  const renews = current.cadence === '/ year' && acct.planSince ? addYear(acct.planSince) : RENEWS
+  const yearly = current.cadence === '/ year'
+  const renews = yearly && acct.planSince ? addYear(acct.planSince) : RENEWS
+  // Payments grace (§4B) bills the plan's own renewal: Plus in February by UPI autopay (it failed),
+  // Patron's yearly renewal by a Razorpay link (it is unpaid: no card is on file, and the sum is
+  // beyond a UPI mandate). Joy OS (free) bills nothing, and nothing can fail without a method.
+  const renewYear = Number(renews.slice(0, 4))
+  const overdue: Invoice | null = acct.plan === 'Free'
+    ? null
+    : yearly
+      ? { id: `INV-${renewYear}-000017`, date: renews, item: `Patron · ${renewYear}–${renewYear + 1}`, total: current.price, method: 'Razorpay link', status: 'Unpaid' }
+      : { id: FEB_INVOICE, date: FEB_DUE, item: 'Joy OS Plus · February', total: current.price, method: 'UPI', status: 'Retrying' }
+  const graceUntil = yearly ? addDays(renews, GRACE_DAYS) : GRACE_UNTIL
+  /** An invoice still to pay: the failed UPI renewal, or the unpaid Patron link. */
+  const isDue = (inv: Invoice | null) => !!inv && (inv.status === 'Retrying' || inv.status === 'Unpaid')
+  const billing: Billing = acct.billing ?? 'razorpay'
+  const storeBilled = billing !== 'razorpay' && acct.plan === 'Plus' ? billing : null
+  const hasMethod = !!storeBilled || !!upi
+  const canGrace = !!overdue && hasMethod
+  // Once the renewal is paid the grace state is over; the demo switch can no longer bring it back.
+  const overduePaid = !!overdue && paidHere.some((i) => i.id === overdue.id)
+  const inGrace = paymentsGrace && canGrace && !overduePaid
+  const invoiceRows: Invoice[] = [...(inGrace && overdue ? [overdue] : []), ...paidHere.map(({ ref: _ref, ...i }) => i), ...ownInvoices]
+  // What the plan includes: its own points (Plus also for Patron), then Circle where the account
+  // has it. The specimen member's rows say how he uses each one.
+  const points = (k: PlanKey) => PLANS.find((p) => p.key === k)!.points
+  const useOf = (name: string) => (account.id === 'arjun' ? ENTITLEMENTS.find((e) => e.name === name)?.use : undefined) ?? 'Included'
+  const included: Entitlement[] = [
+    ...(acct.plan === 'Free' ? points('Free').map((n) => ({ name: n, from: current.name, use: 'Included' })) : []),
+    ...(acct.plan !== 'Free' ? points('Plus').map((n) => ({ name: n, from: 'Plus', use: useOf(n) })) : []),
+    ...(acct.plan === 'Patron' ? points('Patron').map((n) => ({ name: n, from: 'Patron', use: 'Included' })) : []),
+    ...(circle ? ENTITLEMENTS.filter((e) => e.from === 'Circle') : []),
+  ]
   const base = current.price
   // Prices include GST at 18% (as on every invoice); the GST inside the price is shown.
   const gstIn = (n: number) => Math.round((n - n / (1 + GST_RATE)) * 100) / 100
   const gst = gstIn(base)
   const t = useDict(MEMBERSHIP)
+  const fig = useFigures()
   const { lang } = useApp()
   const tc = useCommon()
   const tx = useTx()
   const cad = (c: string) => tx(CADENCE[c], c)
   const pt = (p: string) => tx(PLAN_POINT[p], p)
   const pay = (w: string) => tx(PAY_WORD[w], w)
-  const invItem = (inv: (typeof INVOICES)[number]) => tx(INVOICE_ITEM[inv.id], inv.item)
+  const invItem = (inv: Invoice) =>
+    yearly && overdue && inv.id === overdue.id ? t('patronRenewal', { from: renewYear, to: renewYear + 1 }) : tx(INVOICE_ITEM[inv.id], inv.item)
+  /** "Retrying · due by 15 Feb" for the failed UPI renewal; "Unpaid · due by …" for the Patron link. */
+  const dueLine = (inv: Invoice) => t(inv.status === 'Unpaid' ? 'dueByUnpaid' : 'dueBy', { date: fmtDate(graceUntil) })
+  const payLabel = overdue ? (yearly ? t('payLink', { amount: inr(overdue.total) }) : t('payUpiAmount', { amount: inr(overdue.total) })) : ''
 
   const openPay = () => {
     setInvoice(null)
@@ -93,11 +141,12 @@ function Membership() {
     setTimeout(() => setPayOpen(true), invoice ? 350 : 0)
   }
   const sendCollect = () => {
+    if (!overdue) return
     setPayStep('approving')
-    // Specimen: the UPI app "approves" after a short, honest pause; nothing is charged anywhere.
+    // Specimen: the UPI app (or Razorpay's own page) "approves" after a short, honest pause; nothing is charged anywhere.
     payTimer.current = setTimeout(() => {
       payTimer.current = null
-      setAcct((a) => ({ ...a, paidInvoices: [...(a.paidInvoices ?? []).filter((i) => i.id !== FEB_INVOICE), { ...overdue, status: 'Paid', date: SPECIMEN_NOW, ref: refCode('UPI') }] }))
+      setAcct((a) => ({ ...a, paidInvoices: [...(a.paidInvoices ?? []).filter((i) => i.id !== overdue.id), { ...overdue, status: 'Paid', date: SPECIMEN_NOW, ref: refCode(yearly ? 'RZP' : 'UPI') }] }))
       setPaymentsGrace(false)
       setPayStep('paid')
     }, 1400)
@@ -170,8 +219,6 @@ function Membership() {
   const isUpgrade = PLANS.findIndex((p) => p.key === pick) > PLANS.findIndex((p) => p.key === acct.plan)
   // Joy OS Plus bought on the phone goes through its store; everything else through Razorpay.
   const viaStore = STORE && pick === 'Plus' && isUpgrade ? STORE : null
-  const billing: Billing = acct.billing ?? 'razorpay'
-  const storeBilled = billing !== 'razorpay' && acct.plan === 'Plus' ? billing : null
   const doChange = (by?: Billing) => {
     const upgrade = isUpgrade
     const effective = upgrade ? SPECIMEN_NOW : renews
@@ -199,25 +246,35 @@ function Membership() {
             {t('titleA')}<Serif>{t('titleSerif')}</Serif>{t('titleB')}
           </>
         }
-        lead={t('lead')}
+        lead={
+          <Body tone="ink2">
+            <MonoNums text={t('lead')} />
+          </Body>
+        }
       />
 
       {/* Demo switch: the payments-grace state (§4B), specimen only */}
       <View style={{ borderWidth: 1, borderStyle: 'dashed', borderColor: c.lineStrong, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 6 }}>
-        <Toggle checked={inGrace} onChange={setPaymentsGrace} disabled={febPaid} label={t('demoGrace')} description={febPaid ? t('demoGracePaid') : t('demoGraceD')} />
+        <Toggle
+          checked={inGrace}
+          onChange={setPaymentsGrace}
+          disabled={overduePaid || !canGrace}
+          label={t('demoGrace')}
+          description={!overdue ? t('demoGraceFree') : !hasMethod ? t('demoGraceNoMethod') : overduePaid ? (yearly ? t('demoGracePaidPatron') : t('demoGracePaid')) : t('demoGraceD')}
+        />
       </View>
 
-      {inGrace ? (
+      {inGrace && overdue ? (
         <Card tone="soft" style={{ gap: space.s1 }}>
-          <Eyebrow tone="daybreak">{t('graceEyebrow')}</Eyebrow>
+          <Eyebrow tone="daybreak">{fig(t('graceEyebrow'))}</Eyebrow>
           <Title size={22}>
-            {t('graceTitle')}
-            <Mono size={20} tone="ink">{fmtDate(GRACE_UNTIL)}</Mono>
+            {yearly ? t('graceTitlePatron') : t('graceTitle')}
+            <Mono size={20} tone="ink">{fmtDate(graceUntil)}</Mono>
             {lang === 'hi' ? '।' : '.'}
           </Title>
-          <Body tone="ink2">{t('graceBody')}</Body>
-          <DaybreakButton icon="smartphone" onPress={openPay}>
-            {t('payUpi')}
+          <Body tone="ink2">{yearly ? t('graceBodyPatron') : t('graceBody')}</Body>
+          <DaybreakButton icon={yearly ? 'external-link' : 'smartphone'} onPress={openPay}>
+            {payLabel}
           </DaybreakButton>
         </Card>
       ) : null}
@@ -226,7 +283,7 @@ function Membership() {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: space.s1 }}>
           <View style={{ flex: 1, gap: 4 }}>
             <Eyebrow>{t('yourPlan')}</Eyebrow>
-            <Title size={26}>{`${current.name} + ${MEMBER.membership}`}</Title>
+            <Title size={26}>{circle ? `${current.name} + ${MEMBER.membership}` : current.name}</Title>
           </View>
           <Pill tone={paused ? 'neutral' : 'daybreak'}>{paused ? t('pausedPill') : t('active')}</Pill>
         </View>
@@ -235,15 +292,17 @@ function Membership() {
           <Meta>{cad(current.cadence)}</Meta>
         </View>
         <Meta>
-          {base ? t('inclGst', { gst: inr(gst) }) : t('noCharge')}
+          <MonoNums text={base ? t('inclGst', { gst: inr(gst) }) : t('noCharge')} />
           <Mono tone="ink2">{fmtDate(renews)}</Mono>
         </Meta>
-        <Meta>
-          {t('circleMem')}
-          <Mono tone="ink2">{inr(150000)}</Mono>
-          {t('perYear')}
-          <Mono tone="ink2">{fmtDate(CIRCLE_RENEWS)}</Mono>
-        </Meta>
+        {circle ? (
+          <Meta>
+            {t('circleMem')}
+            <Mono tone="ink2">{inr(150000)}</Mono>
+            {t('perYear')}
+            <Mono tone="ink2">{fmtDate(CIRCLE_RENEWS)}</Mono>
+          </Meta>
+        ) : null}
         {pending ? <Done>{t('pendingLine', { verb: pending.to === acct.plan ? t('changedTo') : t('movingTo'), name: PLANS.find((p) => p.key === pending.to)!.name, date: fmtDate(pending.effective), ref: pending.ref })}</Done> : null}
         {pending && pending.to !== acct.plan ? (
           <Button variant="link" onPress={() => setAcct((a) => ({ ...a, planChange: undefined }))} accessibilityHint={t('cancelHint')}>
@@ -256,7 +315,7 @@ function Membership() {
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{t('included')}</SectionTitle>
         <Card tone="raised" padding={8} style={{ paddingHorizontal: 16 }}>
-          {ENTITLEMENTS.map((e, i) => (
+          {included.map((e, i) => (
             <View key={e.name}>
               {i ? <Divider /> : null}
               <View style={{ paddingVertical: 12, gap: 2 }}>
@@ -264,7 +323,9 @@ function Membership() {
                   <Body style={{ flexShrink: 1 }}>{pt(e.name)}</Body>
                   <Pill>{e.from}</Pill>
                 </View>
-                <Meta size={14}>{tx(ENTITLEMENT_USE[e.use], e.use)}</Meta>
+                <Meta size={14}>
+                  <MonoNums text={tx(ENTITLEMENT_USE[e.use], e.use)} />
+                </Meta>
               </View>
             </View>
           ))}
@@ -324,40 +385,44 @@ function Membership() {
               </View>
               <Meta size={14} tone="ink3">{t('storeNever')}</Meta>
             </>
-          ) : acct.plan === 'Free' && !paidHere.length ? (
-            <Meta>{t('noMethod')}</Meta>
+          ) : !upi ? (
+            <Meta>{acct.plan === 'Free' ? t('noMethod') : t('noMethodPlan')}</Meta>
           ) : (
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 <Icon name="smartphone" size={18} color={c.ink2} />
                 <View style={{ flex: 1 }}>
                   <Body>
-                    UPI · <Mono tone="ink">••••@okhdfc</Mono>
+                    UPI · <Mono tone="ink">{upi}</Mono>
                   </Body>
                   <Meta size={14}>{t('autopay')}</Meta>
                 </View>
               </View>
               <Meta size={14} tone="ink3">{t('razorpay')}</Meta>
+              {yearly ? <Meta size={14} tone="ink3">{t('patronByLink')}</Meta> : null}
             </>
           )}
           <Meta size={14} tone="ink3">{STORE ? t('plusInStore', { store: STORE_NAME[STORE] }) : t('plusOnWeb')}</Meta>
         </Card>
         <Card tone="sunk" padding={16} style={{ flexDirection: 'row', gap: 10 }}>
           <Icon name="shield" size={16} color={c.ink2} />
-          <Meta style={{ flex: 1 }}>{t('grace')}</Meta>
+          <Meta style={{ flex: 1 }}>
+            <MonoNums text={t('grace')} />
+          </Meta>
         </Card>
       </View>
 
       <View style={{ gap: space.s1 }}>
         <SectionTitle>{t('invoicesGst')}</SectionTitle>
         <Card tone="raised" padding={8} style={{ paddingHorizontal: 16 }}>
+          {invoiceRows.length === 0 ? <Meta style={{ paddingVertical: 12 }}>{t('noInvoices')}</Meta> : null}
           {invoiceRows.map((inv, i) => (
             <View key={inv.id}>
               {i ? <Divider /> : null}
-              <ListRow
+              <FigureListRow
                 title={invItem(inv)}
-                sub={inv.status === 'Retrying' ? `${inr(inv.total)} · ${pay(inv.method)} · ${t('dueBy', { date: fmtDate(GRACE_UNTIL) })}` : `${fmtDate(inv.date)} · ${inr(inv.total)} · ${pay(inv.method)} · ${pay(inv.status)}`}
-                trailing={inv.status === 'Retrying' ? <Pill tone="neutral">{pay('Retrying')}</Pill> : undefined}
+                sub={isDue(inv) ? `${inr(inv.total)} · ${pay(inv.method)} · ${dueLine(inv)}` : `${fmtDate(inv.date)} · ${inr(inv.total)} · ${pay(inv.method)} · ${pay(inv.status)}`}
+                trailing={isDue(inv) ? <Pill tone="neutral">{pay(inv.status)}</Pill> : undefined}
                 onPress={() => {
                   setShareNote(null)
                   setInvoice(inv)
@@ -481,7 +546,7 @@ function Membership() {
                 ? viaStore
                   ? t('upgradeStoreNote', { store: STORE_NAME[viaStore] })
                   : t('upgradeNote')
-                : t('downNote', { date: fmtDate(renews) })}
+                : <MonoNums text={t('downNote', { date: fmtDate(renews) })} />}
             </Meta>
           </>
         )}
@@ -492,9 +557,9 @@ function Membership() {
         onClose={() => setInvoice(null)}
         title={t('taxInvoice')}
         footer={
-          invoice?.status === 'Retrying' ? (
+          isDue(invoice) ? (
             <View style={{ gap: 8 }}>
-              <Button variant="ink" block icon="smartphone" onPress={openPay}>
+              <Button variant="ink" block icon={yearly ? 'external-link' : 'smartphone'} onPress={openPay}>
                 {t('payNow')}
               </Button>
               <Button variant="secondary" block onPress={() => setInvoice(null)}>
@@ -537,9 +602,9 @@ function Membership() {
             <KeyValue k={t('kTotal')}>
               <Mono tone="ink">{inr(invoice.total)}</Mono>
             </KeyValue>
-            <KeyValue k={invoice.status === 'Retrying' ? t('payment') : t('kPaidBy')} last>{invoice.status === 'Retrying' ? t('dueBy', { date: fmtDate(GRACE_UNTIL) }) : `${pay(invoice.method)} · ${pay(invoice.status)}`}</KeyValue>
+            <KeyValue k={isDue(invoice) ? t('payment') : t('kPaidBy')} last>{isDue(invoice) ? dueLine(invoice) : `${pay(invoice.method)} · ${pay(invoice.status)}`}</KeyValue>
             <Meta size={14} tone="ink3">{`AIWO Joyspan Pvt Ltd · Chennai, Tamil Nadu · GSTIN ${GSTIN_AIWO} · SAC 999319`}</Meta>
-            {invoice.status !== 'Retrying' && Platform.OS !== 'web' ? <Meta size={14} tone="ink3">{t('printNote')}</Meta> : null}
+            {!isDue(invoice) && Platform.OS !== 'web' ? <Meta size={14} tone="ink3">{t('printNote')}</Meta> : null}
             {shareNote ? <Meta accessibilityLiveRegion="polite">{shareNote}</Meta> : null}
           </>
         ) : null}
@@ -548,27 +613,27 @@ function Membership() {
       <Sheet
         open={payOpen}
         onClose={closePay}
-        title={t('payUpi')}
+        title={payLabel}
         footer={
           payStep === 'paid' ? (
             <Button variant="secondary" block onPress={closePay}>
               {tc('close')}
             </Button>
           ) : (
-            <Button variant="ink" block icon="smartphone" disabled={payStep === 'approving'} onPress={sendCollect}>
-              {payStep === 'approving' ? t('approving') : t('sendCollect')}
+            <Button variant="ink" block icon={yearly ? 'external-link' : 'smartphone'} disabled={payStep === 'approving'} onPress={sendCollect}>
+              {payStep === 'approving' ? (yearly ? t('approvingCard') : t('approving')) : yearly ? t('sendCard') : t('sendCollect')}
             </Button>
           )
         }
       >
-        {payStep === 'paid' ? (
+        {!overdue ? null : payStep === 'paid' ? (
           <>
             <Title size={24}>
               {t('paidA')}<Serif>{t('thanks')}</Serif>
             </Title>
-            <Body accessibilityLiveRegion="polite">{t('paidBody', { id: FEB_INVOICE })}</Body>
+            <Body accessibilityLiveRegion="polite">{yearly ? t('paidBodyPatron', { id: overdue.id }) : t('paidBody', { id: overdue.id })}</Body>
             <KeyValue k={t('reference')} last>
-              <Mono tone="ink">{paidHere.find((i) => i.id === FEB_INVOICE)?.ref ?? ''}</Mono>
+              <Mono tone="ink">{paidHere.find((i) => i.id === overdue.id)?.ref ?? ''}</Mono>
             </KeyValue>
           </>
         ) : (
@@ -578,8 +643,10 @@ function Membership() {
             <KeyValue k={t('kTotal')} last>
               <Mono tone="ink">{inr(overdue.total)}</Mono>
             </KeyValue>
-            <Body>{t('payBody')}</Body>
-            {payStep === 'approving' ? <Meta accessibilityLiveRegion="polite">{t('approving')}</Meta> : null}
+            <Body>
+              <MonoNums text={yearly ? t('payBodyLink', { amount: inr(overdue.total) }) : t('payBodyUpi', { upi: upi ?? '', amount: inr(overdue.total) })} />
+            </Body>
+            {payStep === 'approving' ? <Meta accessibilityLiveRegion="polite">{yearly ? t('approvingCard') : t('approving')}</Meta> : null}
           </>
         )}
       </Sheet>
@@ -605,7 +672,9 @@ function Membership() {
             { value: '3', label: t('months3') },
           ]}
         />
-        <Meta>{t('pauseWhen', { from: fmtDate(renews), until: fmtDate(addMonths(renews, Number(pauseMonths))) })}</Meta>
+        <Meta>
+          <MonoNums text={t('pauseWhen', { from: fmtDate(renews), until: fmtDate(addMonths(renews, Number(pauseMonths))) })} />
+        </Meta>
       </Sheet>
     </Screen>
   )

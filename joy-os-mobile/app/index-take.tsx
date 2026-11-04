@@ -45,6 +45,7 @@ import { ATTRIB_TEXT, BLOCK_NAME_TEXT, LAB_TEXT, TAKE } from '@/screens/b/i18n/i
 import { INSTR_TEXT } from '@/screens/b/i18n/method'
 import { useCommon } from '@/screens/b/i18n/common'
 import { txFor } from '@/screens/a/i18n'
+import { MonoNums } from '@/lib/monoNums'
 
 // TAKE THE INDEX (Memo p.10–11; Plan §4B): two sittings of about ten minutes, organised by
 // instrument (a short intro before each one), one item per screen, progress always visible,
@@ -179,9 +180,9 @@ function TakeIndex() {
     <Card tone="sunk" style={{ gap: space.s1 }}>
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <Icon name="user-check" size={18} color={c.ink} />
-        <Body style={{ flex: 1 }}>{t('careBody')}</Body>
+        <Body style={{ flex: 1 }}><MonoNums text={t('careBody')} /></Body>
       </View>
-      <Meta>{t('careNow')}</Meta>
+      <Meta><MonoNums text={t('careNow')} /></Meta>
       <View style={{ flexDirection: 'row', gap: space.s1, flexWrap: 'wrap' }}>
         <Button size="sm" variant="ink" icon="life-buoy" onPress={() => setCrisisOpen(true)}>
           {t('talkNow')}
@@ -211,10 +212,10 @@ function TakeIndex() {
           eyebrow={t('minorEyebrow')}
           title={
             <>
-              {t('minorA')}<Serif>{t('minorSerif')}</Serif>{t('minorB')}
+              <MonoNums text={t('minorA')} /><Serif>{t('minorSerif')}</Serif><MonoNums text={t('minorB')} />
             </>
           }
-          lead={t('minorLead')}
+          lead={<Body tone="ink2"><MonoNums text={t('minorLead')} /></Body>}
         />
         <DaybreakButton onPress={() => router.replace('/')}>{tc('backToday')}</DaybreakButton>
       </Screen>
@@ -225,7 +226,7 @@ function TakeIndex() {
   if (clinical && rm.stage !== 'invite' && step.kind !== 'sentClinical') {
     return (
       <Screen key="clinical-sent">
-        <ScreenHeader back eyebrow={t('csEyebrow')} title={t('clinEyebrow')} lead={t('csAlready')} />
+        <ScreenHeader back eyebrow={t('csEyebrow')} title={t('clinEyebrow')} lead={<Body tone="ink2"><MonoNums text={t('csAlready')} /></Body>} />
         <DaybreakButton onPress={() => router.replace('/day-90')}>{t('csWhere')}</DaybreakButton>
       </Screen>
     )
@@ -236,7 +237,7 @@ function TakeIndex() {
     if (!submitted) {
       return (
         <Screen key="amend-none">
-          <ScreenHeader back eyebrow={t('amEyebrow')} title={t('amEyebrow')} lead={t('amNone')} />
+          <ScreenHeader back eyebrow={t('amEyebrow')} title={t('amEyebrow')} lead={<Body tone="ink2"><MonoNums text={t('amNone')} /></Body>} />
           <DaybreakButton onPress={() => setStep({ kind: 'intro' })}>{t('amTake')}</DaybreakButton>
         </Screen>
       )
@@ -287,10 +288,10 @@ function TakeIndex() {
               {f.item.text}
             </Title>
             <Card tone="sunk" padding={16} style={{ gap: 4 }}>
-              <Meta tone="ink">{t('amAsSent', { label: labelFor(f, submitted.answers[f.item.id]) })}</Meta>
-              {corrected.has(f.item.id) ? <Meta tone="ink">{t('amNow', { label: labelFor(f, now) })}</Meta> : null}
+              <Meta tone="ink"><MonoNums text={t('amAsSent', { label: labelFor(f, submitted.answers[f.item.id]) })} /></Meta>
+              {corrected.has(f.item.id) ? <Meta tone="ink"><MonoNums text={t('amNow', { label: labelFor(f, now) })} /></Meta> : null}
             </Card>
-            <Meta>{t('amPickNew')}</Meta>
+            <Meta><MonoNums text={t('amPickNew')} /></Meta>
           </View>
           <View accessibilityRole="radiogroup" accessibilityLabel={f.item.text} style={{ gap: space.s1 }}>
             {scaleOf(f.block, f.item).map((o) => (
@@ -302,7 +303,7 @@ function TakeIndex() {
               {t('amAdd')}
             </DaybreakButton>
             <Meta size={14} tone="ink3" align="center">
-              {t('amNote')}
+              <MonoNums text={t('amNote')} />
             </Meta>
           </View>
         </Screen>
@@ -318,7 +319,7 @@ function TakeIndex() {
               {t('amTitleA')}<Serif>{t('amTitleSerif')}</Serif>{t('amTitleB')}
             </>
           }
-          lead={t('amLead', { date: fmtDate(submitted.at) })}
+          lead={<Body tone="ink2"><MonoNums text={t('amLead', { date: fmtDate(submitted.at) })} /></Body>}
         />
         {amendToast ? (
           <Card tone="soft" padding={16} style={{ flexDirection: 'row', gap: 10 }}>
@@ -331,7 +332,7 @@ function TakeIndex() {
         <Card tone="sunk" style={{ gap: space.s1 }}>
           <Eyebrow {...H2}>{t('amLog', { n: submitted.amendments.length })}</Eyebrow>
           {submitted.amendments.length === 0 ? (
-            <Meta>{t('amLogNone')}</Meta>
+            <Meta><MonoNums text={t('amLogNone')} /></Meta>
           ) : (
             [...submitted.amendments].reverse().map((a) => {
               const f = items.find((x) => x.item.id === a.itemId)
@@ -341,14 +342,14 @@ function TakeIndex() {
                   <Meta size={14} tone="ink3">
                     {`${instr(f.block.code)} · ${localStamp(a.at)}`}
                   </Meta>
-                  <Body>{itemText(f)}</Body>
-                  <Meta tone="ink">{t('amLogRow', { from: labelFor(f, a.from), to: labelFor(f, a.to) })}</Meta>
+                  <Body><MonoNums text={itemText(f)} /></Body>
+                  <Meta tone="ink"><MonoNums text={t('amLogRow', { from: labelFor(f, a.from), to: labelFor(f, a.to) })} /></Meta>
                 </View>
               )
             })
           )}
           <Meta size={14} tone="ink3">
-            {t('amNote')}
+            <MonoNums text={t('amNote')} />
           </Meta>
         </Card>
         {note}
@@ -376,13 +377,13 @@ function TakeIndex() {
                       <Meta size={14} tone="ink3">
                         {corrected.has(f.item.id) ? `${instr(f.block.code)} · ${t('amCorrected')}` : instr(f.block.code)}
                       </Meta>
-                      <Body>{itemText(f)}</Body>
+                      <Body><MonoNums text={itemText(f)} /></Body>
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                         <Meta tone="ink" weight="semibold">
                           {label}
                         </Meta>
                         <Meta size={14} tone="ink2" style={{ textDecorationLine: 'underline' }}>
-                          {t('amCorrect')}
+                          <MonoNums text={t('amCorrect')} />
                         </Meta>
                       </View>
                     </Pressable>
@@ -423,7 +424,7 @@ function TakeIndex() {
               {t('labsA')}<Serif>{t('labsSerif')}</Serif>{t('labsB')}
             </>
           }
-          lead={t('labsLead', { date: fmtDate(REMEASURE_DATES.labsDrawn) })}
+          lead={<Body tone="ink2"><MonoNums text={t('labsLead', { date: fmtDate(REMEASURE_DATES.labsDrawn) })} /></Body>}
         />
         <Card tone="raised" style={{ gap: space.s1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
@@ -434,11 +435,11 @@ function TakeIndex() {
             <View key={m.name}>
               {j > 0 ? <Divider /> : null}
               <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, paddingVertical: 10 }} accessible accessibilityLabel={`${labName(m.name)}: ${m.value} ${m.unit}, ${t('labsRange', { r: m.range })}`}>
-                <Body style={{ flex: 1 }}>{labName(m.name)}</Body>
+                <Body style={{ flex: 1 }}><MonoNums text={labName(m.name)} /></Body>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Mono size={17} tone="ink">{`${m.value} ${m.unit}`}</Mono>
                   <Meta size={13} tone="ink3">
-                    {t('labsRange', { r: m.range })}
+                    <MonoNums text={t('labsRange', { r: m.range })} />
                   </Meta>
                 </View>
               </View>
@@ -468,9 +469,9 @@ function TakeIndex() {
               {t('csA')}<Serif>{t('csSerif')}</Serif>{t('csB')}
             </>
           }
-          lead={t('csLead')}
+          lead={<Body tone="ink2"><MonoNums text={t('csLead')} /></Body>}
         />
-        {offline ? <Meta tone="ink3">{t('queuedOffline')}</Meta> : null}
+        {offline ? <Meta tone="ink3"><MonoNums text={t('queuedOffline')} /></Meta> : null}
         {sentCare ? careCard : null}
         <View style={{ gap: space.s1 }}>
           <DaybreakButton onPress={() => router.replace('/day-90')}>{t('csWhere')}</DaybreakButton>
@@ -501,11 +502,11 @@ function TakeIndex() {
               </>
             )
           }
-          lead={clinical ? t('clinLead') : t('introLead')}
+          lead={<Body tone="ink2"><MonoNums text={clinical ? t('clinLead') : t('introLead')} /></Body>}
         />
         {clinical ? (
           <View style={{ borderWidth: 1, borderStyle: 'dashed', borderColor: c.lineStrong, borderRadius: 12, padding: 12 }}>
-            <Meta size={14}>{t('clinSpecimen')}</Meta>
+            <Meta size={14}><MonoNums text={t('clinSpecimen')} /></Meta>
           </View>
         ) : null}
         {resuming ? (
@@ -528,7 +529,7 @@ function TakeIndex() {
               {s.blocks.map((b) => (
                 <View key={b.code} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <TermChip term={b.term} />
-                  <Meta style={{ flex: 1 }}>{instr(b.code)}</Meta>
+                  <Meta style={{ flex: 1 }}><MonoNums text={instr(b.code)} /></Meta>
                   <Mono size={13} tone="ink3">
                     {String(b.items)}
                   </Mono>
@@ -541,12 +542,12 @@ function TakeIndex() {
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <Icon name="lock" size={16} color={c.ink2} />
             <Meta style={{ flex: 1 }}>
-              {t('scoredBy')}
+              <MonoNums text={t('scoredBy')} />
             </Meta>
           </View>
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <Icon name="heart" size={16} color={c.ink2} />
-            <Meta style={{ flex: 1 }}>{t('threshold')}</Meta>
+            <Meta style={{ flex: 1 }}><MonoNums text={t('threshold')} /></Meta>
           </View>
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <Icon name="watch" size={16} color={c.ink2} />
@@ -558,7 +559,7 @@ function TakeIndex() {
             </ArrowLink>
           ) : null}
         </Card>
-        <Meta tone="ink3">{t('allItems', { total: totalItems })}</Meta>
+        <Meta tone="ink3"><MonoNums text={t('allItems', { total: totalItems })} /></Meta>
         <View style={{ gap: space.s1 }}>
           <DaybreakButton onPress={() => goTo(resuming ? resumeAt() : 0)}>{resuming ? t('pickUp') : t('begin1')}</DaybreakButton>
           {resuming ? (
@@ -608,7 +609,7 @@ function TakeIndex() {
               {blockName(b.name).includes(' · ') ? <Serif>{` · ${blockName(b.name).split(' · ').slice(1).join(' · ')}`}</Serif> : null}
             </>
           }
-          lead={ax(b.about)}
+          lead={<Body tone="ink2"><MonoNums text={ax(b.about)} /></Body>}
         />
         <Card tone="raised" style={{ gap: space.s1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1, flexWrap: 'wrap' }}>
@@ -633,7 +634,7 @@ function TakeIndex() {
         {b.careNote ? (
           <Card tone="sunk" padding={16} style={{ flexDirection: 'row', gap: 10 }}>
             <Icon name="heart" size={16} color={c.ink2} />
-            <Meta style={{ flex: 1 }}>{ax(b.careNote)}</Meta>
+            <Meta style={{ flex: 1 }}><MonoNums text={ax(b.careNote)} /></Meta>
           </Card>
         ) : null}
         <DaybreakButton
@@ -701,7 +702,7 @@ function TakeIndex() {
         ) : f.block.careNote ? (
           <Card tone="sunk" padding={16} style={{ flexDirection: 'row', gap: 10 }}>
             <Icon name="heart" size={16} color={c.ink2} />
-            <Meta style={{ flex: 1 }}>{ax(f.block.careNote)}</Meta>
+            <Meta style={{ flex: 1 }}><MonoNums text={ax(f.block.careNote)} /></Meta>
           </Card>
         ) : null}
 
@@ -742,16 +743,16 @@ function TakeIndex() {
               {t('sigA')}<Serif>{t('sigSerif')}</Serif>{t('sigB')}
             </>
           }
-          lead={t('sigLead')}
+          lead={<Body tone="ink2"><MonoNums text={t('sigLead')} /></Body>}
         />
         {signalsDown ? (
           <Card tone="sunk" style={{ gap: space.s1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <Icon name="watch" size={18} color={c.ink} />
-              <Body weight="semibold" style={{ flexShrink: 1 }}>{t('sigDownTitle')}</Body>
+              <Body weight="semibold" style={{ flexShrink: 1 }}><MonoNums text={t('sigDownTitle')} /></Body>
               <Pill>{t('surveyOnlyTag')}</Pill>
             </View>
-            <Meta tone="ink">{t('sigDownBody')}</Meta>
+            <Meta tone="ink"><MonoNums text={t('sigDownBody')} /></Meta>
             <ArrowLink icon="watch" onPress={() => router.push('/devices')}>
               {t('sigDevices')}
             </ArrowLink>
@@ -760,7 +761,7 @@ function TakeIndex() {
           <Card tone="raised" style={{ gap: space.s1 }}>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <Icon name="watch" size={18} color={c.ink} />
-              <Meta tone="ink" style={{ flex: 1 }}>{t('sigUpBody')}</Meta>
+              <Meta tone="ink" style={{ flex: 1 }}><MonoNums text={t('sigUpBody')} /></Meta>
             </View>
             <Toggle checked={!saved.signalsOff} onChange={(on) => setSaved((x) => ({ ...x, signalsOff: !on }))} label={t('sigUse')} description={t('sigUseD')} />
           </Card>
@@ -780,7 +781,7 @@ function TakeIndex() {
                       {t('sigShareB')}
                     </Meta>
                   ) : (
-                    <Meta size={14} tone="ink3">{t('sigNone')}</Meta>
+                    <Meta size={14} tone="ink3"><MonoNums text={t('sigNone')} /></Meta>
                   )}
                 </View>
               </View>
@@ -803,7 +804,7 @@ function TakeIndex() {
               {t('breakA')}<Serif>{t('breakSerif')}</Serif>{t('breakB')}
             </>
           }
-          lead={t('breakLead')}
+          lead={<Body tone="ink2"><MonoNums text={t('breakLead')} /></Body>}
         />
         <Card tone="raised" style={{ gap: space.s1 }}>
           <Progress value={firstOf2} max={items.length} color={c.ink} label={t('answeredOf', { n: firstOf2, total: items.length })} />
@@ -832,16 +833,16 @@ function TakeIndex() {
               {t('pausedA')}<Serif>{t('pausedSerif')}</Serif>{t('pausedB')}
             </>
           }
-          lead={t('pausedLead', { n: answered, total: items.length })}
+          lead={<Body tone="ink2"><MonoNums text={t('pausedLead', { n: answered, total: items.length })} /></Body>}
         />
         <Card tone="raised" style={{ gap: space.s1 }}>
           <Progress value={answered} max={items.length} color={c.ink} label={t('answeredOf', { n: answered, total: items.length })} />
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <Icon name="smartphone" size={16} color={c.ink2} />
-            <Meta style={{ flex: 1 }}>{t('savedJustNow')}</Meta>
+            <Meta style={{ flex: 1 }}><MonoNums text={t('savedJustNow')} /></Meta>
           </View>
         </Card>
-        {offline ? <Meta tone="ink3">{t('offline')}</Meta> : null}
+        {offline ? <Meta tone="ink3"><MonoNums text={t('offline')} /></Meta> : null}
         <View style={{ gap: space.s1 }}>
           <DaybreakButton onPress={() => goTo(resumeAt())}>{t('carryOn')}</DaybreakButton>
           <Button variant="ghost" onPress={() => router.replace('/')} style={{ alignSelf: 'center' }}>
@@ -863,7 +864,7 @@ function TakeIndex() {
               {t('reviewA')}<Serif>{t('reviewSerif')}</Serif>{t('reviewB')}
             </>
           }
-          lead={t('reviewLead')}
+          lead={<Body tone="ink2"><MonoNums text={t('reviewLead')} /></Body>}
         />
         {phqHigh ? careCard : null}
         {note}
@@ -880,7 +881,7 @@ function TakeIndex() {
                 {surveyOnly ? t('sigReviewOff') : t('sigReviewOn')}
               </Meta>
               <Meta size={14} tone="ink2" style={{ textDecorationLine: 'underline' }}>
-                {t('change')}
+                <MonoNums text={t('change')} />
               </Meta>
             </View>
           </Pressable>
@@ -907,7 +908,7 @@ function TakeIndex() {
                       style={({ pressed }) => ({ paddingVertical: 12, gap: 4, opacity: pressed ? 0.7 : 1 })}
                     >
                       <Meta size={14} tone="ink3">
-                        {instr(f.block.code)}
+                        <MonoNums text={instr(f.block.code)} />
                       </Meta>
                       <Body>{f.item.stem ? `${f.item.stem.replace('…', '')} ${f.item.text.replace('…', '')}` : f.item.text}</Body>
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -915,7 +916,7 @@ function TakeIndex() {
                           {label}
                         </Meta>
                         <Meta size={14} tone="ink2" style={{ textDecorationLine: 'underline' }}>
-                          {t('change')}
+                          <MonoNums text={t('change')} />
                         </Meta>
                       </View>
                     </Pressable>
@@ -948,7 +949,7 @@ function TakeIndex() {
             {clinical ? t('clinSendReview') : t('send')}
           </DaybreakButton>
           {answered < items.length ? (
-            <Meta tone="ink3" align="center">{t('stillTo', { n: items.length - answered })}</Meta>
+            <Meta tone="ink3" align="center"><MonoNums text={t('stillTo', { n: items.length - answered })} /></Meta>
           ) : null}
           <Button variant="ghost" onPress={pause} style={{ alignSelf: 'center' }}>
             {t('keepPhone')}
@@ -968,14 +969,14 @@ function TakeIndex() {
             {t('thanksA')}<Serif>{t('thanksSerif')}</Serif>{t('thanksB')}
           </>
         }
-        lead={t('thanksLead')}
+        lead={<Body tone="ink2"><MonoNums text={t('thanksLead')} /></Body>}
       />
       <Card tone="sunk" style={{ gap: space.s1 }}>
         <Meta>
           <Meta tone="ink" weight="semibold">
-            {t('whatNext')}
+            <MonoNums text={t('whatNext')} />
           </Meta>{' '}
-          {t('whatNextBody')}
+          <MonoNums text={t('whatNextBody')} />
         </Meta>
       </Card>
       {result ? (
@@ -989,9 +990,9 @@ function TakeIndex() {
               {result.surveyOnly ? <Pill>{t('surveyOnlyTag')}</Pill> : null}
             </View>
           </View>
-          <Meta>{t('resultLine', { v: result.engine.value, name: tt.name(result.lowest) })}</Meta>
-          {result.surveyOnly ? <Meta size={14}>{t('surveyOnlyDone')}</Meta> : null}
-          {offline ? <Meta size={14} tone="ink3">{t('queuedOffline')}</Meta> : null}
+          <Meta><MonoNums text={t('resultLine', { v: result.engine.value, name: tt.name(result.lowest) })} /></Meta>
+          {result.surveyOnly ? <Meta size={14}><MonoNums text={t('surveyOnlyDone')} /></Meta> : null}
+          {offline ? <Meta size={14} tone="ink3"><MonoNums text={t('queuedOffline')} /></Meta> : null}
         </Card>
       ) : null}
       {sentCare ? careCard : null}

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'rea
 import { MEMBER } from '@/data/member'
 import { useDict } from '@/lib/i18n'
 import { useMemberName } from '@/lib/memberName'
-import { DUR } from '@/lib/motion'
+import { DUR, brandTransition, useReduceMotion } from '@/lib/motion'
 import { SHARED } from '@/components/_i18n'
 import { useA11yPrefs } from '@/routes/member/account/_prefs'
 import { Wordmark } from './Wordmark'
@@ -82,6 +82,7 @@ function withNode(line: string, node: ReactNode) {
 
 export function AppLock({ reason, minutes, onUnlock }: { reason: 'session' | 'away'; minutes: number; onUnlock: () => void }) {
   const t = useDict(SHARED)
+  const reduce = useReduceMotion()
   const { firstName } = useMemberName()
   const [mode, setMode] = useState<'bio' | 'id'>('bio')
   const [checking, setChecking] = useState<false | 'checking' | 'done'>(false)
@@ -128,7 +129,7 @@ export function AppLock({ reason, minutes, onUnlock }: { reason: 'session' | 'aw
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: DUR.settle / 1000 }}
+      transition={brandTransition(reduce, DUR.settle)}
     >
       <div className="w-full max-w-sm text-center">
         <Wordmark height={20} className="mx-auto" />

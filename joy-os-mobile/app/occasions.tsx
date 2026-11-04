@@ -7,9 +7,10 @@ import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { useDict } from '@/lib/i18n'
 import { occasionsStore, useStore, type OccasionGeneration, type OccasionGuest, type OccasionRequest, type OccasionTemplate } from '@/screens/b/bStore'
-import { CheckLine, ChoiceCard, Done, Field, KeyValue, PrimaryChip, memberOnly, useSheetCrisisGuard } from '@/screens/b/parts'
+import { CheckLine, ChoiceCard, Done, Field, KeyValue, PrimaryChip, memberOnly, useFigures, useSheetCrisisGuard } from '@/screens/b/parts'
 import { OCC, VENUE_T } from '@/screens/b/i18n/occasions'
 import { useCommon, useTx } from '@/screens/b/i18n/common'
+import { MonoNums } from '@/lib/monoNums'
 
 // JOYSPAN OCCASIONS (Memo p.20, p.29): a 60th birthday, an anniversary, a homecoming —
 // templates on the ’cation engine ("a new template, live in weeks"), three generations
@@ -61,6 +62,7 @@ export default memberOnly(Occasions)
 function Occasions() {
   const { c, space } = useTheme()
   const t = useDict(OCC)
+  const fig = useFigures()
   const tx = useTx()
   const [store, setStore] = useStore(occasionsStore)
   const [planFor, setPlanFor] = useState<OccasionTemplate | null>(null)
@@ -110,7 +112,7 @@ function Occasions() {
               <Pill tone="daybreak">{t('requestedRef', { ref: q.ref })}</Pill>
             </View>
             <Title size={24}>{t('occSentTitle', { name: t(NAME[q.template]) })}</Title>
-            {sentRef === q.ref ? <Done>{t('occSentBody', { c: CONCIERGE })}</Done> : <Meta>{t('occSentBody', { c: CONCIERGE })}</Meta>}
+            {sentRef === q.ref ? <Done>{t('occSentBody', { c: CONCIERGE })}</Done> : <Meta><MonoNums text={t('occSentBody', { c: CONCIERGE })} /></Meta>}
             <View>
               <KeyValue k={t('dtReference')}>
                 <Mono tone="ink">{q.ref}</Mono>
@@ -130,7 +132,7 @@ function Occasions() {
               <Serif>{`“${q.outcome}”`}</Serif>
             </Meta>
             <Divider />
-            <Eyebrow>{gens.length === 3 ? t('occThreeGen') : t('occGenCount', { n: gens.length })}</Eyebrow>
+            <Eyebrow>{gens.length === 3 ? t('occThreeGen') : fig(t('occGenCount', { n: gens.length }))}</Eyebrow>
             {GENS.map((g) => {
               const people = q.guests.filter((x) => x.generation === g)
               return (
@@ -195,7 +197,7 @@ function Occasions() {
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                 <Title size={24}>{t(NAME[x.id])}</Title>
-                <Eyebrow>{t('nightsN', { n: x.nights })}</Eyebrow>
+                <Eyebrow>{fig(t('nightsN', { n: x.nights }))}</Eyebrow>
               </View>
               <Body tone="ink2">{t(PROMISE[x.id])}</Body>
               {x.includes.map((k) => (
@@ -204,7 +206,7 @@ function Occasions() {
                 </CheckLine>
               ))}
               <Meta size={14} tone="ink3">
-                {t('day90Dot')}
+                {fig(t('day90Dot'))}
                 {t(MEASURE[x.id])}
               </Meta>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
@@ -269,6 +271,7 @@ function Occasions() {
 function PlanSheet({ tpl, existing, onClose, onSent }: { tpl: Template; existing?: OccasionRequest; onClose: () => void; onSent: (q: OccasionRequest) => void }) {
   const { c, space } = useTheme()
   const t = useDict(OCC)
+  const fig = useFigures()
   const tc = useCommon()
   const tx = useTx()
   const guard = useSheetCrisisGuard()
@@ -336,7 +339,7 @@ function PlanSheet({ tpl, existing, onClose, onSent }: { tpl: Template; existing
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <PrimaryChip primary={tpl.primary} />
-        <Meta size={14}>{`${t('occFrom', { p: tpl.priceFrom })} · ${t('nightsN', { n: tpl.nights })}`}</Meta>
+        <Meta size={14}>{fig(`${t('occFrom', { p: tpl.priceFrom })} · ${t('nightsN', { n: tpl.nights })}`)}</Meta>
       </View>
 
       <Field label={t('occHonoree')} value={honoree} onChangeText={setHonoree} placeholder={t('occHonoreePh')} maxLength={60} autoComplete="off" error={tried ? errs.honoree : null} />
@@ -407,9 +410,9 @@ function PlanSheet({ tpl, existing, onClose, onSent }: { tpl: Template; existing
       <Card tone="sunk" padding={16} style={{ gap: 4 }} >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} accessibilityLiveRegion="polite">
           {gens.length === 3 ? <Icon name="check" size={15} color={c.ink} /> : null}
-          <Body style={{ flexShrink: 1 }}>{gens.length === 3 ? t('occThreeGen') : t('occGenCount', { n: gens.length })}</Body>
+          <Body style={{ flexShrink: 1 }}>{gens.length === 3 ? t('occThreeGen') : fig(t('occGenCount', { n: gens.length }))}</Body>
         </View>
-        <Meta size={14}>{t('occGuestsN', { n: guests.length, m: measured.length })}</Meta>
+        <Meta size={14}><MonoNums text={t('occGuestsN', { n: guests.length, m: measured.length })} /></Meta>
         {missing && gens.length < 3 ? <Meta size={14} tone="ink3">{t('occGenHint', { gen: t(GEN_KEY[missing]) })}</Meta> : null}
         {guests.some((g) => g.elder) ? <Meta size={14} tone="ink3">{t('occElderNote')}</Meta> : null}
       </Card>

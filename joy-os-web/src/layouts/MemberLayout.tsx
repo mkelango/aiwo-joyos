@@ -17,6 +17,8 @@ import { useApp } from '@/lib/store'
 import { useDict, useT } from '@/lib/i18n'
 import { useMemberName } from '@/lib/memberName'
 import { MemberScoreScope } from '@/lib/minor'
+import { BrandMotion } from '@/lib/motion'
+import { nums } from '@/lib/nums'
 import { SHARED } from '@/components/_i18n'
 import { CrisisSheet, ThemeToggle } from './shared'
 
@@ -118,6 +120,9 @@ export default function MemberLayout() {
 
   return (
     <MemberScoreScope>
+    {/* Every framer animation below settles on the brand easing; under reduced motion each one
+        is a 120 ms opacity fade (Playbook p53). */}
+    <BrandMotion>
     {/* App open: the 2.4 s daybreak, once per session (skipped under reduced motion). */}
     <DaybreakMark />
     {/* Biometric lock (Settings · Security): over everything, the app behind it inert. */}
@@ -220,6 +225,7 @@ export default function MemberLayout() {
       )}
       <CrisisSheet />
     </div>
+    </BrandMotion>
     </MemberScoreScope>
   )
 }
@@ -235,7 +241,7 @@ function RailLink({ to, label, icon: Icon, end, small }: { to: string; label: st
         }
       >
         <Icon size={small ? 17 : 19} strokeWidth={1.5} className="shrink-0" />
-        <span className="min-w-0 break-words">{label}</span>
+        <span className="min-w-0 break-words">{nums(label)}</span>
       </NavLink>
     </li>
   )

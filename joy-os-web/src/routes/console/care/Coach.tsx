@@ -13,11 +13,11 @@ import { CIRCLES_LED, CIRCLE_ROSTER, COACH_CASELOAD, DAY_N, MEERA, PRIYA, RAVI }
 import { ConciergeDesk } from './_concierge'
 import { useClinicalState } from './_clinicalStore'
 import { RaiseConcernSheet, type ConcernTarget } from './_concern'
-import { PreviewBanner, coachDeskOf, useConsoleAccess, useConsoleRole } from './_gate'
+import { PreviewBanner, actorOf, coachDeskOf, useConsoleAccess, useConsoleRole, withGrant } from './_gate'
 import { useRemeasure } from './_remeasure'
 import { useCircleReports, type CircleReport } from './_reports'
 import { coach, isClinicalTask, isMyTask, taskLabel, useCoachState, type CoachTask } from './_store'
-import { AccessNote, CardHead, ConsoleTermChip, Kpi, PriorityTag, ScrollTabs, SlaChip, areaCls, fieldCls, fmtClock, fmtOpened, labelCls, parseIst, useConsoleNow } from './_parts'
+import { AccessNote, AuditList, CardHead, ConsoleTermChip, Kpi, PriorityTag, ScrollTabs, SlaChip, areaCls, fieldCls, fmtClock, fmtOpened, labelCls, parseIst, useConsoleNow } from './_parts'
 
 // COACH & CONCIERGE CONSOLE (Memo p.15, p.18; Architecture p6): caseload by loop day,
 // drift tasks with SLA timers, circles, Day-N. Coaches see term scores and bands only.
@@ -31,6 +31,26 @@ const deadlineOf = (t: DriftTask) => parseIst(t.openedAt) + t.slaHours * 3600_00
 const OUTCOMES = ['Reached · plan adjusted', 'Reached · no change needed', 'Message left · will retry', 'Handed to clinician', 'Member asked for space this week']
 
 type Desk = 'coach' | 'concierge'
+
+/** The console clock's date, as the member digest stamps its lines. */
+const TODAY = '28 Jan 2027'
+
+/** Writes one coach-desk audit line (and to the member's trail when it is about one member). */
+type DeskLog = (e: { what: string; purpose: string; memberId?: string | null }) => void
+
+/**
+ * The coach desk's audit writer: every line names the signed-in person (with their role when it
+ * is not the coach's own desk) and carries the grant reference when the action is under one.
+ */
+function useDeskLog(): DeskLog {
+  const acc = useConsoleAccess('/console/coach')
+  const now = useConsoleNow()
+  const actor = actorOf(acc)
+  const who = actor.role === 'Coach' || actor.role === 'Preview' ? actor.who : `${actor.who} · ${actor.role.toLowerCase()}`
+  return (e) => coach.audit(e.memberId ?? null, { at: `${TODAY} · ${fmtClock(now)}`, who, what: e.what, purpose: withGrant(e.purpose, acc) })
+}
+
+const STATUS_LABEL: Record<DriftTask['status'], string> = { open: 'open', 'in-progress': 'in progress', done: 'done' }
 
 /**
  * The console is two desks: the coach's (drift, digests, circles) and the concierge's
@@ -66,7 +86,8 @@ export default function CoachConsole() {
 function Coach({ deskSwitch }: { deskSwitch: ReactNode }) {
   const navigate = useNavigate()
   const now = useConsoleNow()
-  const { tasks, circles } = useCoachState()
+  const { tasks, circles, deskLog } = useCoachState()
+  const log = useDeskLog()
   // canAct is the console as a whole; canActOn answers for one member, so a grant scoped to one
   // member or to the holder's assigned members acts on those rows and nowhere else.
   const { canAct, canActOn } = useConsoleAccess('/console/coach')
@@ -104,7 +125,13 @@ function Coach({ deskSwitch }: { deskSwitch: ReactNode }) {
     .filter((t) => isMine(t) && t.status === 'open')
     .sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority] || deadlineOf(a) - deadlineOf(b))[0]
 
-  const setStatus = (id: string, status: DriftTask['status'], extra?: Partial<CoachTask>) => coach.setStatus(id, status, extra)
+  /** A status change on a drift task, written to the desk audit and the member's trail. */
+  const setStatus = (id: string, status: DriftTask['status'], extra?: Partial<CoachTask>) => {
+    const t = tasks.find((x) => x.id === id)
+    if (!t || t.status === status) return
+    coach.setStatus(id, status, extra)
+    if (status !== 'done') log({ what: `Drift task ${id.toUpperCase()} · ${t.memberName} · ${STATUS_LABEL[t.status]} → ${STATUS_LABEL[status]}`, purpose: 'Drift queue', memberId: t.memberId })
+  }
 
   const takeNext = () => {
     if (!nextForMe || !canActOn(nextForMe.memberId)) return
@@ -116,6 +143,7 @@ function Coach({ deskSwitch }: { deskSwitch: ReactNode }) {
     if (!closing || !canActOn(closing.memberId)) return
     if (!outcome) return setOutcomeErr('Choose an outcome. A task closes with what happened, not just a tick.')
     setStatus(closing.id, 'done', { outcome: outcomeNote ? `${outcome} — ${outcomeNote}` : outcome, closedAt: fmtClock(now) })
+    log({ what: `Closed drift task ${closing.id.toUpperCase()} · ${closing.memberName} · ${outcome.toLowerCase()}`, purpose: 'Drift queue · close with outcome', memberId: closing.memberId })
     const next = tasks.filter((t) => t.id !== closing.id && isMine(t) && t.status === 'open').sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority] || deadlineOf(a) - deadlineOf(b))[0]
     setNotice({ text: `${closing.memberName} closed at ${fmtClock(now)}: ${outcome.toLowerCase()}.`, to: next ? `/console/coach/member/${next.memberId}?task=${next.id}` : undefined, cta: next ? `Next · ${next.memberName}` : undefined })
     setClosing(null)
@@ -430,7 +458,14 @@ function Coach({ deskSwitch }: { deskSwitch: ReactNode }) {
         </div>
       </section>
 
-      <Moderation canActOn={canActOn} now={now} onConcern={setConcern} />
+      <Moderation canActOn={canActOn} now={now} onConcern={setConcern} log={log} />
+
+      {deskLog.length > 0 && (
+        <Card className="mt-6">
+          <CardHead eyebrow={<>Audit · this desk · <span className="num">{deskLog.length}</span> {deskLog.length === 1 ? 'line' : 'lines'}</>} aside={<span className="text-[13px] text-ink-3">Queue, circles and moderation · reviewed by the DPO</span>} />
+          <AuditList events={deskLog} />
+        </Card>
+      )}
 
       {tonight && (
         <div className="mt-8 flex justify-end">
@@ -440,12 +475,16 @@ function Coach({ deskSwitch }: { deskSwitch: ReactNode }) {
         </div>
       )}
 
-      <CircleSheet id={circleOpen} onClose={() => setCircleOpen(null)} canAct={canAct} canActOn={canActOn} now={now} onConcern={(t) => { setCircleOpen(null); setConcern(t) }} />
+      <CircleSheet id={circleOpen} onClose={() => setCircleOpen(null)} canAct={canAct} canActOn={canActOn} now={now} log={log} onConcern={(t) => { setCircleOpen(null); setConcern(t) }} />
       <RaiseConcernSheet
         target={concern}
         onClose={() => setConcern(null)}
         canAct={!!concern && canActOn(concern.memberId)}
-        onRaised={(a) => { if (concern?.reportId) coach.moderate(concern.reportId, { status: 'concern', at: fmtClock(now), alertId: a.id }) }}
+        onRaised={(a) => {
+          if (!concern?.reportId) return
+          coach.moderate(concern.reportId, { status: 'concern', at: fmtClock(now), alertId: a.id })
+          log({ what: `Circle report on ${concern.name.split(' ')[0]} · concern raised to ${a.owner}`, purpose: 'Circle moderation', memberId: concern.memberId })
+        }}
       />
 
       <Sheet open={!!closing} onClose={() => setClosing(null)} title={closing ? `Close task · ${closing.memberName}` : 'Close task'} side="center">
@@ -483,7 +522,7 @@ function Coach({ deskSwitch }: { deskSwitch: ReactNode }) {
 
 // ─── Circle sheet: roster, this week, call room, attendance ────────────────
 
-function CircleSheet({ id, onClose, canAct, canActOn, now, onConcern }: { id: string | null; onClose: () => void; canAct: boolean; canActOn: (memberId?: string | null) => boolean; now: number; onConcern: (t: ConcernTarget) => void }) {
+function CircleSheet({ id, onClose, canAct, canActOn, now, log, onConcern }: { id: string | null; onClose: () => void; canAct: boolean; canActOn: (memberId?: string | null) => boolean; now: number; log: DeskLog; onConcern: (t: ConcernTarget) => void }) {
   const { circles } = useCoachState()
   const c = CIRCLES_LED.find((x) => x.id === id)
   const roster = id ? CIRCLE_ROSTER[id] ?? [] : []
@@ -502,9 +541,16 @@ function CircleSheet({ id, onClose, canAct, canActOn, now, onConcern }: { id: st
 
   if (!c) return <Sheet open={false} onClose={onClose} title="Circle">{null}</Sheet>
   const roomOpen = work?.room === 'open'
+  const setRoom = (room: 'open' | 'closed') => {
+    if (!canAct) return
+    coach.updateCircle(c.id, (w) => ({ ...w, room }))
+    log({ what: room === 'open' ? `Started the call room · ${c.name} · week ${c.week} · recordings off` : `Ended the call · ${c.name} · week ${c.week}`, purpose: 'Circle call room' })
+  }
   const toggle = (name: string) => { setPresent((p) => (p.includes(name) ? p.filter((x) => x !== name) : [...p, name])); setSavedNote(null) }
   const save = () => {
+    if (!canAct) return
     coach.updateCircle(c.id, (w) => ({ ...w, attended: present, savedAt: fmtClock(now) }))
+    log({ what: `Saved attendance · ${c.name} · week ${c.week} · ${present.length} of ${roster.length} present`, purpose: 'Circle attendance' })
     setSavedNote(`Attendance saved for week ${c.week} · ${present.length} of ${roster.length} present · ${fmtClock(now)}. Absent members get a gentle catch-up note from you, never a reminder count.`)
   }
 
@@ -529,12 +575,12 @@ function CircleSheet({ id, onClose, canAct, canActOn, now, onConcern }: { id: st
             <div role="status" className="mt-2">
               <p className="flex items-center gap-2 text-[15px] text-ink"><Video size={16} aria-hidden /> Call room open · recordings off</p>
               <p className="mt-1 text-[13px] text-ink-2">Members can join from the app. Nothing is recorded or transcribed.</p>
-              <Button size="sm" variant="ghost" className="mt-3" disabled={!canAct} onClick={() => coach.updateCircle(c.id, (w) => ({ ...w, room: 'closed' }))}>End call</Button>
+              <Button size="sm" variant="ghost" className="mt-3" disabled={!canAct} onClick={() => setRoom('closed')}>End call</Button>
             </div>
           ) : (
             <div className="mt-2">
               <p className="text-[14px] text-ink-2">Thirty minutes. Opens for all <span className="num">{roster.length}</span> at once; recordings are off by design.</p>
-              <Button size="sm" variant="secondary" className="mt-3" disabled={!canAct} onClick={() => coach.updateCircle(c.id, (w) => ({ ...w, room: 'open' }))}><Video size={14} aria-hidden /> Start call room</Button>
+              <Button size="sm" variant="secondary" className="mt-3" disabled={!canAct} onClick={() => setRoom('open')}><Video size={14} aria-hidden /> Start call room</Button>
             </div>
           )}
         </div>
@@ -669,7 +715,7 @@ function fmtReportAt(ms: number | null) {
   return fmtOpened(new Date(ms + 5.5 * 3600_000).toISOString().slice(0, 16).replace('T', ' '))
 }
 
-function Moderation({ canActOn, now, onConcern }: { canActOn: (memberId?: string | null) => boolean; now: number; onConcern: (t: ConcernTarget & { reportId?: string }) => void }) {
+function Moderation({ canActOn, now, onConcern, log }: { canActOn: (memberId?: string | null) => boolean; now: number; onConcern: (t: ConcernTarget & { reportId?: string }) => void; log: DeskLog }) {
   const reports = useCircleReports()
   const { moderation } = useCoachState()
   const { alerts } = useClinicalState()
@@ -682,6 +728,7 @@ function Moderation({ canActOn, now, onConcern }: { canActOn: (memberId?: string
     if (!canActOn(r.memberId)) return
     if (note.trim().length < 10) return setErr('Write a sentence about what you said and agreed (10 characters or more).')
     coach.moderate(r.id, { status: 'spoken', at: fmtClock(now), note: note.trim() })
+    log({ what: `Circle report on ${r.memberName.split(' ')[0]} · spoke with them`, purpose: 'Circle moderation', memberId: r.memberId })
     setNoting(null); setNote(''); setErr('')
   }
 
@@ -720,7 +767,7 @@ function Moderation({ canActOn, now, onConcern }: { canActOn: (memberId?: string
                       {m.status === 'concern' && <>Concern raised to {alert?.owner ?? 'the clinical team'} · <span className="num">{m.at}</span> · {alert?.status === 'closed' ? 'closed by the clinician' : 'open on the safety board'}</>}
                     </span>
                   </p>
-                  {m.status !== 'concern' && <button type="button" disabled={!canAct} onClick={() => coach.moderate(r.id, null)} className="text-[13px] text-ink-2 underline underline-offset-4 hover:text-ink focus-ring disabled:opacity-50">Reopen</button>}
+                  {m.status !== 'concern' && <button type="button" disabled={!canAct} onClick={() => { if (!canAct) return; coach.moderate(r.id, null); log({ what: `Circle report on ${r.memberName.split(' ')[0]} · reopened`, purpose: 'Circle moderation', memberId: r.memberId }) }} className="text-[13px] text-ink-2 underline underline-offset-4 hover:text-ink focus-ring disabled:opacity-50">Reopen</button>}
                 </div>
               ) : noting === r.id ? (
                 <form onSubmit={(e) => { e.preventDefault(); spoke(r) }} noValidate className="mt-3 space-y-2">
@@ -736,7 +783,7 @@ function Moderation({ canActOn, now, onConcern }: { canActOn: (memberId?: string
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button size="sm" variant="secondary" disabled={!canAct} onClick={() => { setNoting(r.id); setNote(''); setErr('') }}>Spoke with them</Button>
                   <Button size="sm" variant="secondary" disabled={!canAct} onClick={() => onConcern({ name: r.memberName, memberId: r.memberId, context: `circle report${r.circleName ? ` · ${r.circleName}` : ''}`, prefill: `A circle member reported: “${r.reason}” `, reportId: r.id })}><ShieldAlert size={14} aria-hidden /> Raise a concern</Button>
-                  <Button size="sm" variant="ghost" disabled={!canAct} onClick={() => coach.moderate(r.id, { status: 'no-action', at: fmtClock(now) })}>No action needed</Button>
+                  <Button size="sm" variant="ghost" disabled={!canAct} onClick={() => { if (!canAct) return; coach.moderate(r.id, { status: 'no-action', at: fmtClock(now) }); log({ what: `Circle report on ${r.memberName.split(' ')[0]} · read, no action needed`, purpose: 'Circle moderation', memberId: r.memberId }) }}>No action needed</Button>
                 </div>
               )}
             </li>

@@ -21,14 +21,18 @@ export interface Notice {
   date?: string
   href: string
   cta: string
+  /** The accounts it was sent to (L2); absent = every member. A notice about a message thread is
+   *  shown only to an account that has the thread. */
+  for?: ('arjun' | 'lakshmi' | 'new')[]
 }
 
 export const NOTICES: Notice[] = [
-  { id: 'n1', group: 'Today', kind: 'action', title: 'Today’s action', body: 'Ten minutes on the verandah with tea. Notice three things.', at: '07:45', href: '/', cta: 'Open Today' },
+  { id: 'n1', group: 'Today', kind: 'action', title: 'Today’s action', body: 'Ten minutes on the verandah with tea. Notice three things.', at: '07:45', href: '/', cta: 'Open Today', for: ['arjun'] },
   { id: 'n3', group: 'Today', kind: 'ledger', title: 'Anything good in the last few hours?', body: 'Ten seconds for the Joy Ledger.', at: '16:30', href: '/ledger', cta: 'Add to the Ledger' },
-  { id: 'n2', group: 'Earlier', kind: 'message', title: 'Priya replied', body: 'Skipping is allowed — it is never counted against you…', at: 'Yesterday', href: '/messages?t=t_priya', cta: 'Read the reply' },
-  { id: 'n4', group: 'Earlier', kind: 'circle', title: 'Circle on Monday, 19:00', body: 'Week 4 · Don’t Postpone Joy. Thirty minutes with the same eight.', at: 'Yesterday', href: '/circles', cta: 'See the circle' },
-  { id: 'n5', group: 'Earlier', kind: 'care', title: 'Your January panel is signed', body: 'Dr Meera Iyer signed it with a note in plain words.', at: '24 Jan', date: '2027-01-24', href: '/care', cta: 'See results' },
+  { id: 'n2', group: 'Earlier', kind: 'message', title: 'Priya replied', body: 'Skipping is allowed — it is never counted against you…', at: 'Yesterday', href: '/messages?t=t_priya', cta: 'Read the reply', for: ['arjun'] },
+  { id: 'n7', group: 'Earlier', kind: 'message', title: 'Ravi wrote to you', body: 'Vanakkam, Lakshmi-amma. Arjun asked me to keep you a place…', at: '19 Jan', date: '2027-01-19', href: '/messages?t=t_ravi_lk', cta: 'Read the message', for: ['lakshmi'] },
+  { id: 'n4', group: 'Earlier', kind: 'circle', title: 'Circle on Monday, 19:00', body: 'Week 4 · Don’t Postpone Joy. Thirty minutes with the same eight.', at: 'Yesterday', href: '/circles', cta: 'See the circle', for: ['arjun'] },
+  { id: 'n5', group: 'Earlier', kind: 'care', title: 'Your January panel is signed', body: 'Dr Meera Iyer signed it with a note in plain words.', at: '24 Jan', date: '2027-01-24', href: '/care', cta: 'See results', for: ['arjun'] },
   { id: 'n6', group: 'Earlier', kind: 'letter', title: 'The Joyspan Letter · Winter', body: 'Published results, up and down, and what we changed.', at: '15 Jan', date: '2027-01-15', href: '/method', cta: 'Read the method' },
 ]
 

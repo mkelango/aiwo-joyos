@@ -7,7 +7,7 @@ import { AiwoMark } from '@/components/joy/Brand'
 import { DEMO_ROLES } from '@/layouts/DemoBar'
 import { ThemeToggle } from '@/layouts/shared'
 import { useApp } from '@/lib/store'
-import { DEMO_ACCOUNTS, OPS_ACCOUNT } from '@/routes/entry/_data'
+import { ROLE_ACCOUNTS } from '@/routes/entry/_data'
 import { DeckCtx, H, SLIDES, SlideFrame, W } from './_deck'
 
 // CREDS (Plan §4E): the Joy OS credentials deck — 16:9 slides scaled to the viewport,
@@ -380,14 +380,12 @@ function Overview({ current, onPick, onClose }: { current: number; onPick: (k: n
     setRole(r.role)
     nav(r.to)
   }
-  // the seven roles, plus Engineering & ops (its own ops role, lands on /console/ops)
-  const accounts = [
-    ...DEMO_ACCOUNTS.flatMap((a) => {
-      const r = DEMO_ROLES.find((d) => d.role === a.role)
-      return r ? [{ key: a.key, role: a.role, title: a.title, email: a.email, who: r.who, to: r.to }] : []
-    }),
-    { key: OPS_ACCOUNT.key, role: OPS_ACCOUNT.role, title: OPS_ACCOUNT.title, email: OPS_ACCOUNT.email, who: OPS_ACCOUNT.who, to: OPS_ACCOUNT.to },
-  ]
+  // every demo role: the concierge (its own desk at the coach console) and Engineering & ops
+  // (its own ops role, lands on /console/ops) included
+  const accounts = ROLE_ACCOUNTS.flatMap((a) => {
+    const r = DEMO_ROLES.find((d) => d.role === a.role)
+    return r ? [{ key: a.key, role: a.role, title: a.title, email: a.email, who: r.who, to: r.to }] : []
+  })
   return (
     <motion.div
       ref={ref}

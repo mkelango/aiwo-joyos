@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { ArrowRight, Check, ChevronRight, Clock, Eye, EyeOff, Lock, MapPin, Send, Smartphone, Wallet } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -7,13 +7,16 @@ import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
 import { AiwoMark } from '@/components/joy/Brand'
 import { BandLabel, DaybreakButton, Eyebrow, MethodLine, NotScoredNote, SpecimenTag, TermDot, useFmtDate } from '@/components/joy/primitives'
 import { Button, Card, LoopRing, PageHeader, Pill, SectionTitle, Sheet } from '@/components/ui'
-import { INDEX_HISTORY, MEMBER } from '@/data/member'
+import { MEMBER } from '@/data/member'
+import { useIndexHistory } from '@/routes/member/core/_latest'
 import { useMemberName } from '@/lib/memberName'
 import { useScoresHidden } from '@/lib/minor'
 import { FLAGSHIP_NEXT, PASSES, PASSPORT, SESSIONS_ALLOWANCE } from './_data'
-import { QRCode, SheetFocus } from './_parts'
+import { QRCode, SheetFocus, reducedFade } from './_parts'
+import { DUR, EASE_BRAND, useReduceMotion } from '@/lib/motion'
 import { setWallet, useJourney } from './_store'
 import { useJ } from './_i18n'
+import { monoDigits } from './_mono'
 
 // The card is a dark object in both themes, so its foreground is the fixed
 // brand Stone, not --paper (which swaps to the dark ground in dark mode).
@@ -32,11 +35,15 @@ const ENTITLEMENT_LINKS: Record<string, string> = {
 // editions and Houses — the same card, the same Index, the same ninety days.
 // Venues scan the pass and see a name and a booking, never health data.
 
-const stampIn = (reduce: boolean | null) => ({ initial: { opacity: 0, rotate: reduce ? 0 : -2, y: 6 }, animate: { opacity: 1, rotate: 0, y: 0 }, transition: { duration: 0.24 } })
+// Stamps press in with a slight turn; under reduced motion, the 120 ms fade alone.
+const stampIn = (reduce: boolean, delay = 0) => reduce
+  ? reducedFade(true)
+  : { initial: { opacity: 0, rotate: -2, y: 6 }, animate: { opacity: 1, rotate: 0, y: 0 }, transition: { delay, duration: DUR.settle / 1000 } }
 
 export default function Passport() {
-  const latest = INDEX_HISTORY[0]
-  const reduce = useReducedMotion()
+  // The latest Index: a signed Day-90 re-measure replaces the specimen's (core/_latest).
+  const { latest } = useIndexHistory()
+  const reduce = useReduceMotion()
   const [showPass, setShowPass] = useState(false)
   const [flipped, setFlipped] = useState(false)
   const [hideIndex, setHideIndex] = useState(false)
@@ -55,7 +62,7 @@ export default function Passport() {
   const savourRequested = requested.some((r) => r.slug === 'savourcation')
   const upcoming = [...PASSES.filter((p) => p.status === 'Valid').map((p) => ({ id: p.id, code: p.code, label: 'Joyspan Session · Chennai' })), ...booked.map((b) => ({ id: b.id, code: b.code, label: b.name }))]
 
-  return (
+  return monoDigits(
     <div>
       <PageHeader
         eyebrow={t('joyPassport')}
@@ -68,10 +75,13 @@ export default function Passport() {
         {/* The card */}
         <div>
           <div className="[perspective:1600px]">
+            {/* Under reduced motion the card does not turn: the other side fades in over 120 ms. */}
             <motion.div
+              key={reduce ? (flipped ? 'back' : 'front') : 'card'}
               className="relative grid [transform-style:preserve-3d]"
-              animate={{ rotateY: flipped ? 180 : 0 }}
-              transition={{ duration: reduce ? 0 : 0.5, ease: [0.2, 0, 0, 1] }}
+              initial={reduce ? { opacity: 0, rotateY: flipped ? 180 : 0 } : false}
+              animate={{ opacity: 1, rotateY: flipped ? 180 : 0 }}
+              transition={reduce ? { duration: DUR.instant / 1000 } : { duration: 0.5, ease: [...EASE_BRAND] }}
             >
               {/* Front */}
               <div className={`relative overflow-hidden rounded-[22px] bg-ink-ground p-6 [grid-area:1/1] ${FG} shadow-lift ring-1 ring-[color:color-mix(in_srgb,var(--aiwo-stone)_10%,transparent)] [backface-visibility:hidden] md:p-8`} aria-hidden={flipped}>
@@ -143,7 +153,7 @@ export default function Passport() {
             </div>
           </div>
           {wallet && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px] text-ink-2" role="status">
+            <motion.div {...reducedFade(reduce)} className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px] text-ink-2" role="status">
               <span className="flex items-center gap-2"><Check size={15} className="shrink-0" /> {t('addedWallet', { w: wallet === 'apple' ? 'Apple Wallet' : 'Google Wallet' })}</span>
               <Button variant="link" className="text-[14px]" onClick={() => setWallet(null)}>{t('remove')}</Button>
             </motion.div>
@@ -191,7 +201,7 @@ export default function Passport() {
         <SectionTitle aside={<span className="text-[13px] text-ink-3">{t('stampsAside')}</span>}><span id="stamps">{t('stamps')}</span></SectionTitle>
         <ol className="grid gap-4 md:grid-cols-3">
           {PASSPORT.stamps.map((s, i) => (
-            <motion.li key={s.id} initial={{ opacity: 0, rotate: reduce ? 0 : -2, y: 6 }} animate={{ opacity: 1, rotate: 0, y: 0 }} transition={{ delay: i * 0.08, duration: 0.24 }}>
+            <motion.li key={s.id} {...stampIn(reduce, i * 0.08)}>
               <div className={clsx('relative flex h-full flex-col rounded-card border-2 p-5', s.done ? 'border-ink' : 'border-dashed border-line-strong')}>
                 <div className="flex items-start justify-between gap-3">
                   <span className="house min-w-0 text-ink">{tx(s.place)}</span>

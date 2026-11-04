@@ -4,13 +4,14 @@ import { ArrowLeft, Check, CheckCheck, Clock, PenLine, Plus, ShieldAlert, Sparkl
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { DaybreakButton } from '@/components/joy/primitives'
+import { EmptyIllustration } from '@/components/joy/EmptyIllustration'
 import { Avatar, Button, Card, PageHeader, Pill, Sheet, Tabs } from '@/components/ui'
 import { TEAM } from '@/data/member'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { AUTO_REPLY, PEOPLE_DETAIL, THREADS, type Msg, type Thread } from './_data'
 import { CARE_INBOX_CHANGED, isClinicalPerson, specimenNow } from './_careInbox'
 import { TeleManasStrip } from './_parts'
-import { fmtDay, fmtShortDate, fmtTime, readPersisted, rich, usePersisted } from './_util'
+import { fmtDay, fmtShortDate, fmtTime, nums, readPersisted, rich, usePersisted } from './_util'
 import { useDict } from '@/lib/i18n'
 import { MSG, useData } from './_i18n'
 
@@ -143,7 +144,12 @@ export default function Messages() {
             <Tabs value={filter} onChange={changeFilter} items={[{ value: 'all', label: tr('all') }, { value: 'unread', label: <>{tr('unread')}{threads.some((t) => t.unread) && <span className="num ml-1 text-ink-3">{threads.reduce((a, t) => a + t.unread, 0)}</span>}</> }, { value: 'clinical', label: tr('clinical') }]} />
           </div>
           <ul className="min-h-0 flex-1 overflow-y-auto" aria-label={tr('conversations')}>
-            {visible.length === 0 && <li className="p-6 text-[15px] text-ink-2">{tr('caughtUp')}</li>}
+            {visible.length === 0 && (
+              <li className="p-6 text-center">
+                <EmptyIllustration kind="generic" width={120} className="mb-4" />
+                <p className="text-[15px] text-ink-2">{tr('caughtUp')}</p>
+              </li>
+            )}
             {visible.map((t) => {
               const tp = person(t.personId)
               const last = [...t.messages].reverse().find((m) => m.from !== 'system')
@@ -164,7 +170,7 @@ export default function Messages() {
                       <span className="mt-0.5 flex items-center gap-1.5 text-[13px] text-ink-2">
                         {dx(tp.role)}{t.clinical && <><span aria-hidden>·</span><Stethoscope size={12} /> {tr('clinical')}</>}
                       </span>
-                      <span className="mt-1 line-clamp-2 block text-[14px] text-ink-2">{last ? last.body : tr('startConv')}</span>
+                      <span className="mt-1 line-clamp-2 block text-[14px] text-ink-2">{nums(last ? last.body : tr('startConv'))}</span>
                     </span>
                     {t.unread > 0 && <><span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-daybreak" aria-hidden /><span className="sr-only">{tr('nUnread', { n: t.unread })}</span></>}
                   </button>
@@ -186,7 +192,7 @@ export default function Messages() {
             <Avatar person={p} size={40} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-[16px] text-ink">{p.name}</p>
-              <p className="truncate text-[13px] text-ink-2">{dx(p.role)} · {dx(active.subject)}</p>
+              <p className="truncate text-[13px] text-ink-2">{dx(p.role)} · {nums(dx(active.subject))}</p>
             </div>
             {active.clinical && <Pill tone="caution"><Stethoscope size={12} /> {tr('clinical')}</Pill>}
           </div>
@@ -199,9 +205,10 @@ export default function Messages() {
 
           <div ref={logRef} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-6 md:px-6" role="log" aria-label={tr('convWith', { name: p.name })}>
             {active.messages.length === 0 && (
-              <p className="mx-auto max-w-sm py-16 text-center text-[15px] text-ink-2">
-                {tr('writeTo', { name: p.name })}
-              </p>
+              <div className="mx-auto max-w-sm py-12 text-center">
+                <EmptyIllustration kind="letter" width={140} className="mb-5" />
+                <p className="text-[15px] text-ink-2">{tr('writeTo', { name: p.name })}</p>
+              </div>
             )}
             {active.messages.map((m, i) => {
               const showDay = i === 0 || fmtDay(active.messages[i - 1].at) !== fmtDay(m.at)
@@ -243,7 +250,7 @@ export default function Messages() {
             />
             <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p id="composer-hint" className={clsx('text-[13px]', error ? 'text-error' : 'text-ink-3')} role={error ? 'alert' : undefined}>
-                {error ?? (active.clinical ? tr('hintClinical') : tr('hintPerson'))}
+                {nums(error ?? (active.clinical ? tr('hintClinical') : tr('hintPerson')))}
               </p>
               <DaybreakButton type="submit" className="!h-12 !text-[17px]">{tr('send')}</DaybreakButton>
             </div>
@@ -301,14 +308,14 @@ export default function Messages() {
 function Bubble({ m }: { m: Msg }) {
   const tr = useDict(MSG)
   if (m.from === 'system') {
-    return <p className="mx-auto flex w-fit items-center gap-1.5 rounded-full bg-paper-sunk px-3 py-1.5 text-center text-[13px] text-ink-2" role="status"><Clock size={13} className="text-ink-3" /> {m.sys ? tr(m.sys.k, { name: m.sys.name }) : m.body}</p>
+    return <p className="mx-auto flex w-fit items-center gap-1.5 rounded-full bg-paper-sunk px-3 py-1.5 text-center text-[13px] text-ink-2" role="status"><Clock size={13} className="text-ink-3" /> {nums(m.sys ? tr(m.sys.k, { name: m.sys.name }) : m.body)}</p>
   }
   const mine = m.from === 'me'
   return (
     <div className={clsx('flex', mine ? 'justify-end' : 'justify-start')}>
       <div className={clsx('max-w-[85%] md:max-w-[75%]')}>
         <div className={clsx('rounded-2xl px-4 py-3 text-[16px] leading-relaxed', mine ? 'rounded-br-md bg-ink text-paper' : 'rounded-bl-md border border-line bg-paper-raised text-ink')}>
-          {m.body}
+          {nums(m.body)}
         </div>
         <p className={clsx('mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-ink-3', mine && 'justify-end')}>
           <span className="num">{fmtTime(m.at)}</span>

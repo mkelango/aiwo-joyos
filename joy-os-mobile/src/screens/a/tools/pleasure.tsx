@@ -6,7 +6,7 @@ import { interceptsCrisis, useApp } from '@/lib/store'
 import { ledgerStamp, ledgerWhen, madeHere, useLocal } from '@/screens/a/local'
 import { trustStore, useStore } from '@/screens/b/bStore'
 import { CONSENTS } from '@/shared/member'
-import { BarRow, IconButton, TextField } from '@/screens/a/parts'
+import { BarRow, IconButton, TextField, monoNums } from '@/screens/a/parts'
 import { FILMS, PLANNED_START, SAVOURING_PROMPTS } from '@/screens/a/spacesData'
 import { LEDGER, LEDGER_WEEK } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
@@ -116,9 +116,9 @@ function Planned() {
                 </Mono>
               </View>
               <View style={{ flex: 1, gap: 2 }}>
-                <Body>{p.what}</Body>
+                <Body>{monoNums(p.what)}</Body>
                 <Meta size={14} tone="ink3">
-                  {t('{n} min{with}', { n: p.minutes, with: p.with ? t(' · with {w}', { w: p.with }) : '' })}
+                  {monoNums(t('{n} min{with}', { n: p.minutes, with: p.with ? t(' · with {w}', { w: p.with }) : '' }))}
                 </Meta>
               </View>
               <IconButton icon="x" label={t('Remove {n}', { n: p.what })} onPress={() => setItems((x) => x.filter((y) => y.id !== p.id))} />
@@ -136,7 +136,7 @@ function Planned() {
         </Button>
         {added ? (
           <Meta tone="ink" accessibilityLiveRegion="polite">
-            {t('Planned: {what} · {day} {time}. In your calendar like a meeting.', { what: added.what, day: dayShort(added.day, lang), time: added.time })}
+            {monoNums(t('Planned: {what} · {day} {time}. In your calendar like a meeting.', { what: added.what, day: dayShort(added.day, lang), time: added.time }))}
           </Meta>
         ) : null}
       </View>
@@ -156,7 +156,7 @@ function Savour() {
       <View style={{ gap: space.s1 }} accessibilityLiveRegion="polite">
         <Eyebrow tone="daybreak">{tx(p.kind)}</Eyebrow>
         <Body size={19} style={{ lineHeight: 27 }}>
-          {tx(p.text)}
+          {monoNums(tx(p.text))}
         </Body>
       </View>
       {did ? (
@@ -237,7 +237,7 @@ function Moments() {
               <Icon name="play" size={18} color={c.onInk} />
             </View>
             <View style={{ flex: 1, gap: 2 }}>
-              <Body weight="medium">{tx(f.title)}</Body>
+              <Body weight="medium">{monoNums(tx(f.title))}</Body>
               <Meta size={14}>{f.who}</Meta>
             </View>
             <Mono size={13} tone="ink3">
@@ -286,7 +286,7 @@ function Moments() {
               </View>
             </View>
             <Eyebrow>{film.who}</Eyebrow>
-            <Body>{tx(film.note)}</Body>
+            <Body>{monoNums(tx(film.note))}</Body>
             {at >= total ? (
               <View style={{ gap: 2 }} accessibilityLiveRegion="polite">
                 <Meta tone="ink">{t('Watched. If it brought something to mind, the Ledger is one tap away.')}</Meta>
@@ -352,7 +352,7 @@ function MyMomentOfJoy() {
               const what = e.word ?? e.tags.map((x) => tx(x)).join(lang === 'en' ? ' & ' : ', ')
               return (
                 <View key={e.id} style={{ backgroundColor: c.paperSunk, borderRadius: 12, padding: 12, gap: 6 }}>
-                  <Body>{what}</Body>
+                  <Body>{monoNums(what)}</Body>
                   <Meta size={13} tone="ink3">
                     <Mono size={13} tone="ink3">{ledgerWhen(ledgerStamp(e), lang)}</Mono>
                     {` · ${e.tags.map((x) => tx(x)).join(', ')}${e.photo ? t(' · photo') : ''}`}

@@ -3,7 +3,8 @@ import type { TermKey } from '@/domain/types'
 import { CRISIS_EVENTS_KEY, readCrisisEvents, type CrisisEvent } from '@/lib/store'
 import { CLINICAL_RECORDS, HITL_QUEUE, MD_CONFIG, SAFETY_ALERTS, SCREEN_QUEUE, SIGNOFF_QUEUE, type SafetyAlert } from './_data'
 import { coach, getCoachTasks, isClinicalTask } from './_store'
-import { consoleNowMs } from './_parts'
+import { consoleNowMs, fmtClock } from './_parts'
+import { REMEASURE_OCCASION, remeasure } from './_remeasure'
 
 // A small store for the clinical portal, in the same pattern as the coach store (_store.ts),
 // so alerts, sign-offs, AI reviews, screen routing, the Medical Director's signed config and
@@ -42,6 +43,8 @@ export type SoapNote = {
 }
 /** The marker on an order raised when a Clinical-grade draft is returned: the concierge desk dispatches it as a home redraw. */
 export const REDRAW = 'Redraw · home draw'
+/** The order a returned draft raises, named by the draft it redraws for (the concierge never sees the test). */
+export const redrawTestFor = (occasion: string) => `Redraw for sign-off · ${occasion}`
 export type RecordWork = { sent: Sent[]; adjusted: Record<string, string>; orders: Order[]; soap?: SoapNote[] }
 /** The clinician's work on the member's own Clinical-grade re-measure (the record itself lives with the member). */
 export type RemeasureWork = { notes: string[]; returned: { reason: string; note: string; at: string } | null }
@@ -195,6 +198,26 @@ export const clinical = {
   },
   setRemeasure(w: RemeasureWork) {
     emit({ ...state, remeasure: w })
+  },
+  /**
+   * The lab partner received a redraw for a returned draft (the concierge marks it): the new
+   * result goes to the clinician and the draft re-queues for signature, the member's own Day-90
+   * draft included, whose record goes back to awaiting sign-off. Written to the audit.
+   */
+  redrawReceived(memberId: string, test: string, by: { who: string; role: string }) {
+    const ms = consoleNowMs()
+    const line = `Lab: redraw received ${fmtClock(ms)} · new result in · back in the sign-off queue`
+    let requeued: string | null = null
+    if (test === redrawTestFor(REMEASURE_OCCASION) && remeasure.requeue(ms)) {
+      requeued = REMEASURE_OCCASION
+      emit({ ...state, remeasure: { notes: [...state.remeasure.notes, line], returned: null } })
+    }
+    const hit = state.signoffs.find((x) => x.memberId === memberId && x.returned && redrawTestFor(x.occasion) === test)
+    if (hit) {
+      requeued = hit.occasion
+      emit({ ...state, signoffs: state.signoffs.map((x) => (x.id === hit.id ? { ...x, returned: null, notes: [...x.notes, line] } : x)) })
+    }
+    if (requeued) clinical.log({ ...by, what: `Redraw received by the lab partner · ${requeued} back in the sign-off queue`, purpose: 'Clinical-grade sign-off · redraw', kind: 'action', memberId, member: CLINICAL_RECORDS[memberId]?.name })
   },
   /** The next e-Rx number for this session. */
   nextRx() {

@@ -5,7 +5,7 @@ import Svg, { Circle, G, Text as SvgText } from 'react-native-svg'
 import { ArrowLink, Body, Button, Divider, EmptyIllustration, Eyebrow, Icon, Meta, Mono, Pill, Progress, Segmented, Sheet, SpecimenTag } from '@/components'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { useLocal } from '@/screens/a/local'
-import { IconButton, TextField } from '@/screens/a/parts'
+import { IconButton, monoNums, TextField } from '@/screens/a/parts'
 import { CIRCLE_START, CONNECTIONS, COUPLES_CHECK, STATE_OF_US, TWO_AM_START, type CirclePerson } from '@/screens/a/spacesData'
 import { CIRCLE } from '@/shared/platform'
 import { useTheme } from '@/theme/ThemeProvider'
@@ -193,7 +193,7 @@ function OrbitPicker({ open, onClose, people, orbit, setOrbit }: { open: boolean
       </View>
       {note ? (
         <Meta tone="ink" accessibilityLiveRegion="polite">
-          {note}
+          {monoNums(note)}
         </Meta>
       ) : null}
       {([5, 15] as const).map((r) => (
@@ -230,7 +230,7 @@ function OrbitPicker({ open, onClose, people, orbit, setOrbit }: { open: boolean
             <SpecimenTag />
           </View>
           <TextField label={t('Search contacts')} hideLabel placeholder={t('Search contacts')} value={q} onChangeText={setQ} returnKeyType="search" />
-          {shown.length === 0 ? <Meta tone="ink3">{t('No contact matches “{q}”.', { q: q.trim() })}</Meta> : null}
+          {shown.length === 0 ? <Meta tone="ink3">{monoNums(t('No contact matches “{q}”.', { q: q.trim() }))}</Meta> : null}
           {shown.map((n) => {
             const first = n.split(' ')[0]
             const inCircle = has(first)
@@ -347,9 +347,9 @@ function StateOfUs() {
             <Mono tone="ink3" size={13}>{t('{n} min', { n: s.minutes })}</Mono>
           </View>
           <Body size={22} style={{ lineHeight: 30 }}>
-            {tx(s.title)}
+            {monoNums(tx(s.title))}
           </Body>
-          <Body tone="ink2">{tx(s.prompt)}</Body>
+          <Body tone="ink2">{monoNums(tx(s.prompt))}</Body>
           <View style={{ flexDirection: 'row', gap: space.s1, flexWrap: 'wrap' }}>
             {step < STATE_OF_US.length - 1 ? (
               <Button variant="ink" onPress={() => setStep(step + 1)} iconRight="arrow-right">
@@ -390,7 +390,7 @@ function StateOfUs() {
                 <Mono size={13} tone="ink3">
                   {String(i + 1)}
                 </Mono>
-                <Body style={{ flex: 1 }}>{tx(p.title)}</Body>
+                <Body style={{ flex: 1 }}>{monoNums(tx(p.title))}</Body>
                 <Mono size={13} tone="ink3">{t('{n} min', { n: p.minutes })}</Mono>
               </View>
             ))}
@@ -415,7 +415,7 @@ function StateOfUs() {
         {rows.filter((x) => !x.agree).map((x) => (
           <View key={x.area} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Icon name="git-branch" size={14} color={c.ink2} />
-            <Meta tone="ink" style={{ flexShrink: 1 }}>{tx(x.area)}</Meta>
+            <Meta tone="ink" style={{ flexShrink: 1 }}>{monoNums(tx(x.area))}</Meta>
           </View>
         ))}
         {justSaved ? <Meta tone="ink">{t('Your answers are kept private to you. Kavya sees only the agreement, as you do.')}</Meta> : null}
@@ -453,7 +453,7 @@ function StateOfUs() {
         <Meta>{t('Eight areas. For each, is it going well for the two of you? Kavya answers on her own phone. Neither of you sees the other’s answers, only where you agree.')}</Meta>
         {COUPLES_CHECK.map((x, i) => (
           <View key={x.area} style={{ gap: 8, borderTopWidth: i ? 1 : 0, borderTopColor: c.line, paddingTop: i ? space.s2 : 0 }} accessibilityRole="radiogroup" accessibilityLabel={tx(x.area)}>
-            <Body>{tx(x.area)}</Body>
+            <Body>{monoNums(tx(x.area))}</Body>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {[
                 { v: true, label: t('Going well') },
@@ -502,7 +502,7 @@ function CircleOfEight() {
               </Mono>
             </View>
             <Meta size={14} tone="ink">
-              {i === 0 ? t('{m} (you)', { m }) : m}
+              {monoNums(i === 0 ? t('{m} (you)', { m }) : m)}
             </Meta>
           </View>
         ))}
@@ -520,7 +520,7 @@ function CircleOfEight() {
         <Button size="sm" variant={inCal ? 'ghost' : 'secondary'} icon={inCal ? 'check' : 'calendar'} onPress={() => setInCal(!inCal)} accessibilityLabel={inCal ? t('In your calendar. Tap to remove.') : t('Add the call to your calendar')}>
           {inCal ? t('In your calendar') : t('Add to calendar')}
         </Button>
-        <ArrowLink icon="users" onPress={() => router.push('/circles')}>
+        <ArrowLink joyIcon="circle" onPress={() => router.push('/circles')}>
           {t('Open your circle')}
         </ArrowLink>
       </View>
@@ -545,7 +545,7 @@ function Connections() {
                   {localDate(x.when, lang)}
                 </Mono>
               </View>
-              <Body weight="medium">{tx(x.title)}</Body>
+              <Body weight="medium">{monoNums(tx(x.title))}</Body>
               <Meta size={14}>
                 {x.where} · {tx(x.who)}
               </Meta>

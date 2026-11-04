@@ -516,6 +516,19 @@ export const TOOLS = dict({
   'Missed a dose? Carry on with the next one as usual. Never double up.': ['ஒரு அளவைத் தவறவிட்டீர்களா? அடுத்ததை வழக்கம்போல் தொடருங்கள். ஒருபோதும் இரட்டிப்பாக்காதீர்கள்.', 'कोई ख़ुराक छूट गई? अगली वाली हमेशा की तरह लीजिए। कभी दोगुनी न लें।'],
   'Protocol-only. AIWO Daily reaches you only when your physician adds it to your protocol, against a signed panel. There is no shop here, and nothing is sold to you on this screen.': ['நெறிமுறைக்கு மட்டும். கையொப்பமிட்ட பரிசோதனையின் அடிப்படையில் உங்கள் மருத்துவர் நெறிமுறையில் சேர்க்கும்போது மட்டுமே AIWO Daily உங்களை வந்தடையும். இங்கே கடை இல்லை; இந்தத் திரையில் உங்களுக்கு எதுவும் விற்கப்படுவதில்லை.', 'सिर्फ़ प्रोटोकॉल के तहत। AIWO Daily आप तक तभी पहुँचता है जब आपके डॉक्टर उसे हस्ताक्षर किए पैनल के आधार पर आपके प्रोटोकॉल में जोड़ते हैं। यहाँ कोई दुकान नहीं है, और इस स्क्रीन पर आपको कुछ नहीं बेचा जाता।'],
   'Reviewed at Day 45 · re-tested at Day 90': ['நாள் 45-இல் மதிப்பாய்வு · நாள் 90-இல் மறுபரிசோதனை', 'दिन 45 पर समीक्षा · दिन 90 पर दोबारा जाँच'],
+  // Asks posted to the physician's thread in Messages (bStore postMemberMessage)
+  'About {x}': ['{x} பற்றி', '{x} के बारे में'],
+  'Could you tell me more about {x} ({dose}) in my protocol? I would like to understand why it is there and how long to take it.': ['என் நெறிமுறையில் உள்ள {x} ({dose}) பற்றி மேலும் சொல்ல முடியுமா? அது ஏன் இருக்கிறது, எவ்வளவு காலம் எடுக்க வேண்டும் என்று புரிந்துகொள்ள விரும்புகிறேன்.', 'क्या आप मेरे प्रोटोकॉल में {x} ({dose}) के बारे में और बता सकती हैं? मुझे समझना है कि यह क्यों है और इसे कितने समय तक लेना है।'],
+  'Asked in Messages · {name} replies within a working day': ['செய்திகளில் கேட்கப்பட்டது · {name} ஒரு வேலை நாளுக்குள் பதிலளிப்பார்', 'संदेशों में पूछ लिया · {name} एक कामकाजी दिन में जवाब देंगी'],
+  'Open the thread': ['உரையாடலைத் திற', 'बातचीत खोलें'],
+  'Day 45 review: biological age': ['நாள் 45 மதிப்பாய்வு: உயிரியல் வயது', 'दिन 45 की समीक्षा: जैविक उम्र'],
+  'Please add my biological age estimate to the agenda for my Day 45 review. Once you have signed it, I would like to go through it with you.': ['என் நாள் 45 மதிப்பாய்வின் நிகழ்ச்சி நிரலில் என் உயிரியல் வயது மதிப்பீட்டைச் சேர்க்கவும். நீங்கள் கையொப்பமிட்ட பிறகு அதை உங்களுடன் பார்க்க விரும்புகிறேன்.', 'कृपया मेरी दिन 45 की समीक्षा के एजेंडा में मेरी जैविक उम्र का अनुमान जोड़ दीजिए। आपके हस्ताक्षर के बाद हम इसे साथ में देख लें।'],
+  'Sent to {name} in Messages, to put on the agenda for your Day 45 review.': ['உங்கள் நாள் 45 மதிப்பாய்வின் நிகழ்ச்சி நிரலில் சேர்க்க, செய்திகளில் {name}-க்கு அனுப்பப்பட்டது.', 'दिन 45 की समीक्षा के एजेंडा में रखने के लिए, संदेशों में {name} को भेज दिया गया।'],
+  // Ease · screen-form source and licence lines (the instrument names stay as published)
+  'PHQ-4 · Kroenke et al., 2009 · public domain': ['PHQ-4 · Kroenke et al., 2009 · பொதுக் களம்', 'PHQ-4 · Kroenke et al., 2009 · सार्वजनिक डोमेन'],
+  'Insomnia Severity Index · Morin et al., 2001 · licensed for Joy OS': ['Insomnia Severity Index · Morin et al., 2001 · Joy OS-க்கு உரிமம் பெற்றது', 'Insomnia Severity Index · Morin et al., 2001 · Joy OS के लिए लाइसेंस प्राप्त'],
+  'PSS-4 · Cohen et al., 1983 · free for non-commercial and clinical use': ['PSS-4 · Cohen et al., 1983 · வணிக நோக்கமற்ற, கிளினிக்கல் பயன்பாட்டுக்கு இலவசம்', 'PSS-4 · Cohen et al., 1983 · ग़ैर-व्यावसायिक और क्लिनिकल उपयोग के लिए मुफ़्त'],
+  'Numeric rating scale, 0–10': ['எண் மதிப்பீட்டு அளவுகோல், 0–10', 'अंकों वाला पैमाना, 0–10'],
   'Only {name} changes the stack. Ask, and the question goes to your care team.': ['{name} மட்டுமே தொகுப்பை மாற்றுவார். கேளுங்கள்; கேள்வி உங்கள் பராமரிப்புக் குழுவுக்குச் செல்லும்.', 'स्टैक सिर्फ़ {name} बदलती हैं। पूछिए, और सवाल आपकी केयर टीम तक जाएगा।'],
 
   // ─── Body · biological age ───

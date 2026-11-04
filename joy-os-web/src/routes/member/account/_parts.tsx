@@ -2,7 +2,7 @@ import clsx from 'clsx'
 import { Check, Phone } from 'lucide-react'
 import { useId, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { inputCls } from './_util'
+import { inputCls, nums } from './_util'
 import { useDict } from '@/lib/i18n'
 import { COMMON } from './_i18n'
 
@@ -14,7 +14,7 @@ export function TeleManasStrip({ className }: { className?: string }) {
   return (
     <div className={clsx('flex flex-col gap-3 rounded-card border border-line bg-paper-sunk px-5 py-4 sm:flex-row sm:items-center sm:justify-between', className)}>
       <p className="text-[15px] text-ink-2">
-        <span className="text-ink">{t('teleLead')}</span> {t('teleRest')}
+        <span className="text-ink">{t('teleLead')}</span> {nums(t('teleRest'))}
       </p>
       <a href="tel:14416" className="inline-flex shrink-0 items-center gap-2 self-start rounded-full bg-ink px-4 py-2 text-[15px] font-medium text-paper focus-ring sm:self-auto">
         <Phone size={15} /> Tele-MANAS <span className="num">14416</span>
@@ -46,7 +46,7 @@ export function Section({ id, eyebrow, title, lead, aside, children, className }
         <div className="max-w-2xl">
           <p className="eyebrow text-ink-3">{eyebrow}</p>
           <h2 id={id ? `${id}-h` : undefined} className="mt-2 text-[1.45rem] font-light leading-snug tracking-tight text-ink md:text-[1.6rem]">{title}</h2>
-          {lead && <p className="mt-2 text-[16px] leading-relaxed text-ink-2">{lead}</p>}
+          {lead && <p className="mt-2 text-[16px] leading-relaxed text-ink-2">{nums(lead)}</p>}
         </div>
         {aside && <div className="shrink-0">{aside}</div>}
       </div>
@@ -63,9 +63,9 @@ export function Field({ label, hint, error, children, className }: { label: Reac
       <label htmlFor={id} className="text-[15px] text-ink">{label}</label>
       {children(id, hintId)}
       {error ? (
-        <p id={hintId} role="alert" className="text-[14px] text-error">{error}</p>
+        <p id={hintId} role="alert" className="text-[14px] text-error">{nums(error)}</p>
       ) : hint ? (
-        <p id={hintId} className="text-[13px] text-ink-3">{hint}</p>
+        <p id={hintId} className="text-[13px] text-ink-3">{nums(hint)}</p>
       ) : null}
     </div>
   )
@@ -96,7 +96,7 @@ export function Checkbox({ checked, onChange, children }: { checked: boolean; on
       >
         {checked && <Check size={14} strokeWidth={2.5} />}
       </button>
-      <label htmlFor={id} className="cursor-pointer text-[15px] leading-snug text-ink-2">{children}</label>
+      <label htmlFor={id} className="cursor-pointer text-[15px] leading-snug text-ink-2">{nums(children)}</label>
     </div>
   )
 }
@@ -114,7 +114,7 @@ export function Segmented<T extends string>({ value, onChange, items, label, cla
           onClick={() => onChange(it.value)}
           className={clsx('rounded-full px-4 py-1.5 text-[14px] transition-colors focus-ring', value === it.value ? 'bg-paper-raised text-ink shadow-card' : 'text-ink-2 hover:text-ink')}
         >
-          {it.label}
+          {nums(it.label)}
         </button>
       ))}
     </div>
@@ -130,8 +130,8 @@ export function Toggle({ checked, onChange, label, description, disabled }: { ch
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="min-w-0">
-        <label htmlFor={id} className="text-[16px] text-ink">{label}</label>
-        {description && <div className="mt-0.5 text-[14px] text-ink-2">{description}</div>}
+        <label htmlFor={id} className="text-[16px] text-ink">{nums(label)}</label>
+        {description && <div className="mt-0.5 text-[14px] text-ink-2">{nums(description)}</div>}
       </div>
       <button
         id={id}

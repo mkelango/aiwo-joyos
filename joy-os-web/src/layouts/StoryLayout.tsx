@@ -1,12 +1,14 @@
 import { ArrowLeft } from 'lucide-react'
 import { Link, Outlet } from 'react-router-dom'
 import { JoyOsLockup } from '@/components/joy/Brand'
+import { BrandMotion } from '@/lib/motion'
 import { ThemeToggle } from './shared'
 
 // Minimal chrome for the internal "connecting the dots" pages (platform map, journeys).
 // There is no public marketing site: the front door is sign-in.
 export default function StoryLayout() {
   return (
+    <BrandMotion>
     <div className="min-h-screen bg-paper">
       <header className="sticky top-0 z-30 border-b border-line/70 bg-paper/90 backdrop-blur-md">
         <div className="page flex h-16 items-center justify-between gap-1 max-sm:px-4 sm:gap-4">
@@ -31,5 +33,6 @@ export default function StoryLayout() {
         <Outlet />
       </main>
     </div>
+    </BrandMotion>
   )
 }

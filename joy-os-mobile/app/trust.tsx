@@ -28,16 +28,16 @@ import { ACCESS_LOG, CONSENTS, INDEX_HISTORY, MEMBER } from '@/shared/member'
 import { TENANT } from '@/shared/platform'
 import type { AccessEvent, Consent } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
-import { CLAIMS_LOG, EXPORTS_PAST, EXTRA_ACCESS, SPECIMEN_NOW } from '@/screens/b/accountData'
+import { ACCESS_LAKSHMI, CLAIMS_LOG, EXPORTS_PAST, EXTRA_ACCESS, SPECIMEN_NOW } from '@/screens/b/accountData'
 import { ARTEFACT_VERSION, EXPORT_STAGE_MS, accountStore, consentHistoryStore, exportStage, recordConsent, trustStore, useStore, type ConsentAction, type ConsentEvent, type ExportDone, type ExportFormat, type InsurerDecision } from '@/screens/b/bStore'
-import { ChoiceCard, Done, Field, FilterChips, KeyValue, TimelineStep, useAccount, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
+import { ButtonFigures, ChoiceCard, Done, Field, FilterChips, KeyValue, TimelineStep, useAccount, useAccountIndex, useSheetCrisisGuard, memberOnly, FigureToggle } from '@/screens/b/parts'
 import { StepUp } from '@/screens/b/stepUp'
 import { AbhaCard, MethodCard, NomineeCard } from '@/screens/b/trustCards'
 import { useDict } from '@/lib/i18n'
-import { useLatestIndex } from '@/lib/indexRecord'
 import { useIsMinor } from '@/lib/minor'
 import { TRUST, SCOPE_TEXT, CONSENT_T, ACCESS_T, EXPORT_T, CLAIM_STATE, CLAIM_BY, CLAIM_T } from '@/screens/b/i18n/trust'
 import { ROLE, useCommon, useTx } from '@/screens/b/i18n/common'
+import { MonoNums } from '@/lib/monoNums'
 
 // TRUST CENTRE (Memo module 14, p.27): who has seen my data, consents by purpose, export
 // (FHIR / JSON, ≤72 h), delete (step-up, honoured ≤24 h), research, aggregates-only for
@@ -68,8 +68,13 @@ function Trust() {
   const aWhat = (e: AccessEvent) => tx(ACCESS_T[e.id]?.what, e.what)
   const aPurpose = (e: AccessEvent) => tx(ACCESS_T[e.id]?.purpose, e.purpose)
 
-  // Access log
-  const all = useMemo<AccessEvent[]>(() => [...ACCESS_LOG, ...EXTRA_ACCESS].sort((a, b) => b.at.localeCompare(a.at)), [])
+  // Access log: the signed-in account's own (L2). Arjun's specimen log, Lakshmi's own, and none
+  // yet for an account made today.
+  const account = useAccount()
+  const all = useMemo<AccessEvent[]>(
+    () => (account.id === 'arjun' ? [...ACCESS_LOG, ...EXTRA_ACCESS] : account.id === 'lakshmi' ? ACCESS_LAKSHMI : []).sort((a, b) => b.at.localeCompare(a.at)),
+    [account.id],
+  )
   const roles = useMemo(() => Array.from(new Set(all.map((e) => e.role))), [all])
   const [role, setRole] = useState('all')
   const [showAll, setShowAll] = useState(false)
@@ -80,19 +85,20 @@ function Trust() {
   // Consents
   // Consents, research use and a scheduled erasure are kept on the phone (they hold on return).
   const [trust, setTrust] = useStore(trustStore)
-  const account = useAccount()
   // The export carries only the signed-in account's own Index (L2): Arjun's recorded history (with
   // any re-take on this phone first), the Index taken on this phone for an account made in
   // onboarding, and none for Lakshmi, who has no Index on record. Under 18 nothing is scored, so
   // a minor's export carries no Index, term score or band at all.
   const minor = useIsMinor()
   const [acctState] = useStore(accountStore)
-  const latestIdx = useLatestIndex()
-  const ownIndex = minor
+  // Each account's own measured Index (bStore phoneOwnersStore): another account's re-take on this
+  // phone is never exported as yours.
+  const latestIdx = useAccountIndex()
+  const ownIndex = minor || !latestIdx
     ? []
     : account.id === 'arjun'
       ? [...(latestIdx.onPhone ? [latestIdx] : []), ...INDEX_HISTORY]
-      : account.id === 'new' && latestIdx.onPhone
+      : latestIdx.onPhone
         ? [latestIdx]
         : []
   // The insurer consent (c_star) is answered on its own card: granted, declined or undecided.
@@ -292,7 +298,7 @@ function Trust() {
             <Icon name={icon} size={18} color={c.ink2} />
             <Eyebrow>{label}</Eyebrow>
             <Numeral size={40}>{value}</Numeral>
-            <Meta size={14}>{sub}</Meta>
+            <Meta size={14}><MonoNums text={sub} /></Meta>
           </Card>
         ))}
       </View>
@@ -308,8 +314,11 @@ function Trust() {
         <FilterChips label={t('filter')} value={role} onChange={(v) => setRole(v)} items={[{ value: 'all', label: t('everyone') }, ...roles.map((r) => ({ value: r, label: role_(r) }))]} />
         <Card tone="raised" style={{ gap: 0 }}>
           <Meta size={14} tone="ink3" accessibilityLiveRegion="polite">
-            {t('entries', { n: rows.length, unit: rows.length === 1 ? t('entry') : t('entriesW') })}
+            <MonoNums text={t('entries', { n: rows.length, unit: rows.length === 1 ? t('entry') : t('entriesW') })} />
           </Meta>
+          {rows.length === 0 ? (
+            <Meta style={{ paddingVertical: 12 }}>{t('noLooks')}</Meta>
+          ) : null}
           {visible.map((e) => (
             <View key={e.id} accessible accessibilityLabel={t('rowA11y', { at: e.at, who: aWho(e), role: role_(e.role), what: aWhat(e), purpose: aPurpose(e) })} style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.line, gap: 4 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.s1, flexWrap: 'wrap' }}>
@@ -324,8 +333,8 @@ function Trust() {
             </View>
           ))}
           {rows.length > 4 ? (
-            <Button variant="link" onPress={() => setShowAll((s) => !s)}>
-              {showAll ? t('showFewer') : t('showAll', { n: rows.length })}
+            <Button variant="link" accessibilityLabel={showAll ? t('showFewer') : t('showAll', { n: rows.length })} onPress={() => setShowAll((s) => !s)}>
+              <ButtonFigures variant="link" text={showAll ? t('showFewer') : t('showAll', { n: rows.length })} />
             </Button>
           ) : null}
           <Button variant="ghost" size="sm" icon="help-circle" onPress={() => openAsk()} style={{ marginTop: space.s1 }}>
@@ -340,7 +349,7 @@ function Trust() {
         <Title size={24}>
           {t('agreeA')}<Serif>{t('agreeSerif')}</Serif>{t('agreeB')}
         </Title>
-        <Body tone="ink2">{t('agreeBody')}</Body>
+        <Body tone="ink2"><MonoNums text={t('agreeBody')} /></Body>
         <Card tone="raised" style={{ gap: space.s2 }}>
           {groups.map(({ g, items }, gi) => (
             <View key={g} style={{ gap: space.s2 }}>
@@ -365,7 +374,7 @@ function Trust() {
                   )
                 }
                 return (
-                  <Toggle
+                  <FigureToggle
                     key={x.id}
                     checked={s.on}
                     onChange={(v) => (!v && (x.scope === 'core' || x.scope === 'cohort') ? setConfirm(x) : applyConsent(x, v))}
@@ -391,8 +400,7 @@ function Trust() {
         <Body tone="ink2">{t('histLead')}</Body>
         <Card tone="raised" style={{ gap: 0 }}>
           <Meta size={14} tone="ink3" accessibilityLiveRegion="polite">
-            {t('histEvents', { n: histRows.length })}
-            {histLive > 0 ? t('histPhone', { n: histLive }) : ''}
+            <MonoNums text={t('histEvents', { n: histRows.length }) + (histLive > 0 ? t('histPhone', { n: histLive }) : '')} />
           </Meta>
           {histShown.map((e) => (
             <View
@@ -460,8 +468,8 @@ function Trust() {
             ) : null}
             <Meta>
               {exp === 'ready'
-                ? t('readyLine', { format: format === 'fhir' ? 'FHIR R4 bundle' : t('jsonFile') })
-                : t('reqLine', { a: fmtDate('2027-01-28'), b: fmtDate('2027-01-31') })}
+                ? <MonoNums text={t('readyLine', { format: format === 'fhir' ? 'FHIR R4 bundle' : t('jsonFile') })} />
+                : <MonoNums text={t('reqLine', { a: fmtDate('2027-01-28'), b: fmtDate('2027-01-31') })} />}
             </Meta>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s1 }}>
               {exp === 'ready' ? (
@@ -482,7 +490,8 @@ function Trust() {
             <Mono size={14} tone="ink2">{fmtDate(x.requested)}</Mono> · {x.format === 'fhir' ? 'FHIR R4 bundle' : t('jsonFile')} · <Mono size={14} tone="ink2">{x.size}</Mono> · {t(doneStatus[x.status])}
           </Meta>
         ))}
-        {EXPORTS_PAST.map((x) => (
+        {account.id === 'arjun' || (trust.exportsDone ?? []).length ? null : <Meta size={14}>{t('noEarlier')}</Meta>}
+        {(account.id === 'arjun' ? EXPORTS_PAST : []).map((x) => (
           <Meta key={x.id} size={14}>
             <Mono size={14} tone="ink2">{fmtDate(x.requested)}</Mono> · {tx(EXPORT_T[x.id]?.format, x.format)} · <Mono size={14} tone="ink2">{x.size}</Mono> · {tx(EXPORT_T[x.id]?.status, x.status)}
           </Meta>
@@ -499,7 +508,7 @@ function Trust() {
         {[t('d1'), t('d2'), t('d3')].map((x) => (
           <View key={x} style={{ flexDirection: 'row', gap: 10 }}>
             <Icon name="check" size={15} color={c.ink2} />
-            <Meta style={{ flex: 1 }}>{x}</Meta>
+            <Meta style={{ flex: 1 }}><MonoNums text={x} /></Meta>
           </View>
         ))}
         {scheduled ? (
@@ -555,7 +564,7 @@ function Trust() {
               </Body>
               {i === 1 ? <Pill tone={insurer === 'granted' ? 'ink' : 'neutral'}>{insState}</Pill> : null}
             </View>
-            <Meta>{body}</Meta>
+            <Meta><MonoNums text={body} /></Meta>
             {i === 1 ? (
               <Button size="sm" variant="secondary" onPress={() => setInsOpen(true)} style={{ alignSelf: 'flex-start' }}>
                 {insurer === 'not-granted' ? t('reviewStar') : t('changeAnswer')}
@@ -586,7 +595,7 @@ function Trust() {
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Icon name="map-pin" size={14} color={c.ink3} />
           <Meta size={14} tone="ink3" style={{ flex: 1 }}>
-            {t('stored')}
+            <MonoNums text={t('stored')} />
           </Meta>
         </View>
       </View>
@@ -626,11 +635,7 @@ function Trust() {
         }
       >
         <Body>
-          {confirm?.id === 'c_care'
-            ? t('wCare')
-            : confirm?.id === 'c_data'
-              ? t('wData')
-              : t('wPub')}
+          <MonoNums text={confirm?.id === 'c_care' ? t('wCare') : confirm?.id === 'c_data' ? t('wData') : t('wPub')} />
         </Body>
         <Meta>{t('giveAgain')}</Meta>
       </Sheet>
@@ -640,8 +645,8 @@ function Trust() {
         {del === 'explain' ? (
           <>
             <Body>{t('eraseBody')}</Body>
-            <Meta>{t('copyFirst')}</Meta>
-            <ChoiceCard kind="checkbox" selected={understood} onPress={() => setUnderstood((u) => !u)} accessibilityLabel={t('understand')} title={<Body>{t('understand')}</Body>} />
+            <Meta><MonoNums text={t('copyFirst')} /></Meta>
+            <ChoiceCard kind="checkbox" selected={understood} onPress={() => setUnderstood((u) => !u)} accessibilityLabel={t('understand')} title={<Body><MonoNums text={t('understand')} /></Body>} />
             {tried && !understood ? <Meta tone="error">{t('tick')}</Meta> : null}
             <View style={{ flexDirection: 'row', gap: space.s1, justifyContent: 'flex-end' }}>
               <Button variant="ghost" onPress={closeDel}>
@@ -738,7 +743,7 @@ function Trust() {
           <KeyValue k={t('never')}>{t('neverList')}</KeyValue>
           <KeyValue k={t('premium')} last>{t('notAffected')}</KeyValue>
         </Card>
-        <Meta size={14} tone="ink3">{`${t('artefact', { v: ARTEFACT_VERSION.insurer })} · ${t('withdrawAnyTime')}`}</Meta>
+        <Meta size={14} tone="ink3"><MonoNums text={`${t('artefact', { v: ARTEFACT_VERSION.insurer })} · ${t('withdrawAnyTime')}`} /></Meta>
       </Sheet>
 
       <Sheet
@@ -760,7 +765,7 @@ function Trust() {
         {askSent ? (
           <>
             <Done>{t('sentDpo')}</Done>
-            <Meta>{(() => { const en = all.find((e) => e.id === askEntry); return t('about', { who: en ? aWho(en) : '', at: en?.at ?? '' }) })()}</Meta>
+            <Meta><MonoNums text={(() => { const en = all.find((e) => e.id === askEntry); return t('about', { who: en ? aWho(en) : '', at: en?.at ?? '' }) })()} /></Meta>
           </>
         ) : (
           <>

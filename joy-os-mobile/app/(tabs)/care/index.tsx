@@ -35,7 +35,7 @@ import { accountStore, messagesStore, refCode, useAccountThreads, useStore } fro
 import { ChoiceCard, Done, Field, HereMarker, KeyValue, TimelineStep, useSheetCrisisGuard } from '@/screens/b/parts'
 import { localDate, Rich, useA } from '@/screens/a/i18n'
 import { slotsFor, useCareConsults, type Clinician, type ConsultRow } from '@/screens/a/care'
-import { Chip } from '@/screens/a/parts'
+import { Chip, monoNums } from '@/screens/a/parts'
 
 // CARE (Memo p.24; Technical Architecture, Care bridge): a person behind every number.
 // My people with SLAs, the care ladder, consults, signed results and prescriptions,
@@ -212,7 +212,7 @@ export default function Care() {
                   {isUnread(th.id, th.unread) ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.daybreak }} /> : null}
                 </View>
                 <Meta size={14} numberOfLines={2}>
-                  {last.body}
+                  {monoNums(last.body)}
                 </Meta>
               </View>
             </Pressable>
@@ -239,19 +239,19 @@ export default function Care() {
                 <Avatar person={p} size={48} />
                 <View style={{ flex: 1 }}>
                   <Body weight="medium">{p.name}</Body>
-                  <Meta size={14}>{`${tx(p.role)}${d.clinical ? t(' · clinical') : ''}`}</Meta>
+                  <Meta size={14}>{monoNums(`${tx(p.role)}${d.clinical ? t(' · clinical') : ''}`)}</Meta>
                 </View>
               </View>
-              <Body tone="ink2">{tx(d.line)}</Body>
+              <Body tone="ink2">{monoNums(tx(d.line))}</Body>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s3, rowGap: space.s1 }}>
                 <View style={{ gap: 2 }}>
                   <Eyebrow>{t('Next')}</Eyebrow>
                   <Mono tone="ink">{ld(tx(d.next))}</Mono>
-                  <Meta size={13}>{tx(d.nextKind)}</Meta>
+                  <Meta size={13}>{monoNums(tx(d.nextKind))}</Meta>
                 </View>
                 <View style={{ gap: 2 }}>
                   <Eyebrow>{t('Speaks')}</Eyebrow>
-                  <Meta tone="ink">{tx(d.languages)}</Meta>
+                  <Meta tone="ink">{monoNums(tx(d.languages))}</Meta>
                 </View>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space.s1 }}>
@@ -259,7 +259,7 @@ export default function Care() {
                   {t('Message {name}', { name: shortName(p.name) })}
                 </Button>
                 <Meta size={13} tone="ink3" style={{ flexShrink: 1 }}>
-                  {tx(d.replies)}
+                  {monoNums(tx(d.replies))}
                 </Meta>
               </View>
             </Card>
@@ -273,7 +273,7 @@ export default function Care() {
         <Title size={24}>
           <Rich text={t('Step up when you need more, *down* when you need less.')} wrap={(w) => <Serif>{w}</Serif>} />
         </Title>
-        <Body tone="ink2">{t('Most of the time the Practice and your circle are enough. An Ease screen above threshold moves you up to a clinician, with a person, within 48 hours.')}</Body>
+        <Body tone="ink2">{monoNums(t('Most of the time the Practice and your circle are enough. An Ease screen above threshold moves you up to a clinician, with a person, within 48 hours.'))}</Body>
         <Card tone="raised">
           <View accessibilityRole="list" accessibilityLabel={t('Care ladder, from self-care to a ’cation')}>
             {CARE_LADDER.map((r, i) => {
@@ -283,11 +283,11 @@ export default function Care() {
                   <View style={{ gap: 4 }}>
                     <View accessible accessibilityLabel={t('Rung {n}, {name}{here}. {who}. {what}', { n: i + 1, name: tx(r.name), here: r.status === 'here' ? t(', you are here') : '', who: tx(r.who), what: tx(r.what) })} style={{ gap: 4 }}>
                       <Body weight="medium" tone={st === 'next' ? 'ink2' : 'ink'}>
-                        {tx(r.name)}
+                        {monoNums(tx(r.name))}
                       </Body>
                       {r.status === 'here' ? <HereMarker label={t('You are here')} /> : null}
-                      <Meta tone="ink">{tx(r.who)}</Meta>
-                      <Meta>{tx(r.what)}</Meta>
+                      <Meta tone="ink">{monoNums(tx(r.who))}</Meta>
+                      <Meta>{monoNums(tx(r.what))}</Meta>
                     </View>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s2 }}>
                       {(RUNG_NEXT[r.key] ?? []).map((n) => (
@@ -308,7 +308,7 @@ export default function Care() {
             })}
           </View>
           <Divider style={{ marginVertical: space.s2 }} />
-          <Meta>{t('You use rungs 1–{n} today. Dr Meera signed your Clinical-grade Index in October; Priya has asked Dr Sanjay for a first conversation about sleep.', { n: hereIdx + 1 })}</Meta>
+          <Meta>{monoNums(t('You use rungs 1–{n} today. Dr Meera signed your Clinical-grade Index in October; Priya has asked Dr Sanjay for a first conversation about sleep.', { n: hereIdx + 1 }))}</Meta>
         </Card>
       </View>
 
@@ -319,7 +319,7 @@ export default function Care() {
           <Card tone="outline" style={{ gap: space.s2, alignItems: 'flex-start' }}>
             <EmptyIllustration kind="generic" />
             <Body weight="medium">{t('No consults booked.')}</Body>
-            <Meta>{t('Find a clinician below, or ask Priya: she can refer you to a clinician within 48 hours.')}</Meta>
+            <Meta>{monoNums(t('Find a clinician below, or ask Priya: she can refer you to a clinician within 48 hours.'))}</Meta>
           </Card>
         ) : null}
         {consults.map((cs) => {
@@ -351,9 +351,9 @@ export default function Care() {
               {rs ? (
                 <Done>{t('New time requested · {ref}. {name} confirms within one working day; until then {when} stays held.', { ref: rs.ref, name: shortName(cs.who.name), when: ld(`${cs.when} · ${cs.time}`) })}</Done>
               ) : cs.booked ? (
-                <Meta>{t('Booked on this phone · {ref}. Only {name} reads what you wrote.', { ref: cs.booked.ref, name: shortName(cs.who.name) })}</Meta>
+                <Meta>{monoNums(t('Booked on this phone · {ref}. Only {name} reads what you wrote.', { ref: cs.booked.ref, name: shortName(cs.who.name) }))}</Meta>
               ) : cs.prep ? (
-                <Meta>{tx(cs.prep)}</Meta>
+                <Meta>{monoNums(tx(cs.prep))}</Meta>
               ) : null}
               {was ? <Done>{t('You joined the specimen room ({m}:{s}). {name} writes the summary; it appears in Results once signed.', { m: String(Math.floor(was.secs / 60)).padStart(2, '0'), s: String(was.secs % 60).padStart(2, '0'), name: shortName(cs.who.name) })}</Done> : null}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s1 }}>
@@ -363,7 +363,7 @@ export default function Care() {
                   </Button>
                 ) : (
                   <Meta tone="ink3" style={{ alignSelf: 'center' }}>
-                    {t('Waiting for {name} to confirm.', { name: shortName(cs.who.name) })}
+                    {monoNums(t('Waiting for {name} to confirm.', { name: shortName(cs.who.name) }))}
                   </Meta>
                 )}
                 <Button
@@ -392,14 +392,14 @@ export default function Care() {
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Icon name="shield" size={15} color={c.ink3} />
           <Meta size={14} tone="ink3" style={{ flex: 1 }}>
-            {t('Telemedicine Practice Guidelines 2020. Every consult begins with the clinician’s name and registration, your identity and your consent.')}
+            {monoNums(t('Telemedicine Practice Guidelines 2020. Every consult begins with the clinician’s name and registration, your identity and your consent.'))}
           </Meta>
         </View>
         <Card tone="sunk" style={{ gap: space.s1 }}>
           <Eyebrow>{t('Past consults')}</Eyebrow>
           {PAST_CONSULTS.map((pc) => (
             <View key={pc.id} style={{ gap: 2, paddingVertical: 6 }}>
-              <Body>{tx(pc.title)}</Body>
+              <Body>{monoNums(tx(pc.title))}</Body>
               <Meta size={14}>
                 <Mono size={14} tone="ink2">{ld(pc.when)}</Mono> · {person(pc.with).name} · {tx(pc.note)}
               </Meta>
@@ -414,7 +414,7 @@ export default function Care() {
           <SectionTitle>{t('Results')}</SectionTitle>
           <SpecimenTag />
         </View>
-        <Body tone="ink2">{t('Signed by a physician before you see them. Lab partner, then the result pipeline (FHIR R4), then sign-off, then you.')}</Body>
+        <Body tone="ink2">{monoNums(t('Signed by a physician before you see them. Lab partner, then the result pipeline (FHIR R4), then sign-off, then you.'))}</Body>
         {RESULTS.map((r) => {
           const open = openResult === r.id
           const watch = r.markers.filter((m) => m.flag === 'watch').length
@@ -429,8 +429,8 @@ export default function Care() {
                 style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, minHeight: 44 }}
               >
                 <View style={{ flex: 1, gap: 4 }}>
-                  <Body weight="medium">{tx(r.name)}</Body>
-                  <Meta size={14}>{tx(r.lab)}</Meta>
+                  <Body weight="medium">{monoNums(tx(r.name))}</Body>
+                  <Meta size={14}>{monoNums(tx(r.lab))}</Meta>
                   <Meta size={14}>
                     <Rich text={t('Drawn *{d}*', { d: fmtDate(r.drawn, lang) })} wrap={(w) => <Mono size={14} tone="ink2">{w}</Mono>} />
                   </Meta>
@@ -448,7 +448,7 @@ export default function Care() {
                     {r.markers.map((m) => (
                       <View key={m.name} accessible accessibilityLabel={t('{name}, {value} {unit}. Range {range}.{flag}', { name: tx(m.name), value: m.value, unit: m.unit, range: m.range, flag: m.flag === 'watch' ? t(' Worth watching.') : t(' In range.') })} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: c.line }}>
                         <View style={{ flex: 1, gap: 2 }}>
-                          <Meta tone="ink">{tx(m.name)}</Meta>
+                          <Meta tone="ink">{monoNums(tx(m.name))}</Meta>
                           <Meta size={13} tone="ink3">
                             <Rich text={t('Range *{r}*', { r: m.range })} wrap={(w) => <Mono size={13} tone="ink3">{w}</Mono>} />
                           </Meta>
@@ -462,7 +462,7 @@ export default function Care() {
                     {r.note ? (
                       <Card tone="sunk" padding={14} style={{ gap: 6 }}>
                         <Eyebrow>{t('Note from {who}', { who: r.signedBy ?? '' })}</Eyebrow>
-                        <Body>{r.note}</Body>
+                        <Body>{monoNums(r.note)}</Body>
                         <Meta size={13} tone="ink3">
                           <Rich text={t('Signed *{d}*{watch}', { d: fmtDate(r.signedOn!, lang), watch: watch ? t(' · {n} to watch', { n: watch }) : '' })} wrap={(w) => <Mono size={13} tone="ink3">{w}</Mono>} />
                         </Meta>
@@ -487,7 +487,7 @@ export default function Care() {
               </Body>
               <Pill tone={rx.status === 'active' ? 'ink' : 'neutral'}>{rx.status === 'active' ? t('Active') : t('Completed')}</Pill>
             </View>
-            <Body tone="ink2">{tx(rx.sig)}</Body>
+            <Body tone="ink2">{monoNums(tx(rx.sig))}</Body>
             <Meta size={14}>
               {rx.by} · <Mono size={14} tone="ink2">{rx.reg}</Mono>
             </Meta>
@@ -495,7 +495,7 @@ export default function Care() {
               <Mono size={14} tone="ink2">{`${fmtDate(rx.on, lang)} → ${fmtDate(rx.until, lang)}`}</Mono>
             </Meta>
             <Meta size={13} tone="ink3">
-              {tx(rx.check)}
+              {monoNums(tx(rx.check))}
             </Meta>
           </Card>
         ))}
@@ -594,11 +594,11 @@ export default function Care() {
               <Title size={24}>
                 <Rich text={t('Cancelled. *No charge.*')} wrap={(w) => <Serif>{w}</Serif>} />
               </Title>
-              <Body tone="ink2">{t('{name} has been told. When you want to talk again, find a clinician here or ask Priya.', { name: resched.who.name })}</Body>
+              <Body tone="ink2">{monoNums(t('{name} has been told. When you want to talk again, find a clinician here or ask Priya.', { name: resched.who.name }))}</Body>
             </>
           ) : (
             <>
-              <Meta>{t('{title} · {n} min, {mode}. Three times {name} can do:', { title: consultTitle(resched), n: resched.minutes, mode: tx(resched.mode.toLowerCase()), name: shortName(resched.who.name) })}</Meta>
+              <Meta>{monoNums(t('{title} · {n} min, {mode}. Three times {name} can do:', { title: consultTitle(resched), n: resched.minutes, mode: tx(resched.mode.toLowerCase()), name: shortName(resched.who.name) }))}</Meta>
               <View style={{ gap: space.s1 }} accessibilityRole="radiogroup" accessibilityLabel={t('New time')}>
                 {(SLOTS[resched.id] ?? SLOTS.default).map((sl) => (
                   <ChoiceCard key={sl} selected={slot === sl} onPress={() => setSlot(sl)} accessibilityLabel={ld(sl)} title={<Mono tone="ink" size={17}>{ld(sl)}</Mono>} />
@@ -689,7 +689,7 @@ export default function Care() {
                     <Avatar person={x} size={44} />
                     <View style={{ flex: 1 }}>
                       <Body weight="medium">{x.name}</Body>
-                      <Meta size={14}>{tx(x.focus)}</Meta>
+                      <Meta size={14}>{monoNums(tx(x.focus))}</Meta>
                     </View>
                   </View>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
@@ -715,16 +715,16 @@ export default function Care() {
             <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
               <Avatar person={chosen} size={44} />
               <View style={{ flex: 1 }}>
-                <Body weight="medium">{t('{role} · video consult', { role: tx(chosen.role) })}</Body>
+                <Body weight="medium">{monoNums(t('{role} · video consult', { role: tx(chosen.role) }))}</Body>
                 <Meta size={14}>{chosen.languages.map((l) => tx(l)).join(' · ')}</Meta>
               </View>
             </View>
             <View style={{ gap: space.s1 }} accessibilityRole="radiogroup" accessibilityLabel={t('Time')}>
               <Eyebrow>{t('Time')}</Eyebrow>
               {slotsFor(chosen).map((sl) => (
-                <ChoiceCard key={sl} selected={bSlot === sl} onPress={() => setBSlot(sl)} accessibilityLabel={ld(sl)} title={<Mono tone="ink" size={17}>{ld(sl)}</Mono>} trailing={<Meta size={13} tone="ink3">{t('{n} min', { n: 45 })}</Meta>} />
+                <ChoiceCard key={sl} selected={bSlot === sl} onPress={() => setBSlot(sl)} accessibilityLabel={ld(sl)} title={<Mono tone="ink" size={17}>{ld(sl)}</Mono>} trailing={<Meta size={13} tone="ink3">{monoNums(t('{n} min', { n: 45 }))}</Meta>} />
               ))}
-              {tried && bookErrors.slot ? <Meta tone="error" accessibilityLiveRegion="polite">{bookErrors.slot}</Meta> : null}
+              {tried && bookErrors.slot ? <Meta tone="error" accessibilityLiveRegion="polite">{monoNums(bookErrors.slot)}</Meta> : null}
             </View>
             <Field
               label={t('What would you like to talk about?')}
@@ -745,8 +745,8 @@ export default function Care() {
                 </Meta>
               </Card>
             ) : null}
-            <ChoiceCard kind="checkbox" selected={consent} onPress={() => setConsent(!consent)} accessibilityLabel={t('I consent to a teleconsultation under the Telemedicine Practice Guidelines 2020. The clinician will confirm their identity and registration at the start.')} title={<Meta tone="ink">{t('I consent to a teleconsultation under the Telemedicine Practice Guidelines 2020. The clinician will confirm their identity and registration at the start.')}</Meta>} />
-            {tried && bookErrors.consent ? <Meta tone="error" accessibilityLiveRegion="polite">{bookErrors.consent}</Meta> : null}
+            <ChoiceCard kind="checkbox" selected={consent} onPress={() => setConsent(!consent)} accessibilityLabel={t('I consent to a teleconsultation under the Telemedicine Practice Guidelines 2020. The clinician will confirm their identity and registration at the start.')} title={<Meta tone="ink">{monoNums(t('I consent to a teleconsultation under the Telemedicine Practice Guidelines 2020. The clinician will confirm their identity and registration at the start.'))}</Meta>} />
+            {tried && bookErrors.consent ? <Meta tone="error" accessibilityLiveRegion="polite">{monoNums(bookErrors.consent)}</Meta> : null}
             <Meta size={13} tone="ink3" align="center">
               {t('Included in Circle · no charge for this consult')}
             </Meta>
@@ -769,7 +769,7 @@ export default function Care() {
       </Sheet>
 
       <Sheet open={!!note} onClose={() => setNote(null)} title={t('Noted')} footer={<Button variant="secondary" block onPress={() => setNote(null)}>{t('Close')}</Button>}>
-        <Body>{note}</Body>
+        <Body>{monoNums(note ?? '')}</Body>
       </Sheet>
     </Screen>
   )

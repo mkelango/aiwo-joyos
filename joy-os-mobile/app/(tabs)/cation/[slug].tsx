@@ -32,6 +32,7 @@ import { CATION_DETAIL, buildItinerary, type ItemKind } from '@/screens/b/journe
 import { CheckLine, ChoiceCard, Field, IconButton, KeyValue, PrimaryChip, useCrisisGuard } from '@/screens/b/parts'
 import { useCationRequests } from '@/screens/a/local'
 import { localDate, Rich, useA } from '@/screens/a/i18n'
+import { monoNums } from '@/screens/a/parts'
 
 // ’CATION DETAIL (Memo p.20): the template as configuration — primary term, Day-90 measure,
 // itinerary day by day, before and after, a named clinician present, and the request.
@@ -133,13 +134,13 @@ export default function CationDetail() {
         ) : null}
         <View style={{ gap: 4 }}>
           <Eyebrow>{t('Day-90 measure in Joy OS')}</Eyebrow>
-          <Body>{tx(cation.day90Measure)}</Body>
-          <Meta>{minor ? t('Under 18 nothing is scored: this measure is not taken for you, and nothing joins the cohort.') : t('Measured like for like at Day 90 and stored in your record. The delta joins the published cohort aggregate, up or down.')}</Meta>
+          <Body>{monoNums(tx(cation.day90Measure))}</Body>
+          <Meta>{monoNums(minor ? t('Under 18 nothing is scored: this measure is not taken for you, and nothing joins the cohort.') : t('Measured like for like at Day 90 and stored in your record. The delta joins the published cohort aggregate, up or down.'))}</Meta>
         </View>
         {d.note ? (
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Icon name="info" size={15} color={col.ink2} />
-            <Meta style={{ flex: 1 }}>{tx(d.note)}</Meta>
+            <Meta style={{ flex: 1 }}>{monoNums(tx(d.note))}</Meta>
           </View>
         ) : null}
         <Divider />
@@ -159,7 +160,7 @@ export default function CationDetail() {
             {cation.venues.map((v) => (
               <View key={v} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Icon name="map-pin" size={13} color={col.ink2} />
-                <Meta tone="ink">{tx(v)}</Meta>
+                <Meta tone="ink">{monoNums(tx(v))}</Meta>
               </View>
             ))}
           </View>
@@ -196,7 +197,7 @@ export default function CationDetail() {
         <Card tone="outline" style={{ gap: space.s2 }}>
           <View style={{ gap: 4 }}>
             <Eyebrow>{t('Day {a} of {b}', { a: current.day, b: itinerary.length })}</Eyebrow>
-            <Title size={22}>{tx(current.title)}</Title>
+            <Title size={22}>{monoNums(tx(current.title))}</Title>
           </View>
           <View accessibilityRole="list">
             {current.items.map((it, i) => (
@@ -214,7 +215,7 @@ export default function CationDetail() {
                 </View>
                 <View style={{ flex: 1, gap: 2 }}>
                   <Body>{txRow(it.title)}</Body>
-                  <Meta size={14}>{t('{kind} · {where}', { kind: tx(it.kind), where: tx(it.where) })}</Meta>
+                  <Meta size={14}>{monoNums(t('{kind} · {where}', { kind: tx(it.kind), where: tx(it.where) }))}</Meta>
                   {it.term ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
                       <TermDot term={it.term} size={8} />
@@ -243,7 +244,7 @@ export default function CationDetail() {
           {CATION_PHASES.slice(2).map((p) => (
             <View key={p.key} style={{ gap: 2 }}>
               <Mono size={13} tone="ink3">{tx(p.when)}</Mono>
-              <Meta tone="ink">{p.key === 'remeasure' ? t('Re-measure: {m}', { m: tx(cation.day90Measure) }) : p.key === 'checkout' ? t('Hand-off: protocol live, coach and concierge named') : tx(p.what)}</Meta>
+              <Meta tone="ink">{monoNums(p.key === 'remeasure' ? t('Re-measure: {m}', { m: tx(cation.day90Measure) }) : p.key === 'checkout' ? t('Hand-off: protocol live, coach and concierge named') : tx(p.what))}</Meta>
             </View>
           ))}
         </Card>
@@ -260,8 +261,8 @@ export default function CationDetail() {
             <Body weight="medium">{d.clinician.name}</Body>
           </View>
         </View>
-        <Meta>{t('{role} · on site, not on call', { role: tx(d.clinician.role) })}</Meta>
-        <Body tone="ink2">{tx(d.clinician.note)}</Body>
+        <Meta>{monoNums(t('{role} · on site, not on call', { role: tx(d.clinician.role) }))}</Meta>
+        <Body tone="ink2">{monoNums(tx(d.clinician.note))}</Body>
         <Meta tone="ink3" size={14}>{t('Venues receive your name, booking and dietary note only. No health data leaves AIWO for the hotel.')}</Meta>
       </Card>
 
@@ -273,9 +274,9 @@ export default function CationDetail() {
               <Rich text={interestOnly ? t('Your interest is *noted*.') : t('Request *received*.')} wrap={(w) => <Serif>{w}</Serif>} />
             </Title>
             <Body tone="ink2">
-              {interestOnly
+              {monoNums(interestOnly
                 ? t('{c} will write when {name} opens, with dates first to you.', { c: concierge, name: cation.name })
-                : t('{c}, your concierge, will confirm availability within one working day and send a Razorpay link with a GST invoice. Nothing has been charged.', { c: concierge })}
+                : t('{c}, your concierge, will confirm availability within one working day and send a Razorpay link with a GST invoice. Nothing has been charged.', { c: concierge }))}
             </Body>
           </View>
           <View>
@@ -298,7 +299,7 @@ export default function CationDetail() {
             <View key={x} style={{ flexDirection: 'row', gap: 10 }}>
               <Mono tone="ink3">{String(i + 1)}</Mono>
               <Meta tone="ink" style={{ flex: 1 }}>
-                {x}
+                {monoNums(x)}
               </Meta>
             </View>
           ))}
@@ -351,7 +352,7 @@ export default function CationDetail() {
                   title={<Mono tone="ink" size={16}>{localDate(w, lang)}</Mono>}
                 />
               ))}
-              {errors.win ? <Meta tone="error">{errors.win}</Meta> : null}
+              {errors.win ? <Meta tone="error">{monoNums(errors.win)}</Meta> : null}
             </View>
           ) : null}
 
@@ -365,7 +366,7 @@ export default function CationDetail() {
           ) : (
             <View style={{ gap: 4 }}>
               <Eyebrow>{t('Venue')}</Eyebrow>
-              <Body>{tx(venue)}</Body>
+              <Body>{monoNums(tx(venue))}</Body>
             </View>
           )}
 
@@ -378,7 +379,7 @@ export default function CationDetail() {
               </Mono>
               <IconButton icon="plus" label={t('One more guest')} disabled={forTwo || guests >= 2} onPress={() => setGuests((g) => Math.min(2, g + 1))} />
             </View>
-            {forTwo ? <Meta size={14}>{t('Made for two. Each partner gives their own consents.')}</Meta> : <Meta size={14}>{guests >= 2 ? t('Two at most per booking. For a group, message Ravi.') : t('Yourself, or you and one guest.')}</Meta>}
+            {forTwo ? <Meta size={14}>{t('Made for two. Each partner gives their own consents.')}</Meta> : <Meta size={14}>{monoNums(guests >= 2 ? t('Two at most per booking. For a group, message Ravi.') : t('Yourself, or you and one guest.'))}</Meta>}
           </View>
 
           <Field
@@ -399,7 +400,7 @@ export default function CationDetail() {
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Icon name="shield" size={14} color={col.ink3} />
             <Meta size={14} tone="ink3" style={{ flex: 1 }}>
-              {t('No payment now. Payment by Razorpay in INR once your dates are confirmed; GST at 18% added on the invoice. Specimen pricing.')}
+              {monoNums(t('No payment now. Payment by Razorpay in INR once your dates are confirmed; GST at 18% added on the invoice. Specimen pricing.'))}
             </Meta>
           </View>
         </Card>

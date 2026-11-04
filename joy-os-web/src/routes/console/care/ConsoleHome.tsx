@@ -7,7 +7,7 @@ import { DaybreakButton, Eyebrow, SpecimenTag } from '@/components/joy/primitive
 import { Button, Card, PageHeader, Pill } from '@/components/ui'
 import { CONSOLES } from '@/layouts/ConsoleLayout'
 import { AccessRequestSheet } from './_access'
-import { DECLINE_REASONS, STRUCTURE_ONLY, AGGREGATES_ONLY, ASSIGNED_MEMBERS, NAMED_MEMBER, access, assignedIds, isLive, scopeLabel, standingRequest, lastSettled, statusLabel, useAccessRequests, type AccessRequest } from './_accessStore'
+import { DECLINE_REASONS, STRUCTURE_ONLY, AGGREGATES_ONLY, ASSIGNED_MEMBERS, NAMED_MEMBER, OPS_JIT_READ, OPS_JIT_WRITE, access, assignedIds, isLive, scopeLabel, standingRequest, lastSettled, statusLabel, useAccessAudit, useAccessRequests, type AccessRequest } from './_accessStore'
 import { useMemberAccessLog } from '@/routes/member/account/_access'
 import { GATE, ROLE_OPTIONS, specimenRoleOf, useConsoleRole } from './_gate'
 import { AccessNote, fmtClock, fmtDuration, useConsoleNow } from './_parts'
@@ -201,6 +201,7 @@ export default function ConsoleHome() {
       </section>
 
       {requests.length > 0 && <AccessRequests requests={requests} now={now} />}
+      <AccessAuditTrail />
 
       {/* How gating works */}
       <section className="mt-12 grid gap-6 2xl:grid-cols-[1fr_1.6fr]" aria-labelledby="gating-h">
@@ -367,6 +368,8 @@ function AccessRequests({ requests, now }: { requests: AccessRequest[]; now: num
                   {live && r.scope === STRUCTURE_ONLY && <p className="mt-1 text-[13px] text-ink-3">Structure only: the console opens to look, never to act on a member.</p>}
                   {live && r.scope === AGGREGATES_ONLY && <p className="mt-1 text-[13px] text-ink-3">Aggregates only: never acts on a member’s record.</p>}
                   {live && r.scope === NAMED_MEMBER && <p className="mt-1 text-[13px] text-ink-3">Acts on {r.memberName ?? r.memberId}’s record only; every other member stays view only.</p>}
+                  {live && r.scope === OPS_JIT_READ && <p className="mt-1 text-[13px] text-ink-3">Production read: the control plane opens to look; nothing there can be changed under it.</p>}
+                  {live && r.scope === OPS_JIT_WRITE && <p className="mt-1 text-[13px] text-ink-3">Production write: acts on the control plane only, and every action there carries <span className="num">{r.ref}</span>.</p>}
                   {live && r.scope === ASSIGNED_MEMBERS && <p className="mt-1 text-[13px] text-ink-3">Acts on the records of the <span className="num">{assignedIds(r).length}</span> members assigned to {r.person} only, one by one; every other member and anything console-wide stays view only.</p>}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 md:flex-col md:items-end">
@@ -401,6 +404,36 @@ function AccessRequests({ requests, now }: { requests: AccessRequest[]; now: num
           })}
         </ul>
         <AccessNote icon="shield" className="mt-5">A grant opens one console for one role, for the time asked, and ends on its own. Every action taken under it carries its reference in the audit.</AccessNote>
+      </Card>
+    </section>
+  )
+}
+
+/**
+ * The access audit: every request and every decision on it (approved, declined, withdrawn,
+ * revoked), with who took it and in what role. Append-only for the session, kept through a reset.
+ */
+function AccessAuditTrail() {
+  const audit = useAccessAudit()
+  if (!audit.length) return null
+  return (
+    <section className="mt-6" aria-labelledby="acc-audit-h">
+      <Card tone="sunk" className="min-w-0">
+        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="acc-audit-h" className="eyebrow text-ink-3">Access audit · <span className="num">{audit.length}</span> {audit.length === 1 ? 'line' : 'lines'}</h2>
+          <span className="text-[13px] text-ink-3">Reviewed by the DPO every quarter</span>
+        </div>
+        <ol className="divide-y divide-[color:var(--line)]">
+          {audit.map((a) => (
+            <li key={a.id} className="grid gap-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[6rem_1fr]">
+              <span className="num text-[12px] text-ink-3">{fmtClock(a.ms)}</span>
+              <div className="min-w-0">
+                <p className="text-[14px] text-ink"><span className="font-medium">{a.who}</span> <span className="text-ink-3">· {a.role}</span> · {a.what}</p>
+                <p className="text-[13px] text-ink-3"><span className="num">{a.ref}</span> · {a.label}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
       </Card>
     </section>
   )

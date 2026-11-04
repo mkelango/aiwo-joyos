@@ -123,6 +123,52 @@ export function readCalendarProvider(): CalProvider | null {
   return p && CAL_PROVIDERS.includes(p) ? p : null
 }
 
+/** Fired on this page whenever Freedom connects or disconnects a calendar. */
+const CAL_CHANGED = 'joyos:spaces:calendar'
+
+/** Freedom's write: saves the connection and tells every reader on the page at once. */
+export function writeCalendarProvider(provider: CalProvider | null) {
+  try {
+    localStorage.setItem(PREFIX + CAL_KEY, JSON.stringify({ provider } satisfies CalConnection))
+  } catch {
+    /* storage unavailable: readers on this page still follow the event */
+  }
+  memCal = provider
+  window.dispatchEvent(new CustomEvent(CAL_CHANGED))
+}
+/** The last write on this page, for when storage is blocked. */
+let memCal: CalProvider | null | undefined
+
+/** The connected provider, following Freedom's changes on this page and in other tabs. */
+export function useCalendarProvider(): CalProvider | null {
+  const read = () => {
+    const stored = readCalendarProvider()
+    return stored ?? (memCal === undefined ? null : memCal)
+  }
+  const [p, setP] = useState<CalProvider | null>(read)
+  useEffect(() => {
+    const sync = () => setP(read())
+    sync()
+    window.addEventListener(CAL_CHANGED, sync)
+    window.addEventListener('storage', sync)
+    return () => {
+      window.removeEventListener(CAL_CHANGED, sync)
+      window.removeEventListener('storage', sync)
+    }
+  }, [])
+  return p
+}
+
+/**
+ * True while a calendar is connected and its Trust centre consent (c_cal) is on: only then may
+ * a screen say anything learned from the calendar (the time audit's findings).
+ */
+export function useCalendarConnected() {
+  const consent = useTrustConsent('c_cal')
+  const provider = useCalendarProvider()
+  return consent.on && !!provider
+}
+
 // ─── Savouring prompts kept for today ─────────────────────────────────────
 // Pleasure saves each kept prompt here; the Ledger reads it to ask "How was it?" in the
 // evening. Shape is shared with the Ledger: { date: 'YYYY-MM-DD', id, text } (text in English,

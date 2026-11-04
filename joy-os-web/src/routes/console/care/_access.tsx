@@ -2,7 +2,7 @@ import { Check } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button, Sheet } from '@/components/ui'
 import type { Role } from '@/domain/types'
-import { AGGREGATES_ONLY, ASSIGNED_MEMBERS, DURATIONS, NAMED_MEMBER, PURPOSES, SCOPES, STRUCTURE_ONLY, access, assignedTo, scopeLabel } from './_accessStore'
+import { AGGREGATES_ONLY, ASSIGNED_MEMBERS, DURATIONS, NAMED_MEMBER, OPS_JIT_READ, OPS_JIT_SCOPES, OPS_JIT_WRITE, PURPOSES, SCOPES, STRUCTURE_ONLY, access, assignedTo, scopeLabel } from './_accessStore'
 import { CLINICAL_RECORDS, COACH_CASELOAD, MEMBER_IDS } from './_data'
 import { areaCls, fieldCls, labelCls } from './_parts'
 
@@ -10,6 +10,9 @@ import { areaCls, fieldCls, labelCls } from './_parts'
 // only a request: the DPO (or a second engineer, for the control plane) decides.
 
 type ConsoleRef = { to: string; label: string }
+
+/** Production access is never long: the control plane's JIT runs an hour, or four for an incident. */
+const JIT_DURATIONS = DURATIONS.slice(0, 2)
 
 /** Every specimen member a console knows by id, for naming the one member a grant covers. */
 const KNOWN_MEMBERS: { id: string; name: string }[] = (() => {
@@ -30,6 +33,9 @@ function resolveMember(raw: string) {
 
 export function AccessRequestSheet({ console: c, role, roleLabel, person, onClose }: { console: ConsoleRef | null; role: Role; roleLabel: string; person: string; onClose: () => void }) {
   const jit = c?.to === '/console/ops'
+  // The control plane takes its own JIT scopes (read or write), never a member scope.
+  const scopes = jit ? OPS_JIT_SCOPES : SCOPES
+  const durations = jit ? JIT_DURATIONS : DURATIONS
   const [purpose, setPurpose] = useState('')
   const [scope, setScope] = useState(SCOPES[0])
   const [duration, setDuration] = useState(DURATIONS[0])
@@ -44,7 +50,7 @@ export function AccessRequestSheet({ console: c, role, roleLabel, person, onClos
 
   useEffect(() => {
     if (c) {
-      setPurpose(''); setScope(SCOPES[0]); setDuration(DURATIONS[0]); setWhy(''); setMember(''); setErrors({}); setSent(null)
+      setPurpose(''); setScope(c.to === '/console/ops' ? OPS_JIT_READ : SCOPES[0]); setDuration(DURATIONS[0]); setWhy(''); setMember(''); setErrors({}); setSent(null)
     }
   }, [c])
 
@@ -75,8 +81,8 @@ export function AccessRequestSheet({ console: c, role, roleLabel, person, onClos
             <dt className="text-ink-3">Scope</dt><dd className="text-ink">{scopeLabel({ scope, memberId: resolved?.id, memberName: resolved?.name, memberIds: assigned?.ids, assignedLabel: assigned?.label })}</dd>
             <dt className="text-ink-3">Duration</dt><dd className="text-ink">{duration}</dd>
           </dl>
-          <p className="text-[15px] text-ink-2">{jit ? 'A second engineer approves or declines within 30 minutes. The grant expires on its own; every action under it is audited.' : 'You will be told within 24 h. Nothing opens until it is approved, and the request itself is written to the audit.'}</p>
-          <p className="text-[13px] text-ink-3">It now waits under Your access requests on All consoles, where this specimen lets you play {jit ? 'the second engineer' : 'the DPO'} and decide it.{scope === STRUCTURE_ONLY ? ' A structure-only grant lets you look, never act on a member.' : scope === AGGREGATES_ONLY ? ' An aggregates-only grant never acts on a member’s record.' : named && resolved ? ` A one-member grant acts on ${resolved.name}’s record only.` : assigned ? ` It acts on the records of the ${assigned.ids.length} members on ${assigned.label}, one by one, and on nothing console-wide.` : ''}</p>
+          <p className="text-[15px] text-ink-2">{jit ? 'A second engineer approves or declines within 30 minutes. The grant expires on its own; the request, the decision and every action under it are audited.' : 'You will be told within 24 h. Nothing opens until it is approved, and the request itself is written to the access audit on All consoles.'}</p>
+          <p className="text-[13px] text-ink-3">It now waits under Your access requests on All consoles, where this specimen lets you play {jit ? 'the second engineer' : 'the DPO'} and decide it.{scope === OPS_JIT_READ ? ' A read grant opens the control plane to look; nothing there can be changed under it.' : scope === OPS_JIT_WRITE ? ' A write grant lets you act on the control plane only, and every action carries its reference.' : scope === STRUCTURE_ONLY ? ' A structure-only grant lets you look, never act on a member.' : scope === AGGREGATES_ONLY ? ' An aggregates-only grant never acts on a member’s record.' : named && resolved ? ` A one-member grant acts on ${resolved.name}’s record only.` : assigned ? ` It acts on the records of the ${assigned.ids.length} members on ${assigned.label}, one by one, and on nothing console-wide.` : ''}</p>
           <div className="flex justify-end"><Button variant="ink" onClick={onClose}>Done</Button></div>
         </div>
       ) : (
@@ -92,15 +98,15 @@ export function AccessRequestSheet({ console: c, role, roleLabel, person, onClos
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label htmlFor="acc-scope" className={labelCls}>Member scope</label>
+              <label htmlFor="acc-scope" className={labelCls}>{jit ? 'Production scope' : 'Member scope'}</label>
               <select id="acc-scope" className={fieldCls} value={scope} onChange={(e) => { setScope(e.target.value); setErrors((x) => ({ ...x, member: undefined, scope: undefined })) }} aria-invalid={!!errors.scope} aria-describedby={errors.scope ? 'acc-scope-err' : assigned ? 'acc-scope-help' : undefined}>
-                {SCOPES.map((p) => <option key={p}>{p}</option>)}
+                {scopes.map((p) => <option key={p} value={p}>{scopeLabel({ scope: p })}</option>)}
               </select>
             </div>
             <div>
               <label htmlFor="acc-dur" className={labelCls}>Duration</label>
               <select id="acc-dur" className={fieldCls} value={duration} onChange={(e) => setDuration(e.target.value)}>
-                {DURATIONS.map((p) => <option key={p}>{p}</option>)}
+                {durations.map((p) => <option key={p}>{p}</option>)}
               </select>
             </div>
           </div>

@@ -9,7 +9,7 @@ import { MEMBER, PAYMENTS_GRACE } from '@/data/member'
 import { MEMBERSHIPS } from '@/data/platform'
 import { ENTITLEMENTS, GSTIN_AIWO, GST_RATE, INVOICES, SUPPLIER_STATE, placeOfSupply } from './_data'
 import { Section, Segmented, Toggle } from './_parts'
-import { inr, rich, useMemberProfile, usePersisted, useToast } from './_util'
+import { inr, nums, rich, useMemberProfile, usePersisted, useToast } from './_util'
 import { useDict, useLang } from '@/lib/i18n'
 import { useApp } from '@/lib/store'
 import { MEM, useData } from './_i18n'
@@ -186,7 +186,7 @@ export default function Membership() {
             {ENTITLEMENTS.map((e) => (
               <li key={e.name} className="flex items-start justify-between gap-3 py-2.5">
                 <span className="flex items-start gap-2 text-[15px] text-ink"><Check size={15} className="mt-1 shrink-0 text-ink-3" /> {dx(e.name)}</span>
-                <span className="text-right text-[13px] text-ink-2">{dx(e.use)}<span className="eyebrow block text-ink-3">{e.from}</span></span>
+                <span className="text-right text-[13px] text-ink-2">{nums(dx(e.use))}<span className="eyebrow block text-ink-3">{e.from}</span></span>
               </li>
             ))}
           </ul>
@@ -214,7 +214,7 @@ export default function Membership() {
                 <p className="mt-3 text-[18px] text-ink">{m.name}</p>
                 <p className="mt-1"><span className="num text-[1.6rem] font-light text-ink">{dx(m.price)}</span> <span className="text-[14px] text-ink-2">{dx(m.cadence)}</span></p>
                 <ul className="mt-4 space-y-1.5 text-[14px] text-ink-2">
-                  {m.points.map((p) => <li key={p} className="flex gap-2"><Check size={14} className="mt-1 shrink-0 text-ink-3" /> {dx(p)}</li>)}
+                  {m.points.map((p) => <li key={p} className="flex gap-2"><Check size={14} className="mt-1 shrink-0 text-ink-3" /> {nums(dx(p))}</li>)}
                 </ul>
                 <div className="mt-auto pt-5">
                   {mine ? (
@@ -244,7 +244,7 @@ export default function Membership() {
               {invoiceRows.map((r) => (
                 <li key={r.id} className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
                   <span className="min-w-0">
-                    <span className="block text-[15px] text-ink">{dx(r.item)}</span>
+                    <span className="block text-[15px] text-ink">{nums(dx(r.item))}</span>
                     <span className="num block text-[12px] text-ink-3">{fmtDate(r.date)} · {r.id}</span>
                     <span className="mt-1 flex items-center gap-2"><span className="num text-[15px] text-ink">{inr(r.total)}</span><Pill tone={r.status === 'Paid' ? 'positive' : 'caution'}>{dx(r.status)}</Pill></span>
                   </span>
@@ -259,7 +259,7 @@ export default function Membership() {
               rowKey={(r) => r.id}
               columns={[
                 { key: 'date', header: t('date'), render: (r) => <span className="num whitespace-nowrap text-ink-2">{fmtDate(r.date)}</span> },
-                { key: 'item', header: t('item'), render: (r) => <span><span className="block text-ink">{dx(r.item)}</span><span className="num text-[12px] text-ink-3">{r.id} · {dx(r.method)}</span></span>, className: 'min-w-[170px]' },
+                { key: 'item', header: t('item'), render: (r) => <span><span className="block text-ink">{nums(dx(r.item))}</span><span className="num text-[12px] text-ink-3">{r.id} · {dx(r.method)}</span></span>, className: 'min-w-[170px]' },
                 { key: 'total', header: t('total'), align: 'right', render: (r) => <span className="whitespace-nowrap"><span className="num block text-ink">{inr(r.total)}</span><span className="text-[12px] text-ink-3">{rich(t('inclGst'), { amt: <span className="num">{inr(gstOf(r.total), 2)}</span> })}</span></span> },
                 { key: 'status', header: t('status'), render: (r) => <Pill tone={r.status === 'Paid' ? 'positive' : 'caution'}>{dx(r.status)}</Pill> },
                 { key: 'open', header: '', align: 'right', render: (r) => <button onClick={() => setInvoice(r)} className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-[13px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring" aria-label={t('openInvoice', { id: r.id })}><FileText size={14} /> {t('view')}</button> },
@@ -323,7 +323,7 @@ export default function Membership() {
                     : t('downPaid', { plan })}
               </p>
               <ul className="mt-4 space-y-1.5 text-[15px] text-ink-2">
-                {m.points.map((p) => <li key={p} className="flex gap-2"><Check size={15} className="mt-1 shrink-0 text-ink-3" /> {dx(p)}</li>)}
+                {m.points.map((p) => <li key={p} className="flex gap-2"><Check size={15} className="mt-1 shrink-0 text-ink-3" /> {nums(dx(p))}</li>)}
               </ul>
               {q.kind === 'up' ? (
                 <dl className="mt-5 space-y-2 rounded-card bg-paper-sunk p-4 text-[15px]">
@@ -460,7 +460,7 @@ function InvoiceView({ inv, onSaved }: { inv: Invoice; onSaved: (m: string) => v
       <table className="mt-6 w-full text-[15px]">
         <caption className="sr-only">{t('invoiceLines')}</caption>
         <tbody>
-          <tr className="border-b border-line"><th scope="row" className="py-2.5 text-left font-normal text-ink">{dx(inv.item)}</th><td className="num py-2.5 text-right text-ink">{inr(taxable, 2)}</td></tr>
+          <tr className="border-b border-line"><th scope="row" className="py-2.5 text-left font-normal text-ink">{nums(dx(inv.item))}</th><td className="num py-2.5 text-right text-ink">{inr(taxable, 2)}</td></tr>
           {taxLines.map(([k, v], i) => {
             const [name, rate] = k.split(' ')
             return <tr key={k} className={clsx(i === taxLines.length - 1 && 'border-b border-line')}><th scope="row" className="py-2 text-left font-normal text-ink-2">{name} <span className="num">{rate}</span></th><td className="num py-2 text-right text-ink-2">{inr(v, 2)}</td></tr>

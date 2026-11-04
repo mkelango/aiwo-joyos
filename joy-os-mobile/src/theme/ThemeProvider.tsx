@@ -16,7 +16,9 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { useColorScheme } from 'react-native'
 import { useApp } from '../lib/store'
 import type { TermKey } from '../shared/types'
-import { fonts, indicFonts, type FontSet, indicType, maxScale, motion, palettes, radius, resolveColor, space, termColors, tracking, type, type Palette, type Scheme } from './tokens'
+import { fonts, indicFonts, indicStep, type FontSet, indicType, maxScale, motion, palettes, radius, resolveColor, type Script, space, termColors, tracking, type, type Palette, type Scheme, vizColors, vizSeriesColor, type VizColors } from './tokens'
+
+export { scriptFamily, scriptOfText, type Script } from './tokens'
 
 export interface Theme {
   scheme: Scheme
@@ -28,6 +30,21 @@ export interface Theme {
   indic: boolean
   /** Size and leading multipliers for reading text (1 in English). */
   script: { scale: number; leading: number }
+  /** The app language's script ('ta' or 'hi'), or null in English. */
+  scriptLang: Script | null
+  /** Which script sets have loaded. Both load at start, so Tamil shown in English (the
+   *  Thirukkural, a language picker's தமிழ்) still draws in its own face. */
+  scripts: Record<Script, boolean>
+  /** The family for a role in a given script, in any app language. Until that set is in, the
+   *  role's current family stands and the phone draws the glyphs for that moment. */
+  scriptFamily: (s: Script, role: keyof FontSet) => string
+  /** A label size one step up in Tamil and Hindi (eyebrow 12→13, Daybreak 19→20, tab bar
+   *  12→13); the size itself in English. Pair it with script.leading for the line height. */
+  step: (pt: number) => number
+  /** Neutral chart colours for non-term series (Ink, Slate, Bronze, Mist). Never the Spectrum. */
+  viz: VizColors
+  /** The nth non-term line series colour: Ink, Slate, Bronze, then wraps. */
+  vizSeries: (n: number) => string
   type: typeof type
   tracking: typeof tracking
   space: typeof space
@@ -46,48 +63,58 @@ const ThemeCtx = createContext<Theme | null>(null)
 
 const TEXT_SCALE = { default: 1, large: 1.125, xlarge: 1.25 } as const
 
-// The script faces load when the member's language needs them, not at every start (each set is
-// several hundred KB). Until a set is in, the Latin families stay, and the phone draws the
-// Indic glyphs with its own system font for that moment.
+// Both script sets load at start, whatever the language: Tamil and Hindi appear outside their own
+// mode (the Thirukkural on Practice, தமிழ் and हिन्दी in the language pickers), and a sample in the
+// phone's system font would misdraw the brand. Until a set is in, the Latin families stay, and the
+// phone draws the Indic glyphs with its own font for that moment.
 const SCRIPT_FONTS = {
   ta: { MuktaMalar_300Light, MuktaMalar_400Regular, MuktaMalar_500Medium, MuktaMalar_600SemiBold, MuktaMalar_700Bold, NotoSerifTamil_300Light_Italic, NotoSerifTamil_400Regular_Italic },
   hi: { Mukta_300Light, Mukta_400Regular, Mukta_500Medium, Mukta_600SemiBold, Mukta_700Bold, TiroDevanagariHindi_400Regular_Italic },
 } as const
 const scriptLoaded = (l: 'ta' | 'hi') => Object.keys(SCRIPT_FONTS[l]).every((n) => Font.isLoaded(n))
 
-function useScriptFonts(lang: string) {
-  const want = lang === 'ta' || lang === 'hi' ? lang : null
-  const [ready, setReady] = useState<Record<string, boolean>>(() => ({ ta: scriptLoaded('ta'), hi: scriptLoaded('hi') }))
+function useScriptFonts() {
+  const [ready, setReady] = useState<Record<Script, boolean>>(() => ({ ta: scriptLoaded('ta'), hi: scriptLoaded('hi') }))
   useEffect(() => {
-    if (!want || ready[want]) return
     let alive = true
-    Font.loadAsync(SCRIPT_FONTS[want])
-      .then(() => alive && setReady((r) => ({ ...r, [want]: true })))
-      .catch(() => {
-        /* keep the system font */
-      })
+    for (const l of ['ta', 'hi'] as const) {
+      if (scriptLoaded(l)) continue
+      Font.loadAsync(SCRIPT_FONTS[l])
+        .then(() => alive && setReady((r) => ({ ...r, [l]: true })))
+        .catch(() => {
+          /* keep the system font */
+        })
+    }
     return () => {
       alive = false
     }
-  }, [want, ready])
-  return want && ready[want] ? want : null
+  }, [])
+  return ready
 }
 
 /** Follows the system scheme; the member can override it in Settings (themePref). */
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const system = useColorScheme()
   const { themePref, textSize, lang } = useApp()
-  const script = useScriptFonts(lang)
+  const scripts = useScriptFonts()
   const scheme: Scheme = themePref === 'system' ? (system === 'dark' ? 'dark' : 'light') : themePref
   const value = useMemo<Theme>(() => {
     const c = palettes[scheme]
-    const indic = lang === 'ta' || lang === 'hi'
+    const scriptLang: Script | null = lang === 'ta' || lang === 'hi' ? lang : null
+    const indic = scriptLang !== null
+    const set: FontSet = scriptLang && scripts[scriptLang] ? indicFonts[scriptLang] : fonts
     return {
       scheme,
       c,
-      fonts: script ? indicFonts[script] : fonts,
+      fonts: set,
       indic,
       script: indic ? indicType : { scale: 1, leading: 1 },
+      scriptLang,
+      scripts,
+      scriptFamily: (s, role) => (scripts[s] ? indicFonts[s][role] : set[role]),
+      step: (pt) => (indic ? indicStep(pt) : pt),
+      viz: vizColors(c),
+      vizSeries: (n) => vizSeriesColor(c, n),
       type,
       tracking,
       space,
@@ -98,7 +125,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       resolve: (v) => resolveColor(c, v),
       term: (k) => termColors(c, k),
     }
-  }, [scheme, textSize, lang, script])
+  }, [scheme, textSize, lang, scripts])
   return <ThemeCtx.Provider value={value}>{children}</ThemeCtx.Provider>
 }
 

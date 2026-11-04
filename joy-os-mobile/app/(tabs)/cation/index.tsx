@@ -40,6 +40,7 @@ import { MY_CATION, SIGNAL_READINGS } from '@/screens/b/journeyData'
 import { FilterChips, HereMarker, PrimaryChip, TimelineStep } from '@/screens/b/parts'
 import { useCationRequests, useLocal } from '@/screens/a/local'
 import { Rich, useA } from '@/screens/a/i18n'
+import { monoNums } from '@/screens/a/parts'
 import { useT } from '@/lib/i18n'
 import { useLatestIndex } from '@/lib/indexRecord'
 import { useIsMinor } from '@/lib/minor'
@@ -94,7 +95,7 @@ function WithCation({ demo }: { demo: ReactNode }) {
       <ScreenHeader
         eyebrow={`${tt('cation')} · ${mine.name} · ${tt('dayOf', { n: MEMBER.dayOfLoop })}`}
         title={<Rich text={t('Go somewhere. Come back *different*.')} wrap={(w) => <Serif>{w}</Serif>} />}
-        lead={t('You checked out of {venue} on {date}. The ’cation ended; the ninety days did not.', { venue: MY_CATION.venue, date: fmtDate(MY_CATION.checkedOut, lang) })}
+        lead={<Body tone="ink2">{monoNums(t('You checked out of {venue} on {date}. The ’cation ended; the ninety days did not.', { venue: MY_CATION.venue, date: fmtDate(MY_CATION.checkedOut, lang) }))}</Body>}
       />
       {demo}
 
@@ -103,7 +104,7 @@ function WithCation({ demo }: { demo: ReactNode }) {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.s2 }}>
           <View style={{ flex: 1, gap: 6 }}>
             <Eyebrow>{t('Your ’cation · {edition}', { edition: MY_CATION.edition })}</Eyebrow>
-            <Title size={24}>{t('{name} at {venue}', { name: mine.name, venue: MY_CATION.venue })}</Title>
+            <Title size={24}>{monoNums(t('{name} at {venue}', { name: mine.name, venue: MY_CATION.venue }))}</Title>
             <Mono tone="ink2">{`${fmtDate(MY_CATION.arrived, lang)} – ${fmtDate(MY_CATION.checkedOut, lang)}`}</Mono>
             <Meta>
               {tx(mine.nights)} · <Mono tone="ink2">{MY_CATION.bookingRef}</Mono>
@@ -120,10 +121,10 @@ function WithCation({ demo }: { demo: ReactNode }) {
                 <View accessible accessibilityLabel={t('{when}, {name}, {state}. {what}', { when: tx(ph.when), name: tx(ph.name), state: t(st === 'done' ? 'completed' : st === 'now' ? 'current' : 'upcoming'), what: tx(ph.what) })} style={{ gap: 4 }}>
                   <Eyebrow>{tx(ph.when)}</Eyebrow>
                   <Body tone={st === 'next' ? 'ink2' : 'ink'} weight="medium">
-                    {tx(ph.name)}
+                    {monoNums(tx(ph.name))}
                   </Body>
                   {st === 'now' ? <HereMarker label={t('You are here · Day {n}', { n: MEMBER.dayOfLoop })} /> : null}
-                  <Meta>{tx(ph.what)}</Meta>
+                  <Meta>{monoNums(tx(ph.what))}</Meta>
                 </View>
               </TimelineStep>
             )
@@ -137,7 +138,7 @@ function WithCation({ demo }: { demo: ReactNode }) {
         <Title size={22}>
           <Serif>“{MY_CATION.namedOutcome}”</Serif>
         </Title>
-        <Meta>{t('Written on the booking, {date}. Priya reads it back to you on Day 45, and again at Day 90.', { date: fmtDate(MY_CATION.outcomeWritten, lang) })}</Meta>
+        <Meta>{monoNums(t('Written on the booking, {date}. Priya reads it back to you on Day 45, and again at Day 90.', { date: fmtDate(MY_CATION.outcomeWritten, lang) }))}</Meta>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s1 }}>
           <TermChip term={MY_CATION.protocolTerm} withSpace />
           <TermChip term="R" withSpace />
@@ -153,7 +154,7 @@ function WithCation({ demo }: { demo: ReactNode }) {
         <Body>
           <Rich text={t(minor ? 'Your protocol went live for *{name}* at checkout.' : 'Your protocol went live for *{name}*, your lowest term at checkout.', { name: name(MY_CATION.protocolTerm) })} wrap={(w) => <Body weight="semibold">{w}</Body>} />
         </Body>
-        <Meta>{tx(MY_CATION.protocol)}</Meta>
+        <Meta>{monoNums(tx(MY_CATION.protocol))}</Meta>
         {[
           { p: coach, what: t('Your coach · Day 15, 45 and the circle'), thread: 't_priya' },
           { p: concierge, what: t('Your concierge · bookings and the Passport'), thread: 't_ravi' },
@@ -168,7 +169,7 @@ function WithCation({ demo }: { demo: ReactNode }) {
             <Avatar person={p} size={40} />
             <View style={{ flex: 1 }}>
               <Body>{p.name}</Body>
-              <Meta size={14}>{what}</Meta>
+              <Meta size={14}>{monoNums(what)}</Meta>
             </View>
             <Icon name="message-circle" size={18} color={c.ink2} />
           </Pressable>
@@ -176,9 +177,9 @@ function WithCation({ demo }: { demo: ReactNode }) {
         <Divider />
         <View style={{ gap: 4 }}>
           <Eyebrow>{t('First action')}</Eyebrow>
-          <Body>{tx(MY_CATION.firstAction.what)}</Body>
+          <Body>{monoNums(tx(MY_CATION.firstAction.what))}</Body>
         </View>
-        <ArrowLink icon="users" onPress={() => router.push('/circles')}>
+        <ArrowLink joyIcon="circle" onPress={() => router.push('/circles')}>
           {tx(CIRCLE.name)}
         </ArrowLink>
       </Card>
@@ -197,7 +198,7 @@ function WithCation({ demo }: { demo: ReactNode }) {
           <SectionTitle>{t('Readings on site')}</SectionTitle>
           <SpecimenTag />
         </View>
-        <Body tone="ink2">{t('Each reading flowed into your record as it was taken, beside your pre-arrival baseline. They are re-taken like for like at Day 90.')}</Body>
+        <Body tone="ink2">{monoNums(t('Each reading flowed into your record as it was taken, beside your pre-arrival baseline. They are re-taken like for like at Day 90.'))}</Body>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s1 + 4 }}>
           {SIGNAL_READINGS.map((r) => {
             const numeric = r.baseline && !r.value.includes('/') ? Number(r.value.replace('+', '')) - Number(r.baseline.replace('+', '')) : null
@@ -213,9 +214,9 @@ function WithCation({ demo }: { demo: ReactNode }) {
                   <TermDot term={r.term} />
                   <Meta size={13}>{spaceName(r.term)}</Meta>
                 </View>
-                <Meta tone="ink">{tx(r.label)}</Meta>
+                <Meta tone="ink">{monoNums(tx(r.label))}</Meta>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, flexWrap: 'wrap' }}>
-                  {lang === 'en' || /^[-+\d./]+$/.test(r.value) ? <Numeral size={r.value.length > 5 ? 22 : 30}>{r.value}</Numeral> : <Body size={20} weight="medium" style={{ flexShrink: 1 }}>{tx(r.value)}</Body>}
+                  {lang === 'en' || /^[-+\d./]+$/.test(r.value) ? <Numeral size={r.value.length > 5 ? 22 : 30}>{r.value}</Numeral> : <Body size={20} weight="medium" style={{ flexShrink: 1 }}>{monoNums(tx(r.value))}</Body>}
                   {r.unit ? <Mono size={12} tone="ink3">{tx(r.unit)}</Mono> : null}
                 </View>
                 {r.baseline ? (
@@ -225,7 +226,7 @@ function WithCation({ demo }: { demo: ReactNode }) {
                     {better !== null && !minor ? <Delta value={Math.round(better * 10) / 10} size={13} /> : null}
                   </View>
                 ) : (
-                  <Meta size={13} tone="ink3">{r.note ? tx(r.note) : t('First reading')}</Meta>
+                  <Meta size={13} tone="ink3">{monoNums(r.note ? tx(r.note) : t('First reading'))}</Meta>
                 )}
               </View>
             )
@@ -238,9 +239,9 @@ function WithCation({ demo }: { demo: ReactNode }) {
       <Card tone="outline" style={{ gap: space.s2 }}>
         <Eyebrow>{t('The ninety days · from checkout')}</Eyebrow>
         <Body>
-          {minor
+          {monoNums(minor
             ? t('Day {n}. Your Day-45 review with Priya is on {date}. Nothing is re-measured: under 18 there is no score.', { n: MEMBER.dayOfLoop, date: fmtDate('2027-02-19', lang) })
-            : t('Day {n}. Your Day-45 review with Priya is on {date}. The Day-90 measure for {name}, a {measure}, opens on Day 76.', { n: MEMBER.dayOfLoop, date: fmtDate('2027-02-19', lang), name: mine.name, measure: tx(mine.day90Measure) })}
+            : t('Day {n}. Your Day-45 review with Priya is on {date}. The Day-90 measure for {name}, a {measure}, opens on Day 76.', { n: MEMBER.dayOfLoop, date: fmtDate('2027-02-19', lang), name: mine.name, measure: tx(mine.day90Measure) }))}
         </Body>
         {minor ? null : <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />}
       </Card>
@@ -259,12 +260,12 @@ function WithCation({ demo }: { demo: ReactNode }) {
           </View>
           <Title size={30}>{suggested.name}</Title>
           <Body tone="ink2">
-            {minor
+            {monoNums(minor
               ? t('{promise} It is built around {name}, the gentlest place to begin. Priya will talk it through with you and your guardian at Day 60; you can look now.', { promise: tx(suggested.promise), name: name(lowest.key) })
-              : t('{promise} {name} is still your lowest term on Day {n}. Priya will open this conversation at Day 60; you can look now.', { promise: tx(suggested.promise), name: name(lowest.key), n: MEMBER.dayOfLoop })}
+              : t('{promise} {name} is still your lowest term on Day {n}. Priya will open this conversation at Day 60; you can look now.', { promise: tx(suggested.promise), name: name(lowest.key), n: MEMBER.dayOfLoop }))}
           </Body>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s2, rowGap: 4 }}>
-            <Meta>{tx(suggested.nights)}</Meta>
+            <Meta>{monoNums(tx(suggested.nights))}</Meta>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 }}>
               <Icon name="map-pin" size={14} color={c.ink2} />
               <Meta style={{ flexShrink: 1 }}>{suggested.venues.map((v) => tx(v)).join(' · ')}</Meta>
@@ -273,7 +274,7 @@ function WithCation({ demo }: { demo: ReactNode }) {
               <Rich text={t('From *{p}*', { p: suggested.priceFrom })} wrap={(w) => <Mono tone="ink">{w}</Mono>} />
             </Meta>
           </View>
-          <Meta size={14} tone="ink3">{t('Day-90 measure: {m}', { m: tx(suggested.day90Measure) })}</Meta>
+          <Meta size={14} tone="ink3">{monoNums(t('Day-90 measure: {m}', { m: tx(suggested.day90Measure) }))}</Meta>
           <DaybreakButton icon="arrow-right" onPress={() => router.push(`/cation/${suggested.slug}`)}>
             {t('See {name}', { name: suggested.name })}
           </DaybreakButton>
@@ -306,7 +307,7 @@ function Catalogue({ noCation = false }: { noCation?: boolean }) {
       {/* The ten */}
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{t('The ten ’cations · by term')}</SectionTitle>
-        <Body tone="ink2">{t('One engine, ten templates. Each has a primary term, a named clinician present, and a Day-90 measure kept in Joy OS.')}</Body>
+        <Body tone="ink2">{monoNums(t('One engine, ten templates. Each has a primary term, a named clinician present, and a Day-90 measure kept in Joy OS.'))}</Body>
         <FilterChips<Filter>
           label={t('Filter ’cations by term')}
           value={filter}
@@ -336,8 +337,8 @@ function Catalogue({ noCation = false }: { noCation?: boolean }) {
                 <Title size={22}>{x.name}</Title>
                 <Eyebrow>{tx(x.nights)}</Eyebrow>
               </View>
-              <Meta>{tx(x.promise)}</Meta>
-              {!noCation && x.slug === MY_CATION.slug ? <Meta size={14} tone="daybreak">{t('You took this · {venue}', { venue: MY_CATION.venue })}</Meta> : null}
+              <Meta>{monoNums(tx(x.promise))}</Meta>
+              {!noCation && x.slug === MY_CATION.slug ? <Meta size={14} tone="daybreak">{monoNums(t('You took this · {venue}', { venue: MY_CATION.venue }))}</Meta> : null}
               {!minor && x.primary === latest.lowestTerm ? <Meta size={14} tone="daybreak">{t('For your lowest term')}</Meta> : null}
               {requestLine(x.slug) ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -401,7 +402,7 @@ function OccasionsLink() {
         </View>
         <View style={{ flex: 1, gap: 4 }}>
           <Eyebrow>{t('Joyspan Occasions')}</Eyebrow>
-          <Title size={20}>{t('A 60th birthday, an anniversary, a homecoming')}</Title>
+          <Title size={20}>{monoNums(t('A 60th birthday, an anniversary, a homecoming'))}</Title>
           <Meta>{t('The family’s day, with three generations measured together: each person their own Index and their own ninety days.')}</Meta>
         </View>
       </View>
@@ -443,21 +444,21 @@ function NoCation({ demo }: { demo: ReactNode }) {
               </Eyebrow>
             )}
           </View>
-          <Title size={28}>{minor ? t('Your first ’cation: {name}', { name: invite.name }) : t('Your first ’cation, for your lowest term: {name}', { name: invite.name })}</Title>
+          <Title size={28}>{monoNums(minor ? t('Your first ’cation: {name}', { name: invite.name }) : t('Your first ’cation, for your lowest term: {name}', { name: invite.name }))}</Title>
           <Body tone="ink2">
             {minor ? (
-              t('{cation} is made for {lowest}: {promise} It ends with a Day-90 conversation, not a souvenir.', { lowest: name(lowest), cation: invite.name, promise: tx(invite.promise) })
+              monoNums(t('{cation} is made for {lowest}: {promise} It ends with a Day-90 conversation, not a souvenir.', { lowest: name(lowest), cation: invite.name, promise: tx(invite.promise) }))
             ) : (
               <Rich text={t('{lowest} is your lowest term at *{v}*. {cation} is made for it: {promise} It ends with a measured delta on Day 90, not a souvenir.', { lowest: name(lowest), v: String(score), cation: invite.name, promise: tx(invite.promise) })} wrap={(w) => <Mono tone="ink2">{w}</Mono>} />
             )}
           </Body>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s2, rowGap: 4 }}>
-            <Meta>{tx(invite.nights)}</Meta>
+            <Meta>{monoNums(tx(invite.nights))}</Meta>
             <Meta>
               <Rich text={t('From *{p}*', { p: invite.priceFrom })} wrap={(w) => <Mono tone="ink">{w}</Mono>} />
             </Meta>
           </View>
-          {minor ? null : <Meta size={14} tone="ink3">{t('Day-90 measure: {m}', { m: tx(invite.day90Measure) })}</Meta>}
+          {minor ? null : <Meta size={14} tone="ink3">{monoNums(t('Day-90 measure: {m}', { m: tx(invite.day90Measure) }))}</Meta>}
           {others.length ? <Meta size={14} tone="ink3">{t('Also for {lowest}: {list}', { lowest: name(lowest), list: others.map((x) => x.name).join(t(' and ')) })}</Meta> : null}
           {req ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -475,7 +476,7 @@ function NoCation({ demo }: { demo: ReactNode }) {
         {[t('A named outcome on the booking, in your own words'), minor ? t('No score under 18: the change is talked through with you, not measured') : t('A measured change in the primary term, kept in Joy OS'), t('A named clinician present, not on call'), t('Ninety days of continuation from checkout')].map((x) => (
           <View key={x} style={{ flexDirection: 'row', gap: 10 }}>
             <Icon name="check" size={15} color={c.ink3} />
-            <Body style={{ flex: 1 }}>{x}</Body>
+            <Body style={{ flex: 1 }}>{monoNums(x)}</Body>
           </View>
         ))}
         {minor ? null : <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />}

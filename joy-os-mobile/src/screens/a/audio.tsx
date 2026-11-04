@@ -2,16 +2,25 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, View } from 'react-native'
 import { Body, Eyebrow, Icon, Meta, Mono, Toggle, type IconName } from '@/components'
 import { useDict } from '@/lib/i18n'
+import { useApp } from '@/lib/store'
 import { IconButton, fmtTime } from '@/screens/b/parts'
 import { PARTS } from '@/screens/b/i18n/parts'
 import { useTheme } from '@/theme/ThemeProvider'
 import { useA } from './i18n'
 import { useLocal } from './local'
+import { monoNums } from './parts'
 
 // The Mentor's five-minute audio for the Practice tab — simulated playback, transcript and an
 // offline download whose state is kept on the phone per week (AsyncStorage via useLocal), so a
 // saved week stays saved after leaving the screen and a download in progress resumes on return.
 // The transcript is the Mentor's words as he spoke them, in English; in Tamil and Hindi a note says so.
+// The phone's simulated flight mode (useApp().offline, set in Settings) is honoured: a saved week
+// plays with no signal, a week not saved says it needs a connection, and a download pauses while
+// offline and carries on when the connection is back. The Practice tab's eight-week strip reads the
+// same record to mark the saved weeks and the storage they use.
+
+/** Megabytes a week's audio takes on the phone (the Mentor's audio at about 123 kbps). */
+export const audioMB = (seconds: number) => Math.round(seconds * 0.0154 * 10) / 10
 
 /** Week number → download progress (0–100). A week with no entry is not kept for offline. */
 export function useOfflineAudio() {
@@ -36,14 +45,23 @@ export function AudioPlayer({ week, title, seconds, transcript, startAt = 0 }: {
   const [rate, setRate] = useState<1 | 1.25 | 0.8>(1)
   const [showText, setShowText] = useState(false)
   const offline = useOfflineAudio()
+  const { offline: noSignal } = useApp()
   const kept = String(week) in offline.weeks
   const downloading = offline.weeks[String(week)] ?? 0
+  const saved = kept && downloading >= 100
+  // With no signal only a week saved on the phone can play.
+  const canPlay = !noSignal || saved
   const timer = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     setPos(startAt)
     setPlaying(false)
   }, [week, startAt])
+
+  // Going offline mid-play stops a week that was streaming.
+  useEffect(() => {
+    if (!canPlay && playing) setPlaying(false)
+  }, [canPlay, playing])
 
   useEffect(() => {
     if (!playing) return
@@ -63,11 +81,21 @@ export function AudioPlayer({ week, title, seconds, transcript, startAt = 0 }: {
   }, [playing, rate, seconds])
 
   // The simulated download advances while this screen is open and picks up where it left off.
+  // It needs a connection: offline it holds where it is.
   useEffect(() => {
-    if (!kept || downloading >= 100) return
+    if (!kept || downloading >= 100 || noSignal) return
     const tm = setTimeout(() => offline.step(week), 180)
     return () => clearTimeout(tm)
-  }, [kept, downloading, week]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [kept, downloading, week, noSignal]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const mb = audioMB(seconds)
+  const status = kept
+    ? saved
+      ? ta('Saved on this phone · {mb} MB · plays with no signal', { mb })
+      : noSignal
+      ? ta('Download paused at {pct}% · you are offline. It carries on when the connection is back.', { pct: downloading })
+      : t('downloading', { pct: downloading })
+    : t('downloadHint')
 
   const pct = (pos / seconds) * 100
   const active = Math.min(transcript.length - 1, Math.floor((pos / seconds) * transcript.length))
@@ -81,6 +109,8 @@ export function AudioPlayer({ week, title, seconds, transcript, startAt = 0 }: {
           label={playing ? t('pause') : t('play', { title })}
           filled
           size={56}
+          disabled={!canPlay}
+          hint={!canPlay ? ta('This week is not saved on this phone, so it needs a connection to play.') : undefined}
           onPress={() => {
             if (pos >= seconds) setPos(0)
             setPlaying((p) => !p)
@@ -100,18 +130,24 @@ export function AudioPlayer({ week, title, seconds, transcript, startAt = 0 }: {
           </View>
         </View>
       </View>
+      {noSignal ? (
+        <View accessibilityLiveRegion="polite" style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+          <Icon name={saved ? 'check-circle' : 'wifi-off'} size={16} color={c.ink2} />
+          <Meta tone="ink" style={{ flex: 1 }}>
+            {saved ? ta('You are offline. This week is saved on this phone, so it plays.') : ta('You are offline. This week is not saved on this phone, so it needs a connection to play.')}
+          </Meta>
+        </View>
+      ) : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s1 }}>
-        <SmallPill icon="rotate-ccw" label="15 s" a11y={t('back15')} onPress={() => setPos((p) => Math.max(0, p - 15))} />
+        <SmallPill mono icon="rotate-ccw" label="15 s" a11y={t('back15')} onPress={() => setPos((p) => Math.max(0, p - 15))} />
         <SmallPill label={`${rate}×`} a11y={t('speed', { rate })} onPress={() => setRate((r) => (r === 1 ? 1.25 : r === 1.25 ? 0.8 : 1))} mono />
         <SmallPill icon={showText ? 'chevron-up' : 'chevron-down'} label={t('transcript')} a11y={showText ? t('hideTranscript') : t('showTranscript')} onPress={() => setShowText((s) => !s)} />
       </View>
       <View style={{ borderTopWidth: 1, borderTopColor: c.line, paddingTop: space.s2 }}>
-        <Toggle
-          checked={kept}
-          onChange={(v) => offline.set(week, v)}
-          label={t('offline')}
-          description={kept ? (downloading < 100 ? t('downloading', { pct: downloading }) : t('savedDevice')) : t('downloadHint')}
-        />
+        {/* The status sits under the switch as its own line, so its numbers can be Mono and a
+            screen reader still hears it (a switch's hint takes plain text only). */}
+        <Toggle checked={kept} onChange={(v) => offline.set(week, v)} label={t('offline')} />
+        <Meta accessibilityLiveRegion="polite">{monoNums(status)}</Meta>
       </View>
       {showText ? (
         <View style={{ backgroundColor: c.paperSunk, borderRadius: radius.card, padding: space.s2, gap: space.s1 }}>
@@ -119,7 +155,7 @@ export function AudioPlayer({ week, title, seconds, transcript, startAt = 0 }: {
           {lang !== 'en' ? <Meta tone="ink2">{ta('The Mentor’s audio and its transcript are in English for now. His words are kept as he spoke them.')}</Meta> : null}
           {transcript.map((line, i) => (
             <Body key={i} tone={i === active && pos > 0 ? 'ink' : 'ink2'} accessibilityLanguage="en">
-              {line}
+              {monoNums(line)}
             </Body>
           ))}
         </View>

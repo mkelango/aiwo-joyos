@@ -8,15 +8,17 @@ import { AiwoMark } from '@/components/joy/Brand'
 import { BandLabel, DaybreakButton, Eyebrow, MethodLine, NotScoredNote, SpecimenTag, TermChip, TermDot, useFmtDate } from '@/components/joy/primitives'
 import { Button, Card, LoopRing, PageHeader, Pill, SectionTitle, Sheet, Tabs } from '@/components/ui'
 import { CIRCLE, COHORTS, EVENTS } from '@/data/platform'
-import { HOUSEHOLD, INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
+import { HOUSEHOLD, MEMBER, TEAM } from '@/data/member'
+import { useIndexHistory } from '@/routes/member/core/_latest'
 import { useMemberName } from '@/lib/memberName'
 import { useScoresHidden } from '@/lib/minor'
 import { FLAGSHIP_NEXT, FLAGSHIP_RECAP, NYE_PROGRAMME, PASSES, SALONS, SESSIONS_ALLOWANCE, SESSIONS_OPEN, SESSION_SCHEDULE, ZONES } from './_data'
-import { JourneyEmpty, OccasionsCard, PrintOnly, QRCode, SheetFocus, fade, printOnly } from './_parts'
+import { JourneyEmpty, OccasionsCard, PrintOnly, QRCode, SheetFocus, useFade, printOnly } from './_parts'
 // One shared emergency intercept for every member free-text field (Memo p.24).
 import { useCrisisGuard } from '@/routes/member/spaces/_SpaceShell'
 import { addPass, cancelPass, isoDate, passCode, setBadge, setFlagshipRequest, setSalon, setSchedule, signDeclaration, useJourney, type BadgeDiet } from './_store'
 import { useJ, type JourneyKey } from './_i18n'
+import { monoDigits } from './_mono'
 
 // EVENTS (Memo p.21): the Joyspan Event Platform — AIWO Joyspan at New Year,
 // Joyspan Sessions, Connections salons, passes, personal schedules and
@@ -32,7 +34,8 @@ const FLAGSHIP_ID = 'ev1'
 interface PassView { id: string; name: string; when: string; where: string; kind: string; code: string; gate: string; seat: string; holder: string; status: 'Valid' | 'Used'; mine: boolean }
 
 export default function Events() {
-  const latest = INDEX_HISTORY[0]
+  const fade = useFade()
+  const { latest } = useIndexHistory()
   const journey = useJourney()
   const me = useMemberName()
   const [passTab, setPassTab] = useState<'upcoming' | 'past'>('upcoming')
@@ -95,7 +98,7 @@ export default function Events() {
     setSwapNote(clash >= 0 ? { k: 'swapClash', i, o: clash } : { k: 'swapOn', i })
   }
 
-  return (
+  return monoDigits(
     <div>
       <PageHeader
         eyebrow={t('eventsEyebrow')}
@@ -319,7 +322,7 @@ function DelegateBadge({ pass }: { pass: PassView }) {
     [t('bPhoto'), photo, !!badge.photography],
     [t('bDiet'), diet, !!badge.diet],
   ]
-  return (
+  return monoDigits(
     <div className="w-full text-left">
       <PrintOnly id={BADGE_ID} />
       <article id={BADGE_ID} aria-label={t('badgeFor', { name: pass.holder })} className="mx-auto w-full max-w-[22rem] overflow-hidden rounded-[14px] border border-line-strong bg-paper-raised shadow-card" style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}>
@@ -375,9 +378,6 @@ function DelegateBadge({ pass }: { pass: PassView }) {
 // The badge and invitation headers are dark objects in both themes: fixed brand Stone, not --paper.
 const FG_STONE = 'text-[color:var(--aiwo-stone)]'
 
-/** Digits in running text set in Mono, the rest left as it is. */
-const monoDigits = (s: string): ReactNode => s.split(/(\d+)/).map((p, i) => (/^\d+$/.test(p) ? <span key={i} className="num">{p}</span> : p))
-
 const DECL_ID = 'declaration-card'
 const INV_ID = 'joyspan-invitation'
 
@@ -396,7 +396,7 @@ function Invitation() {
   const [oFirst, ...oRest] = other.name.split(' ')
   const oLast = oRest.join(' ')
   const names = oLast && oLast === me.lastName ? `${me.firstName}${t('andJoin')}${oFirst} ${oLast}` : `${me.fullName}${t('andJoin')}${other.name}`
-  return (
+  return monoDigits(
     <div className="grid gap-6 lg:grid-cols-[1fr_1.05fr] lg:items-center">
       <PrintOnly id={INV_ID} />
       <article id={INV_ID} aria-label={t('invAria', { name: flagship.name })} className="relative flex min-h-[17rem] flex-col rounded-[6px] border border-line bg-[color:var(--aiwo-paper)] p-7 text-[color:var(--aiwo-ink)] shadow-card md:p-9" style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}>
@@ -425,7 +425,7 @@ function NewYearsEve() {
   const { t, r, tx, term } = useJ()
   const fmtDate = useFmtDate()
   const flagship = EVENTS.find((e) => e.kind === 'Flagship')!
-  const lowest = INDEX_HISTORY[0].lowestTerm
+  const lowest = useIndexHistory().latest.lowestTerm
   const declTime = NYE_PROGRAMME.find((p) => p.declaration)!.time
   const signed = journey.declaration
   const [name, setName] = useState('')
@@ -450,7 +450,7 @@ function NewYearsEve() {
     window.setTimeout(() => inputRef.current?.focus(), 0)
   }
 
-  return (
+  return monoDigits(
     <section id="declaration" className="mt-12 scroll-mt-24" aria-labelledby={`${id}-h`}>
       <PrintOnly id={DECL_ID} />
       <SectionTitle aside={<span className="text-[13px] text-ink-3"><span className="num">{fmtDate('2026-12-31')}</span> · {tx(flagship.where)}</span>}><span id={`${id}-h`}>{t('nyeTitle')}</span></SectionTitle>
@@ -542,6 +542,7 @@ function NewYearsEve() {
 }
 
 function UpcomingAtAiwo() {
+  const fade = useFade()
   const id = useId()
   const journey = useJourney()
   const [open, setOpen] = useState(false)
@@ -562,7 +563,7 @@ function UpcomingAtAiwo() {
     setOpen(false)
   }
 
-  return (
+  return monoDigits(
     <section id="upcoming-aiwo" className="mt-12 scroll-mt-24" aria-labelledby={`${id}-h`}>
       <SectionTitle aside={<span className="text-[13px] text-ink-3">{t('upcomingAside')}</span>}><span id={`${id}-h`}>{t('upcomingTitle')}</span></SectionTitle>
       <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr]">
@@ -645,6 +646,7 @@ function UpcomingAtAiwo() {
 }
 
 function SessionBooking({ onShowPass }: { onShowPass: (id: string) => void }) {
+  const fade = useFade()
   const id = useId()
   const journey = useJourney()
   const [pick, setPick] = useState<string>('')
@@ -671,7 +673,7 @@ function SessionBooking({ onShowPass }: { onShowPass: (id: string) => void }) {
     setDone(s.id)
   }
 
-  return (
+  return monoDigits(
     <section className="mt-12" aria-labelledby={`${id}-h`}>
       <SectionTitle aside={<span className="text-[13px] text-ink-3">{r('includedAside', { u: used, n: SESSIONS_ALLOWANCE.included })}</span>}><span id={`${id}-h`}>{t('sessionsTitle')}</span></SectionTitle>
       {doneLive && chosen ? (

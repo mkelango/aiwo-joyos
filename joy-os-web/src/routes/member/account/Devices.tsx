@@ -8,7 +8,7 @@ import { DaybreakButton, SpecimenTag, TermChip } from '@/components/joy/primitiv
 import { Button, Card, EmptyState, PageHeader, Pill, Sheet } from '@/components/ui'
 import { DEVICES, HEALTHKIT_TYPES, WEAR_NIGHTS, type DeviceState } from './_data'
 import { Checkbox, Section, Toggle } from './_parts'
-import { fmtShortDate, rich, usePersisted, useToast } from './_util'
+import { fmtShortDate, nums, rich, usePersisted, useToast } from './_util'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
 import { DEV, useData } from './_i18n'
 import { finishedOnboarding } from './_onboarding'
@@ -145,14 +145,14 @@ export default function Devices() {
                 <div className="flex items-center gap-3">
                   <DeviceIcon id={d.id} />
                   <div>
-                    <p className="flex flex-wrap items-center gap-2 text-[17px] text-ink">{d.name} {d.isDefault && <Pill tone="daybreak">{t('default')}</Pill>} {fromSetup.includes(d.id) && <Pill>{t('linkedInSetup')}</Pill>}</p>
-                    <p className="text-[14px] text-ink-2">{dx(d.via)}</p>
+                    <p className="flex flex-wrap items-center gap-2 text-[17px] text-ink">{nums(d.name)} {d.isDefault && <Pill tone="daybreak">{t('default')}</Pill>} {fromSetup.includes(d.id) && <Pill>{t('linkedInSetup')}</Pill>}</p>
+                    <p className="text-[14px] text-ink-2">{nums(dx(d.via))}</p>
                   </div>
                 </div>
                 <Pill tone={d.freshness === 'fresh' ? 'positive' : 'caution'}>{d.freshness === 'fresh' ? t('fresh') : t('stale')}</Pill>
               </div>
               <p className="mt-4 flex items-center gap-1.5 text-[14px] text-ink-2"><Clock size={14} className="text-ink-3" /> {rich(t('lastSync'), { when: <span className="num text-ink">{syncing ? t('syncingLower') : dx(d.lastSync ?? '')}</span> })}</p>
-              <p className="mt-3 text-[15px] text-ink-2">{dx(d.note)}</p>
+              <p className="mt-3 text-[15px] text-ink-2">{nums(dx(d.note))}</p>
               <div className="mt-4 flex flex-wrap gap-1.5">
                 {d.signals.map((s) => <Pill key={s}>{dx(s)}</Pill>)}
               </div>
@@ -219,7 +219,7 @@ export default function Devices() {
         ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
           <Card>
-            <p className="text-[15px] text-ink-2">{t('chartIntro')}</p>
+            <p className="text-[15px] text-ink-2">{nums(t('chartIntro'))}</p>
             <div className="mt-4 h-56" role="img" aria-label={t('chartAria', { worn: wornNights, gaps: gaps.map((g) => wearDay(g.d)).join(lang === 'en' ? ' and ' : ', '), short: short.map((s) => wearDay(s.d)).join(', ') })}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={WEAR_NIGHTS} margin={{ top: 8, right: 4, left: -24, bottom: 0 }}>
@@ -259,11 +259,11 @@ export default function Devices() {
               <div className="flex items-center gap-3">
                 <DeviceIcon id={d.id} />
                 <div className="min-w-0">
-                  <p className="text-[16px] text-ink">{d.name}</p>
-                  <p className="text-[13px] text-ink-2">{dx(d.via)}</p>
+                  <p className="text-[16px] text-ink">{nums(d.name)}</p>
+                  <p className="text-[13px] text-ink-2">{nums(dx(d.via))}</p>
                 </div>
               </div>
-              <p className="mt-3 text-[14px] text-ink-2">{dx(d.note)}</p>
+              <p className="mt-3 text-[14px] text-ink-2">{nums(dx(d.note))}</p>
               <p className="mt-2 text-[13px] text-ink-3">{d.signals.map(dx).join(' · ')}</p>
               <div className="mt-auto pt-4">
                 {d.state === 'android' ? (
@@ -317,7 +317,7 @@ function QualityRow({ label, value, note, ok }: { label: string; value: string; 
       <span className={clsx('mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full', ok ? 'bg-paper-sunk text-ink' : 'border border-line-strong text-ink-2')}>{ok ? <Check size={14} /> : <AlertCircle size={14} />}</span>
       <div className="min-w-0">
         <p className="flex flex-wrap items-baseline justify-between gap-x-3 text-[15px] text-ink">{label} <span className="num text-[14px] text-ink-2">{value}</span></p>
-        <p className="mt-0.5 text-[13px] text-ink-2">{note}</p>
+        <p className="mt-0.5 text-[13px] text-ink-2">{nums(note)}</p>
       </div>
     </li>
   )

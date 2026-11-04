@@ -12,6 +12,7 @@ import { CheckLine, IconButton, ORDER } from '@/screens/b/parts'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
 import { METHOD, GRADE_TEXT, RULES_TEXT, NEVER_TEXT, AI_TEXT, LICENCE_TEXT, METHOD_LABEL, INSTR_TEXT, PART_TEXT } from '@/screens/b/i18n/method'
 import { BAND, useTx } from '@/screens/b/i18n/common'
+import { MonoNums } from '@/lib/monoNums'
 
 // THE METHOD (Memo p.10): the formula, a live worked example run through the same engine as
 // your Index, the three grades, the instrument registry with licences, method versions,
@@ -62,7 +63,7 @@ export default function Method() {
             {t('titleA')}<Serif>{t('titleSerif')}</Serif>{t('titleB')}
           </>
         }
-        lead={t('lead')}
+        lead={<Body tone="ink2"><MonoNums text={t('lead')} /></Body>}
       />
 
       {/* Where Joyspan is defined: the word equation, verbatim, and the credit for the word. */}
@@ -70,8 +71,8 @@ export default function Method() {
         <Eyebrow>{t('equation')}</Eyebrow>
         <JoyspanEquation />
         <View style={{ gap: 4 }}>
-          {lang !== 'en' ? <Meta size={14} tone="ink3">{t('equationNote')}</Meta> : null}
-          <Meta size={14}>{t('credit')}</Meta>
+          {lang !== 'en' ? <Meta size={14} tone="ink3"><MonoNums text={t('equationNote')} /></Meta> : null}
+          <Meta size={14}><MonoNums text={t('credit')} /></Meta>
         </View>
       </Card>
 
@@ -80,7 +81,7 @@ export default function Method() {
         <Mono tone="ink" size={18}>
           JI = GM(H, P, R, F, D) − λ·B
         </Mono>
-        <Meta>{t('formulaBody', { lambda: METHODS['v1.0'].lambda })}</Meta>
+        <Meta><MonoNums text={t('formulaBody', { lambda: METHODS['v1.0'].lambda })} /></Meta>
       </Card>
 
       <View style={{ gap: space.s2 }}>
@@ -88,7 +89,7 @@ export default function Method() {
           <SectionTitle>{t('worked')}</SectionTitle>
           <SpecimenTag />
         </View>
-        <Body tone="ink2">{t('workedBody')}</Body>
+        <Body tone="ink2"><MonoNums text={t('workedBody')} /></Body>
         <Card tone="raised" style={{ gap: space.s1 }}>
           {ORDER.map((k, i) => {
             const tm = termByKey(k)
@@ -117,7 +118,7 @@ export default function Method() {
             <CountUp value={res.value} size={72} />
             <View style={{ paddingBottom: 8, gap: 6 }}>
               <BandLabel band={bandFor(res.value)} />
-              <Meta size={14}>{t('specIdx')}</Meta>
+              <Meta size={14}><MonoNums text={t('specIdx')} /></Meta>
             </View>
           </View>
           <Mono tone="ink2">{`GM ${res.gm} − ${res.lambda} × ${vals.B} = ${res.value}`}</Mono>
@@ -134,17 +135,17 @@ export default function Method() {
         {GRADES.map((g) => (
           <Card key={g.key} tone="raised" style={{ gap: 4 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-              <Body weight="medium">{tx(GRADE_TEXT[g.key]?.name, g.name)}</Body>
+              <Body weight="medium"><MonoNums text={tx(GRADE_TEXT[g.key]?.name, g.name)} /></Body>
               <Pill>{tx(GRADE_TEXT[g.key]?.who, g.who)}</Pill>
             </View>
-            <Meta>{tx(GRADE_TEXT[g.key]?.what, g.what)}</Meta>
+            <Meta><MonoNums text={tx(GRADE_TEXT[g.key]?.what, g.what)} /></Meta>
           </Card>
         ))}
       </View>
 
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{t('tmTitle')}</SectionTitle>
-        <Body tone="ink2">{t('tmLead')}</Body>
+        <Body tone="ink2"><MonoNums text={t('tmLead')} /></Body>
         {TERMS.map((x) => {
           const parts = weightsOf(x.formula)
           const col = th.term(x.key)
@@ -165,7 +166,7 @@ export default function Method() {
                 <Eyebrow>{t('tmWeights')}</Eyebrow>
                 {parts.map((pt) => (
                   <View key={pt.part} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 28 }} accessible accessibilityLabel={t('tmWeightA11y', { part: partName(pt.part), w: pt.w })}>
-                    <Meta size={14} tone="ink" style={{ width: 128 }}>{partName(pt.part)}</Meta>
+                    <Meta size={14} tone="ink" style={{ width: 128 }}><MonoNums text={partName(pt.part)} /></Meta>
                     <View style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: c.paperSunk, overflow: 'hidden' }}>
                       <View style={{ width: `${Math.round(pt.w * 100)}%`, height: '100%', backgroundColor: col.main, borderRadius: 3 }} />
                     </View>
@@ -187,12 +188,12 @@ export default function Method() {
             </Card>
           )
         })}
-        <Meta size={14} tone="ink3">{t('tmLambda', { lambda: METHODS['v1.0'].lambda })}</Meta>
+        <Meta size={14} tone="ink3"><MonoNums text={t('tmLambda', { lambda: METHODS['v1.0'].lambda })} /></Meta>
       </View>
 
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{t('registry')}</SectionTitle>
-        <Body tone="ink2">{t('registryBody')}</Body>
+        <Body tone="ink2"><MonoNums text={t('registryBody')} /></Body>
         <Card tone="raised" padding={8} style={{ paddingHorizontal: 16 }}>
           {INSTRUMENTS.map((ins, i) => (
             <View key={ins.code}>
@@ -200,7 +201,7 @@ export default function Method() {
               <View style={{ paddingVertical: 10, gap: 2 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <TermDot term={ins.term} />
-                  <Body style={{ flexShrink: 1 }}>{instr(ins.code)}</Body>
+                  <Body style={{ flexShrink: 1 }}><MonoNums text={instr(ins.code)} /></Body>
                   <Meta size={13}>{tt.space(ins.term)}</Meta>
                   <Pill tone={ins.status === 'live' ? 'ink' : 'neutral'}>{ins.status === 'live' ? t('inUse') : ins.status === 'gated' ? t('gated') : t('inReview')}</Pill>
                 </View>
@@ -225,7 +226,7 @@ export default function Method() {
                   {v}
                 </Mono>
                 <View style={{ flex: 1 }}>
-                  <Body>{tx(METHOD_LABEL[v], METHODS[v].label)}</Body>
+                  <Body><MonoNums text={tx(METHOD_LABEL[v], METHODS[v].label)} /></Body>
                   <Meta size={14}>
                     <Mono size={14} tone="ink2">{`λ ${METHODS[v].lambda}`}</Mono>
                     {' · '}
@@ -237,7 +238,7 @@ export default function Method() {
             </View>
           ))}
         </Card>
-        <Meta size={14} tone="ink3">{t('neverRewrite')}</Meta>
+        <Meta size={14} tone="ink3"><MonoNums text={t('neverRewrite')} /></Meta>
       </View>
 
       <View style={{ gap: space.s2 }}>
@@ -251,7 +252,7 @@ export default function Method() {
 
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{t('never')}</SectionTitle>
-        <Body tone="ink2">{t('neverBody')}</Body>
+        <Body tone="ink2"><MonoNums text={t('neverBody')} /></Body>
         <Card tone="sunk" style={{ gap: space.s1 }}>
           {NEVER_IMPORTED.map((r, i) => (
             <CheckLine key={r} icon="x">
@@ -281,7 +282,7 @@ export default function Method() {
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <Icon name="book-open" size={14} color={c.ink3} />
         <Meta size={14} tone="ink3" style={{ flex: 1 }}>
-          {t('published')}
+          <MonoNums text={t('published')} />
         </Meta>
       </View>
     </Screen>

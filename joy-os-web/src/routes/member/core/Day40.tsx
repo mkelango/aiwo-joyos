@@ -10,7 +10,7 @@ import { INDEX_HISTORY, MEMBER, TODAY_ACTION } from '@/data/member'
 import { useApp } from '@/lib/store'
 import { useT } from '@/lib/i18n'
 import { DAY90_DATES } from './_data'
-import { PrintOnly } from './_parts'
+import { PrintOnly, nums } from './_parts'
 import { REMEASURE_OPENS, addDays, liveLedger, useLedgerRemoved } from './_store'
 import { ACTION_TEXT, rich, useCore } from './_i18n'
 import { useX } from './_i18nX'
@@ -94,7 +94,7 @@ export default function Day40() {
         </header>
 
         <h2 className="mt-8 text-[2rem] font-light leading-tight text-ink md:text-[2.6rem]">{rich(x('d4Title'))}</h2>
-        <p className="mt-3 max-w-[60ch] text-[17px] text-ink-2">{x('d4Lead')}</p>
+        <p className="mt-3 max-w-[60ch] text-[17px] text-ink-2">{nums(x('d4Lead'))}</p>
 
         {/* Where you started */}
         <section className="mt-8 grid items-center gap-6 border-t border-line pt-6 sm:grid-cols-[auto_1fr]">
@@ -163,7 +163,7 @@ export default function Day40() {
         {/* The next fifty days */}
         <section className="mt-8 rounded-card bg-paper-sunk p-5">
           <Eyebrow tone="daybreak">{x('d4Next')}</Eyebrow>
-          <p className="mt-2 text-[17px] text-ink">{x('d4NextBody', { term: name(lowest) })}</p>
+          <p className="mt-2 text-[17px] text-ink">{nums(x('d4NextBody', { term: name(lowest) }))}</p>
           <p className="eyebrow mt-4 text-ink-3">
             {x('d4Dates', { a: dotDate(REMEASURE_OPENS), b: dotDate(DAY90_DATES.day90) })}
           </p>

@@ -158,6 +158,7 @@ export const HOUSE = {
   fjoClinical: { en: 'A Clinical Index for every adult', ta: 'ஒவ்வொரு பெரியவருக்கும் மருத்துவக் குறியீடு', hi: 'हर वयस्क का क्लिनिकल इंडेक्स' },
   fjoSigned: { en: 'Signed {date}', ta: '{date} அன்று கையொப்பம்', hi: '{date} को हस्ताक्षरित' },
   fjoBooked: { en: 'Booked {date}', ta: '{date} அன்று பதிவுசெய்யப்பட்டது', hi: '{date} के लिए बुक' },
+  fjoToBook: { en: 'Not booked yet', ta: 'இன்னும் பதிவுசெய்யப்படவில்லை', hi: 'अभी बुक नहीं' },
   fjoNever: { en: 'Never scored', ta: 'ஒருபோதும் மதிப்பிடப்படுவதில்லை', hi: 'कभी स्कोर नहीं' },
   fjoAsk: { en: 'Ask the concierge', ta: 'உதவியாளரிடம் கேட்கவும்', hi: 'कंसीयर्ज से पूछें' },
   fjoAsked: { en: 'Sent. {name} will call within one working day (specimen).', ta: 'அனுப்பப்பட்டது. ஒரு வேலை நாளுக்குள் {name} அழைப்பார் (மாதிரி).', hi: 'भेज दिया। {name} एक कामकाजी दिन में फ़ोन करेंगी (नमूना)।' },
@@ -267,6 +268,10 @@ export const HOUSE = {
   lkNone: { en: 'You have no family helper. Priya, your coach, is a message away.', ta: 'உங்களுக்குக் குடும்ப உதவியாளர் இல்லை. உங்கள் பயிற்சியாளர் Priya ஒரு செய்தி தூரத்தில் இருக்கிறார்.', hi: 'आपका कोई परिवार-सहायक नहीं है। आपकी कोच Priya एक संदेश की दूरी पर हैं।' },
   lkCouple: { en: 'Arjun and Kavya’s shared page and their agreements are between the two of them. You see only what someone chooses to share with you.', ta: 'Arjun, Kavya-வின் பகிர்ந்த பக்கமும் அவர்களின் ஒப்பந்தங்களும் அவர்கள் இருவருக்கு மட்டுமே. யாராவது உங்களுடன் பகிர்வதை மட்டுமே நீங்கள் பார்ப்பீர்கள்.', hi: 'Arjun और Kavya का साझा पेज और उनके समझौते उन दोनों के बीच हैं। आपको सिर्फ़ वही दिखता है जो कोई आपसे साझा करना चुने।' },
   lkTextNote: { en: 'Large type also sets this phone’s text to Larger.', ta: 'பெரிய எழுத்து இந்தத் தொலைபேசியின் எழுத்தையும் பெரியதாக்கும்.', hi: 'बड़े अक्षर इस फ़ोन का टेक्स्ट भी बड़ा कर देते हैं।' },
+  // The account made in onboarding: a household of one until someone joins
+  yourHousehold: { en: 'Your household', ta: 'உங்கள் குடும்பம்', hi: 'आपका परिवार' },
+  newAlone: { en: 'Just you here, for now.', ta: 'இப்போதைக்கு இங்கே நீங்கள் மட்டும்.', hi: 'अभी यहाँ सिर्फ़ आप हैं।' },
+  newAloneBody: { en: 'Made for two, welcoming to one. Invite a partner and you are still scored separately; a shared page shows only what you both agree to share.', ta: 'இருவருக்காக உருவானது, ஒருவரையும் வரவேற்கிறது. துணையை அழைத்தாலும் நீங்கள் தனித்தனியாகவே மதிப்பிடப்படுவீர்கள்; நீங்கள் இருவரும் பகிர ஒப்புக்கொள்வதை மட்டுமே பகிர்ந்த பக்கம் காட்டும்.', hi: 'दो के लिए बना, एक का भी स्वागत। साथी को बुलाएँ, तब भी आप दोनों का स्कोर अलग रहता है; साझा पेज पर वही दिखता है जो आप दोनों साझा करना मानें।' },
 } satisfies Dict
 
 export const THEME_TEXT: Record<string, L3> = {

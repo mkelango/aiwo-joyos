@@ -42,7 +42,7 @@ import { useCalendarConsent } from '@/screens/a/tools/freedom'
 import { useLatestIndex } from '@/lib/indexRecord'
 import type { Action, TermKey } from '@/shared/types'
 import { Rich, useA } from '@/screens/a/i18n'
-import { NotScored } from '@/screens/a/parts'
+import { NotScored, monoNums } from '@/screens/a/parts'
 import { useIsMinor } from '@/lib/minor'
 
 // TODAY (Memo p.14, p.17, p.18; Playbook p62): the Index and Wheel, the lowest term, one
@@ -225,7 +225,7 @@ export default function Today() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Icon name="clock" size={14} color={c.ink3} />
             <Meta tone="ink3" size={14}>
-              {ta(action.shared ? '{n} min · with Kavya' : '{n} min · solo', { n: action.minutes })}
+              {monoNums(ta(action.shared ? '{n} min · with Kavya' : '{n} min · solo', { n: action.minutes }))}
             </Meta>
           </View>
         </View>
@@ -238,8 +238,8 @@ export default function Today() {
               </Title>
             ) : (
               <View style={{ gap: 4 }}>
-                <Title size={26}>{tx(action.title)}</Title>
-                <Body tone="ink2">{tx(action.detail)}</Body>
+                <Title size={26}>{monoNums(tx(action.title))}</Title>
+                <Body tone="ink2">{monoNums(tx(action.detail))}</Body>
               </View>
             )}
             <Pressable
@@ -292,7 +292,7 @@ export default function Today() {
                     <TermChip term={k} />
                   </View>
                   <Pressable onPress={() => router.push(`/spaces/${termByKey(k).slug}`)} accessibilityRole="link" accessibilityLabel={ta('Also planned: {title} Opens the {space} space.', { title: tx(a.title), space: spaceName(k) })}>
-                    <Body>{tx(a.title)}</Body>
+                    <Body>{monoNums(tx(a.title))}</Body>
                   </Pressable>
                 </View>
                 <Button variant="link" size="sm" onPress={() => plan(k, null)} accessibilityLabel={ta('Undo: remove {title} from today', { title: tx(a.title) })}>
@@ -331,7 +331,7 @@ export default function Today() {
             </View>
           ))}
         </View>
-        <ArrowLink icon="users" onPress={() => router.push('/circles')}>
+        <ArrowLink joyIcon="circle" onPress={() => router.push('/circles')}>
           {ta('Week {n} of the Practice', { n: CIRCLE.week })}
         </ArrowLink>
       </Card>
@@ -387,7 +387,7 @@ export default function Today() {
       {/* The ninety days */}
       <Card tone="outline" style={{ gap: space.s2 }}>
         <Eyebrow>{ta('The ninety days')}</Eyebrow>
-        <Body>{minor ? ta('Day {n}. Your next review with Priya is on Day 45. Nothing is re-measured: under 18 there is no score.', { n: day }) : ta('Day {n}. Your next review with Priya is on Day 45; the re-measure opens on Day 76.', { n: day })}</Body>
+        <Body>{monoNums(minor ? ta('Day {n}. Your next review with Priya is on Day 45. Nothing is re-measured: under 18 there is no score.', { n: day }) : ta('Day {n}. Your next review with Priya is on Day 45; the re-measure opens on Day 76.', { n: day }))}</Body>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.s1 }} accessibilityLabel={ta('Loop milestones')} accessibilityRole="list">
           {(minor ? MILESTONES_MINOR : MILESTONES).map(([d, label]) => {
             const past = d <= day
@@ -448,7 +448,7 @@ export default function Today() {
           <TermChip term={action.term} withSpace />
           <Eyebrow>next_best_action · rules v1.0</Eyebrow>
         </View>
-        {showWhy ? <Body>{tx(action.why)}</Body> : null}
+        {showWhy ? <Body>{monoNums(tx(action.why))}</Body> : null}
         <View style={{ gap: space.s2 }} accessibilityRole="list">
           {[
             [

@@ -24,18 +24,22 @@ import { useIsMinor } from '@/lib/minor'
 import { VIVA_MEMORY } from '@/screens/a/coreData'
 import { H2, useLocal } from '@/screens/a/local'
 import { HumanWritten, IconButton, Provenance, TextField } from '@/screens/a/parts'
-import { SCREEN_HISTORY, SCREEN_META } from '@/screens/a/spacesData'
+import { SCREEN_HISTORY, SCREEN_META, todayActionFor } from '@/screens/a/spacesData'
+import { useCalendarConsent } from '@/screens/a/tools/freedom'
 import { joyspanIndex } from '@/shared/indexEngine'
-import { INDEX_HISTORY, TEAM, TODAY_ACTION } from '@/shared/member'
+import { TEAM, TODAY_ACTION } from '@/shared/member'
 import { CIRCLE, PRACTICE_WEEKS } from '@/shared/platform'
 import { TERMS, termByKey } from '@/shared/terms'
-import type { TermKey } from '@/shared/types'
+import type { Action, TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { memberOnly, useAccount } from '@/screens/b/parts'
-import { fill, useDict, useLang, useTermText } from '@/lib/i18n'
+import { fill, TERM_TEXT, useDict, useLang, useTermText } from '@/lib/i18n'
+import { useLatestIndex, type LatestIndex } from '@/lib/indexRecord'
+import { MonoNums } from '@/lib/monoNums'
+import { postMemberMessage, threadHref } from '@/screens/b/bStore'
 import type { Lang } from '@/lib/store'
 import { VIVA, TOOL_TEXT, GUARD_TEXT } from '@/screens/b/i18n/viva'
-import { PRACTICE_TITLE } from '@/screens/b/i18n/common'
+import { BAND, PRACTICE_TITLE } from '@/screens/b/i18n/common'
 import { txFor } from '@/screens/a/i18n'
 
 // VIVA COMPANION (Memo p.27; Plan §4B). Typed tools, scripted replies (no live model in
@@ -43,6 +47,8 @@ import { txFor } from '@/screens/a/i18n'
 // emergency intercept first, no AI text on a Suffering result, no diagnosis, no financial
 // advice. The member can see and edit what VIVA remembers. Under 18 nothing is scored: VIVA
 // quotes no Index, term score or band, and the Index tool explains the method instead.
+// The Index VIVA explains is the latest one (useLatestIndex: the one taken on this phone when
+// there is one), and "Why today's action" explains the action Today shows for its lowest term.
 
 type Kind = 'reply' | 'refusal' | 'suffering' | 'crisis' | 'unavailable'
 interface Msg {
@@ -70,7 +76,7 @@ function phq4Passage(retakes: { date: string; score: number }[] = [], lang: Lang
 }
 
 const TOOLS: { id: string; term: TermKey | null; icon: IconName; title: string; ask: string }[] = [
-  { id: 'index_explainer', term: null, icon: 'compass', title: 'Explain my Index', ask: 'Why is my Index 64?' },
+  { id: 'index_explainer', term: null, icon: 'compass', title: 'Explain my Index', ask: 'Why is my Index {v}?' },
   { id: 'next_best_action', term: 'D', icon: 'sun', title: 'Why today’s action', ask: 'Why the verandah tea today?' },
   { id: 'ikigai_coach', term: 'P', icon: 'anchor', title: 'Ikigai coach', ask: 'Help me with the Tomorrow Question.' },
   { id: 'couples_prompt', term: 'R', icon: 'heart', title: 'Couples prompt', ask: 'A State of Us prompt for Kavya and me.' },
@@ -112,6 +118,10 @@ function Viva() {
   const [notice, setNotice] = useState('')
   const me = useAccount()
   const minor = useIsMinor()
+  // The latest Index and the one action Today shows for its lowest term (under 18: the gentlest start).
+  const latest = useLatestIndex()
+  const action = todayActionFor(minor ? null : latest.lowestTerm)
+  const calendarOn = useCalendarConsent()
   // A space's "Ask VIVA about {space}" opens /viva?space=<slug>: VIVA starts on that space, with
   // a question about it ready in the box for the member to send or change.
   const { space: spaceSlug } = useLocalSearchParams<{ space?: string }>()
@@ -147,7 +157,7 @@ function Viva() {
   }, [msgs])
 
   /** text is shown as the member's words; routeText (English) picks the scripted reply when a tool or guardrail was tapped. */
-  const respond = (text: string, routeText = text) => {
+  const respond = (text: string, routeText = text, tool?: string) => {
     const mine: Msg = { id: mid(), from: 'me', text }
     // 1. Emergency intercept first — before any model runs (Memo p.27, guardrail 1).
     if (interceptsCrisis(text)) {
@@ -161,7 +171,9 @@ function Viva() {
     }
     setMsgs((m) => [...m, mine])
     setTyping(true)
-    const reply = route(routeText, memoryOn, phq4Retakes, lang, minor)
+    const reply = route(routeText, { memoryOn, retakes: phq4Retakes, lang, minor, latest, action, calendarOn, tool })
+    // No diagnosis: the question goes to Dr Meera's thread in Messages, as the reply says.
+    if (reply.extra === 'route-meera') postMemberMessage({ to: 'physician', subject: t('dxSubject'), body: text, from: 'viva' })
     const id = setTimeout(() => {
       timers.current = timers.current.filter((x) => x !== id)
       if (timers.current.length === 0) setTyping(false)
@@ -212,7 +224,7 @@ function Viva() {
                 {t('titleA')}<Serif>{t('titleSerif')}</Serif>{t('titleB')}
               </>
             }
-            lead={t('lead')}
+            lead={<Body tone="ink2"><MonoNums text={t('lead')} /></Body>}
             right={<IconButton icon="database" label={t('remembers')} onPress={() => setMemoryOpen(true)} />}
           />
           <Pill tone={unavailable ? 'neutral' : 'ink'}>{unavailable ? t('pillResting') : t('pillOn')}</Pill>
@@ -228,11 +240,14 @@ function Viva() {
                 // Under 18 the Index tool asks how the Index works, never why "my Index" is a number.
                 const minorIndex = minor && tool.id === 'index_explainer'
                 const title = minorIndex ? t('toolIndexMinor') : TOOL_TEXT[tool.id]?.title[lang] ?? tool.title
-                const ask = minorIndex ? t('askIndexMinor') : TOOL_TEXT[tool.id]?.ask[lang] ?? tool.ask
+                const askEn = toolAsk(tool, 'en', latest, action)
+                const ask = minorIndex ? t('askIndexMinor') : toolAsk(tool, lang, latest, action)
+                // The action tool carries the term of the action Today shows.
+                const term = tool.id === 'next_best_action' ? action.term : tool.term
                 return (
                 <Pressable
                   key={tool.id}
-                  onPress={() => respond(ask, minorIndex ? VIVA.askIndexMinor.en : tool.ask)}
+                  onPress={() => respond(ask, minorIndex ? VIVA.askIndexMinor.en : askEn, tool.id === 'index_explainer' || tool.id === 'next_best_action' ? tool.id : undefined)}
                   disabled={unavailable}
                   accessibilityRole="button"
                   accessibilityLabel={t('asks', { title, ask })}
@@ -252,11 +267,11 @@ function Viva() {
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                     <Icon name={tool.icon} size={16} color={c.ink2} />
-                    {tool.term ? (
+                    {term ? (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 }}>
-                        <TermDot term={tool.term} size={8} />
+                        <TermDot term={term} size={8} />
                         <Meta size={12} tone="ink3" style={{ flexShrink: 1 }}>
-                          {tt.space(tool.term)}
+                          {tt.space(term)}
                         </Meta>
                       </View>
                     ) : null}
@@ -282,7 +297,7 @@ function Viva() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} accessible accessibilityLabel={t('drafting')}>
                 <Icon name="feather" size={14} color={c.ink3} />
                 <Meta size={14} tone="ink3">
-                  {t('draftingDots')}
+                  <MonoNums text={t('draftingDots')} />
                 </Meta>
               </View>
             ) : null}
@@ -326,10 +341,10 @@ function Viva() {
 
       {/* Memory */}
       <Sheet open={memoryOpen} onClose={() => setMemoryOpen(false)} title={t('remembers')}>
-        <Body tone="ink2">{t('memBody')}</Body>
+        <Body tone="ink2"><MonoNums text={t('memBody')} /></Body>
         {notice ? (
           <Meta tone="ink" accessibilityLiveRegion="polite">
-            {notice}
+            <MonoNums text={notice} />
           </Meta>
         ) : null}
         {SPACE_ORDER.map((k) => {
@@ -347,9 +362,9 @@ function Viva() {
                 ? items.map((it) => (
                     <View key={it.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.paperSunk, borderRadius: 12, paddingLeft: 12, paddingVertical: 6 }}>
                       <View style={{ flex: 1, gap: 2 }}>
-                        <Meta tone="ink">{txFor(lang, it.text)}</Meta>
+                        <Meta tone="ink"><MonoNums text={txFor(lang, it.text)} /></Meta>
                         <Meta size={13} tone="ink3">
-                          {txFor(lang, it.source)}
+                          <MonoNums text={txFor(lang, it.source)} />
                         </Meta>
                       </View>
                       <Pressable onPress={() => forget(k, it.id)} accessibilityRole="button" accessibilityLabel={t('forgetA11y', { text: txFor(lang, it.text) })} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
@@ -388,7 +403,9 @@ function Bubble({ m, onWriteDown }: { m: Msg; onWriteDown: () => void }) {
   if (m.from === 'me')
     return (
       <View style={{ alignSelf: 'flex-end', maxWidth: '85%', backgroundColor: c.ink, borderRadius: 18, borderBottomRightRadius: 6, paddingHorizontal: 16, paddingVertical: 10 }}>
-        <Body color={c.paper}>{m.text}</Body>
+        <Body color={c.paper}>
+          <MonoNums text={m.text} />
+        </Body>
       </View>
     )
   if (m.from === 'system') {
@@ -399,7 +416,9 @@ function Bubble({ m, onWriteDown }: { m: Msg; onWriteDown: () => void }) {
           <Icon name={crisis ? 'shield' : 'alert-triangle'} size={14} color={c.ink3} />
           <Eyebrow style={{ flexShrink: 1 }}>{crisis ? t('intercept') : t('unavailable')}</Eyebrow>
         </View>
-        <Body>{m.text}</Body>
+        <Body>
+          <MonoNums text={m.text} />
+        </Body>
         {m.kind === 'unavailable' ? (
           <ArrowLink icon="message-square" onPress={() => router.push('/care')}>
             {t('openCare')}
@@ -412,7 +431,9 @@ function Bubble({ m, onWriteDown }: { m: Msg; onWriteDown: () => void }) {
     return (
       <View style={{ maxWidth: '92%', borderRadius: 18, borderBottomLeftRadius: 6, borderWidth: 1, borderColor: c.line, backgroundColor: c.paper, padding: 14, gap: 8 }}>
         <Eyebrow>{t('passage')}</Eyebrow>
-        <Body>{m.text}</Body>
+        <Body>
+          <MonoNums text={m.text} />
+        </Body>
         <HumanWritten by="Dr Sanjay Menon" />
         <ArrowLink icon="message-square" onPress={() => router.push('/care')}>
           {t('msgSanjay')}
@@ -424,7 +445,9 @@ function Bubble({ m, onWriteDown }: { m: Msg; onWriteDown: () => void }) {
       <View style={{ borderRadius: 18, borderBottomLeftRadius: 6, padding: 14, gap: 8, backgroundColor: m.kind === 'refusal' ? c.paper : c.paperSunk, borderWidth: m.kind === 'refusal' ? 1 : 0, borderColor: c.line }}>
         {m.kind === 'refusal' ? <Eyebrow>{t('outside')}</Eyebrow> : null}
         {m.note ? <Eyebrow>{t('yourQ')}</Eyebrow> : null}
-        <Body>{m.text}</Body>
+        <Body>
+          <MonoNums text={m.text} />
+        </Body>
         {m.extra ? <Extra kind={m.extra} onWriteDown={onWriteDown} /> : null}
       </View>
       <Provenance tool={m.tool && m.tool in GUARD_TOOL ? t(GUARD_TOOL[m.tool]) : m.tool ?? 'router'} />
@@ -438,10 +461,10 @@ function Extra({ kind, onWriteDown }: { kind: NonNullable<Msg['extra']>; onWrite
   const t = useDict(VIVA)
   const tt = useTermText()
   const minor = useIsMinor()
+  const latest = useLatestIndex()
   if (kind === 'index') {
     // Never a term score under 18 (the router does not attach this for a minor either).
     if (minor) return null
-    const latest = INDEX_HISTORY[0]
     return (
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
         {latest.terms.map((s) => (
@@ -465,14 +488,14 @@ function Extra({ kind, onWriteDown }: { kind: NonNullable<Msg['extra']>; onWrite
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <Avatar person={meera} size={32} />
           <View style={{ flex: 1 }}>
-            <Meta tone="ink">{t('routed', { name: meera.name })}</Meta>
+            <Meta tone="ink"><MonoNums text={t('routed', { name: meera.name })} /></Meta>
             <Meta size={13} tone="ink3">
-              {t('signoff')}
+              <MonoNums text={t('signoff')} />
             </Meta>
           </View>
         </View>
-        <ArrowLink icon="message-square" onPress={() => router.push('/care')}>
-          {t('openCare')}
+        <ArrowLink icon="message-square" onPress={() => router.push(threadHref('physician'))}>
+          {t('openThread', { name: meera.name })}
         </ArrowLink>
       </View>
     )
@@ -480,11 +503,11 @@ function Extra({ kind, onWriteDown }: { kind: NonNullable<Msg['extra']>; onWrite
     <View style={{ backgroundColor: c.paperRaised, borderRadius: 10, padding: 10, gap: 8 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
         <Icon name="briefcase" size={16} color={c.ink3} />
-        <Meta style={{ flex: 1 }}>{t('sebi')}</Meta>
+        <Meta style={{ flex: 1 }}><MonoNums text={t('sebi')} /></Meta>
       </View>
       {written ? (
         <Meta tone="ink" accessibilityLiveRegion="polite">
-          {t('written')}
+          <MonoNums text={t('written')} />
         </Meta>
       ) : (
         <Button
@@ -525,10 +548,64 @@ const MONEY_WORDS_INDIC = [
 ]
 const hasAny = (t: string, words: string[]) => words.some((w) => t.includes(w))
 
-function route(text: string, memoryOn: Record<TermKey, boolean>, retakes: { date: string; score: number }[] = [], lang: Lang = 'en', minor = false): Msg {
+interface RouteCtx {
+  memoryOn: Record<TermKey, boolean>
+  retakes?: { date: string; score: number }[]
+  lang?: Lang
+  minor?: boolean
+  latest: LatestIndex
+  /** The action Today shows: todayActionFor(latest.lowestTerm). */
+  action: Action
+  calendarOn: boolean
+  /** The typed tool that was tapped: its own ask is answered by that tool, whatever words the action's title holds. */
+  tool?: string
+}
+
+/** A tool's ask, in the member's language: the Index tool names the latest value, the action tool the action Today shows. */
+function toolAsk(tool: (typeof TOOLS)[number], lang: Lang, latest: LatestIndex, action: Action) {
+  if (tool.id === 'next_best_action' && action.id !== TODAY_ACTION.id) return tr(lang, 'askAction', { title: txFor(lang, action.title).replace(/[.।]$/, '') })
+  return fill(TOOL_TEXT[tool.id]?.ask[lang] ?? tool.ask, { v: latest.value })
+}
+
+/** Why today's action, as Today's why-sheet gives it: the lowest term, the action's own reason when it is shown there, the action and its evidence. */
+function actionReply(ctx: RouteCtx, lang: Lang) {
+  const { latest, action, calendarOn } = ctx
+  const specimen = action.id === TODAY_ACTION.id
+  const low = latest.terms.find((s) => s.key === latest.lowestTerm)?.value
+  // Today shows the written reason only for the recorded Index, and the specimen's names the calendar.
+  const showWhy = !latest.onPhone && (!specimen || calendarOn)
+  const title = txFor(lang, action.title)
+  return [
+    tr(lang, 'rActLowest', { name: TERM_TEXT[latest.lowestTerm].name[lang], score: low ?? '' }),
+    showWhy ? (specimen ? tr(lang, 'rActCal') : txFor(lang, action.why)) : '',
+    tr(lang, 'rActOne', { title: lang === 'en' ? title.charAt(0).toLowerCase() + title.slice(1) : title, detail: txFor(lang, action.detail) }),
+    tr(lang, 'rActEvidence', { evidence: txFor(lang, action.evidence) }),
+    tr(lang, 'rActNotToday'),
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
+
+function route(text: string, ctx: RouteCtx): Msg {
+  const { memoryOn, retakes = [], lang = 'en', minor = false, latest } = ctx
   const t = text.toLowerCase()
-  const latest = INDEX_HISTORY[0]
   const viva = (tool: string, body: string, extra?: Msg['extra'], kind: Kind = 'reply'): Msg => ({ id: mid(), from: 'viva', kind, tool, text: body, extra })
+  const explainIndex = () => {
+    if (minor) return viva('index_explainer', tr(lang, 'rIndexMinor'))
+    const e = joyspanIndex(latest.terms)!
+    const lifted = joyspanIndex(latest.terms.map((s) => (s.key === latest.lowestTerm ? { ...s, value: (s.value ?? 0) + 10 } : s)))!
+    const low = latest.terms.find((s) => s.key === latest.lowestTerm)?.value ?? ''
+    const band = latest.band in BAND ? BAND[latest.band as keyof typeof BAND][lang] : latest.band
+    return viva(
+      'index_explainer',
+      (latest.onPhone ? tr(lang, 'rIndexPhone') : '') +
+        tr(lang, 'rIndex', { v: latest.value, band, gm: e.gm.toFixed(1), burden: e.burden.toFixed(1), lowest: TERM_TEXT[latest.lowestTerm].name[lang], low, lifted: lifted.value }),
+      'index',
+    )
+  }
+  const explainAction = () => (minor ? viva('next_best_action', tr(lang, 'rActionMinor')) : viva('next_best_action', actionReply(ctx, lang)))
+  if (ctx.tool === 'index_explainer') return explainIndex()
+  if (ctx.tool === 'next_best_action') return explainAction()
 
   if (/\b(phq|isi|pss|screen(ing)? result|depress(ion)? score|anxiety score)\b/.test(t))
     return {
@@ -543,20 +620,8 @@ function route(text: string, memoryOn: Record<TermKey, boolean>, retakes: { date
     return viva('guardrail_no_diagnosis', tr(lang, 'rDx'), 'route-meera', 'refusal')
   if (/\b(savings|invest|equity|mutual fund|stocks?|shares|loan|money|portfolio|sip)\b/.test(t))
     return viva('guardrail_no_financial_advice', tr(lang, 'rMoney'), 'route-adviser', 'refusal')
-  if (/\b(index|score|64|lowest|wheel|band)\b/.test(t)) {
-    if (minor) return viva('index_explainer', tr(lang, 'rIndexMinor'))
-    const e = joyspanIndex(latest.terms)!
-    const lifted = joyspanIndex(latest.terms.map((s) => (s.key === latest.lowestTerm ? { ...s, value: (s.value ?? 0) + 10 } : s)))!
-    return viva(
-      'index_explainer',
-      tr(lang, 'rIndex', { v: latest.value, gm: e.gm.toFixed(1), burden: e.burden.toFixed(1), d: latest.terms.find((s) => s.key === 'D')!.value ?? '', lifted: lifted.value }),
-      'index',
-    )
-  }
-  if (/\b(why|today|action|verandah|tea)\b/.test(t) && !/savour/.test(t))
-    return minor
-      ? viva('next_best_action', tr(lang, 'rActionMinor'))
-      : viva('next_best_action', lang === 'en' ? `${TODAY_ACTION.why} So the one action is: ${TODAY_ACTION.title.toLowerCase()} ${TODAY_ACTION.detail} The evidence: ${TODAY_ACTION.evidence} “Not today” is always allowed.` : tr(lang, 'rAction'))
+  if (/\b(index|score|lowest|wheel|band)\b/.test(t) || new RegExp(`\\b${latest.value}\\b`).test(t)) return explainIndex()
+  if (/\b(why|today|action|verandah|tea)\b/.test(t) && !/savour/.test(t)) return explainAction()
   if (/\b(purpose|ikigai|tomorrow|meaning)\b/.test(t))
     return viva(
       'ikigai_coach',

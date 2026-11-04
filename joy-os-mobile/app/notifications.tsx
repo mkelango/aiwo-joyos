@@ -4,8 +4,9 @@ import { Pressable, View } from 'react-native'
 import { Body, Button, Card, DaybreakButton, Divider, EmptyIllustration, Eyebrow, Icon, Meta, Mono, Screen, ScreenHeader, SectionTitle, Serif, Toggle, type IconName } from '@/components'
 import { useTheme } from '@/theme/ThemeProvider'
 import { NOTICES, type Notice } from '@/screens/b/_data'
-import { notifPrefsStore, notifReadStore, useStore, validatePrefs, type NotifPrefs } from '@/screens/b/bStore'
-import { Done, NumberSegmented, TimeStepper, memberOnly } from '@/screens/b/parts'
+import { messagesStore, notifPrefsStore, notifReadStore, useAccountThreads, useStore, validatePrefs, type NotifPrefs } from '@/screens/b/bStore'
+import { Done, NumberSegmented, TimeStepper, memberOnly, useAccount } from '@/screens/b/parts'
+import { MonoNums } from '@/lib/monoNums'
 import { useDict, useLang } from '@/lib/i18n'
 import { parseIsoDate } from '@/components/MethodLine'
 import type { Lang } from '@/lib/store'
@@ -16,6 +17,8 @@ import { perDayKey, useCommon, usePrefsError, useTx } from '@/screens/b/i18n/com
 // belongs; then the rules we keep — quiet hours, at most three a day, and the channels. The
 // same preferences Settings and onboarding use. One Daybreak: Save. What has been read or
 // cleared belongs to the account signed in (L2: kept with the account when another signs in).
+// So do the notices themselves: each account sees only what was sent to it, and a reply notice
+// only when the account has that thread. The preferences are the account's own, too.
 
 const ICON: Record<Notice['kind'], IconName> = { action: 'sun', ledger: 'feather', circle: 'users', message: 'message-circle', letter: 'mail', care: 'heart' }
 
@@ -50,7 +53,15 @@ function Notifications() {
     if (!dirty) setDraft(prefs)
   }, [prefs, dirty])
 
-  const shown = NOTICES.filter((n) => !rd.cleared.includes(n.id))
+  const account = useAccount()
+  const specimenThreads = useAccountThreads()
+  const [msgs] = useStore(messagesStore)
+  const hasThread = (href: string) => {
+    const id = /[?&]t=([^&]+)/.exec(href)?.[1]
+    return !id || [...specimenThreads, ...msgs.started].some((th) => th.id === id)
+  }
+  const mine = NOTICES.filter((n) => (!n.for || n.for.includes(account.id)) && hasThread(n.href))
+  const shown = mine.filter((n) => !rd.cleared.includes(n.id))
   const unread = shown.filter((n) => !rd.read.includes(n.id)).length
   const edit = (fn: (d: NotifPrefs) => NotifPrefs) => {
     setDraft(fn)
@@ -80,11 +91,15 @@ function Notifications() {
             {t('titleA')}<Serif>{t('titleSerif')}</Serif>{t('titleB')}
           </>
         }
-        lead={t('lead')}
+        lead={
+          <Body tone="ink2">
+            <MonoNums text={t('lead')} />
+          </Body>
+        }
       />
 
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s1, flexWrap: 'wrap' }}>
-        <Meta>{unread ? t('notOpened', { n: unread }) : t('allRead')}</Meta>
+        <Meta>{unread ? <MonoNums text={t('notOpened', { n: unread })} /> : t('allRead')}</Meta>
         <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap' }}>
           <Button variant="ghost" size="sm" disabled={!unread} onPress={() => setRd((r) => ({ ...r, read: Array.from(new Set([...r.read, ...shown.map((n) => n.id)])) }))}>
             {t('markAll')}
@@ -135,12 +150,12 @@ function Notifications() {
                       <View style={{ flex: 1, gap: 2 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                           <Body weight={isNew ? 'semibold' : 'regular'} style={{ flex: 1 }}>
-                            {title}
+                            <MonoNums text={title} />
                           </Body>
                           {isNew ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.daybreak }} /> : null}
                         </View>
                         <Meta size={14} numberOfLines={2}>
-                          {body}
+                          <MonoNums text={body} />
                         </Meta>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <Mono size={12} tone="ink3">
@@ -166,13 +181,15 @@ function Notifications() {
             <Mono tone="ink">{prefs.quiet.from}</Mono>
             {t('quietNowB')}
             <Mono tone="ink">{prefs.quiet.to}</Mono>
-            {t('quietNowC', { n: prefs.perDay })}
+            <MonoNums text={t('quietNowC', { n: prefs.perDay })} />
           </Meta>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s2 }}>
             <TimeStepper label={tc('from')} value={draft.quiet.from} onChange={(v) => edit((d) => ({ ...d, quiet: { ...d.quiet, from: v } }))} />
             <TimeStepper label={tc('until')} value={draft.quiet.to} onChange={(v) => edit((d) => ({ ...d, quiet: { ...d.quiet, to: v } }))} />
           </View>
-          <Meta size={14}>{tc('quietExceptionShort')}</Meta>
+          <Meta size={14}>
+            <MonoNums text={tc('quietExceptionShort')} />
+          </Meta>
         </Card>
       </View>
 
@@ -180,7 +197,9 @@ function Notifications() {
         <SectionTitle>{tc('remindersADay')}</SectionTitle>
         <Card tone="raised" style={{ gap: space.s2 }}>
           <NumberSegmented value={draft.perDay} onChange={(v) => edit((d) => ({ ...d, perDay: v }))} items={[0, 1, 2, 3]} label={tc('remindersADay')} />
-          <Meta>{tc(perDayKey(draft.perDay))}</Meta>
+          <Meta>
+            <MonoNums text={tc(perDayKey(draft.perDay))} />
+          </Meta>
           <Divider />
           <Toggle checked={draft.kinds.action} onChange={(v) => edit((d) => ({ ...d, kinds: { ...d.kinds, action: v } }))} label={tc('kAction')} description={tc('kActionD')} />
           <Toggle checked={draft.kinds.ledger} onChange={(v) => edit((d) => ({ ...d, kinds: { ...d.kinds, ledger: v } }))} label={tc('kLedger')} description={tc('kLedgerD')} />

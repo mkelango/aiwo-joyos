@@ -8,8 +8,9 @@ import { DaybreakButton, Eyebrow, SpecimenTag } from '@/components/joy/primitive
 import { Button, Pill, Progress, Tabs } from '@/components/ui'
 import { NO_SUGGESTIONS, PEACE_OF_MIND, TIME_AUDIT, TIME_KINDS } from './_data'
 import { ChartTip, CopyDetails, SpaceShell, ToolCard, axisTick, focusCard, rovingRadio, useCrisisGuard, Toggle } from './_SpaceShell'
-import { useSpaceText, type SpKey } from './_i18n'
-import { CAL_KEY, CAL_NAME, CAL_PROVIDERS, SABBATH_DAYS, SABBATH_KEY, nextSabbathOn, useSpaceState, useTrustConsent, type CalConnection, type CalProvider, type SabbathDay, type SabbathPlan } from './_state'
+import { mono, useSpaceText, type SpKey } from './_i18n'
+import { CAL_NAME, CAL_PROVIDERS, SABBATH_DAYS, SABBATH_KEY, nextSabbathOn, useCalendarProvider, useSpaceState, useTrustConsent, writeCalendarProvider, type CalConnection, type CalProvider, type SabbathDay, type SabbathPlan } from './_state'
+import { setCalendarConsent } from '@/routes/member/account/_links'
 
 // FREEDOM (Memo p.19): the time audit (two weeks of calendar, consented,
 // summarised then discarded: whose time is it?), the No list, the digital
@@ -22,7 +23,10 @@ export default function Freedom() {
   const { t, r } = useSpaceText()
   // One calendar connection for the page: the time audit changes it and the sabbath card
   // reads it, so connecting or disconnecting shows in both straight away (no reload).
-  const [conn, setConn] = useSpaceState<CalConnection>(CAL_KEY, { provider: null })
+  // Written through writeCalendarProvider, so the shell's lead and the three actions follow it too.
+  const provider = useCalendarProvider()
+  const conn: CalConnection = { provider }
+  const setConn = (c: CalConnection) => writeCalendarProvider(c.provider)
   return (
     <SpaceShell term="F" title={<>{r('fr.title', { e: <em>{t('fr.titleE')}</em> })}</>}>
       <div id="time-audit" tabIndex={-1} className="scroll-mt-24 rounded-card focus:outline-none"><TimeAudit conn={conn} setConn={setConn} /></div>
@@ -50,6 +54,9 @@ const AUDIT_FROM = '2027-01-11'
 const AUDIT_TO = '2027-01-24'
 const AUDIT_RERUN = '2027-02-07'
 
+/** The Trust centre's name for each provider Freedom offers (account/_links setCalendarConsent). */
+const TRUST_PROVIDER: Record<CalProvider, 'google' | 'outlook'> = { google: 'google', microsoft: 'outlook' }
+
 /** The Trust centre's calendar consent, read-only, following changes made elsewhere. */
 function useCalendarConsent() {
   return useTrustConsent('c_cal')
@@ -60,9 +67,18 @@ function TimeAudit({ conn, setConn }: { conn: CalConnection; setConn: (c: CalCon
   const [rerun, setRerun] = useSpaceState<'idle' | 'asked'>('freedom.audit.rerun.v1', 'idle')
   const [note, setNote] = useState('')
   const provider = conn.provider && CAL_PROVIDERS.includes(conn.provider) ? conn.provider : null
-  const disconnect = () => { setConn({ provider: null }); setRerun('idle'); setNote('fr.ta.disconnected') }
-  if (!consent.on) return <CalendarOff provider={provider} withdrawnAt={consent.withdrawnAt} onDisconnect={disconnect} />
-  if (!provider) return <CalendarOptIn note={note} onConnect={(p) => { setConn({ provider: p }); setNote('') }} />
+  // Connecting grants the Trust centre's calendar consent naming the provider; disconnecting
+  // withdraws it (each a consent_event there). With the consent already withdrawn in the Trust
+  // centre, deleting the summary records no second withdrawal.
+  const disconnect = () => {
+    if (consent.on) setCalendarConsent(null)
+    setConn({ provider: null }); setRerun('idle'); setNote('fr.ta.disconnected')
+  }
+  const connect = (p: CalProvider) => { setCalendarConsent(TRUST_PROVIDER[p]); setConn({ provider: p }); setNote('') }
+  // A withdrawal in the Trust centre turns a connected audit off; with nothing connected the
+  // opt-in stands, and connecting gives the consent again.
+  if (!consent.on && provider) return <CalendarOff provider={provider} withdrawnAt={consent.withdrawnAt} onDisconnect={disconnect} />
+  if (!provider) return <CalendarOptIn note={note} onConnect={connect} />
   return <AuditView provider={provider} rerun={rerun} onRerun={() => setRerun('asked')} onDisconnect={disconnect} />
 }
 
@@ -95,7 +111,7 @@ function CalendarOptIn({ note, onConnect }: { note: string; onConnect: (p: CalPr
                       <span aria-hidden className={clsx('mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border', provider === p ? 'border-ink' : 'border-line-strong')}>{provider === p && <span className="h-2 w-2 rounded-full bg-ink" />}</span>
                       <span className="min-w-0">
                         <span className="block text-[16px] text-ink">{CAL_NAME[p]}</span>
-                        <span className="mt-0.5 block text-[13px] text-ink-3">{t('fr.cal.readonly')}</span>
+                        <span className="mt-0.5 block text-[13px] text-ink-3">{mono(t('fr.cal.readonly'))}</span>
                       </span>
                     </button>
                   ))}
@@ -114,7 +130,7 @@ function CalendarOptIn({ note, onConnect }: { note: string; onConnect: (p: CalPr
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-line p-4">
                 <Eyebrow>{t('fr.cal.can')}</Eyebrow>
-                <p className="mt-2 flex gap-2 text-[14px] text-ink"><Check size={15} className="mt-0.5 shrink-0" aria-hidden /> {t('fr.cal.can1', { from: dm(AUDIT_FROM), to: dm(AUDIT_TO) })}</p>
+                <p className="mt-2 flex gap-2 text-[14px] text-ink"><Check size={15} className="mt-0.5 shrink-0" aria-hidden /> {mono(t('fr.cal.can1', { from: dm(AUDIT_FROM), to: dm(AUDIT_TO) }))}</p>
               </div>
               <div className="rounded-2xl border border-line p-4">
                 <Eyebrow>{t('fr.cal.cannot')}</Eyebrow>
@@ -155,8 +171,8 @@ function CalendarOptIn({ note, onConnect }: { note: string; onConnect: (p: CalPr
 function CalendarOff({ provider, withdrawnAt, onDisconnect }: { provider: CalProvider | null; withdrawnAt?: string; onDisconnect: () => void }) {
   const { t, dm } = useSpaceText()
   return (
-    <ToolCard tone="sunk" eyebrow={t('fr.cal.eyebrow')} title={t('fr.cal.offTitle')} sub={<>{t('fr.cal.offSub')}{withdrawnAt ? <> {t('fr.cal.offOn', { d: dm(withdrawnAt) })}</> : null}</>} aside={<ShieldCheck size={16} className="text-ink-3" aria-hidden />}>
-      {provider && <p className="text-[14px] text-ink-2">{t('fr.cal.paused', { p: CAL_NAME[provider] })}</p>}
+    <ToolCard tone="sunk" eyebrow={t('fr.cal.eyebrow')} title={t('fr.cal.offTitle')} sub={<>{t('fr.cal.offSub')}{withdrawnAt ? <> {mono(t('fr.cal.offOn', { d: dm(withdrawnAt) }))}</> : null}</>} aside={<ShieldCheck size={16} className="text-ink-3" aria-hidden />}>
+      {provider && <p className="text-[14px] text-ink-2">{mono(t('fr.cal.paused', { p: CAL_NAME[provider] }))}</p>}
       <div className={clsx('flex flex-wrap items-center gap-3', provider && 'mt-4')}>
         <Link to="/app/trust#consents" className="inline-flex h-11 items-center gap-2 rounded-full border border-line-strong bg-paper-raised px-4 text-[15px] font-medium text-ink hover:bg-paper-sunk focus-ring">{t('fr.cal.turnOn')}</Link>
         {provider && <Button variant="ghost" onClick={onDisconnect}><Trash2 size={14} /> {t('fr.cal.deleteSummary')}</Button>}
@@ -182,13 +198,13 @@ function AuditView({ provider, rerun, onRerun, onDisconnect }: { provider: CalPr
     <ToolCard
       eyebrow={t('fr.ta.eyebrow', { p: CAL_NAME[provider], from: dm(AUDIT_FROM), to: dm(AUDIT_TO) })}
       title={<>{r('fr.ta.title', { p: <span className="num">{pct(totals.mine)}%</span>, e: <em>{t('fr.ta.titleE')}</em> })}</>}
-      sub={t('fr.ta.sub', { all: Math.round(all), mine: pct(totals.mine), asked: pct(totals.asked), wk: weekdayAsked })}
+      sub={mono(t('fr.ta.sub', { all: Math.round(all), mine: pct(totals.mine), asked: pct(totals.asked), wk: weekdayAsked }))}
       aside={<SpecimenTag />}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs value={view} onChange={setView} items={[{ value: 'day', label: t('fr.ta.byDay') }, { value: 'total', label: t('fr.ta.fortnight') }]} />
         <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] text-ink-2">
-          {TIME_KINDS.map((k) => <li key={k.key} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: k.color }} aria-hidden /> {d(k.label)}</li>)}
+          {TIME_KINDS.map((k) => <li key={k.key} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: k.color }} aria-hidden /> {mono(d(k.label))}</li>)}
         </ul>
       </div>
       <AnimatePresence mode="wait" initial={false}>
@@ -217,9 +233,9 @@ function AuditView({ provider, rerun, onRerun, onDisconnect }: { provider: CalPr
             <dl className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-4">
               {TIME_KINDS.map((k) => (
                 <div key={k.key}>
-                  <dt className="flex items-center gap-1.5 text-[14px] text-ink"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: k.color }} aria-hidden /> {d(k.label)}</dt>
+                  <dt className="flex items-center gap-1.5 text-[14px] text-ink"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: k.color }} aria-hidden /> {mono(d(k.label))}</dt>
                   <dd className="num mt-1 text-[2rem] font-light leading-none text-ink">{pct(totals[k.key])}<span className="text-[14px] text-ink-3">%</span></dd>
-                  <dd className="mt-1 text-[13px] text-ink-3"><span className="num">{totals[k.key]}</span> h · {d(k.note)}</dd>
+                  <dd className="mt-1 text-[13px] text-ink-3"><span className="num">{totals[k.key]}</span> h · {mono(d(k.note))}</dd>
                 </div>
               ))}
             </dl>
@@ -229,8 +245,8 @@ function AuditView({ provider, rerun, onRerun, onDisconnect }: { provider: CalPr
       <div className="mt-6 flex flex-col gap-3 border-t border-line pt-4 md:flex-row md:items-center md:justify-between">
         <p className="flex items-start gap-2 text-[13px] text-ink-3"><ShieldCheck size={15} className="mt-0.5 shrink-0" aria-hidden /> <span>{r('fr.ta.footer', { p: CAL_NAME[provider], link: <Link to="/app/trust#consents" className="rounded underline underline-offset-4 focus-ring">{t('c.trust')}</Link> })}</span></p>
         <div className="flex flex-wrap items-center gap-2">
-          {rerun === 'idle' ? <Button size="sm" onClick={onRerun}><CalendarCheck size={14} /> {t('fr.ta.rerun')}</Button> : <p className="text-[13px] text-ink-2" role="status">{t('fr.ta.scheduled', { d: dm(AUDIT_RERUN) })}</p>}
-          <Button size="sm" variant="ghost" onClick={onDisconnect}>{t('fr.ta.disconnect', { p: CAL_NAME[provider] })}</Button>
+          {rerun === 'idle' ? <Button size="sm" onClick={onRerun}><CalendarCheck size={14} /> {t('fr.ta.rerun')}</Button> : <p className="text-[13px] text-ink-2" role="status">{mono(t('fr.ta.scheduled', { d: dm(AUDIT_RERUN) }))}</p>}
+          <Button size="sm" variant="ghost" onClick={onDisconnect}>{mono(t('fr.ta.disconnect', { p: CAL_NAME[provider] }))}</Button>
         </div>
       </div>
     </ToolCard>
@@ -262,13 +278,13 @@ function NoList() {
     setKeptItems(clean)
   }
   return (
-    <ToolCard className="w-full" eyebrow={t('fr.no.eyebrow')} title={t('fr.no.title')} sub={t('fr.no.sub')}>
+    <ToolCard className="w-full" eyebrow={t('fr.no.eyebrow')} title={t('fr.no.title')} sub={mono(t('fr.no.sub'))}>
       <ol className="space-y-3">
         {items.map((v, i) => (
           <li key={i} className="flex items-center gap-3">
             <span className="num w-6 shrink-0 text-[1.4rem] font-light text-ink-3">{i + 1}</span>
             <label className="min-w-0 flex-1">
-              <span className="sr-only">{t('fr.no.item', { n: i + 1 })}</span>
+              <span className="sr-only">{mono(t('fr.no.item', { n: i + 1 }))}</span>
               <input value={v} onChange={(e) => setAt(i, e.target.value)} placeholder={t('fr.no.placeholder')} className="h-12 w-full rounded-xl border border-line-strong bg-paper px-4 text-[16px] text-ink placeholder:text-ink-3 focus-ring" />
             </label>
             {v && <button onClick={() => setAt(i, '')} aria-label={t('fr.no.clear', { n: i + 1 })} className="rounded-full p-2 text-ink-3 hover:bg-paper-sunk focus-ring"><Trash2 size={15} /></button>}
@@ -280,15 +296,15 @@ function NoList() {
         <div className="mt-2.5 flex flex-wrap gap-2">
           {NO_SUGGESTIONS.filter((s) => !items.includes(s) && !items.includes(d(s))).map((s) => (
             <button key={s} onClick={() => suggest(s)} disabled={filled >= 3} className="inline-flex max-w-full items-center gap-1 rounded-full border border-line px-3 py-1.5 text-left text-[13px] text-ink-2 hover:border-line-strong hover:text-ink disabled:opacity-40 focus-ring">
-              <Plus size={12} className="shrink-0" aria-hidden /> {d(s)}
+              <Plus size={12} className="shrink-0" aria-hidden /> {mono(d(s))}
             </button>
           ))}
         </div>
       </div>
-      {err !== null && <p role="alert" className="mt-4 text-[14px] text-error">{t('fr.no.err', { n: err })}</p>}
+      {err !== null && <p role="alert" className="mt-4 text-[14px] text-error">{mono(t('fr.no.err', { n: err }))}</p>}
       <div className="mt-auto flex flex-wrap items-center gap-4 pt-6">
-        <DaybreakButton onClick={keep}>{kept ? <><Check size={18} /> {t('fr.no.kept')}</> : t('fr.no.keep')}</DaybreakButton>
-        <span className="text-[14px] text-ink-3" role="status">{kept ? t('fr.no.ask45') : <>{r('fr.no.of3', { n: <span className="num">{filled}</span> })}</>}</span>
+        <DaybreakButton onClick={keep}>{kept ? <><Check size={18} /> {mono(t('fr.no.kept'))}</> : t('fr.no.keep')}</DaybreakButton>
+        <span className="text-[14px] text-ink-3" role="status">{kept ? mono(t('fr.no.ask45')) : <>{r('fr.no.of3', { n: <span className="num">{filled}</span> })}</>}</span>
       </div>
     </ToolCard>
   )
@@ -358,7 +374,7 @@ function Sabbath({ conn }: { conn: CalConnection }) {
         <div className="mt-2.5 flex flex-wrap gap-2">
           {(Object.keys(off) as (keyof typeof off)[]).map((k) => (
             <button key={k} onClick={() => setOff((o) => ({ ...o, [k]: !o[k] }))} aria-pressed={off[k]} className={clsx('inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] focus-ring', off[k] ? 'bg-ink text-paper' : 'border border-line text-ink-2')}>
-              {off[k] && <Check size={12} aria-hidden />} {labels[k]}
+              {off[k] && <Check size={12} aria-hidden />} {mono(labels[k])}
             </button>
           ))}
         </div>
@@ -367,13 +383,13 @@ function Sabbath({ conn }: { conn: CalConnection }) {
       <div className="mt-auto pt-6">
         <p className="mb-3 text-[15px] text-ink" aria-live="polite">{!invalid && r('fr.sb.summary', { day: dayName(day), from: <span className="num">{from}</span>, to: <span className="num">{to}</span>, h: <span className="num">{hours}</span>, with: withKavya ? t('fr.sb.withKavya') : '' })}</p>
         {kept && !invalid
-          ? <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px] text-ink-2" role="status"><span className="flex items-center gap-2"><Check size={15} className="shrink-0" aria-hidden /> {t('fr.sb.scheduled', { date: wdm(nextSabbathOn(day)) })}</span><button type="button" onClick={() => setKept(false)} className="rounded text-ink underline underline-offset-4 focus-ring">{t('c.remove')}</button></p>
+          ? <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px] text-ink-2" role="status"><span className="flex items-center gap-2"><Check size={15} className="shrink-0" aria-hidden /> {mono(t('fr.sb.scheduled', { date: wdm(nextSabbathOn(day)) }))}</span><button type="button" onClick={() => setKept(false)} className="rounded text-ink underline underline-offset-4 focus-ring">{t('c.remove')}</button></p>
           : <Button variant="ink" disabled={invalid} onClick={() => setKept(true)}><BellRing size={15} /> {t('fr.sb.put')}</Button>}
         {!invalid && (
           <div className="mt-4 rounded-2xl border border-line px-4 py-3 text-[14px] text-ink-2">
             {provider ? (
               <>
-                <p>{t('fr.sb.readOnly', { cal: CAL_NAME[provider] })}</p>
+                <p>{mono(t('fr.sb.readOnly', { cal: CAL_NAME[provider] }))}</p>
                 <CopyDetails text={details} className="mt-2.5" />
               </>
             ) : consent.on ? (
@@ -406,8 +422,8 @@ function PeaceOfMind() {
                 {done[p.id] && <Check size={13} />}
               </span>
               <span>
-                <span className={clsx('block text-[16px]', done[p.id] ? 'text-ink-2' : 'text-ink')}>{d(p.title)}</span>
-                <span className="mt-0.5 block text-[14px] text-ink-3">{d(p.detail)}</span>
+                <span className={clsx('block text-[16px]', done[p.id] ? 'text-ink-2' : 'text-ink')}>{mono(d(p.title))}</span>
+                <span className="mt-0.5 block text-[14px] text-ink-3">{mono(d(p.detail))}</span>
               </span>
             </label>
           </li>

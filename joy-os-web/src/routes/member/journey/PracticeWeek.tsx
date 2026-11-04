@@ -9,11 +9,12 @@ import { CIRCLE, PRACTICE_WEEKS } from '@/data/platform'
 import { INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
 import { useScoresHidden } from '@/lib/minor'
 import { PRACTICE_CONTENT } from './_data'
-import { AudioPlayer, JourneyEmpty, PrimaryChip, Quote, Verse, fade, useAfterIndex } from './_parts'
+import { AudioPlayer, JourneyEmpty, PrimaryChip, Quote, Verse, useFade, useAfterIndex } from './_parts'
 // One shared emergency intercept for every member free-text field (Memo p.24).
 import { useCrisisGuard } from '@/routes/member/spaces/_SpaceShell'
 import { addDays, isoDate, practisedToday, saveReflection, setWeekPractised, togglePractisedToday, useJourney, weekPractised } from './_store'
 import { useJ, type JourneyKey } from './_i18n'
+import { monoDigits } from './_mono'
 
 // PRACTICE WEEK (Memo p.21): one week of the Joyspiration Practice in full —
 // audio, the practice, the science note, a private reflection and "mark practised".
@@ -26,6 +27,7 @@ export default function PracticeWeek() {
 }
 
 function WeekView({ n }: { n: string }) {
+  const fade = useFade()
   const num = Number(n)
   const week = PRACTICE_WEEKS.find((w) => w.week === num)
   const content = PRACTICE_CONTENT.find((p) => p.week === num)
@@ -45,7 +47,7 @@ function WeekView({ n }: { n: string }) {
   const fmtDate = useFmtDate()
 
   if (!week || !content) {
-    return (
+    return monoDigits(
       <div>
         <PageHeader eyebrow={t('practiceName')} title={t('nfWeekTitle')} lead={t('nfWeekLead')} />
         <JourneyEmpty kind="generic" title={t('nfWeekEmpty')} body={t('nfWeekBody')} action={<Link to="/app/practice" className="btn-daybreak">{t('backToPractice')}</Link>} />
@@ -77,7 +79,7 @@ function WeekView({ n }: { n: string }) {
     setSavedAt(at)
   }
 
-  return (
+  return monoDigits(
     <div>
       <Link to="/app/practice" className="mb-6 inline-flex items-center gap-1.5 text-[14px] text-ink-2 hover:text-ink focus-ring"><ArrowLeft size={15} /> {t('thePracticeBack')}</Link>
 

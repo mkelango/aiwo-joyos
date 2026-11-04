@@ -2,7 +2,7 @@ import { router } from 'expo-router'
 import { useState } from 'react'
 import { View } from 'react-native'
 import { ArrowLink, Body, Button, Card, Divider, Eyebrow, Icon, Meta, Mono, Pill, SectionTitle, Sheet, fmtDate } from '@/components'
-import { INDEX_HISTORY } from '@/shared/member'
+import { useLatestIndex } from '@/lib/indexRecord'
 import { METHODS } from '@/shared/indexEngine'
 import type { MethodVersion } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
@@ -36,7 +36,8 @@ export function MethodCard() {
   const { space } = useTheme()
   const t = useDict(TRUST)
   const tx = useTx()
-  const latest = INDEX_HISTORY[0]
+  // The method and build of the latest Index (a re-take on this phone included).
+  const latest = useLatestIndex()
   return (
     <View style={{ gap: space.s2 }}>
       <SectionTitle>{t('methodTitle')}</SectionTitle>

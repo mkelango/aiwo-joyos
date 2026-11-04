@@ -9,6 +9,7 @@ import { LETTER_AUTHOR, LETTER_ISSUES } from '@/screens/b/entryData'
 import { LETTER } from '@/screens/b/i18n/letter'
 import { useCrisisGuard } from '@/screens/b/parts'
 import { useTheme } from '@/theme/ThemeProvider'
+import { MonoNums } from '@/lib/monoNums'
 
 // THE JOYSPAN LETTER (Memo p17: print artefacts; Playbook p63: "monthly, in the Mentor's voice,
 // with real numbers"). Editorial register: Newsreader for the headline, generous margins,
@@ -58,7 +59,7 @@ export default function LetterScreen() {
             {t('titleB')}
           </>
         }
-        lead={t('lead')}
+        lead={<Body tone="ink2"><MonoNums text={t('lead')} /></Body>}
       />
 
       <View style={{ gap: space.s1 }}>
@@ -91,7 +92,7 @@ export default function LetterScreen() {
           </Title>
           {lang !== 'en' ? (
             <Meta size={14} tone="ink3">
-              {t('asWritten')}
+              <MonoNums text={t('asWritten')} />
             </Meta>
           ) : null}
           {issue.body.map((p) => (
@@ -114,13 +115,13 @@ export default function LetterScreen() {
           </View>
           <View style={{ gap: 2, paddingTop: space.s1 }}>
             <Body weight="semibold">{LETTER_AUTHOR.name}</Body>
-            <Meta size={14}>{t('authorRole')}</Meta>
+            <Meta size={14}><MonoNums text={t('authorRole')} /></Meta>
           </View>
           <SpecimenTag />
         </View>
       </View>
       <Meta size={13} tone="ink3">
-        {t('specimen')}
+        <MonoNums text={t('specimen')} />
       </Meta>
       {Platform.OS === 'web' ? (
         <Button
@@ -138,11 +139,11 @@ export default function LetterScreen() {
       {/* Write back */}
       <Card tone="sunk" style={{ gap: space.s2 }}>
         <Eyebrow {...H2}>{t('writeBack')}</Eyebrow>
-        <Body>{t('writeBackLead')}</Body>
+        <Body><MonoNums text={t('writeBackLead')} /></Body>
         {sent ? (
           <View style={{ flexDirection: 'row', gap: 10 }} accessibilityLiveRegion="polite">
             <Icon name="check" size={18} color={c.ink} />
-            <Body style={{ flex: 1 }}>{t('sent')}</Body>
+            <Body style={{ flex: 1 }}><MonoNums text={t('sent')} /></Body>
           </View>
         ) : null}
         <TextField
@@ -178,7 +179,7 @@ export default function LetterScreen() {
             ))}
           </View>
         ) : null}
-        <Meta size={14}>{t('delivery')}</Meta>
+        <Meta size={14}><MonoNums text={t('delivery')} /></Meta>
       </Card>
     </Screen>
   )

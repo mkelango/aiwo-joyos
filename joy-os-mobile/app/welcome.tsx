@@ -1,6 +1,7 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router'
 import { View } from 'react-native'
 import { AiwoMark, Body, Button, DaybreakButton, Eyebrow, JoyspanWheel, Meta, Mono, Screen, Serif, TermDot, Title } from '@/components'
+import { MonoNums } from '@/lib/monoNums'
 import { useApp } from '@/lib/store'
 import { TERMS } from '@/shared/terms'
 import type { TermScore } from '@/shared/types'
@@ -43,7 +44,7 @@ export default function Welcome() {
     <Screen contentStyle={{ paddingTop: space.s3, gap: space.s4, flexGrow: 1 }}>
       {previewing ? (
         <View style={{ borderWidth: 1, borderStyle: 'dashed', borderColor: c.lineStrong, borderRadius: radius.card, padding: 12, gap: 4 }} accessibilityLiveRegion="polite">
-          <Meta size={14}>{t('previewNote')}</Meta>
+          <Meta size={14}><MonoNums text={t('previewNote')} /></Meta>
           <Button variant="link" icon="x" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} style={{ alignSelf: 'flex-start' }}>
             {t('previewClose')}
           </Button>
@@ -72,8 +73,11 @@ export default function Welcome() {
           {t('titleA')}<Serif>{t('titleSerif')}</Serif>{t('titleB')}
         </Title>
         <Body tone="ink2" size={19}>
-          {t('lead')}
+          <MonoNums text={t('lead')} />
         </Body>
+        <Meta size={14} tone="ink3">
+          <MonoNums text={t('credit')} />
+        </Meta>
       </View>
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s2, rowGap: space.s1 }} accessible accessibilityLabel={t('termsA11y')}>
@@ -100,7 +104,9 @@ export default function Welcome() {
       {previewing ? null : (
         <View style={{ borderWidth: 1, borderStyle: 'dashed', borderColor: c.lineStrong, borderRadius: radius.card, padding: 14, gap: 8 }}>
           <Eyebrow>{t('specimenEyebrow')}</Eyebrow>
-          <Meta size={14}>{t('specimenBody')}</Meta>
+          <Meta size={14}>
+            <MonoNums text={t('specimenBody')} />
+          </Meta>
           <Button variant="secondary" block icon="arrow-right" onPress={exploreSpecimen} accessibilityHint={t('specimenHint')}>
             {t('specimenGo')}
           </Button>
@@ -109,7 +115,7 @@ export default function Welcome() {
 
       <View style={{ gap: 4, alignItems: 'center' }}>
         <Meta size={13} tone="ink3" align="center">
-          {t('bandsNote')}
+          <MonoNums text={t('bandsNote')} />
         </Meta>
         <Button variant="link" onPress={() => setCrisisOpen(true)} style={{ alignSelf: 'center', minHeight: 44 }}>
           {tc('crisis')}

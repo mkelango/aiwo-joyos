@@ -12,6 +12,7 @@ import { Done, Field, StepHead } from '@/screens/b/parts'
 import { useDict } from '@/lib/i18n'
 import { SIGNIN } from '@/screens/b/i18n/entry'
 import { useCommon } from '@/screens/b/i18n/common'
+import { MonoNums } from '@/lib/monoNums'
 
 // SIGN IN: AIWO ID first, then one of three ways in — passkey, a one-time code by SMS, or a
 // link by email. Demo accounts for the specimen. One Daybreak per step. On success the member
@@ -200,7 +201,7 @@ export default function SignIn() {
                     <Avatar person={a} size={40} />
                     <View style={{ flex: 1 }}>
                       <Body>{a.name}</Body>
-                      <Meta size={14}>{role}</Meta>
+                      <Meta size={14}><MonoNums text={role} /></Meta>
                       <Mono size={12} tone="ink3">
                         {a.aiwoId}
                       </Mono>
@@ -237,7 +238,7 @@ export default function SignIn() {
                     <Icon name="key" size={24} color={c.ink} />
                   </View>
                   <Title size={22}>{t('passkeyTitle')}</Title>
-                  <Meta>{t('passkeyBody')}</Meta>
+                  <Meta><MonoNums text={t('passkeyBody')} /></Meta>
                   <DaybreakButton icon="key" onPress={usePasskey} disabled={busy}>
                     {busy ? t('checking') : t('usePasskey')}
                   </DaybreakButton>
@@ -266,7 +267,7 @@ export default function SignIn() {
                     />
                   </View>
                   <DaybreakButton onPress={sendCode}>{t('sendCode')}</DaybreakButton>
-                  <Meta size={14} tone="ink3">{t('codeNote')}</Meta>
+                  <Meta size={14} tone="ink3"><MonoNums text={t('codeNote')} /></Meta>
                 </Card>
               ) : null}
               {method === 'email' ? (
@@ -365,7 +366,7 @@ export default function SignIn() {
               <StepHead eyebrow={t('emailEyebrow')} title={t('linkSent')} lead={t('linkLead', { email: email.trim() })} />
               <Card tone="raised" style={{ gap: space.s1, alignItems: 'flex-start' }}>
                 <Icon name="mail" size={24} color={c.ink} />
-                <Meta>{t('noEmail')}</Meta>
+                <Meta><MonoNums text={t('noEmail')} /></Meta>
               </Card>
               <DaybreakButton onPress={() => finish('email')}>{t('openedLink')}</DaybreakButton>
               <Button variant="link" onPress={() => setPhase('method')}>
@@ -401,7 +402,7 @@ export default function SignIn() {
               {tc('crisis')}
             </Button>
             <Meta size={13} tone="ink3" align="center">
-              {t('footer')}
+              <MonoNums text={t('footer')} />
             </Meta>
           </View>
         </View>

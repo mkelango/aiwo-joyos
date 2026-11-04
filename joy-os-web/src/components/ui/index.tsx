@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, type ReactNode } from 'react'
 import type { Person, TermKey } from '@/domain/types'
 import { EmptyIllustration, type IllustrationKind } from '@/components/joy/EmptyIllustration'
 import { useDict } from '@/lib/i18n'
+import { DUR, brandTransition, useReduceMotion } from '@/lib/motion'
 import { SHARED } from '@/components/_i18n'
 
 export function Card({ children, className, tone = 'raised', as: As = 'section', ...rest }: { children: ReactNode; className?: string; tone?: 'raised' | 'sunk' | 'ink' | 'soft' | 'outline'; as?: 'section' | 'div' | 'article' | 'li' } & React.HTMLAttributes<HTMLElement>) {
@@ -186,6 +187,16 @@ export function Sheet({ open, onClose, title, children, side = 'right' }: { open
   const dialog = useRef<HTMLDivElement>(null)
   const close = useRef(onClose)
   close.current = onClose
+  // Motion (Playbook p53): the scrim fades and the panel settles in 240 ms on the brand easing,
+  // sliding in from the right or rising into the centre. Under reduced motion there is no slide
+  // or rise: scrim and panel only fade, over 120 ms.
+  const reduce = useReduceMotion()
+  const fadeT = brandTransition(reduce, DUR.settle)
+  const panel = reduce
+    ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } }
+    : side === 'right'
+      ? { initial: { x: 40 }, animate: { x: 0 }, exit: { x: 40 } }
+      : { initial: { y: 16, opacity: 0 }, animate: { y: 0, opacity: 1 }, exit: { y: 16, opacity: 0 } }
   // Escape closes; focus moves into the sheet, Tab stays inside it, and focus returns to the opener on close.
   useEffect(() => {
     if (!open) return
@@ -215,7 +226,7 @@ export function Sheet({ open, onClose, title, children, side = 'right' }: { open
   return (
     <AnimatePresence>
       {open && (
-        <motion.div className="fixed inset-0 z-50 flex" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <motion.div className="fixed inset-0 z-50 flex" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={fadeT}>
           <div className="absolute inset-0 bg-ink/30 backdrop-blur-[2px]" onClick={onClose} aria-hidden />
           <motion.div
             ref={dialog}
@@ -227,10 +238,8 @@ export function Sheet({ open, onClose, title, children, side = 'right' }: { open
               'relative z-10 flex max-h-full flex-col overflow-hidden bg-paper shadow-lift',
               side === 'right' ? 'ml-auto h-full w-full max-w-lg' : 'm-auto w-[calc(100%-2rem)] max-w-xl rounded-card',
             )}
-            initial={side === 'right' ? { x: 40 } : { y: 16, opacity: 0 }}
-            animate={side === 'right' ? { x: 0 } : { y: 0, opacity: 1 }}
-            exit={side === 'right' ? { x: 40 } : { y: 16, opacity: 0 }}
-            transition={{ duration: 0.24 }}
+            {...panel}
+            transition={fadeT}
           >
             <div className="flex items-center justify-between gap-3 border-b border-line px-6 py-4">
               <h2 className="min-w-0 break-words text-[18px] text-ink">{title}</h2>

@@ -53,6 +53,13 @@ export interface Palette {
   riseInk: string
   /** The minus in the Joyspan equation: Amber on Paper, Amber Light on dark grounds (p44). */
   minusAmber: string
+  /** Non-term data series (Playbook p39, p62): Ink leads, Slate and Bronze follow, Mist is a
+   *  fill, band or ghost line (never a thin line on Paper, 1.6:1). Use theme.viz in charts. */
+  vizInk: string
+  vizSlate: string
+  vizBronze: string
+  vizMist: string
+  vizMistSoft: string
 }
 
 /** Brand primaries (never change with the scheme). */
@@ -109,6 +116,11 @@ export const light: Palette = {
   rise: '#1f8a68',
   riseInk: '#17694f',
   minusAmber: '#a8703f',
+  vizInk: '#1c1314',
+  vizSlate: '#5e6b73', // 5.3:1 on Paper
+  vizBronze: '#7b4f36', // 6.8:1 on Paper
+  vizMist: '#c4d1d7',
+  vizMistSoft: '#e6edf0',
 }
 
 /** Warm Ink dark mode (Playbook p39). Spectrum mains stay; soft/ink variants and the minus shift. */
@@ -148,6 +160,11 @@ export const dark: Palette = {
   rise: '#5fc6a0',
   riseInk: '#5fc6a0',
   minusAmber: '#e3a86e',
+  vizInk: '#f2eee8',
+  vizSlate: '#9aa7ae', // Slate lifted for warm Ink: 7.4:1
+  vizBronze: '#c39274', // Bronze lifted for warm Ink: 6.7:1
+  vizMist: '#c4d1d7',
+  vizMistSoft: '#2c3336',
 }
 
 export const palettes: Record<Scheme, Palette> = { light, dark }
@@ -209,6 +226,31 @@ export const indicFonts: Record<'ta' | 'hi', FontSet> = {
 
 /** Tamil and Devanagari set one step larger than Latin at the same role, with +10% leading (Playbook p41). */
 export const indicType = { scale: 1.06, leading: 1.1 } as const
+
+/** A label size one step up for Tamil and Devanagari: at least a whole point, as the web steps
+ *  the eyebrow 12→13 and the Daybreak button 19→20. */
+export function indicStep(pt: number): number {
+  return Math.max(pt + 1, pt * indicType.scale)
+}
+
+export type Script = 'ta' | 'hi'
+
+/** The family for one role in a script's set (Mukta Malar / Noto Serif Tamil, Mukta / Tiro
+ *  Devanagari Hindi), whatever the app language. ThemeProvider loads both sets at start; prefer
+ *  useTheme().scriptFamily, which falls back to the Latin face until the set is in. */
+export function scriptFamily(script: Script, role: keyof FontSet): string {
+  return indicFonts[script][role]
+}
+
+const TAMIL = /[\u0B80-\u0BFF]/
+const DEVANAGARI = /[\u0900-\u097F]/
+
+/** The Indic script a string is written in, if any (Tamil wins a mixed string). */
+export function scriptOfText(s: string): Script | null {
+  if (TAMIL.test(s)) return 'ta'
+  if (DEVANAGARI.test(s)) return 'hi'
+  return null
+}
 
 /** Type scale in points. 17 is the body minimum for reading text (Memo p.18). */
 export const type = {
@@ -317,6 +359,19 @@ const TERM_KEYS: Record<TermKey, { main: keyof Palette; soft: keyof Palette; ink
   B: { main: 'termB', soft: 'termBSoft', ink: 'termBInk' },
 }
 
+/** The neutral chart colours for a palette: everything a chart plots that is not one of the six
+ *  terms (a biomarker, a sleep stage, a signal, Life's Essential 8). Daybreak never draws a series. */
+export function vizColors(p: Palette) {
+  return { ink: p.vizInk, slate: p.vizSlate, bronze: p.vizBronze, mist: p.vizMist, mistSoft: p.vizMistSoft }
+}
+export type VizColors = ReturnType<typeof vizColors>
+
+/** The colour of the nth non-term line series: Ink, Slate, Bronze, then wraps. */
+export function vizSeriesColor(p: Palette, n: number): string {
+  const s = [p.vizInk, p.vizSlate, p.vizBronze]
+  return s[((n % s.length) + s.length) % s.length]
+}
+
 /** Spectrum colour for a term — only ever shown beside the term's name. */
 export function termColors(p: Palette, k: TermKey) {
   const m = TERM_KEYS[k]
@@ -360,6 +415,11 @@ const CSS_VAR_TO_KEY: Record<string, keyof Palette> = {
   '--term-d-ink': 'termDInk',
   '--term-b-ink': 'termBInk',
   '--wheel-guide': 'wheelGuide',
+  '--viz-ink': 'vizInk',
+  '--viz-slate': 'vizSlate',
+  '--viz-bronze': 'vizBronze',
+  '--viz-mist': 'vizMist',
+  '--viz-mist-soft': 'vizMistSoft',
 }
 
 /** Resolve 'var(--term-r)' (or a plain colour) against a palette. Unknown vars fall back to ink-2. */

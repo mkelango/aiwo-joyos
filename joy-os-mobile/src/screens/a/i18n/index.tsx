@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode } from 'react'
 import { fill, TERM_TEXT, useLang, type Dict } from '@/lib/i18n'
+import { MonoNums } from '@/lib/monoNums'
 import type { Lang } from '@/lib/store'
 import type { TermKey } from '@/shared/types'
 import { CARE } from './care'
@@ -42,10 +43,11 @@ export function useA() {
   return { t, tx, lang, name, space, week: WEEK[lang], weekFull: WEEK_FULL[lang], date: (s: string) => localDate(s, lang) }
 }
 
-/** Renders "a *b* c": every starred part is wrapped (a serif word, an ink span). */
+/** Renders "a *b* c": every starred part is wrapped (a serif word, an ink span); a figure in the
+ * plain parts is set in Mono (Playbook p40). */
 export function Rich({ text, wrap }: { text: string; wrap: (s: string, i: number) => ReactNode }) {
   const parts = text.split('*')
-  return <>{parts.map((p, i) => (i % 2 ? <Fragment key={i}>{wrap(p, i)}</Fragment> : p ? <Fragment key={i}>{p}</Fragment> : null))}</>
+  return <>{parts.map((p, i) => (i % 2 ? <Fragment key={i}>{wrap(p, i)}</Fragment> : p ? <MonoNums key={i} text={p} /> : null))}</>
 }
 
 const WEEK: Record<Lang, string[]> = {

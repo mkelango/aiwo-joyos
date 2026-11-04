@@ -8,7 +8,7 @@ import { CONSENTS, INDEX_HISTORY, LEDGER_WEEK } from '@/data/member'
 import { termByKey } from '@/data/terms'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { Checkbox, LinkButton, Section } from './_parts'
-import { readNotifPrefs, rich, syncWhatsAppChannel, useMemberProfile, usePersisted, useToast } from './_util'
+import { nums, readNotifPrefs, rich, syncWhatsAppChannel, useMemberProfile, usePersisted, useToast } from './_util'
 import { INSTRUMENT_NOTE, fill, useDict, useLang, useTermText } from '@/lib/i18n'
 import { WA, useLookup } from './_i18n'
 import { WatchComplication } from './_watch'
@@ -275,7 +275,7 @@ export default function WhatsApp() {
                   {msgs.map((m) => (
                     <motion.div key={`${scenario}-${m.id}`} initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }} className={clsx('flex flex-col', m.from === 'me' ? 'items-end' : 'items-start')}>
                       <div className={clsx('max-w-[82%] rounded-xl px-3 py-2 text-[14.5px] leading-snug shadow-card', m.from === 'me' ? 'rounded-tr-sm bg-ink text-paper' : 'rounded-tl-sm bg-paper-raised text-ink')}>
-                        {lineText(m)}
+                        {nums(lineText(m))}
                         <span className={clsx('num ml-2 inline-flex translate-y-0.5 items-center gap-0.5 whitespace-nowrap text-[10px]', m.from === 'me' ? 'opacity-70' : 'text-ink-3')}>
                           {m.time}{m.from === 'me' && <CheckCheck size={12} />}
                         </span>
@@ -289,7 +289,7 @@ export default function WhatsApp() {
                               onClick={() => pick(m.id, r)}
                               className="rounded-lg bg-paper-raised px-3 py-2 text-[14px] font-medium text-daybreak-ink shadow-card transition-opacity hover:bg-paper focus-ring disabled:opacity-45"
                             >
-                              {lk(r.label)}
+                              {nums(lk(r.label))}
                             </button>
                           ))}
                         </div>
@@ -330,7 +330,7 @@ export default function WhatsApp() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="eyebrow text-ink-3">{tw('yourConsent')}</p>
-                <p className="mt-2 text-[1.3rem] font-light text-ink">{consented ? tw('consentOn') : tw('consentOff')}</p>
+                <p className="mt-2 text-[1.3rem] font-light text-ink">{nums(consented ? tw('consentOn') : tw('consentOff'))}</p>
               </div>
               <Pill className="shrink-0 whitespace-nowrap" tone={consented ? 'positive' : 'neutral'}>{consented ? <><Check size={12} /> {tw('given')}</> : tw('notGiven')}</Pill>
             </div>
@@ -352,13 +352,13 @@ export default function WhatsApp() {
               <Card tone="sunk">
                 <p className="flex items-center gap-2 text-[16px] text-ink"><MessageCircle size={17} /> {tw('onWa')}</p>
                 <ul className="mt-3 space-y-2 text-[15px] text-ink-2">
-                  {[tw('on1'), tw('on2'), tw('on3'), tw('on4')].map((x) => <li key={x} className="flex gap-2"><Check size={15} className="mt-1 shrink-0 text-ink-3" /> {x}</li>)}
+                  {[tw('on1'), tw('on2'), tw('on3'), tw('on4')].map((x) => <li key={x} className="flex gap-2"><Check size={15} className="mt-1 shrink-0 text-ink-3" /> {nums(x)}</li>)}
                 </ul>
               </Card>
               <Card tone="outline">
                 <p className="flex items-center gap-2 text-[16px] text-ink"><Ban size={17} /> {tw('neverWa')}</p>
                 <ul className="mt-3 space-y-2 text-[15px] text-ink-2">
-                  {[tw('never1'), tw('never2'), tw('never3'), tw('never4')].map((x) => <li key={x} className="flex gap-2"><span aria-hidden className="mt-0.5 shrink-0 text-ink-3">—</span> {x}</li>)}
+                  {[tw('never1'), tw('never2'), tw('never3'), tw('never4')].map((x) => <li key={x} className="flex gap-2"><span aria-hidden className="mt-0.5 shrink-0 text-ink-3">—</span> {nums(x)}</li>)}
                 </ul>
               </Card>
             </div>
@@ -374,11 +374,11 @@ export default function WhatsApp() {
                 <div key={k} className="rounded-card border border-line p-4">
                   <dt className="eyebrow flex items-center gap-1.5 text-ink-3"><Icon size={13} /> {k}</dt>
                   <dd className={clsx('mt-2 text-[1.2rem] text-ink', mono && 'num')}>{v}</dd>
-                  <dd className="mt-0.5 text-[13px] text-ink-2">{s}</dd>
+                  <dd className="mt-0.5 text-[13px] text-ink-2">{nums(s)}</dd>
                 </div>
               ))}
             </dl>
-            <p className="mt-4 text-[14px] text-ink-3">{tw('tryNote')}</p>
+            <p className="mt-4 text-[14px] text-ink-3">{nums(tw('tryNote'))}</p>
           </Section>
 
           {/* The watch half of "WhatsApp and watch": the same Ledger, from the wrist. */}

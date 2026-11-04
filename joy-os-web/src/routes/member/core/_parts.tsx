@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { Sparkles } from 'lucide-react'
 import { useId, type CSSProperties, type ReactNode } from 'react'
-import { useCore } from './_i18n'
+import { monoFigures, useCore } from './_i18n'
 
 // Lane-local parts shared by the member core screens.
 
@@ -108,6 +108,15 @@ export function PrintOnly({ id }: { id: string }) {
   #${id} [data-noprint] { display: none !important; }
 }`}</style>
   )
+}
+
+/**
+ * Mono for every number, inside running text too (the brand rule). Splits a finished sentence
+ * and sets each figure ("1.9", "−3", "22:00", "Day-90") in the mono style. A digit that is part
+ * of an instrument's name (PHQ-4, LE8, UCLA-3, v1.0) stays in the sentence's face.
+ */
+export function nums(text: string): ReactNode {
+  return monoFigures(text)
 }
 
 /** Small mono key/value line used in detail panels. */

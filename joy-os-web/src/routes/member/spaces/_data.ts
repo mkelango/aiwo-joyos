@@ -1,5 +1,5 @@
-import type { Action, TermKey } from '@/domain/types'
-import { ACTION_LIBRARY, INDEX_HISTORY } from '@/data/member'
+import type { Action, IndexScore, TermKey } from '@/domain/types'
+import { ACTION_LIBRARY, INDEX_HISTORY, TODAY_ACTION } from '@/data/member'
 
 // SPECIMEN DATA for the six spaces — not a real member (Memo p.19).
 // Everything a space needs beyond the shared specimens lives here so the
@@ -27,6 +27,26 @@ export const ROOM_VERDICT: Record<TermKey, string> = {
   B: 'Burden is easing. Sleep is the heaviest part of what is left.',
 }
 
+/**
+ * Lines that would state a time-audit finding (whose time the week was) stand in for these
+ * neutral ones until a calendar is connected and its consent (c_cal) is on: without one,
+ * nothing has been read, so nothing calendar-derived is said.
+ */
+export const ROOM_VERDICT_NO_CAL: Partial<Record<TermKey, string>> = {
+  F: 'Freedom fell after a heavy quarter. Connect a calendar and the time audit will show whose time your week was.',
+}
+export const WHY_NO_CAL: Record<string, string> = {
+  a_f_007: 'An hour named as yours is the smallest way back to your own time.',
+}
+/** The room's verdict, calendar-aware. */
+export function roomVerdict(key: TermKey, calendar: boolean) {
+  return (!calendar && ROOM_VERDICT_NO_CAL[key]) || ROOM_VERDICT[key]
+}
+/** An action's "Why this?" reason, calendar-aware. */
+export function actionWhy(a: Action, calendar: boolean) {
+  return (!calendar && WHY_NO_CAL[a.id]) || a.why
+}
+
 // ─── 90-day history ────────────────────────────────────────────────────────
 
 const DAY_MS = 86400000
@@ -42,9 +62,9 @@ function addDays(iso: string, n: number) {
  * value (the latest full measure). `on` is an ISO date; screens format it in the
  * member's language at render.
  */
-export function termHistory(key: TermKey) {
-  const cur = INDEX_HISTORY[0].terms.find((t) => t.key === key)!.value ?? 0
-  const prev = INDEX_HISTORY[1].terms.find((t) => t.key === key)!.value ?? cur
+export function termHistory(key: TermKey, history: IndexScore[] = INDEX_HISTORY) {
+  const cur = history[0].terms.find((t) => t.key === key)!.value ?? 0
+  const prev = history[1].terms.find((t) => t.key === key)!.value ?? cur
   const seed = key.charCodeAt(0)
   return Array.from({ length: 14 }, (_, i) => {
     const p = i / 13
@@ -75,6 +95,16 @@ const OWN_ACTIONS: Action[] = [
 export function actionsFor(key: TermKey): Action[] {
   const lib = ACTION_LIBRARY.filter((a) => a.term === key)
   return [...lib, ...OWN_ACTIONS.filter((a) => a.term === key)].slice(0, 3)
+}
+
+/**
+ * Today's one action for a lowest term: the specimen TODAY_ACTION for Daily Pleasure, else the
+ * first of that term's actions (the same rule as the mobile app). Under 18, or with no Index,
+ * it stays TODAY_ACTION. A space marks this action as today's instead of offering it again.
+ */
+export function todayActionFor(lowest: TermKey | null): Action {
+  if (!lowest || lowest === TODAY_ACTION.term) return TODAY_ACTION
+  return actionsFor(lowest)[0] ?? TODAY_ACTION
 }
 
 /** A specimen VIVA draft per space — drafted by VIVA, a person signs. */

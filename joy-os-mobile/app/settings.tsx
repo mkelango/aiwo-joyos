@@ -1,7 +1,7 @@
 import { router } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { Platform, View } from 'react-native'
-import { Body, Button, Card, DaybreakButton, Divider, Eyebrow, Icon, ListRow, Meta, Mono, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, Toggle, Title, fmtDate } from '@/components'
+import { Body, Button, Card, DaybreakButton, Divider, Eyebrow, Icon, Meta, Mono, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, Toggle, Title, fmtDate } from '@/components'
 import { LANGS, useDict, useT } from '@/lib/i18n'
 import { SETTINGS } from '@/screens/b/i18n/account'
 import { LANG_LABEL, perDayKey, useCommon, usePrefsError } from '@/screens/b/i18n/common'
@@ -11,7 +11,10 @@ import { MEMBER } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
 import { PLANS } from '@/screens/b/_data'
 import { a11yStore, accountStore, lockStore, notifPrefsStore, onboardingStore, sessionStore, useStore, validatePrefs, type LockState } from '@/screens/b/bStore'
-import { ChoiceCard, Field, NumberSegmented, TimeStepper, memberOnly, useAccount, useSheetCrisisGuard } from '@/screens/b/parts'
+import { FigureListRow, ChoiceCard, Field, NumberSegmented, TimeStepper, memberOnly, useAccount, usePlanLabel, useSheetCrisisGuard } from '@/screens/b/parts'
+import { HOUSE } from '@/screens/b/i18n/household'
+import { MonoNums } from '@/lib/monoNums'
+import { ScriptText } from '@/components/Text'
 
 // SETTINGS: language (English · தமிழ் · हिन्दी), theme (follows the system by default),
 // text size on top of Dynamic Type, notifications with quiet hours (never more than three a
@@ -41,7 +44,7 @@ function Settings() {
   const ts = useDict(SETTINGS)
   const tc = useCommon()
   const prefsErr = usePrefsError()
-  const householdName = MEMBER.household === SETTINGS.householdName.en ? ts('householdName') : MEMBER.household
+  const th = useDict(HOUSE)
   const { lang, setLang, themePref, setThemePref, textSize, setTextSize, offline, setOffline, syncQueue, reduceMotion, setReduceMotion, sound, setSound, biometricLock, setBiometricLock, lockAfter, setLockAfter, lockNow, deviceAtRisk } = useApp()
   const [played, setPlayed] = useState<string | null>(null)
   const SOUNDS: { kind: SoundKind; name: 'sndAction' | 'sndComplete' | 'sndMorning'; desc: 'sndActionDesc' | 'sndCompleteDesc' | 'sndMorningDesc' }[] = [
@@ -80,6 +83,9 @@ function Settings() {
   }
   const [acct, setAcct] = useStore(accountStore)
   const account = useAccount()
+  const planLabel = usePlanLabel()
+  // The account made in onboarding has a household of its own, not the Raos'.
+  const householdName = account.id === 'new' ? th('yourHousehold') : MEMBER.household === SETTINGS.householdName.en ? ts('householdName') : MEMBER.household
   // Voice-first: Lakshmi's is her elder mode's voice; everyone else's is kept with Accessibility.
   const asLakshmi = account.id === 'lakshmi'
   const voiceOn = asLakshmi ? acct.elder.voice : !!a11y.voice
@@ -161,21 +167,21 @@ function Settings() {
       <View style={{ gap: space.s1 }}>
         <SectionTitle>{ts('account')}</SectionTitle>
         <Card tone="raised" padding={8} style={{ paddingHorizontal: 16 }}>
-          <ListRow icon="user" title={ts('profile')} sub={ts('profileSub', { name: acct.profile.name || `${MEMBER.firstName} ${MEMBER.lastName}` })} onPress={() => router.push('/profile')} />
+          <FigureListRow icon="user" title={ts('profile')} sub={ts('profileSub', { name: acct.profile.name || `${MEMBER.firstName} ${MEMBER.lastName}` })} onPress={() => router.push('/profile')} />
           <Divider />
-          <ListRow icon="star" title={ts('membership')} sub={ts('invoices', { plan: `${PLANS.find((p) => p.key === acct.plan)?.name ?? MEMBER.plan} + ${MEMBER.membership}` })} onPress={() => router.push('/membership')} />
+          <FigureListRow icon="star" title={ts('membership')} sub={ts('invoices', { plan: planLabel })} onPress={() => router.push('/membership')} />
           <Divider />
-          <ListRow icon="bell" title={ts('notifications')} sub={ts('notificationsSub')} onPress={() => router.push('/notifications')} />
+          <FigureListRow icon="bell" title={ts('notifications')} sub={ts('notificationsSub')} onPress={() => router.push('/notifications')} />
           <Divider />
-          <ListRow icon="message-circle" title={ts('messages')} sub={ts('messagesSub')} onPress={() => router.push('/messages')} />
+          <FigureListRow icon="message-circle" title={ts('messages')} sub={ts('messagesSub')} onPress={() => router.push('/messages')} />
           <Divider />
-          <ListRow icon="credit-card" title={ts('passport')} sub={ts('passportSub')} onPress={() => router.push('/passport')} />
+          <FigureListRow icon="credit-card" title={ts('passport')} sub={ts('passportSub')} onPress={() => router.push('/passport')} />
           <Divider />
-          <ListRow icon="home" title={ts('household')} sub={householdName} onPress={() => router.push('/household')} />
+          <FigureListRow icon="home" title={ts('household')} sub={householdName} onPress={() => router.push('/household')} />
           <Divider />
-          <ListRow icon="users" title={ts('circle')} sub={ts('circleSub')} onPress={() => router.push('/circles')} />
+          <FigureListRow icon="users" title={ts('circle')} sub={ts('circleSub')} onPress={() => router.push('/circles')} />
           <Divider />
-          <ListRow icon="book-open" title={ts('method')} sub={ts('methodSub')} onPress={() => router.push('/method')} />
+          <FigureListRow icon="book-open" title={ts('method')} sub={ts('methodSub')} onPress={() => router.push('/method')} />
         </Card>
       </View>
 
@@ -191,13 +197,26 @@ function Settings() {
               accessibilityLabel={`${LANG_LABEL[lang][l.value]}, ${l.native}`}
               title={
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-                  <Body size={20} weight="medium">
-                    {l.native}
-                  </Body>
+                  {/* தமிழ் and हिन्दी always in their own face (both script sets load at start), whatever the app language */}
+                  {l.value === 'en' ? (
+                    <Body size={20} weight="medium">
+                      {l.native}
+                    </Body>
+                  ) : (
+                    <ScriptText script={l.value} size={20} weight="medium">
+                      {l.native}
+                    </ScriptText>
+                  )}
                   {l.native !== LANG_LABEL[lang][l.value] ? <Meta>{LANG_LABEL[lang][l.value]}</Meta> : null}
                 </View>
               }
-              sub={<Meta tone="ink3">{`“${SAMPLE[l.value]}”`}</Meta>}
+              sub={
+                l.value === 'en' ? (
+                  <Meta tone="ink3">{`“${SAMPLE[l.value]}”`}</Meta>
+                ) : (
+                  <ScriptText script={l.value} size={15} tone="ink3">{`“${SAMPLE[l.value]}”`}</ScriptText>
+                )
+              }
             />
           ))}
         </View>
@@ -335,7 +354,7 @@ function Settings() {
               </Button>
             </>
           ) : null}
-          <ListRow icon={deviceAtRisk ? 'shield-off' : 'shield'} title={ts('phoneSecurity')} sub={deviceAtRisk ? ts('phoneSecurityRisk') : ts('phoneSecuritySub')} onPress={() => router.push('/device-security')} />
+          <FigureListRow icon={deviceAtRisk ? 'shield-off' : 'shield'} title={ts('phoneSecurity')} sub={deviceAtRisk ? ts('phoneSecurityRisk') : ts('phoneSecuritySub')} onPress={() => router.push('/device-security')} />
           <Divider />
           <Eyebrow>{ts('passkeys')}</Eyebrow>
           <Meta size={14}>{ts('passkeysBody')}</Meta>
@@ -369,7 +388,9 @@ function Settings() {
         <Title size={24}>
           {ts('notifA')}<Serif>{ts('notifSerif')}</Serif>{ts('notifB')}
         </Title>
-        <Body tone="ink2">{ts('notifBody')}</Body>
+        <Body tone="ink2">
+          <MonoNums text={ts('notifBody')} />
+        </Body>
 
         <Card tone="raised" style={{ gap: space.s2 }}>
           <Eyebrow>{tc('quietHours')}</Eyebrow>
@@ -377,7 +398,9 @@ function Settings() {
             <TimeStepper label={tc('from')} value={quiet.from} onChange={(v) => { setQuiet((q) => ({ ...q, from: v })); touch() }} />
             <TimeStepper label={tc('until')} value={quiet.to} onChange={(v) => { setQuiet((q) => ({ ...q, to: v })); touch() }} />
           </View>
-          <Meta size={14}>{tc('quietException')}</Meta>
+          <Meta size={14}>
+            <MonoNums text={tc('quietException')} />
+          </Meta>
         </Card>
 
         <Card tone="raised" style={{ gap: space.s2 }}>
@@ -391,7 +414,9 @@ function Settings() {
             items={[0, 1, 2, 3]}
             label={tc('remindersADay')}
           />
-          <Meta>{tc(perDayKey(perDay))}</Meta>
+          <Meta>
+            <MonoNums text={tc(perDayKey(perDay))} />
+          </Meta>
           <Divider />
           <Toggle checked={kinds.action} onChange={(v) => { setKinds((k) => ({ ...k, action: v })); touch() }} label={tc('kAction')} description={tc('kActionD')} />
           <Toggle checked={kinds.ledger} onChange={(v) => { setKinds((k) => ({ ...k, ledger: v })); touch() }} label={tc('kLedger')} description={tc('kLedgerD')} />
@@ -414,7 +439,7 @@ function Settings() {
         <DaybreakButton onPress={save}>{saved ? tc('saved') : ts('saveNotif')}</DaybreakButton>
         {saved ? (
           <Meta align="center" accessibilityLiveRegion="polite">
-            {ts('savedLine', { from: quiet.from, to: quiet.to, n: perDay })}
+            <MonoNums text={ts('savedLine', { from: quiet.from, to: quiet.to, n: perDay })} />
           </Meta>
         ) : null}
       </View>
@@ -431,7 +456,7 @@ function Settings() {
           />
           {syncQueue.length ? (
             <Meta size={14} accessibilityLiveRegion="polite">
-              {syncQueue.length === 1 ? ts('queued1') : ts('queuedN', { n: syncQueue.length })}
+              <MonoNums text={syncQueue.length === 1 ? ts('queued1') : ts('queuedN', { n: syncQueue.length })} />
             </Meta>
           ) : null}
         </Card>
@@ -441,7 +466,7 @@ function Settings() {
       <View style={{ gap: space.s1 }}>
         <SectionTitle>{ts('startAgain')}</SectionTitle>
         <Card tone="raised" padding={8} style={{ paddingHorizontal: 16 }}>
-          <ListRow
+          <FigureListRow
             icon="play-circle"
             title={ts('replay')}
             sub={ts('replaySub')}
@@ -451,15 +476,15 @@ function Settings() {
             }}
           />
           <Divider />
-          <ListRow icon="sun" title={ts('welcome')} sub={ts('welcomeSub')} onPress={() => router.push('/welcome?preview=1')} />
+          <FigureListRow icon="sun" title={ts('welcome')} sub={ts('welcomeSub')} onPress={() => router.push('/welcome?preview=1')} />
           <Divider />
-          <ListRow icon="check-circle" title={ts('check')} sub={ts('checkSub')} onPress={() => router.push('/check')} />
+          <FigureListRow icon="check-circle" title={ts('check')} sub={ts('checkSub')} onPress={() => router.push('/check')} />
           <Divider />
-          <ListRow icon="log-in" title={ts('signin')} sub={ts('signinSub')} onPress={() => router.push('/signin')} />
+          <FigureListRow icon="log-in" title={ts('signin')} sub={ts('signinSub')} onPress={() => router.push('/signin')} />
           <Divider />
-          <ListRow icon="shield" title={ts('trust')} sub={ts('trustSub')} onPress={() => router.push('/trust')} />
+          <FigureListRow icon="shield" title={ts('trust')} sub={ts('trustSub')} onPress={() => router.push('/trust')} />
           <Divider />
-          <ListRow icon="watch" title={ts('devices')} sub={ts('devicesSub')} onPress={() => router.push('/devices')} />
+          <FigureListRow icon="watch" title={ts('devices')} sub={ts('devicesSub')} onPress={() => router.push('/devices')} />
         </Card>
       </View>
 

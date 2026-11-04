@@ -11,7 +11,7 @@ import { TERMS } from '@/data/terms'
 import { METHODS } from '@/domain/indexEngine'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
 import { useApp } from '@/lib/store'
-import { CONCIERGE_ACCOUNT, COUNTRIES, DEMO_ACCOUNTS, EMAIL_RE, OPS_ACCOUNT, countryName, phoneError, type CountryCode, type DemoAccount } from './_data'
+import { COUNTRIES, DEMO_ACCOUNTS, EMAIL_RE, ROLE_ACCOUNTS, countryName, phoneError, type CountryCode, type DemoAccount } from './_data'
 import { E, SI } from './_i18n'
 import { FlowTopBar, JoyspanCredit, enterCodeDigits, rich } from './_parts'
 
@@ -22,7 +22,7 @@ import { FlowTopBar, JoyspanCredit, enterCodeDigits, rich } from './_parts'
 type Method = 'passkey' | 'phone' | 'email'
 // Every demo role has its own account: the concierge sits right after the coach, whose
 // console it shares (a desk of its own there).
-const ACCOUNTS: DemoAccount[] = DEMO_ACCOUNTS.flatMap((a) => (a.key === 'coach' ? [a, CONCIERGE_ACCOUNT] : [a])).concat(OPS_ACCOUNT)
+const ACCOUNTS: DemoAccount[] = ROLE_ACCOUNTS
 const MEMBER_ACCOUNT = DEMO_ACCOUNTS.find((a) => a.key === 'member')!
 const SPECIMEN = INDEX_HISTORY[0]
 

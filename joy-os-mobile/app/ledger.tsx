@@ -32,6 +32,7 @@ import { useTheme } from '@/theme/ThemeProvider'
 import { notifPrefsStore, useStore } from '@/screens/b/bStore'
 import { memberOnly } from '@/screens/b/parts'
 import { txFor } from '@/screens/a/i18n'
+import { MonoNums } from '@/lib/monoNums'
 
 // JOY LEDGER (Memo p.17 · Daily Pleasure): three light prompts a day, a tag or two and
 // an optional word — ten seconds. Then, weekly, where joy came from. No streaks, no counts
@@ -137,9 +138,9 @@ function Ledger() {
                 <Icon name="image" size={24} color={col.ink} />
               </View>
               <View style={{ flex: 1, gap: 2 }}>
-                <Meta tone="ink">{tl('photo')}</Meta>
+                <Meta tone="ink"><MonoNums text={tl('photo')} /></Meta>
                 <Meta size={14} tone="ink3">
-                  {tl('photoKept')}
+                  <MonoNums text={tl('photoKept')} />
                 </Meta>
               </View>
               <IconButton icon="x" label={tl('removePhoto')} onPress={() => setPhoto(false)} />
@@ -205,7 +206,7 @@ function Ledger() {
           ))}
         </View>
         <Divider />
-        <Body>{txFor(lang, LEDGER_STORY.sentences)}</Body>
+        <Body><MonoNums text={txFor(lang, LEDGER_STORY.sentences)} /></Body>
         <Provenance tool={LEDGER_STORY.tool} prompt={LEDGER_STORY.prompt} />
         <SpecimenTag />
       </Card>
@@ -216,7 +217,7 @@ function Ledger() {
           <Eyebrow {...H2}>{tl('fourWeeks')}</Eyebrow>
           <TermChip term="D" />
         </View>
-        <Meta>{tl('dotsBody')}</Meta>
+        <Meta><MonoNums text={tl('dotsBody')} /></Meta>
         <View
           accessible
           accessibilityRole="image"
@@ -284,7 +285,7 @@ function Ledger() {
             <Mono tone="ink" size={15}>
               {s.time}
             </Mono>
-            <Meta style={{ flex: 1 }}>{slotLabel(s)}</Meta>
+            <Meta style={{ flex: 1 }}><MonoNums text={slotLabel(s)} /></Meta>
             {s.prompt === prompt.prompt ? <Eyebrow tone="daybreak">{tl('now')}</Eyebrow> : null}
           </View>
         ))}
@@ -296,7 +297,7 @@ function Ledger() {
         </View>
         {timesSaved ? (
           <Meta tone="ink" accessibilityLiveRegion="polite">
-            {tl('newTimes')}
+            <MonoNums text={tl('newTimes')} />
           </Meta>
         ) : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s2, flexWrap: 'wrap' }}>
@@ -335,7 +336,7 @@ function Ledger() {
           </Button>
         }
       >
-        <Meta>{tl('sheetBody')}</Meta>
+        <Meta><MonoNums text={tl('sheetBody')} /></Meta>
         {LEDGER_SCHEDULE.map((s, i) => {
           const tm = draftTimes[i] ?? s.time
           const prev = draftTimes[i - 1]
@@ -347,7 +348,7 @@ function Ledger() {
             <View key={s.prompt} style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1, minHeight: 56, borderTopWidth: i ? 1 : 0, borderTopColor: c.line }}>
               <View style={{ flex: 1, gap: 2 }}>
                 <Eyebrow>{tl('promptN', { n: s.prompt })}</Eyebrow>
-                <Meta tone="ink">{slotLabel(s)}</Meta>
+                <Meta tone="ink"><MonoNums text={slotLabel(s)} /></Meta>
               </View>
               <IconButton icon="minus" label={tl('earlier', { n: s.prompt })} onPress={() => setDraftTimes((d) => d.map((x, j) => (j === i ? shiftTime(x, -15) : x)))} disabled={!canEarlier} />
               <Mono tone="ink" size={20} style={{ minWidth: 64, textAlign: 'center' }} accessibilityLiveRegion="polite">
@@ -358,7 +359,7 @@ function Ledger() {
           )
         })}
         <Meta size={14} tone="ink3">
-          {tl('lastBefore', { from: prefs.quiet.from })}
+          <MonoNums text={tl('lastBefore', { from: prefs.quiet.from })} />
         </Meta>
       </Sheet>
     </Screen>

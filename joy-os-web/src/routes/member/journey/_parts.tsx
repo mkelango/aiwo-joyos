@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { ArrowRight, Bed, ChevronDown, Download, Pause, PartyPopper, Play, RotateCcw, Ruler, Sparkles, Users, Utensils, Footprints, MessageCircle } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { Link } from 'react-router-dom'
@@ -11,6 +11,8 @@ import type { ItemKind } from './_data'
 import { useJ } from './_i18n'
 import { setOffline as setOfflineWeek, useJourney } from './_store'
 import { useMeasured } from '@/routes/member/core/_store'
+import { DUR, useReduceMotion } from '@/lib/motion'
+import { monoDigits } from './_mono'
 
 const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 
@@ -18,7 +20,7 @@ const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 export function PrimaryChip({ primary, size = 'sm', className }: { primary: TermKey | 'ALL'; size?: 'sm' | 'md'; className?: string }) {
   const { t } = useJ()
   if (primary !== 'ALL') return <TermChip term={primary} size={size} className={className} />
-  return (
+  return monoDigits(
     <span className={clsx('inline-flex items-center gap-2 rounded-full border border-line bg-paper-raised', size === 'sm' ? 'px-2.5 py-1 text-[13px]' : 'px-3 py-1.5 text-[15px]', className)}>
       <span className="flex -space-x-0.5" aria-hidden>
         {ORDER.map((k) => <TermDot key={k} term={k} size={8} />)}
@@ -57,7 +59,7 @@ export function QRCode({ value, size = 148, className }: { value: string; size?:
       <rect x={x + 2} y={y + 2} width={3} height={3} fill={QR_DARK} />
     </g>
   )
-  return (
+  return monoDigits(
     <svg viewBox={`-2 -2 ${n + 4} ${n + 4}`} width={size} height={size} role="img" aria-label={t('qrFor', { v: value })} className={clsx('rounded-lg', className)} shapeRendering="crispEdges">
       <rect x={-2} y={-2} width={n + 4} height={n + 4} fill={QR_LIGHT} />
       {cells.map(([x, y]) => <rect key={`${x}.${y}`} x={x} y={y} width={1} height={1} fill={QR_DARK} />)}
@@ -67,7 +69,7 @@ export function QRCode({ value, size = 148, className }: { value: string; size?:
 }
 
 export function Quote({ children, by, role, className }: { children: ReactNode; by: string; role?: string; className?: string }) {
-  return (
+  return monoDigits(
     <figure className={clsx('relative', className)}>
       <blockquote className="font-serif text-[1.55rem] font-light italic leading-snug text-ink md:text-[1.9rem]">“{children}”</blockquote>
       <figcaption className="mt-4 flex items-center gap-3">
@@ -93,7 +95,7 @@ const KURAL = {
 
 export function Verse({ className }: { className?: string }) {
   const { t, r } = useJ()
-  return (
+  return monoDigits(
     <figure className={clsx('relative', className)}>
       <p className="eyebrow text-ink-3">{r('verseEyebrow', { n: KURAL.n })}</p>
       <blockquote className="mt-4">
@@ -132,7 +134,8 @@ export function AudioPlayer({ week, title, seconds, transcript, term }: { week: 
   const setOffline = (on: boolean) => setOfflineWeek(week, on)
   const [downloading, setDownloading] = useState(offline ? 100 : 0)
   const [showText, setShowText] = useState(false)
-  const reduce = useReducedMotion()
+  const reduce = useReduceMotion()
+  const fade = useFade(-4, 0.2)
   const { t, r, en } = useJ()
   const timer = useRef<number | null>(null)
 
@@ -159,7 +162,7 @@ export function AudioPlayer({ week, title, seconds, transcript, term }: { week: 
   const activePara = Math.min(transcript.length - 1, Math.floor((pos / seconds) * transcript.length))
   const bars = useMemo(() => Array.from({ length: 56 }, (_, i) => 0.25 + Math.abs(Math.sin(i * 1.7 + week) * Math.cos(i * 0.31)) * 0.75), [week])
 
-  return (
+  return monoDigits(
     <div className="rounded-card border border-line bg-paper-raised p-5 shadow-card md:p-6">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
@@ -233,7 +236,7 @@ export function AudioPlayer({ week, title, seconds, transcript, term }: { week: 
       </div>
 
       {showText && (
-        <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="mt-5 space-y-3 rounded-card bg-paper-sunk p-4 md:p-5">
+        <motion.div {...fade} className="mt-5 space-y-3 rounded-card bg-paper-sunk p-4 md:p-5">
           <p className="eyebrow text-ink-3">{t('transcriptHead')}</p>
           {!en && <p className="text-[14px] text-ink-2">{t('transcriptNote')}</p>}
           {transcript.map((t, i) => (
@@ -250,7 +253,7 @@ export function AudioPlayer({ week, title, seconds, transcript, term }: { week: 
  * Ink line drawing with one Daybreak or term-colour fill, above the title.
  */
 export function JourneyEmpty({ kind, title, body, action }: { kind: 'ledger' | 'cation' | 'occasions' | 'letter' | 'circle' | 'generic'; title: ReactNode; body?: ReactNode; action?: ReactNode }) {
-  return (
+  return monoDigits(
     <EmptyState
       title={<span className="flex flex-col items-center gap-4"><span aria-hidden className="block"><EmptyIllustration kind={kind} /></span><span>{title}</span></span>}
       body={body}
@@ -263,7 +266,7 @@ export function JourneyEmpty({ kind, title, body, action }: { kind: 'ledger' | '
 export function PrintOnly({ id }: { id: string }) {
   // Scoped to printOnly(id): an ordinary browser print of the page prints the whole page.
   const on = `html[data-print-only="${id}"]`
-  return (
+  return monoDigits(
     <style>{`@media print {
   ${on} body * { visibility: hidden !important; }
   ${on} #${id}, ${on} #${id} * { visibility: visible !important; }
@@ -288,14 +291,24 @@ export function printOnly(id: string) {
 
 /** A thin horizontal "you are here" marker for a phase timeline. */
 export function HereMarker({ label }: { label: ReactNode }) {
-  return (
+  return monoDigits(
     <span className="inline-flex items-center gap-1.5 rounded-full bg-daybreak-soft px-2.5 py-1 text-[12px] font-medium text-daybreak-ink">
       <span className="h-1.5 w-1.5 rounded-full bg-daybreak" aria-hidden /> {label}
     </span>
   )
 }
 
-export const fade = { initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.24 } }
+/** The journey rise-in. Under reduced motion (OS setting or the app's own Reduce motion) it is
+ *  the brand's 120 ms opacity fade instead, with no movement (Playbook p53). */
+export function reducedFade(reduce: boolean, y = 8, duration = DUR.settle / 1000) {
+  return reduce
+    ? { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: DUR.instant / 1000 } }
+    : { initial: { opacity: 0, y }, animate: { opacity: 1, y: 0 }, transition: { duration } }
+}
+
+export function useFade(y = 8, duration = DUR.settle / 1000) {
+  return reducedFade(useReduceMotion(), y, duration)
+}
 
 /** Dialog focus: move focus in on open, keep Tab inside, give it back on close. */
 export function useFocusTrap(root: RefObject<HTMLElement | null>, initial?: RefObject<HTMLElement | null>, active = true) {
@@ -362,7 +375,7 @@ export function useAfterIndex() {
 export function OccasionsCard() {
   const { t } = useJ()
   const req = useJourney().occasionRequests[0]
-  return (
+  return monoDigits(
     <section className="mt-10" aria-labelledby="occasions-link">
       <Card tone="outline" className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex min-w-0 gap-4">

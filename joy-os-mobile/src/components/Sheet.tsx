@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Animated, Easing, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native'
+import { type ReactNode } from 'react'
+import { Animated, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useDict } from '../lib/i18n'
 import { useReduceMotion } from '../lib/store'
 import { useTheme } from '../theme/ThemeProvider'
-import { EASE_BRAND, motion } from '../theme/tokens'
 import { KIT } from './_i18n'
+import { useReducedFade } from './FadeModal'
 import { Icon } from './Icon'
 import { Body } from './Text'
 
@@ -59,28 +59,4 @@ export function Sheet({ open, onClose, title, children, footer }: { open: boolea
       </Animated.View>
     </Modal>
   )
-}
-
-/**
- * The reduced-motion fade for a Modal: 0→1 over 120 ms on open, 1→0 over 120 ms on close, and
- * the Modal stays up until the fade-out ends. Without Reduce Motion it follows `open` at full
- * opacity and the Modal's own fade does the work.
- */
-function useReducedFade(open: boolean, reduce: boolean) {
-  const opacity = useRef(new Animated.Value(open && !reduce ? 1 : 0)).current
-  const [up, setUp] = useState(open)
-  useEffect(() => {
-    if (!reduce) {
-      opacity.setValue(1)
-      setUp(open)
-      return
-    }
-    if (open) setUp(true)
-    const run = Animated.timing(opacity, { toValue: open ? 1 : 0, duration: motion.d1, easing: Easing.bezier(...EASE_BRAND), useNativeDriver: true })
-    run.start(({ finished }) => {
-      if (finished && !open) setUp(false)
-    })
-    return () => run.stop()
-  }, [open, reduce, opacity])
-  return { opacity, visible: reduce ? open || up : open }
 }

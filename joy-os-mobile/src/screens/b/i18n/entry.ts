@@ -8,6 +8,8 @@ export const WELCOME = {
   titleSerif: { en: 'living', ta: 'வாழத்', hi: 'जीने' },
   titleB: { en: '.', ta: ' தகுந்த ஆண்டுகள்.', hi: ' लायक हों।' },
   lead: { en: 'Joy OS measures your Joyspan across six terms, names the lowest, and gives you one action a day for ninety days. A person is behind every number.', ta: 'Joy OS உங்கள் ஜாய்ஸ்பானை ஆறு அம்சங்களில் அளவிடுகிறது, மிகக் குறைந்ததைச் சுட்டிக்காட்டுகிறது, தொண்ணூறு நாட்களுக்கு தினமும் ஒரு செயலைத் தருகிறது. ஒவ்வொரு எண்ணுக்குப் பின்னும் ஒரு மனிதர் இருக்கிறார்.', hi: 'Joy OS छह पहलुओं में आपका जॉयस्पैन मापता है, सबसे कमज़ोर पहलू बताता है, और नब्बे दिन तक रोज़ एक काम देता है। हर नंबर के पीछे एक इंसान है।' },
+  // Where Welcome introduces Joyspan, the word is credited (Playbook p17), as on Method and Check.
+  credit: { en: 'The word Joyspan is credited to Dr Kerry Burnight.', ta: 'Joyspan என்ற சொல்லுக்கான பெருமை Dr Kerry Burnight அவர்களுக்கு உரியது.', hi: 'Joyspan शब्द का श्रेय Dr Kerry Burnight को जाता है।' },
   termsA11y: { en: 'The six terms: Healthspan, Purpose, Relationships, Freedom, Daily Pleasure, and less Preventable Suffering.', ta: 'ஆறு அம்சங்கள்: ஆரோக்கிய ஆயுள், நோக்கம், உறவுகள், சுதந்திரம், தினசரி மகிழ்ச்சி, குறைவான தவிர்க்கக்கூடிய துன்பம்.', hi: 'छह पहलू: स्वस्थ आयु, उद्देश्य, रिश्ते, स्वतंत्रता, रोज़ का आनंद, और कम टाला जा सकने वाला कष्ट।' },
   beginHint: { en: 'Sets up your ninety days: about three minutes', ta: 'உங்கள் தொண்ணூறு நாட்களை அமைக்கிறது: சுமார் மூன்று நிமிடங்கள்', hi: 'आपके नब्बे दिन तैयार करता है: लगभग तीन मिनट' },
   begin: { en: 'Begin', ta: 'தொடங்குங்கள்', hi: 'शुरू करें' },

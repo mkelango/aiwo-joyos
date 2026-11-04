@@ -197,6 +197,7 @@ export const DATA = {
   conData: { en: 'Data', ta: 'தரவு', hi: 'डेटा' },
   conPublishing: { en: 'Publishing', ta: 'வெளியீடு', hi: 'प्रकाशन' },
   conOura: { en: 'Oura via Terra', ta: 'Terra வழியாக Oura', hi: 'Terra के ज़रिए Oura' },
+  conCalNone: { en: 'Calendar · not connected', ta: 'நாட்காட்டி · இணைக்கப்படவில்லை', hi: 'कैलेंडर · जुड़ा नहीं है' },
   conStar: { en: 'Star Health (insurer)', ta: 'Star Health (காப்பீட்டு நிறுவனம்)', hi: 'Star Health (बीमा कंपनी)' },
   purCare: { en: 'Use my data to look after me', ta: 'என்னைக் கவனித்துக்கொள்ள என் தரவைப் பயன்படுத்தலாம்', hi: 'मेरी देखभाल के लिए मेरा डेटा इस्तेमाल करें' },
   purData: { en: 'Keep my record and signals', ta: 'என் பதிவையும் சிக்னல்களையும் வைத்திருக்கலாம்', hi: 'मेरा रिकॉर्ड और सिग्नल सँभालकर रखें' },
@@ -1253,7 +1254,7 @@ export const MEM = {
   razorpay: { en: 'Payments by Razorpay. Joy OS never sees or stores your card number or UPI PIN.', ta: 'கட்டணங்கள் Razorpay மூலம். உங்கள் கார்டு எண்ணையோ UPI PIN-ஐயோ Joy OS ஒருபோதும் பார்ப்பதும் இல்லை, சேமிப்பதும் இல்லை.', hi: 'भुगतान Razorpay से। Joy OS आपका कार्ड नंबर या UPI PIN कभी नहीं देखता, न रखता है।' },
   passport: { en: 'The Joy Passport', ta: 'Joy Passport', hi: 'Joy Passport' },
   passportBody: { en: 'One member across ’cations, editions and Houses — your stamps, credits and prepaid stays.', ta: '’கேஷன்கள், பதிப்புகள், Houses எல்லாவற்றிலும் ஒரே உறுப்பினர் — உங்கள் முத்திரைகள், கிரெடிட்கள், முன்கட்டணத் தங்குதல்கள்.', hi: '’केशन, एडिशन और Houses में एक ही सदस्य — आपकी मुहरें, क्रेडिट और पहले से भुगतान किए ठहराव।' },
-  openPassport: { en: 'Open your passport', ta: 'உங்கள் passport-ஐத் திறக்கவும்', hi: 'अपना पासपोर्ट खोलें' },
+  openPassport: { en: 'Open your passport', ta: 'உங்கள் பாஸ்போர்ட்டைத் திறக்கவும்', hi: 'अपना पासपोर्ट खोलें' },
   taxInvoice: { en: 'Tax invoice {id}', ta: 'வரி விலைப்பட்டியல் {id}', hi: 'टैक्स इनवॉइस {id}' },
   invoice: { en: 'Invoice', ta: 'விலைப்பட்டியல்', hi: 'इनवॉइस' },
   upText: { en: '{plan} is {price} {cadence}. Your Circle year is credited to the day — there is no deadline and no offer that runs out.', ta: '{plan} {cadence} {price}. உங்கள் Circle ஆண்டு நாள் கணக்கில் கழிக்கப்படும் — காலக்கெடுவோ, முடிந்துபோகும் சலுகையோ இல்லை.', hi: '{plan} {cadence} {price} है। आपके Circle साल का हिसाब दिन तक जोड़ा जाता है — कोई समय-सीमा नहीं, कोई ऑफ़र जो ख़त्म हो जाए।' },
@@ -1598,6 +1599,9 @@ export const TRUST = {
   deviceGive: { en: 'To give it, connect the device: you choose its purposes there.', ta: 'இதை அளிக்க, சாதனத்தை இணைக்கவும்: அதன் நோக்கங்களை அங்கே தேர்ந்தெடுப்பீர்கள்.', hi: 'देने के लिए डिवाइस जोड़ें: उसके उद्देश्य आप वहीं चुनेंगे।' },
   wDevice: { en: '{name} will be disconnected and stop syncing. Nothing new is read from it; what was already read stays in your record unless you delete it.', ta: '{name} துண்டிக்கப்பட்டு ஒத்திசைப்பது நின்றுவிடும். அதிலிருந்து புதிதாக எதுவும் படிக்கப்படாது; ஏற்கெனவே படித்தவை நீங்கள் நீக்கும் வரை உங்கள் பதிவில் இருக்கும்.', hi: '{name} हटा दिया जाएगा और सिंक बंद हो जाएगा। उससे कुछ नया नहीं पढ़ा जाएगा; जो पहले पढ़ा जा चुका है, वह आपके रिकॉर्ड में रहेगा जब तक आप उसे न हटाएँ।' },
   viaDevices: { en: 'Devices', ta: 'சாதனங்கள்', hi: 'डिवाइस' },
+  viaBody: { en: 'Body space', ta: 'உடல் இடம்', hi: 'शरीर स्पेस' },
+  viaFreedom: { en: 'Freedom time audit', ta: 'சுதந்திரம் நேரக் கணக்கு', hi: 'स्वतंत्रता समय का हिसाब' },
+  calGive: { en: 'To give it, connect a calendar in the {space} time audit: read-only, summarised, then discarded.', ta: 'இதை அளிக்க, {space} நேரக் கணக்கில் ஒரு நாட்காட்டியை இணைக்கவும்: படிக்க மட்டும், சுருக்கப்பட்டு, பிறகு அழிக்கப்படும்.', hi: 'देने के लिए {space} के समय के हिसाब में एक कैलेंडर जोड़ें: सिर्फ़ पढ़ने के लिए, सारांश बनाकर, फिर मिटा दिया जाता है।' },
 } satisfies Dict
 
 export const WA = {
@@ -1655,7 +1659,7 @@ export const WA = {
   startNo: { en: 'Consent is only ever given in the app, never by a reply. Tap “Turn on prompts” beside this phone when you’re ready.', ta: 'ஒப்புதல் செயலியில் மட்டுமே அளிக்கப்படும், பதில் மூலம் ஒருபோதும் இல்லை. தயாரானதும் இந்தப் போனுக்கு அருகிலுள்ள “கேள்விகளை இயக்கவும்” என்பதைத் தட்டுங்கள்.', hi: 'सहमति सिर्फ़ ऐप में दी जाती है, जवाब लिखकर कभी नहीं। तैयार हों तो इस फ़ोन के पास “सवाल चालू करें” पर टैप करें।' },
   resumeOn: { en: 'Prompts are back on for today.', ta: 'இன்றைக்குக் கேள்விகள் மீண்டும் இயக்கத்தில்.', hi: 'आज के लिए सवाल फिर चालू।' },
   resumeNext: { en: 'Prompts are back on for today. The next Ledger prompt comes around 16:15.', ta: 'இன்றைக்குக் கேள்விகள் மீண்டும் இயக்கத்தில். அடுத்த லெட்ஜர் கேள்வி சுமார் 16:15-க்கு வரும்.', hi: 'आज के लिए सवाल फिर चालू। अगला लेजर सवाल लगभग 16:15 पर आएगा।' },
-  checkTab: { en: 'The Check lives under its own tab beside this phone — tap “The Check” to try it.', ta: 'Check இந்தப் போனுக்கு அருகில் தனித் தாவலில் உள்ளது — முயற்சிக்க “The Check” என்பதைத் தட்டுங்கள்.', hi: 'Check इस फ़ोन के पास अपने अलग टैब में है — आज़माने के लिए “The Check” पर टैप करें।' },
+  checkTab: { en: 'The Check lives under its own tab beside this phone — tap “The Check” to try it.', ta: 'செக் இந்தப் போனுக்கு அருகில் தனித் தாவலில் உள்ளது — முயற்சிக்க “செக்” என்பதைத் தட்டுங்கள்.', hi: 'चेक इस फ़ोन के पास अपने अलग टैब में है — आज़माने के लिए “चेक” पर टैप करें।' },
   savedFree: { en: 'Saved to your Joy Ledger: “{text}”. Ten seconds, well spent.', ta: 'உங்கள் ஜாய் லெட்ஜரில் சேமிக்கப்பட்டது: “{text}”. பத்து வினாடிகள், நன்றாகச் செலவானது.', hi: 'आपके जॉय लेजर में सहेजा गया: “{text}”। दस सेकंड, अच्छे से बीते।' },
   nextAround: { en: 'Next prompt around 16:15.', ta: 'அடுத்த கேள்வி சுமார் 16:15-க்கு.', hi: 'अगला सवाल लगभग 16:15 पर।' },
   onlyHelp: { en: 'I can only help with your Joy Ledger, the Check and reminders here. For anything else, open the app or message Priya.', ta: 'இங்கே உங்கள் ஜாய் லெட்ஜர், Check, நினைவூட்டல்களுக்கு மட்டுமே உதவ முடியும். வேறு எதற்கும் செயலியைத் திறக்கவும் அல்லது Priya-வுக்குச் செய்தி அனுப்பவும்.', hi: 'यहाँ मैं सिर्फ़ आपके जॉय लेजर, Check और रिमाइंडर में मदद कर सकता हूँ। बाकी किसी भी चीज़ के लिए ऐप खोलें या Priya को संदेश भेजें।' },

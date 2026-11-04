@@ -14,7 +14,7 @@ import { useLocal } from '@/screens/a/local'
 import type { MeasuredIndex } from '@/shared/indexScoring'
 import { INDEX_HISTORY } from '@/shared/member'
 import { SPACE_TODAY, SPACE_TODAY_INDEX, localDay } from '@/screens/a/spacesData'
-import { Verse } from '@/screens/a/parts'
+import { Verse, monoNums } from '@/screens/a/parts'
 import { useIsMinor } from '@/lib/minor'
 
 // PRACTICE WEEK (Memo p.21): one week in full — audio, the practice, the science note,
@@ -103,14 +103,14 @@ function WeekView({ n }: { n: string }) {
       {status === 'next' ? (
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Icon name="lock" size={16} color={c.ink3} />
-          <Meta style={{ flex: 1 }}>{t('You can read ahead. The circle takes this week together on {date}.', { date: fmtDate(opens, lang) })}</Meta>
+          <Meta style={{ flex: 1 }}>{monoNums(t('You can read ahead. The circle takes this week together on {date}.', { date: fmtDate(opens, lang) }))}</Meta>
         </View>
       ) : null}
 
       <Card tone="raised" style={{ gap: space.s2 }}>
         <View style={{ gap: 6 }}>
           <Eyebrow>{t('Week {n} · the Mentor’s voice · 5 min', { n: num })}</Eyebrow>
-          <Title size={24}>{tx(content.audioTitle)}</Title>
+          <Title size={24}>{monoNums(tx(content.audioTitle))}</Title>
           <Meta size={14}>{t('C. Sivasankaran, Mentor, AIWO Limited · English')}</Meta>
         </View>
         <AudioPlayer week={num} title={tx(content.audioTitle)} seconds={content.seconds} transcript={content.transcript} />
@@ -126,21 +126,21 @@ function WeekView({ n }: { n: string }) {
         ].map(([k, v]) => (
           <View key={k} style={{ gap: 4 }}>
             <Eyebrow tone="ink2">{k}</Eyebrow>
-            <Body>{tx(v)}</Body>
+            <Body>{monoNums(tx(v))}</Body>
           </View>
         ))}
         {num === 8 && minor ? (
           <Card tone="raised" padding={16} style={{ gap: space.s1 }}>
-            <Body weight="medium">{t('Not scored while under 18')}</Body>
+            <Body weight="medium">{monoNums(t('Not scored while under 18'))}</Body>
             <Meta>{t('At the end of the eight weeks, choose one thing for the next ninety days with Priya.')}</Meta>
           </Card>
         ) : num === 8 ? (
           <Card tone="raised" padding={16} style={{ gap: space.s1 }}>
             <Body weight="medium">{t('This week, you take the Index again.')}</Body>
-            <Meta>{t('About twenty minutes, saved as you go. Like for like with your baseline, then a signed delta at Day 90.')}</Meta>
+            <Meta>{monoNums(t('About twenty minutes, saved as you go. Like for like with your baseline, then a signed delta at Day 90.'))}</Meta>
             {measured ? (
               <View style={{ gap: 4 }} accessibilityLiveRegion="polite">
-                <Meta tone="ink">{t('Re-taken {date}: {a} before, {b} after.', { date: fmtDate(measured.at, lang), a: INDEX_HISTORY[0].value, b: Math.round(measured.ji) })}</Meta>
+                <Meta tone="ink">{monoNums(t('Re-taken {date}: {a} before, {b} after.', { date: fmtDate(measured.at, lang), a: INDEX_HISTORY[0].value, b: Math.round(measured.ji) }))}</Meta>
                 <ArrowLink onPress={() => router.push('/practice')}>{t('See before and after')}</ArrowLink>
               </View>
             ) : null}
@@ -174,9 +174,9 @@ function WeekView({ n }: { n: string }) {
           <Icon name="book" size={16} color={c.ink2} />
           <Eyebrow style={{ flexShrink: 1 }}>{t('Science note · from the faculty')}</Eyebrow>
         </View>
-        <Title size={22}>{tx(content.science.title)}</Title>
-        <Body tone="ink2">{tx(content.science.body)}</Body>
-        <Meta tone="ink">{tx(content.science.faculty)}</Meta>
+        <Title size={22}>{monoNums(tx(content.science.title))}</Title>
+        <Body tone="ink2">{monoNums(tx(content.science.body))}</Body>
+        <Meta tone="ink">{monoNums(tx(content.science.faculty))}</Meta>
         <Mono size={12} tone="ink3">
           {content.science.ref}
         </Mono>
@@ -224,8 +224,8 @@ function WeekView({ n }: { n: string }) {
         <Title size={22}>
           <Serif>“{tx(content.circlePrompt)}”</Serif>
         </Title>
-        <Meta>{t('{when} with Priya · {n} minutes', { when: tx(CIRCLE.when), n: CIRCLE.callMinutes })}</Meta>
-        <ArrowLink icon="users" onPress={() => router.push('/circles')}>
+        <Meta>{monoNums(t('{when} with Priya · {n} minutes', { when: tx(CIRCLE.when), n: CIRCLE.callMinutes }))}</Meta>
+        <ArrowLink joyIcon="circle" onPress={() => router.push('/circles')}>
           {t('Your circle')}
         </ArrowLink>
       </Card>
@@ -264,7 +264,7 @@ function WeekLink({ dir, n: w, title }: { dir: 'prev' | 'next'; n: number; title
         {dir === 'next' ? <Icon name="arrow-right" size={13} color={c.ink3} /> : null}
       </View>
       <Meta tone="ink" size={14} align={dir === 'next' ? 'right' : 'left'}>
-        {tx(title)}
+        {monoNums(tx(title))}
       </Meta>
     </Pressable>
   )

@@ -7,7 +7,7 @@ import { DaybreakButton, Eyebrow, SpecimenTag, TermChip } from '@/components/joy
 import { Button, Card, PageHeader, Pill, Sheet, Tabs, Toggle } from '@/components/ui'
 import type { Role } from '@/domain/types'
 import { PreviewBanner, useConsoleAccess, useConsoleRole } from '../care/_gate'
-import { DURATIONS, PURPOSES, access, addAccessRequest, decideAccessRequest, isLive, standingRequest, statusLabel, useAccessRequests, type AccessRequest } from '../care/_accessStore'
+import { DURATIONS, OPS_JIT_READ, OPS_JIT_WRITE, PURPOSES, access, addAccessRequest, decideAccessRequest, isLive, scopeLabel as accessScopeLabel, standingRequest, statusLabel, useAccessRequests, type AccessRequest } from '../care/_accessStore'
 import { fmtClock, fmtDuration } from '../care/_parts'
 import { AI_TOOLS, AUDIT, CELLS, CHECK_PHONE_KEY, COSTS, FLAG_COHORTS, FLAG_RELEASES, FLAG_ROLLOUTS, JIT_REQUESTS, RED_TEAM, RELEASE_FLAGS, RELEASE_FLAGS_KEY, RIGHTS_JOBS, RIGHTS_STORES, SIGNAL_QUALITY, SIGNAL_SOURCES, SLOS, TENANTS, TRACES, TRACE_GUARD, TRACE_REVIEWERS, type FlagTarget, type Trace, type TraceFinding, type TraceGuard } from './_data'
 import { AccessNote, CanActProvider, CardHead, ChartLead, Field, Kpi, Legend, Meter, Row, ScrollTabs, StatusTag, Swatch, Writes, areaCls, fieldCls, pct, readStored, tabPanelProps, tick, tipLabel, tipStyle, useCanAct, useStored, useTabParam, writeStored, type StatusTone } from './_parts'
@@ -24,6 +24,8 @@ const EVAL_BAR = 0.9
 const COST_TARGET = 60
 const ME = 'Neha Iyer · DPO'
 const ME_NAME = ME.split(' · ')[0]
+/** Who decides a control-plane request in this specimen, as the access store records it. */
+const SECOND_ENGINEER = 'Second engineer on call'
 const TENANT_SCOPES = TENANTS.filter((t) => t.members > 0)
 const TENANT_WEIGHTED_COST = Math.round(TENANT_SCOPES.reduce((a, t) => a + t.budget * t.members, 0) / TENANT_SCOPES.reduce((a, t) => a + t.members, 0))
 const scopeLabel = (s: string) => (s === 'all' ? 'all tenants' : TENANTS.find((t) => t.id === s)?.name ?? s)
@@ -35,7 +37,8 @@ type JitStatus = 'pending' | 'active' | 'expired' | 'denied' | 'withdrawn'
 type FlagState = { on: boolean; target: FlagTarget }
 type Flag = (typeof RELEASE_FLAGS)[number]
 type Jit = { id: string; who: string; role: string; scope: string; duration: string; reason: string; status: JitStatus; approver: string; expires: string }
-type Change = { day: string; at: string; what: string; reason: string }
+/** A session audit line. who/role name the actor when it is not the signed-in engineer; grant is the JIT grant it ran under. */
+type Change = { day: string; at: string; what: string; reason: string; who?: string; role?: string; grant?: string }
 type Stamp = { day: string; at: string }
 type ToolState = { on: boolean; killedFor: string[]; signoff: 'none' | 'requested' | 'signed' }
 type Pending = { kind: 'tool' | 'flag' | 'target' | 'signoff'; key: string; to: boolean; nonce: number }
@@ -49,7 +52,15 @@ const KIND_LABEL = { export: 'Export', erase: 'Erase', withdraw: 'Withdraw conse
 // Just-in-time access to the control plane goes through the consoles' access store (care/_accessStore), so a grant
 // approved here opens this console under the gate, and a JIT request sent from All consoles lands in this list.
 const OPS = '/console/ops'
-const JIT_SCOPES = ['prod read · ledger write path traces', 'prod read · signals-ingest logs', 'prod read · research registry schema', 'prod write · feature flags and kill switches']
+// Each choice sends one of the two scopes the gate knows: a read grant looks, a write grant acts on every control here.
+const JIT_SCOPES = [
+  { key: 'read-ledger', scope: OPS_JIT_READ, label: 'Read · ledger write path traces', focus: 'ledger write path traces' },
+  { key: 'read-signals', scope: OPS_JIT_READ, label: 'Read · signals-ingest logs', focus: 'signals-ingest logs' },
+  { key: 'read-registry', scope: OPS_JIT_READ, label: 'Read · research registry schema', focus: 'research registry schema' },
+  { key: 'write', scope: OPS_JIT_WRITE, label: 'Write · flags, kill switches and every control-plane action', focus: 'flags, kill switches, drills, rota, reviews and rights jobs' },
+]
+/** A scope as written on a request ("Production read · look only"), worded by the access store so every console agrees. */
+const jitScopeName = (r: AccessRequest) => accessScopeLabel(r)
 /** Production access is never long: an hour, or four for an incident that runs. */
 const JIT_DURATIONS = DURATIONS.slice(0, 2)
 const JIT_DECLINE = ['No incident or change ticket covers this', 'A read-only scope would do; ask again for that', 'The on-call engineer already has it in hand']
@@ -85,7 +96,7 @@ function initialNotices(r: (typeof RIGHTS_JOBS)[number]): Job['notices'] {
 export default function Ops() {
   const [tab, setTab] = useTabParam(TABS, 'flags')
   // JIT only: GATE gives no role standing access here, so nobody acts without a live grant from a second engineer.
-  const { canAct, chosen, role, roleLabel, person, now } = useConsoleAccess(OPS)
+  const { canAct, chosen, role, roleLabel, person, now, grant } = useConsoleAccess(OPS)
   const { setRole } = useConsoleRole()
   const requests = useAccessRequests()
   const jitRequests = requests.filter((r) => r.to === OPS)
@@ -119,10 +130,17 @@ export default function Ops() {
     const s = next()
     return `${s.day} ${s.at}`
   }
+  // Every write logged while a grant lets this engineer act carries that grant's ref.
+  const actingRef = canAct && grant ? grant.ref : undefined
   const log = (what: string, reason: string): Stamp => {
     const s = next()
-    setChanges((c) => [{ ...s, what, reason }, ...c])
+    setChanges((c) => [{ ...s, what, reason, grant: actingRef }, ...c])
     return s
+  }
+  /** An access line written by someone other than the acting engineer: the requester, or the second engineer deciding. */
+  const logBy = (who: string, actorRole: string, what: string, reason: string) => {
+    const s = next()
+    setChanges((c) => [{ ...s, what, reason, who, role: actorRole }, ...c])
   }
   const ask = (kind: Pending['kind'], key: string, to: boolean) => { if (canAct) setPending({ kind, key, to, nonce: ++nonce.current }) }
 
@@ -170,23 +188,31 @@ export default function Ops() {
   }
 
   // Your own JIT request: written to the access store, decided by a second engineer (played here, as on All consoles).
+  // The store writes each of these to the console audit too; the lines here are this page's own trail, naming the actor.
   const requestJit = (scope: string, duration: string, purpose: string, why: string) => {
     if (!chosen) return null
     const req = addAccessRequest({ to: OPS, label: 'Control plane', role, roleLabel, person, purpose, scope, duration, why })
-    if (req) log(`${req.ref} requested · ${scope} · ${duration}`, why)
+    if (req) logBy(req.person, req.roleLabel, `${req.ref} requested · ${jitScopeName(req)} · ${duration}`, why)
     return req
   }
   const decideJit = (r: AccessRequest, approve: boolean, reason?: string) => {
     decideAccessRequest(r.ref, approve ? 'granted' : 'declined', reason)
-    log(`${r.ref} ${approve ? 'approved' : 'declined'} by the second engineer on call`, approve ? `Just-in-time access for ${r.person} · ${r.duration}` : reason ?? 'Just-in-time access decision')
+    logBy(SECOND_ENGINEER, 'second engineer', `${r.ref} ${approve ? 'approved' : 'declined'} · ${jitScopeName(r)}`, approve ? `Just-in-time access for ${r.person} · ${r.duration}` : reason ?? 'Just-in-time access decision')
   }
   const withdrawJit = (r: AccessRequest) => {
     access.withdraw(r.ref)
-    log(`${r.ref} withdrawn by the requester`, 'Request no longer needed')
+    logBy(r.person, r.roleLabel, `${r.ref} withdrawn by the requester`, 'Request no longer needed')
   }
   const revokeJit = (r: AccessRequest) => {
-    access.revoke(r.ref)
-    log(`${r.ref} revoked`, 'Access no longer needed; ended before expiry')
+    // The holder ends their own grant; anyone else's is ended by the second engineer who approved it.
+    // Both audits (this page's trail and the console audit the store writes) name the same actor.
+    if (chosen && r.role === role) {
+      access.revoke(r.ref)
+      logBy(r.person, r.roleLabel, `${r.ref} revoked by the holder`, 'Access no longer needed; ended before expiry')
+    } else {
+      access.revoke(r.ref, { who: SECOND_ENGINEER, role: 'Control plane · approver' })
+      logBy(SECOND_ENGINEER, 'second engineer', `${r.ref} revoked`, 'Access no longer needed; ended before expiry')
+    }
   }
   const decide = (id: string, approve: boolean) => {
     if (!canAct) return
@@ -232,7 +258,7 @@ export default function Ops() {
         actions={
           <div className="flex flex-wrap items-center gap-3">
             <SpecimenTag />
-            <DaybreakButton onClick={() => setJitOpen(true)}>{myJit ? (myJit.status === 'pending' ? 'JIT request pending' : 'JIT access active') : 'Request JIT access'}</DaybreakButton>
+            <DaybreakButton onClick={() => setJitOpen(true)}>{myJit ? (myJit.status === 'pending' ? 'JIT request pending' : canAct ? 'JIT write access active' : 'JIT read access active') : 'Request JIT access'}</DaybreakButton>
           </div>
         }
       />
@@ -278,7 +304,7 @@ export default function Ops() {
           {tab === 'oncall' && <OnCall log={log} />}
           {tab === 'cost' && <Cost total={totalCost} costs={costs} offTools={killed} />}
           {tab === 'cells' && <Cells tools={tools} />}
-          {tab === 'audit' && <Audit jit={jit} requests={jitRequests} role={chosen ? role : null} now={now} changes={changes} onDecide={decide} onRevoke={revoke} onDecideReq={decideJit} onWithdrawReq={withdrawJit} onRevokeReq={revokeJit} log={log} />}
+          {tab === 'audit' && <Audit jit={jit} requests={jitRequests} role={chosen ? role : null} grant={grant} now={now} changes={changes} onDecide={decide} onRevoke={revoke} onDecideReq={decideJit} onWithdrawReq={withdrawJit} onRevokeReq={revokeJit} log={log} />}
           {tab === 'signals' && <Signals flags={flags} replay={replay} onReplay={runReplay} />}
           {tab === 'rights' && <Rights jobs={jobs} setJobs={setJobs} log={log} stamp={stamp} />}
         </motion.div>
@@ -288,7 +314,7 @@ export default function Ops() {
         {pending && <ChangeForm key={pending.nonce} p={pending} tool={tools[pending.key]} flag={flagStates[pending.key]} onApply={applyChange} onCancel={() => setPending(null)} />}
       </Sheet>
       </CanActProvider>
-      <JitSheet open={jitOpen} onClose={() => setJitOpen(false)} chosen={chosen} roleLabel={roleLabel} person={person} standing={myJit} now={now} onSignIn={() => setRole('ops')} onSubmit={requestJit} onSeeAudit={() => { setJitOpen(false); setTab('audit') }} />
+      <JitSheet open={jitOpen} onClose={() => setJitOpen(false)} chosen={chosen} roleLabel={roleLabel} person={person} standing={myJit} canAct={canAct} now={now} onSignIn={() => setRole('ops')} onSubmit={requestJit} onRevoke={revokeJit} onSeeAudit={() => { setJitOpen(false); setTab('audit') }} />
     </div>
   )
 }
@@ -1001,10 +1027,12 @@ function Cells({ tools }: { tools: Record<string, ToolState> }) {
 
 // ─── Audit & JIT ─────────────────────────────────────────────────────────
 
-function Audit({ jit, requests, role, now, changes, onDecide, onRevoke, onDecideReq, onWithdrawReq, onRevokeReq, log }: {
+function Audit({ jit, requests, role, grant, now, changes, onDecide, onRevoke, onDecideReq, onWithdrawReq, onRevokeReq, log }: {
   jit: Jit[]
   requests: AccessRequest[]
   role: Role | null
+  /** The signed-in engineer's live grant, if any: a read grant looks, a write grant decides other engineers' requests. */
+  grant: AccessRequest | null
   now: number
   changes: Change[]
   onDecide: (id: string, approve: boolean) => void
@@ -1023,6 +1051,9 @@ function Audit({ jit, requests, role, now, changes, onDecide, onRevoke, onDecide
   const session = view === 'system' ? [] : changes
   const tone = (st: JitStatus) => (st === 'active' ? 'ok' : st === 'pending' ? 'watch' : 'off') as 'ok' | 'watch' | 'off'
   const reqTone = (r: AccessRequest) => (r.status === 'pending' ? 'watch' : isLive(r, now) ? 'ok' : 'off') as 'ok' | 'watch' | 'off'
+  const whyOff = grant
+    ? <>Your grant <span className="num">{grant.ref}</span> is {grant.scope === OPS_JIT_READ ? 'read only' : <>scoped to <code className="font-mono text-[13px]">{jitScopeName(grant)}</code></>}, so you can look, not decide. Approving, declining or revoking another engineer’s access takes a write grant of your own.</>
+    : <>You approve, decline or revoke other engineers’ access once you hold a write grant yourself.</>
 
   return (
     <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
@@ -1039,7 +1070,7 @@ function Audit({ jit, requests, role, now, changes, onDecide, onRevoke, onDecide
                   <StatusTag tone={reqTone(r)}>{statusLabel(r, now)}{live && <> · <span className="num">{fmtDuration((r.expiresAt ?? now) - now)}</span> left</>}</StatusTag>
                 </div>
                 <p className="mt-2 text-[15px] text-ink">{r.person} <span className="text-ink-3">· {r.roleLabel}{mine && ' · you'}</span></p>
-                <p className="text-[14px] text-ink-2"><code className="font-mono text-[13px]">{r.scope}</code> · {r.duration}</p>
+                <p className="text-[14px] text-ink-2"><code className="font-mono text-[13px]">{jitScopeName(r)}</code> · {r.duration}</p>
                 <p className="mt-1 text-[14px] text-ink-2">{r.purpose} · {r.why}</p>
                 <p className="mt-1 text-[13px] text-ink-3">
                   Sent <span className="num">{fmtClock(r.sentAt)}</span>
@@ -1068,7 +1099,7 @@ function Audit({ jit, requests, role, now, changes, onDecide, onRevoke, onDecide
                 )}
                 {live && (
                   <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-[13px] text-ink-3">Ends <span className="num">{fmtClock(r.expiresAt ?? now)}</span> · every action under it carries <span className="num">{r.ref}</span></p>
+                    <p className="text-[13px] text-ink-3">Ends <span className="num">{fmtClock(r.expiresAt ?? now)}</span> · every {r.scope === OPS_JIT_READ ? 'read' : 'action'} under it carries <span className="num">{r.ref}</span></p>
                     <Button variant="ghost" size="sm" onClick={() => onRevokeReq(r)} aria-label={`Revoke ${r.ref} now`}>Revoke now</Button>
                   </div>
                 )}
@@ -1088,13 +1119,14 @@ function Audit({ jit, requests, role, now, changes, onDecide, onRevoke, onDecide
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button variant="ink" size="sm" disabled={!canAct} onClick={() => onDecide(j.id, true)}><Check size={14} aria-hidden /> Approve</Button>
                   <Button variant="ghost" size="sm" disabled={!canAct} onClick={() => onDecide(j.id, false)}>Decline</Button>
-                  {!canAct && <p className="basis-full text-[13px] text-ink-3">You approve other engineers’ requests once you hold a grant yourself.</p>}
+                  {!canAct && <p className="basis-full text-[13px] text-ink-3">{whyOff}</p>}
                 </div>
               )}
               {j.status === 'active' && (
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                   <p className="text-[13px] text-ink-3">Approved by {j.approver}</p>
                   <Button variant="ghost" size="sm" disabled={!canAct} onClick={() => onRevoke(j.id)} aria-label={`Revoke ${j.id} now`}>Revoke now</Button>
+                  {!canAct && <p className="basis-full text-[13px] text-ink-3">{whyOff}</p>}
                 </div>
               )}
               {(j.status === 'expired' || j.status === 'denied') && j.approver !== '—' && <p className="mt-2 text-[13px] text-ink-3">{j.expires.startsWith('revoked') ? 'Revoked' : 'Decided'} by {j.approver}</p>}
@@ -1113,7 +1145,7 @@ function Audit({ jit, requests, role, now, changes, onDecide, onRevoke, onDecide
           {session.map((c, i) => (
             <li key={'c' + i} className="grid gap-1 border-b border-line py-3 sm:grid-cols-[8.5rem_1fr]">
               <span className="num text-[12px] text-ink-3">{c.day} {c.at}:00</span>
-              <div><p className="text-[14px] text-ink"><span className="font-medium">{ME_NAME}</span> <span className="text-ink-3">(dpo)</span> · <code className="font-mono text-[13px]">control.change</code> · {c.what}</p><p className="text-[13px] text-ink-3">Purpose: {c.reason}</p></div>
+              <div><p className="text-[14px] text-ink"><span className="font-medium">{c.who ?? ME_NAME}</span> <span className="text-ink-3">({c.role ?? 'dpo'})</span> · <code className="font-mono text-[13px]">{c.who ? 'access.jit' : 'control.change'}</code> · {c.what}</p><p className="text-[13px] text-ink-3">Purpose: {c.reason}{c.grant && <> · under grant <span className="num">{c.grant}</span></>}</p></div>
             </li>
           ))}
           {rows.map((a) => (
@@ -1139,19 +1171,23 @@ function Audit({ jit, requests, role, now, changes, onDecide, onRevoke, onDecide
   )
 }
 
-function JitSheet({ open, onClose, chosen, roleLabel, person, standing, now, onSignIn, onSubmit, onSeeAudit }: {
+function JitSheet({ open, onClose, chosen, roleLabel, person, standing, canAct, now, onSignIn, onSubmit, onRevoke, onSeeAudit }: {
   open: boolean
   onClose: () => void
   chosen: boolean
   roleLabel: string
   person: string
   standing: AccessRequest | null
+  /** What the gate says about the live grant: true for a write grant, false for any grant that does not act. */
+  canAct: boolean
   now: number
   onSignIn: () => void
   onSubmit: (scope: string, duration: string, purpose: string, why: string) => AccessRequest | null
+  onRevoke: (r: AccessRequest) => void
   onSeeAudit: () => void
 }) {
-  const [scope, setScope] = useState(JIT_SCOPES[0])
+  const [choice, setChoice] = useState(JIT_SCOPES[0].key)
+  const pick = JIT_SCOPES.find((x) => x.key === choice) ?? JIT_SCOPES[0]
   const [duration, setDuration] = useState(JIT_DURATIONS[0])
   const [purpose, setPurpose] = useState('Incident investigation')
   const [ticket, setTicket] = useState('')
@@ -1165,10 +1201,13 @@ function JitSheet({ open, onClose, chosen, roleLabel, person, standing, now, onS
     setErrs(e)
     if (Object.keys(e).length) return
     // The store refuses a second request while one already stands for this console and role.
-    if (!onSubmit(scope, duration, purpose, `${ticket.trim().toUpperCase()} · ${reason.trim()}`)) setErrs({ form: 'A request for the control plane already stands for your role. See Audit & JIT.' })
+    if (!onSubmit(pick.scope, duration, purpose, `${ticket.trim().toUpperCase()} · ${pick.focus} · ${reason.trim()}`)) setErrs({ form: 'A request for the control plane already stands for your role. See Audit & JIT.' })
   }
   const close = () => { onClose(); window.setTimeout(() => { setTicket(''); setReason(''); setErrs({}) }, 250) }
   const live = standing && isLive(standing, now) ? standing : null
+  // A grant that does not act is a read grant only when it carries the read scope; one asked for from
+  // All consoles (structure only, one named member) is named by its own scope instead.
+  const readGrant = standing?.scope === OPS_JIT_READ
 
   return (
     <Sheet open={open} onClose={close} title="Request just-in-time access">
@@ -1183,24 +1222,38 @@ function JitSheet({ open, onClose, chosen, roleLabel, person, standing, now, onS
       ) : standing ? (
         <div role="status">
           {live ? <KeyRound size={22} className="text-ink-3" aria-hidden /> : <Timer size={22} className="text-ink-3" aria-hidden />}
-          <p className="mt-3 text-[1.35rem] font-light leading-snug text-ink">{live ? 'Access granted. Every action is audited.' : 'Requested. A second engineer must approve it.'}</p>
+          <p className="mt-3 text-[1.35rem] font-light leading-snug text-ink">{!live ? 'Requested. A second engineer must approve it.' : canAct ? 'Write access granted. Every action is audited.' : readGrant ? 'Read access granted. You can look; every switch here stays off.' : 'Access granted for that scope only. You can look; every switch here stays off.'}</p>
           <p className="mt-2 text-[15px] text-ink-2">
-            <span className="num">{standing.ref}</span> · {standing.scope} · {standing.duration}.{' '}
+            <span className="num">{standing.ref}</span> · {jitScopeName(standing)} · {standing.duration}.{' '}
             {live
               ? <>Approved by {standing.decidedBy}; it ends on its own in <span className="num">{fmtDuration((standing.expiresAt ?? now) - now)}</span>, and you can revoke it sooner from Audit &amp; JIT.</>
               : <>It waits under Audit &amp; JIT, where this specimen lets you play the second engineer. You can withdraw it there.</>}
           </p>
+          {live && (
+            <p className="mt-2 text-[14px] text-ink-2">
+              {canAct
+                ? <>Flags, kill switches, drills, rota swaps, unusual reads, access reviews, rights jobs and other engineers’ requests are open to you until then, and every line in the audit carries <span className="num">{standing.ref}</span>.</>
+                : <>{readGrant ? 'A read grant' : 'A grant with this scope'} opens nothing that writes. To act, end it and ask again for write; one request stands at a time.</>}
+            </p>
+          )}
           <div className="mt-6 flex flex-wrap gap-2">
             <Button variant="secondary" onClick={onSeeAudit}>Go to Audit &amp; JIT</Button>
+            {live && !canAct && <Button variant="ghost" onClick={() => onRevoke(standing)}>{readGrant ? 'End read grant to ask for write' : 'End this grant to ask for write'}</Button>}
             <Button variant="ghost" onClick={close}>Close</Button>
           </div>
         </div>
       ) : (
         <div className="space-y-5">
           <p className="text-[15px] text-ink-2">Least privilege, time-boxed and audited. Health data stays masked in logs whatever you request; raw clinical values are never in scope here. Requesting as {person} · {roleLabel}.</p>
-          <Field label="Scope" htmlFor="jit-scope">
-            <select id="jit-scope" className={fieldCls} value={scope} onChange={(e) => setScope(e.target.value)}>
-              {JIT_SCOPES.map((x) => <option key={x}>{x}</option>)}
+          <Field
+            label="Scope"
+            htmlFor="jit-scope"
+            hint={pick.scope === OPS_JIT_WRITE
+              ? 'Once approved you can act on every control here, including other engineers’ requests. Each action carries the grant’s ref in the audit.'
+              : 'Look only. Once approved you can read production; every switch and button here stays off.'}
+          >
+            <select id="jit-scope" className={fieldCls} value={choice} onChange={(e) => setChoice(e.target.value)}>
+              {JIT_SCOPES.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
             </select>
           </Field>
           <div className="grid gap-5 sm:grid-cols-2">

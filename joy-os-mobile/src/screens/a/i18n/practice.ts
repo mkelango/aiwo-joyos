@@ -149,4 +149,14 @@ export const PRACTICE = dict({
   'Thiruvalluvar': ['திருவள்ளுவர்', 'तिरुवल्लुवर'],
   'The Book of Virtue · On the strength of virtue': ['அறத்துப்பால் · அறன் வலியுறுத்தல்', 'धर्म का खंड · धर्म की महिमा'],
   'The Mentor’s audio and its transcript are in English for now. His words are kept as he spoke them.': ['வழிகாட்டியின் ஒலிப்பதிவும் அதன் எழுத்துவடிவமும் இப்போது ஆங்கிலத்தில் உள்ளன. அவர் பேசிய சொற்கள் அப்படியே வைக்கப்பட்டுள்ளன.', 'मेंटर का ऑडियो और उसका लिखित पाठ अभी अंग्रेज़ी में है। उनके बोले गए शब्द जैसे के तैसे रखे गए हैं।'],
+  // The Mentor's audio offline (screens/a/audio.tsx) and the saved weeks on the eight-week strip
+  'Saved on this phone · {mb} MB · plays with no signal': ['இந்தப் போனில் சேமிக்கப்பட்டது · {mb} MB · சிக்னல் இல்லாமலும் இயங்கும்', 'इस फ़ोन पर सेव · {mb} MB · बिना सिग्नल के भी चलेगा'],
+  'Download paused at {pct}% · you are offline. It carries on when the connection is back.': ['பதிவிறக்கம் {pct}%-இல் நிறுத்தப்பட்டுள்ளது · நீங்கள் இணையத்தில் இல்லை. இணைப்பு திரும்பியதும் தொடரும்.', 'डाउनलोड {pct}% पर रुका है · आप ऑफ़लाइन हैं। कनेक्शन लौटते ही यह आगे बढ़ेगा।'],
+  'This week is not saved on this phone, so it needs a connection to play.': ['இந்த வாரம் இந்தப் போனில் சேமிக்கப்படவில்லை, அதனால் இயக்க இணைப்பு தேவை.', 'यह हफ़्ता इस फ़ोन पर सेव नहीं है, इसलिए चलाने के लिए कनेक्शन चाहिए।'],
+  'You are offline. This week is saved on this phone, so it plays.': ['நீங்கள் இணையத்தில் இல்லை. இந்த வாரம் இந்தப் போனில் சேமிக்கப்பட்டுள்ளது, அதனால் இயங்கும்.', 'आप ऑफ़लाइन हैं। यह हफ़्ता इस फ़ोन पर सेव है, इसलिए चलेगा।'],
+  'You are offline. This week is not saved on this phone, so it needs a connection to play.': ['நீங்கள் இணையத்தில் இல்லை. இந்த வாரம் இந்தப் போனில் சேமிக்கப்படவில்லை, அதனால் இயக்க இணைப்பு தேவை.', 'आप ऑफ़लाइन हैं। यह हफ़्ता इस फ़ोन पर सेव नहीं है, इसलिए चलाने के लिए कनेक्शन चाहिए।'],
+  '. Audio saved for offline, {mb} MB.': ['. ஒலிப்பதிவு இணையமின்றிக் கேட்கச் சேமிக்கப்பட்டது, {mb} MB.', '। ऑडियो ऑफ़लाइन के लिए सेव है, {mb} MB।'],
+  'Saved for offline: {weeks} · {mb} MB on this phone.': ['இணையமின்றிக் கேட்கச் சேமித்தவை: {weeks} · இந்தப் போனில் {mb} MB.', 'ऑफ़लाइन के लिए सेव: {weeks} · इस फ़ोन पर {mb} MB।'],
+  'No week is saved for offline yet.': ['இணையமின்றிக் கேட்க எந்த வாரமும் இன்னும் சேமிக்கப்படவில்லை.', 'ऑफ़लाइन के लिए अभी कोई हफ़्ता सेव नहीं है।'],
+  'You are offline: saved weeks play, the others need a connection.': ['நீங்கள் இணையத்தில் இல்லை: சேமித்த வாரங்கள் இயங்கும், மற்றவற்றுக்கு இணைப்பு தேவை.', 'आप ऑफ़लाइन हैं: सेव किए हफ़्ते चलेंगे, बाक़ी के लिए कनेक्शन चाहिए।'],
 })

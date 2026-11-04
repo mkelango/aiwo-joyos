@@ -181,7 +181,7 @@ export interface DemoAccount {
 
 export const DEMO_ACCOUNTS: DemoAccount[] = [
   { key: 'member', role: 'member', email: 'arjun.rao@specimen.aiwo', title: 'Member', to: '/app', who: 'Arjun Rao · Day 23 of 90', short: 'member' },
-  { key: 'coach', role: 'coach', email: 'priya.natarajan@specimen.aiwo', title: 'Coach & concierge', to: '/console/coach', who: 'Priya Natarajan', short: 'coach' },
+  { key: 'coach', role: 'coach', email: 'priya.natarajan@specimen.aiwo', title: 'Coach', to: '/console/coach', who: 'Priya Natarajan', short: 'coach' },
   { key: 'clinician', role: 'clinician', email: 'meera.iyer@specimen.aiwo', title: 'Clinician', to: '/console/clinical', who: 'Dr Meera Iyer', short: 'clinician' },
   { key: 'partner', role: 'partner', email: 'fairmont.mumbai@specimen.aiwo', title: 'Partner venue', to: '/console/partner', who: 'Fairmont Mumbai', short: 'partner' },
   { key: 'tenant', role: 'tenant', email: 'admin.northwind@specimen.aiwo', title: 'Tenant admin', to: '/console/tenant', who: 'Northwind Capital', short: 'tenant' },
@@ -198,6 +198,10 @@ export const OPS_ACCOUNT: DemoAccount = { key: 'ops', role: 'ops', email: 'sre.o
 // concierge console (bookings, draws, arrivals), where the coach can only look. Kept
 // apart from DEMO_ACCOUNTS for the same reason as OPS_ACCOUNT.
 export const CONCIERGE_ACCOUNT: DemoAccount = { key: 'concierge', role: 'concierge', email: 'ravi.shankar@specimen.aiwo', title: 'Concierge', to: '/console/coach?desk=concierge', who: 'Ravi Shankar', short: 'concierge' }
+
+/** Every demo role's account, in Demo-bar order: the concierge right after the coach, whose
+ *  console it shares, and Engineering & ops last. Sign-in, the creds deck and its overview. */
+export const ROLE_ACCOUNTS: DemoAccount[] = DEMO_ACCOUNTS.flatMap((a) => (a.key === 'coach' ? [a, CONCIERGE_ACCOUNT] : [a])).concat(OPS_ACCOUNT)
 
 // ─── Phone numbers (sign-in and account creation) ───────────────────────────
 

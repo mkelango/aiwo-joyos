@@ -8,14 +8,16 @@ import { Avatar, Button, Card, PageHeader, Pill, SectionTitle, Sheet } from '@/c
 import { CIRCLE, PRACTICE_WEEKS } from '@/data/platform'
 import { MEMBER, TEAM } from '@/data/member'
 import { CAPTIONS, CIRCLE_NEXT, CIRCLE_SESSIONS, OTHER_CIRCLES, PRACTICE_CONTENT, SALONS } from './_data'
-import { SheetFocus, fade, useFocusTrap } from './_parts'
+import { SheetFocus, useFade, useFocusTrap } from './_parts'
 import { TODAY, addCircleReport, isoDate, setCalendar, setCircleRequest, setSalon, useCircleReports, useJourney, withdrawCircleReport } from './_store'
 import { useJ, type JourneyKey } from './_i18n'
 import { useA11yPrefs } from '@/routes/member/account/_prefs'
 import { useApp } from '@/lib/store'
+import { DUR, useReduceMotion } from '@/lib/motion'
 import { useMemberName } from '@/lib/memberName'
 // One shared emergency intercept for every member free-text field (Memo p.24).
 import { useCrisisGuard } from '@/routes/member/spaces/_SpaceShell'
+import { monoDigits } from './_mono'
 
 // JOY CIRCLES (Memo p.21): eight members and a coach, a 30-minute call every
 // Monday for ninety days; video in the app, recordings off by default,
@@ -40,6 +42,7 @@ type RoomMode = 'waiting' | 'live'
 const SELF = MEMBER.firstName
 
 export default function Circles() {
+  const fade = useFade()
   const coach = TEAM.find((p) => p.role === 'Coach')!
   const coachFirst = coach.name.split(' ')[0]
   const week = PRACTICE_WEEKS.find((w) => w.week === CIRCLE.week)!
@@ -69,7 +72,7 @@ export default function Circles() {
   // Give focus back to the join button (Safari does not focus buttons on click).
   const leave = (mode: RoomMode) => { setRoom(null); setLeft(mode); window.setTimeout(() => document.querySelector<HTMLButtonElement>('#join-call button')?.focus(), 0) }
 
-  return (
+  return monoDigits(
     <div>
       <PageHeader
         eyebrow={r('circlesEyebrow', { w: CIRCLE.week })}
@@ -282,6 +285,7 @@ const RULE = 'border-[color:color-mix(in_srgb,var(--room-fg)_25%,transparent)]'
 function CallRoom({ mode, onMode, onLeave }: { mode: RoomMode; onMode: (m: RoomMode) => void; onLeave: () => void }) {
   const coach = TEAM.find((p) => p.role === 'Coach')!
   const week = PRACTICE_WEEKS.find((w) => w.week === CIRCLE.week)!
+  const reduce = useReduceMotion()
   const [mic, setMic] = useState(false)
   const [cam, setCam] = useState(true)
   const [hand, setHand] = useState(false)
@@ -329,8 +333,8 @@ function CallRoom({ mode, onMode, onLeave }: { mode: RoomMode; onMode: (m: RoomM
   const speakerName = tiles[speaker]?.name ?? ''
   const caption = CAPTIONS[speakerName] ?? ''
 
-  return (
-    <motion.div ref={rootRef} tabIndex={-1} style={ROOM_VARS} className={clsx('fixed inset-0 z-50 flex flex-col bg-[color:var(--room-bg)] outline-none', FG)} role="dialog" aria-modal="true" aria-label={t(live ? 'roomLive' : 'roomWait')} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+  return monoDigits(
+    <motion.div ref={rootRef} tabIndex={-1} style={ROOM_VARS} className={clsx('fixed inset-0 z-50 flex flex-col bg-[color:var(--room-bg)] outline-none', FG)} role="dialog" aria-modal="true" aria-label={t(live ? 'roomLive' : 'roomWait')} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduce ? DUR.instant / 1000 : 0.2 }}>
       <header className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-8 md:py-4">
         <div className="min-w-0">
           <p className="eyebrow opacity-70">{tx(CIRCLE.name)}</p>
@@ -405,7 +409,7 @@ function CallRoom({ mode, onMode, onLeave }: { mode: RoomMode; onMode: (m: RoomM
 }
 
 function CallBtn({ on, onClick, label, children }: { on: boolean; onClick: () => void; label: string; children: React.ReactNode }) {
-  return (
+  return monoDigits(
     <button type="button" onClick={onClick} aria-label={label} aria-pressed={on} className={clsx('flex h-12 w-12 items-center justify-center rounded-full transition-colors focus-ring', on ? 'bg-[color:var(--room-fg)] text-[color:var(--room-bg)]' : 'bg-[color:color-mix(in_srgb,var(--room-fg)_14%,transparent)] text-[color:var(--room-fg)]')}>
       {children}
     </button>
@@ -427,6 +431,7 @@ const REASON_EN: Record<Reason, string> = {
 const reasonOf = (stored: string): Reason | undefined => REASONS.find((k) => stored === REASON_EN[k] || stored.startsWith(`${REASON_EN[k]} · `))
 
 function ReportForm({ coach, onDone }: { coach: string; onDone: () => void }) {
+  const fade = useFade()
   const id = useId()
   const { t } = useJ()
   const guard = useCrisisGuard()
@@ -455,7 +460,7 @@ function ReportForm({ coach, onDone }: { coach: string; onDone: () => void }) {
   }
 
   if (sent) {
-    return (
+    return monoDigits(
       <motion.div {...fade} role="status">
         <span className="flex h-11 w-11 items-center justify-center rounded-full bg-paper-sunk text-ink" aria-hidden><Check size={20} /></span>
         <p className="mt-4 text-[1.2rem] text-ink">{t('repSent', { c: coach })}</p>
@@ -469,7 +474,7 @@ function ReportForm({ coach, onDone }: { coach: string; onDone: () => void }) {
     )
   }
 
-  return (
+  return monoDigits(
     <form onSubmit={submit} noValidate className="space-y-5">
       <p className="text-[15px] text-ink-2">{t('repLead', { c: coach })}</p>
       <fieldset>
@@ -516,7 +521,7 @@ function YourReports({ coach }: { coach: string }) {
   const { t } = useJ()
   const fmtDate = useFmtDate()
   if (reports.length === 0) return null
-  return (
+  return monoDigits(
     <div className="mt-3 rounded-card bg-paper-sunk p-3.5">
       <p className="eyebrow text-ink-3">{t('repYours')}</p>
       <ul className="mt-2 space-y-2">

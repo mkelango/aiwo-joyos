@@ -1,7 +1,8 @@
 import { createContext, useContext, type ReactNode } from 'react'
 import { Text as RNText, type StyleProp, type TextProps, type TextStyle } from 'react-native'
+import { MonoNums } from '../lib/monoNums'
 import { useTheme } from '../theme/ThemeProvider'
-import { palettes } from '../theme/tokens'
+import { indicStep, indicType, palettes, scriptOfText, type FontSet, type Script } from '../theme/tokens'
 
 // Typography for Joy OS. "Sans for life, serif for joy, mono for measure."
 // Every component honours Dynamic Type (allowFontScaling, capped per role) and the
@@ -32,12 +33,28 @@ export function useToneColor(tone: Tone): string {
   }
 }
 
-/** Tamil or Devanagari text. Letter-spacing breaks their joined shapes, so tracking is dropped. */
-const INDIC = /[\u0900-\u097F\u0B80-\u0BFF]/
-function hasIndic(children: ReactNode): boolean {
-  if (typeof children === 'string') return INDIC.test(children)
-  if (Array.isArray(children)) return children.some((c) => typeof c === 'string' && INDIC.test(c))
-  return false
+/**
+ * The Indic script a run of text is written in (Tamil or Devanagari), if any. Text in a script
+ * takes that script's face in every app language: the Thirukkural on Practice and தமிழ் / हिन्दी in
+ * the language pickers draw in Mukta Malar and Mukta while the app is in English. Letter-spacing
+ * breaks their joined shapes, so tracking is dropped for them.
+ */
+function scriptOf(children: ReactNode): Script | null {
+  if (typeof children === 'string') return scriptOfText(children)
+  if (Array.isArray(children)) {
+    for (const c of children) {
+      const s = typeof c === 'string' ? scriptOfText(c) : null
+      if (s) return s
+    }
+  }
+  return null
+}
+
+/** The family for a role: the text's own script when it is Tamil or Devanagari, else the app's set. */
+function useFamily(children: ReactNode) {
+  const t = useTheme()
+  const s = scriptOf(children)
+  return { script: s, family: (role: keyof FontSet) => (s ? t.scriptFamily(s, role) : t.fonts[role]) }
 }
 
 type Weight = 'light' | 'regular' | 'medium' | 'semibold' | 'bold'
@@ -56,14 +73,17 @@ interface BaseProps extends Omit<TextProps, 'style'> {
 export function Body({ children, tone = 'ink', color, size, weight = 'regular', style, align, ...rest }: BaseProps & { weight?: Weight }) {
   const t = useTheme()
   const col = useToneColor(tone)
-  // Tamil and Hindi: one step larger, +10% leading (t.script is 1 in English).
-  const fs = (size ?? t.type.body) * t.textScale * t.script.scale
-  const family = { light: t.fonts.sansLight, regular: t.fonts.sans, medium: t.fonts.sansMedium, semibold: t.fonts.sansSemi, bold: t.fonts.sansBold }[weight]
+  const f = useFamily(children)
+  // Tamil and Hindi: one step larger, +10% leading (t.script is 1 in English; Indic text in
+  // English takes the step too, as it is the script that sets larger, not the language).
+  const sc = f.script ? indicType : t.script
+  const fs = (size ?? t.type.body) * t.textScale * sc.scale
+  const family = f.family(({ light: 'sansLight', regular: 'sans', medium: 'sansMedium', semibold: 'sansSemi', bold: 'sansBold' } as const)[weight])
   return (
     <RNText
       maxFontSizeMultiplier={t.maxScale.body}
       {...rest}
-      style={[{ fontFamily: family, fontSize: fs, lineHeight: Math.round(fs * 1.45 * t.script.leading), color: color ?? col, textAlign: align }, style]}
+      style={[{ fontFamily: family, fontSize: fs, lineHeight: Math.round(fs * 1.45 * sc.leading), color: color ?? col, textAlign: align }, style]}
     >
       {children}
     </RNText>
@@ -76,23 +96,27 @@ export function Meta(props: BaseProps & { weight?: Weight }) {
   return <Body tone="ink2" {...props} size={props.size ?? t.type.meta} />
 }
 
-/** Eyebrow / kicker — IBM Plex Mono caps, 12pt, +14% tracking. */
+/** Eyebrow / kicker — IBM Plex Mono caps, 12pt, +14% tracking. In Tamil and Hindi one step
+ *  larger (12→13, as the web's .eyebrow) with +10% leading. */
 export function Eyebrow({ children, tone = 'ink3', color, size, style, align, ...rest }: BaseProps) {
   const t = useTheme()
   const col = useToneColor(tone)
-  const fs = (size ?? t.type.label) * t.textScale
-  const indic = hasIndic(children)
+  const f = useFamily(children)
+  const indic = !!f.script
+  const base = size ?? t.type.label
+  const fs = (indic || t.indic ? indicStep(base) : base) * t.textScale
   return (
     <RNText
       maxFontSizeMultiplier={t.maxScale.label}
       {...rest}
       style={[
         // IBM Plex Mono has no Tamil or Devanagari: an Indic label takes the script's sans.
-        { fontFamily: indic ? t.fonts.sansSemi : t.fonts.mono, fontSize: fs, lineHeight: Math.round(fs * (indic ? 1.7 : 1.5)), letterSpacing: indic ? 0 : fs * 0.14, textTransform: 'uppercase', color: color ?? col, textAlign: align },
+        { fontFamily: indic ? f.family('sansSemi') : t.fonts.mono, fontSize: fs, lineHeight: Math.round(fs * (indic ? 1.7 : 1.5 * t.script.leading)), letterSpacing: indic ? 0 : fs * 0.14, textTransform: 'uppercase', color: color ?? col, textAlign: align },
         style,
       ]}
     >
-      {children}
+      {/* An Indic label is in the script's sans, so its figures ("நாள் 40") are set back in Mono. */}
+      {indic && typeof children === 'string' ? <MonoNums text={children} /> : children}
     </RNText>
   )
 }
@@ -102,8 +126,9 @@ export function Numeral({ children, tone = 'ink', color, size = 96, style, align
   const t = useTheme()
   const col = useToneColor(tone)
   const fs = size * t.textScale
+  const f = useFamily(children)
   // Words in Tamil or Devanagari inside a mono run (a translated "Day 15") take the script's sans.
-  const family = hasIndic(children) ? t.fonts.sans : weight === 'light' ? t.fonts.monoLight : weight === 'medium' ? t.fonts.monoMedium : t.fonts.mono
+  const family = f.script ? f.family('sans') : weight === 'light' ? t.fonts.monoLight : weight === 'medium' ? t.fonts.monoMedium : t.fonts.mono
   return (
     <RNText
       maxFontSizeMultiplier={size >= 40 ? t.maxScale.numeral : t.maxScale.body}
@@ -127,19 +152,47 @@ export function Mono(props: BaseProps & { weight?: 'light' | 'regular' | 'medium
 /** Newsreader italic — the one joy word in a headline. Nest inside Body/Title; inherits size. */
 export function Serif({ children, size, color, style }: { children: ReactNode; size?: number; color?: string; style?: StyleProp<TextStyle> }) {
   const t = useTheme()
-  return <RNText style={[{ fontFamily: t.fonts.serifItalic, fontSize: size ? size * t.textScale : undefined, color }, style]}>{children}</RNText>
+  const f = useFamily(children)
+  return <RNText style={[{ fontFamily: f.family('serifItalic'), fontSize: size ? size * t.textScale : undefined, color }, style]}>{children}</RNText>
 }
 
 /** Headline — Nunito Sans Light. One per screen via ScreenHeader; also card headlines. */
 export function Title({ children, tone = 'ink', color, size, style, align, ...rest }: BaseProps) {
   const t = useTheme()
   const col = useToneColor(tone)
-  const fs = (size ?? t.type.heading) * t.textScale * t.script.scale
+  const f = useFamily(children)
+  const sc = f.script ? indicType : t.script
+  const fs = (size ?? t.type.heading) * t.textScale * sc.scale
   return (
     <RNText
       maxFontSizeMultiplier={t.maxScale.body}
       {...rest}
-      style={[{ fontFamily: t.fonts.sansLight, fontSize: fs, lineHeight: Math.round(fs * 1.22 * t.script.leading), letterSpacing: -fs * 0.01, color: color ?? col, textAlign: align }, style]}
+      style={[{ fontFamily: f.family('sansLight'), fontSize: fs, lineHeight: Math.round(fs * 1.22 * sc.leading), letterSpacing: f.script ? 0 : -fs * 0.01, color: color ?? col, textAlign: align }, style]}
+    >
+      {children}
+    </RNText>
+  )
+}
+
+/**
+ * Text set in a given script whatever the app language: the Thirukkural verse, a language
+ * picker's native name and sample line. Sans (Mukta Malar / Mukta) or the script's serif italic
+ * (Noto Serif Tamil / Tiro Devanagari Hindi), one step larger with +10% leading (Playbook p41).
+ * Body, Title and Eyebrow already pick the face from the text itself; use this when the run
+ * must take a script's face for sure, or for the serif face (face="serif").
+ */
+export function ScriptText({ script, face = 'sans', weight = 'regular', children, tone = 'ink', color, size, style, align, ...rest }: BaseProps & { script: Script; face?: 'sans' | 'serif'; weight?: Weight }) {
+  const t = useTheme()
+  const col = useToneColor(tone)
+  const fs = (size ?? t.type.body) * t.textScale * indicType.scale
+  const key: keyof FontSet =
+    face === 'serif' ? (weight === 'light' ? 'serifLightItalic' : 'serifItalic') : ({ light: 'sansLight', regular: 'sans', medium: 'sansMedium', semibold: 'sansSemi', bold: 'sansBold' } as const)[weight]
+  return (
+    <RNText
+      maxFontSizeMultiplier={t.maxScale.body}
+      accessibilityLanguage={script}
+      {...rest}
+      style={[{ fontFamily: t.scriptFamily(script, key), fontSize: fs, lineHeight: Math.round(fs * 1.45 * indicType.leading), color: color ?? col, textAlign: align }, style]}
     >
       {children}
     </RNText>

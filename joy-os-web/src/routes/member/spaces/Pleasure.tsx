@@ -10,8 +10,8 @@ import { useA11yPrefs } from '@/routes/member/account/_prefs'
 import { useApp } from '@/lib/store'
 import { FILMS, PLANNED_START, SAVOURING_PROMPTS } from './_data'
 import { CopyDetails, SpaceShell, ToolCard, rovingRadio, useCrisisGuard, Toggle } from './_SpaceShell'
-import { useSpaceText, type SpKey } from './_i18n'
-import { CAL_NAME, KEPT_KEY, readCalendarProvider, useSpaceState, useTrustConsent, type KeptPrompt } from './_state'
+import { mono, useSpaceText, type SpKey } from './_i18n'
+import { CAL_NAME, KEPT_KEY, useCalendarProvider, useSpaceState, useTrustConsent, type KeptPrompt } from './_state'
 
 // PLEASURE · Daily Pleasure (Memo p.19): the Joy Ledger's weekly view of where joy
 // came from; one planned pleasure a day, scheduled like a meeting; savouring
@@ -43,7 +43,7 @@ export default function Pleasure() {
 
 function LedgerInsights() {
   const { ledger } = useApp()
-  const { t, d, r, lang, dm, clock } = useSpaceText()
+  const { t, d, r, lang, dm, clock, tn } = useSpaceText()
   const [removed] = useLedgerRemoved()
   // The same week the Ledger shows: the seed entries plus moments kept here, minus any removed.
   const week = useMemo(() => weekCounts(ledger, removed), [ledger, removed])
@@ -60,19 +60,31 @@ function LedgerInsights() {
   const pct = useMemo(() => largestRemainder([byPrompt[1], byPrompt[2], byPrompt[3]]), [byPrompt])
   // liveLedger places new moments on the specimen clock, so newest first is a plain sort by `at`.
   const best = useMemo(() => live.find((e) => e.word), [live])
+  // The headline is read from the same counts as the bars: the top tag, and the second when it
+  // stands alone in second place. A tie of three or more at the top is said as such.
+  const tagWord = (tag: string) => (lang === 'en' ? tag.toLowerCase() : d(tag))
+  const [first, second, third] = week
+  const tiedTop = week.filter((l) => first && l.count === first.count).length
+  const title = !first
+    ? t('pl.lg.titleNone')
+    : tiedTop > 2
+      ? r('pl.lg.titleEven', { n: <span className="num">{tiedTop}</span> })
+      : second && (!third || third.count < second.count)
+        ? r('pl.lg.titleTwo', { a: <em>{tagWord(first.tag)}</em>, b: tagWord(second.tag) })
+        : r('pl.lg.titleOne', { a: <em>{tagWord(first.tag)}</em> })
   return (
     <ToolCard
       className="w-full"
       eyebrow={t('pl.lg.eyebrow')}
-      title={<>{r('pl.lg.title', { e: <em>{t('pl.lg.titleE')}</em> })}</>}
-      sub={t('pl.lg.sub', { n: total })}
+      title={<>{title}</>}
+      sub={tn('pl.lg.sub', { n: total })}
       aside={<SpecimenTag />}
     >
       <p className="text-[15px] text-ink-2">{t('pl.lg.perTag')}</p>
       <ul className="mt-3 space-y-2.5" aria-label={t('pl.lg.perTagAria')}>
         {week.map((l) => (
           <li key={l.tag} className={clsx('grid items-center gap-3', lang === 'en' ? 'grid-cols-[5.5rem_1fr_2rem]' : 'grid-cols-[6.5rem_1fr_2rem]')}>
-            <span className="min-w-0 break-words text-[14px] text-ink">{d(l.tag)}</span>
+            <span className="min-w-0 break-words text-[14px] text-ink">{mono(d(l.tag))}</span>
             <span className="h-3 overflow-hidden rounded-full bg-paper-sunk" aria-hidden>
               <motion.span className="block h-full rounded-full bg-term-d" initial={{ width: 0 }} animate={{ width: `${(l.count / max) * 100}%` }} transition={{ duration: 0.24 }} />
             </span>
@@ -117,7 +129,7 @@ function PlannedPleasure() {
   // The calendar Freedom connected, while c_cal is on: read-only, so it is only ever named
   // as the place the member may add a pleasure themselves.
   const calConsent = useTrustConsent('c_cal')
-  const provider = readCalendarProvider()
+  const provider = useCalendarProvider()
   // The member may keep planned pleasures in the app only: then no calendar details are offered.
   const [appOnly, setAppOnly] = useSpaceState('pleasure.appOnly.v1', false)
   const calName = calConsent.on && provider && !appOnly ? CAL_NAME[provider] : ''
@@ -202,7 +214,7 @@ function PlannedPleasure() {
         )}
         {added && calName && (
           <div className="rounded-2xl border border-line bg-paper-raised px-4 py-3 text-[14px] text-ink-2">
-            <p>{t('pl.pp.addYourself', { cal: calName })}</p>
+            <p>{mono(t('pl.pp.addYourself', { cal: calName }))}</p>
             <CopyDetails className="mt-2.5" text={`${dayT(added.day)} ${added.time} · ${added.minutes} ${t('c.min')}\n${added.what}${added.with ? t('pl.pp.dotWith', { who: added.with }) : ''}`} />
           </div>
         )}
@@ -223,7 +235,7 @@ function PlannedPleasure() {
                 <span className="eyebrow text-ink-3">{dayT(d)}</span>
                 {it ? (
                   <motion.span initial={justAdded === it.id ? { opacity: 0, x: -4 } : false} animate={{ opacity: 1, x: 0 }} className="min-w-0 text-[14px] text-ink">
-                    <span className="num mr-2 text-ink-3">{it.time}</span>{it.what}{it.with ? <span className="text-ink-3">{t('pl.pp.dotWith', { who: it.with })}</span> : null}
+                    <span className="num mr-2 text-ink-3">{it.time}</span>{it.what}{it.with ? <span className="text-ink-3">{mono(t('pl.pp.dotWith', { who: it.with }))}</span> : null}
                   </motion.span>
                 ) : <span className="text-[13px] text-ink-3">{t('c.nothingYet')}</span>}
                 {it ? <button onClick={() => { setItems((x) => x.filter((y) => y.id !== it.id)); setRemoved(it); if (justAdded === it.id) setJustAdded(null) }} aria-label={t('c.removeX', { x: it.what })} className="rounded-full p-1.5 text-ink-3 hover:bg-paper-sunk focus-ring"><Trash2 size={14} /></button> : <span />}
@@ -260,8 +272,8 @@ function Savouring() {
       <div className="relative flex min-h-[200px] flex-col justify-between overflow-hidden rounded-2xl bg-[color:var(--term-d-soft)] p-5">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.22 }} aria-live="polite">
-            <p className="eyebrow text-[color:var(--term-d-ink)]">{d(p.kind)} · <span className="num">{i + 1}</span>/<span className="num">{SAVOURING_PROMPTS.length}</span></p>
-            <p className="mt-3 text-[1.3rem] font-light leading-snug text-ink">{d(p.text)}</p>
+            <p className="eyebrow text-[color:var(--term-d-ink)]">{mono(d(p.kind))} · <span className="num">{i + 1}</span>/<span className="num">{SAVOURING_PROMPTS.length}</span></p>
+            <p className="mt-3 text-[1.3rem] font-light leading-snug text-ink">{mono(d(p.text))}</p>
           </motion.div>
         </AnimatePresence>
         <div className="mt-5 flex flex-wrap gap-2">
@@ -272,7 +284,7 @@ function Savouring() {
         </div>
       </div>
       <div className="mt-auto pt-5">
-        <p className="text-[14px] text-ink-2" role="status">{today.length ? <>{t('pl.sv.kept', { list: today.map((k) => d(kindOf(k.id)).toLowerCase()).join(', ') })}</> : t('pl.sv.keepOne')}</p>
+        <p className="text-[14px] text-ink-2" role="status">{today.length ? <>{mono(t('pl.sv.kept', { list: today.map((k) => d(kindOf(k.id)).toLowerCase()).join(', ') }))}</> : t('pl.sv.keepOne')}</p>
         <div className="mt-5 border-t border-line pt-4">
           <Eyebrow>{t('pl.sv.earlier')}</Eyebrow>
           {earlier.length === 0 ? (
@@ -282,7 +294,7 @@ function Savouring() {
               {earlier.map((h) => (
                 <li key={`${h.date}-${h.id}`} className="grid grid-cols-[minmax(2.75rem,auto)_1fr] gap-2 text-[14px]">
                   <span className="eyebrow pt-0.5 text-ink-3">{day(weekdayOf(h.date))}</span>
-                  <span className="min-w-0 text-ink-2"><span className="text-ink">{d(kindOf(h.id))}</span>{h.note ? <> · {h.note}</> : null}</span>
+                  <span className="min-w-0 text-ink-2"><span className="text-ink">{mono(d(kindOf(h.id)))}</span>{h.note ? <> · {h.note}</> : null}</span>
                 </li>
               ))}
             </ul>
@@ -352,7 +364,7 @@ function Films() {
                 <span className="num relative rounded-full bg-paper-raised/90 px-2 py-0.5 text-[11px] text-ink">{f.minutes}</span>
               </span>
               <span className="block p-2.5 sm:p-3">
-                <span className="block break-words text-[14px] leading-snug text-ink sm:text-[15px]">{d(f.title)}</span>
+                <span className="block break-words text-[14px] leading-snug text-ink sm:text-[15px]">{mono(d(f.title))}</span>
                 <span className="mt-0.5 block text-[12px] text-ink-3 sm:text-[13px]">{f.who}</span>
               </span>
             </button>
@@ -422,7 +434,7 @@ function Films() {
               </span>
             </div>
             <p className="eyebrow mt-4 text-ink-3">{open.who} · <span className="num">{open.minutes}</span></p>
-            <p className="mt-2 text-[17px] text-ink">{d(open.note)}</p>
+            <p className="mt-2 text-[17px] text-ink">{mono(d(open.note))}</p>
             <p className="mt-4 text-[13px] text-ink-3">{t('pl.fm.publishing')}</p>
           </div>
         )}

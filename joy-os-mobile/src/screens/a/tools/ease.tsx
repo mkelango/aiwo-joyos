@@ -4,7 +4,7 @@ import { Linking, Pressable, View } from 'react-native'
 import { ArrowLink, Body, Button, Card, Divider, Eyebrow, Icon, Meta, Mono, Sheet, Toggle, fmtDate } from '@/components'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { shiftTime, useLocal } from '@/screens/a/local'
-import { BarRow, HumanWritten, IconButton, OptionRow, TextField } from '@/screens/a/parts'
+import { BarRow, HumanWritten, IconButton, OptionRow, TextField, monoNums } from '@/screens/a/parts'
 import { BURDEN_PARTS, JOURNAL_START, KEEP_MEANING_START, SCREEN_FORMS, SCREEN_HISTORY, SCREEN_META, SCREEN_ROUTE, SPACE_TODAY, WIND_DOWN, type EaseScreen } from '@/screens/a/spacesData'
 import { messagesStore, useAccountThreads, useStore } from '@/screens/b/bStore'
 import type { Msg } from '@/screens/b/accountData'
@@ -71,7 +71,7 @@ function SecondArrow() {
         <View accessibilityLiveRegion="assertive" style={{ flexDirection: 'row', gap: 10, borderWidth: 1, borderColor: c.ink, borderRadius: 12, padding: 14 }}>
           <Icon name="life-buoy" size={18} color={c.ink} />
           <Meta tone="ink" style={{ flex: 1 }}>
-            {t('This was not saved. What you wrote sounds heavy, so we opened help first. Tele-MANAS is free on 14416, any time.')}
+            {monoNums(t('This was not saved. What you wrote sounds heavy, so we opened help first. Tele-MANAS is free on 14416, any time.'))}
           </Meta>
         </View>
       ) : null}
@@ -87,7 +87,7 @@ function SecondArrow() {
             <Mono size={12} tone="ink3">
               {shortDate(e.date, lang)}
             </Mono>
-            {e.problem ? <Body>{e.problem}</Body> : null}
+            {e.problem ? <Body>{monoNums(e.problem)}</Body> : null}
             {e.arrow ? (
               <Meta>
                 <Meta tone="ink3">{t('Second arrow · ')}</Meta>
@@ -120,7 +120,7 @@ function Parts() {
               <Meta tone="ink" style={{ flex: 1 }}>
                 <Rich text={t('{k} · weight *{w}*', { k: tx(p.key), w: p.weight.toFixed(2) })} wrap={(w) => <Mono tone="ink" size={14}>{w}</Mono>} />
               </Meta>
-              <Meta size={14} tone="ink3">{t('Not scored while under 18.')}</Meta>
+              <Meta size={14} tone="ink3">{monoNums(t('Not scored while under 18.'))}</Meta>
             </View>
           ) : (
           <BarRow
@@ -174,8 +174,8 @@ function SleepPlan() {
               {i < WIND_DOWN.length - 1 ? <View style={{ flex: 1, width: 1, backgroundColor: c.line, marginVertical: 4 }} /> : null}
             </View>
             <View style={{ flex: 1, gap: 2, paddingBottom: space.s2 }}>
-              <Body weight="medium">{tx(s.title)}</Body>
-              <Meta size={14}>{tx(s.detail)}</Meta>
+              <Body weight="medium">{monoNums(tx(s.title))}</Body>
+              <Meta size={14}>{monoNums(tx(s.detail))}</Meta>
             </View>
           </View>
         ))}
@@ -265,9 +265,9 @@ function Screens() {
             <View key={n} style={{ gap: 6, paddingVertical: space.s2, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: c.line }}>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
                 <View style={{ flex: 1 }}>
-                  <Body weight="semibold">{tx(n)}</Body>
+                  <Body weight="semibold">{monoNums(tx(n))}</Body>
                   <Meta size={14} tone="ink3">
-                    {tx(meta.what)}
+                    {monoNums(tx(meta.what))}
                   </Meta>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }} accessible accessibilityLabel={t('{n} {score} of {max}', { n: tx(n), score: last.score, max: meta.max })}>
@@ -278,7 +278,7 @@ function Screens() {
                 </View>
               </View>
               <Eyebrow tone="ink2">{tx(band.label)}</Eyebrow>
-              <Body tone="ink2">{tx(band.copy)}</Body>
+              <Body tone="ink2">{monoNums(tx(band.copy))}</Body>
               <Meta size={13} tone="ink3">
                 <Rich
                   text={t('*{date}* · {cadence} · earlier *{list}*', { date: fmtDate(last.date, lang), cadence: tx(meta.cadence), list: hist.slice(0, -1).map((h) => h.score).join(', ') })}
@@ -336,9 +336,9 @@ function CareRouted({ screen, today = false, thread }: { screen: EaseScreen; tod
     <Card tone="sunk" padding={14} style={{ gap: space.s1 }}>
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <Icon name="user-check" size={16} color={c.ink} />
-        <Body style={{ flex: 1 }}>{text}</Body>
+        <Body style={{ flex: 1 }}>{monoNums(text)}</Body>
       </View>
-      {thread ? <Meta size={14}>{t('Your result is in your Care messages with {name}.', { name: r.name })}</Meta> : null}
+      {thread ? <Meta size={14}>{monoNums(t('Your result is in your Care messages with {name}.', { name: r.name }))}</Meta> : null}
       <ArrowLink icon="message-square" onPress={() => router.push(thread ? `/messages?t=${thread}` : `/messages?compose=1&to=${r.personId}`)}>
         {thread ? t('Open the thread in Care') : t('Message {name} in Care', { name: r.name })}
       </ArrowLink>
@@ -398,7 +398,7 @@ function ScreenSheet({ screen, open, onClose, onScored }: { screen: EaseScreen; 
             <>
               <Meta tone="ink2">{INSTRUMENT_NOTE[lang]}</Meta>
               <Meta>{t('Scored on this phone; no AI reads your answers.')}</Meta>
-              <Meta>{form.stem}</Meta>
+              <Meta>{monoNums(form.stem)}</Meta>
             </>
           )}
           {pain ? (
@@ -434,7 +434,7 @@ function ScreenSheet({ screen, open, onClose, onScored }: { screen: EaseScreen; 
                 <View style={{ flexDirection: 'row', gap: 10, alignItems: 'baseline' }}>
                   <Mono size={13} tone="ink3">{`${i + 1}/${form.items.length}`}</Mono>
                   <Body weight="medium" style={{ flex: 1 }}>
-                    {item}
+                    {monoNums(item)}
                   </Body>
                 </View>
                 {(form.itemOptions?.[i] ?? form.options).map((o, v) => (
@@ -444,9 +444,18 @@ function ScreenSheet({ screen, open, onClose, onScored }: { screen: EaseScreen; 
               </View>
             ))
           )}
-          <Mono size={12} tone="ink3">
-            {form.source}
-          </Mono>
+          {/* The source and licence line in the member's language; the instrument's name and its
+              authors stay as published. Plex Mono has no Tamil or Devanagari, so there the words
+              take the script's sans and only the numbers stay Mono. */}
+          {lang === 'en' ? (
+            <Mono size={12} tone="ink3">
+              {form.source}
+            </Mono>
+          ) : (
+            <Meta size={12} tone="ink3">
+              {monoNums(tx(form.source))}
+            </Meta>
+          )}
         </>
       ) : band ? (
         <View style={{ gap: space.s2 }} accessibilityLiveRegion="polite">
@@ -457,8 +466,8 @@ function ScreenSheet({ screen, open, onClose, onScored }: { screen: EaseScreen; 
             <Mono tone="ink3" size={15}>{`/${meta.max}`}</Mono>
           </View>
           <Eyebrow tone="ink2">{tx(band.label)}</Eyebrow>
-          <Body>{tx(band.copy)}</Body>
-          {routes(screen, score) ? <CareRouted screen={screen} today={band.copy.includes('today')} thread={thread} /> : <Meta>{t('Kept with your screens · {cadence}', { cadence: tx(meta.cadence) })}</Meta>}
+          <Body>{monoNums(tx(band.copy))}</Body>
+          {routes(screen, score) ? <CareRouted screen={screen} today={band.copy.includes('today')} thread={thread} /> : <Meta>{monoNums(t('Kept with your screens · {cadence}', { cadence: tx(meta.cadence) }))}</Meta>}
           <HumanWritten by="Dr Sanjay Menon" />
           <Button variant="link" icon="life-buoy" onPress={() => setCrisisOpen(true)}>
             {t('If it feels heavier than this, talk to someone now')}
@@ -503,7 +512,7 @@ function KeepMeaning() {
                 {x.done ? <Icon name="check" size={14} color={c.paper} /> : null}
               </View>
               <Body tone={x.done ? 'ink3' : 'ink'} style={{ flex: 1, textDecorationLine: x.done ? 'line-through' : 'none' }}>
-                {x.text}
+                {monoNums(x.text)}
               </Body>
             </Pressable>
             <IconButton icon="x" label={t('Remove {n}', { n: x.text })} onPress={() => setItems((all) => all.filter((y) => y.id !== x.id))} />
@@ -535,7 +544,7 @@ function TeleManas() {
         </Button>
       </View>
       <Meta size={14} tone="ink3">
-        {t('In an emergency, call 112. Dr Sanjay Menon, your psychologist, is one message away in Care.')}
+        {monoNums(t('In an emergency, call 112. Dr Sanjay Menon, your psychologist, is one message away in Care.'))}
       </Meta>
       <ArrowLink icon="message-square" onPress={() => router.push('/messages?compose=1&to=p_sanjay')}>
         {t('Message Dr Sanjay in Care')}

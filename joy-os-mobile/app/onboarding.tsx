@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Pressable, ScrollView, View } from 'react-native'
 import type { ScrollViewInstance } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Body, Button, Card, DaybreakButton, Eyebrow, Icon, Meta, Mono, Pill, Segmented, Serif, Sheet, TermDot, Toggle, Title, fmtDate } from '@/components'
+import { Body, Button, Card, DaybreakButton, Eyebrow, Icon, Meta, Mono, Pill, ScriptText, Segmented, Serif, Sheet, TermDot, Toggle, Title, fmtDate } from '@/components'
 import { LANGS, useDict, useTermText } from '@/lib/i18n'
 import { ONB, INTENT_TEXT, CONSENT_TEXT, DEVICE_TEXT } from '@/screens/b/i18n/onboarding'
 import { LANG_LABEL, useCommon, useTx, usePrefsError, perDayKey } from '@/screens/b/i18n/common'
@@ -16,6 +16,7 @@ import { EMPTY_GUARDIAN, GUARDIAN_CODE, accountProblems, contactLabel, guardianP
 import { SPECIMEN_AIWO_ID } from '@/screens/b/_data'
 import { CheckLine, ChoiceCard, Done, Field, KeyValue, StepHead, StepProgress, TimeStepper, TimelineStep, useCrisisGuard } from '@/screens/b/parts'
 import { SPECIMEN_NOW } from '@/screens/b/accountData'
+import { MonoNums } from '@/lib/monoNums'
 
 // ONBOARDING (Plan §4B; intent first, device last): language → AIWO ID (name, contact, a
 // passkey or a one-time code) → intent tiles → three consents → device → quiet hours →
@@ -59,7 +60,7 @@ const CONSENT_ITEMS: { key: keyof Consents; name: string; required: boolean; pla
 ]
 
 export default function Onboarding() {
-  const { c, space } = useTheme()
+  const { c, space, type: typeScale } = useTheme()
   const insets = useSafeAreaInsets()
   const { lang, setLang } = useApp()
   const scroll = useRef<ScrollViewInstance>(null)
@@ -334,7 +335,7 @@ export default function Onboarding() {
         </Pressable>
         <Eyebrow tone="ink2" style={{ flexShrink: 1, textAlign: 'center' }}>{t('settingUp')}</Eyebrow>
         <Pressable onPress={saveAndExit} accessibilityRole="button" accessibilityLabel={t('saveExit')} hitSlop={6} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 }}>
-          <Meta style={{ textDecorationLine: 'underline' }}>{t('saveExitShort')}</Meta>
+          <Meta style={{ textDecorationLine: 'underline' }}><MonoNums text={t('saveExitShort')} /></Meta>
         </Pressable>
       </View>
 
@@ -408,18 +409,31 @@ export default function Onboarding() {
                   accessibilityLabel={`${LANG_LABEL[lang][l.value]}, ${l.native}`}
                   title={
                     <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-                      <Body size={22} weight="medium">
-                        {l.native}
-                      </Body>
+                      {/* தமிழ் and हिन्दी in their own faces (Mukta Malar, Mukta) in every app language. */}
+                      {l.value === 'en' ? (
+                        <Body size={22} weight="medium">
+                          {l.native}
+                        </Body>
+                      ) : (
+                        <ScriptText script={l.value} size={22} weight="medium">
+                          {l.native}
+                        </ScriptText>
+                      )}
                       {l.native !== LANG_LABEL[lang][l.value] ? <Meta>{LANG_LABEL[lang][l.value]}</Meta> : null}
                     </View>
                   }
-                  sub={<Meta tone="ink3">{`“${SAMPLE[l.value]}”`}</Meta>}
+                  sub={
+                    l.value === 'en' ? (
+                      <Meta tone="ink3">{`“${SAMPLE[l.value]}”`}</Meta>
+                    ) : (
+                      <ScriptText script={l.value} tone="ink3" size={typeScale.meta}>{`“${SAMPLE[l.value]}”`}</ScriptText>
+                    )
+                  }
                 />
               ))}
             </View>
             <Card tone="sunk" padding={16}>
-              <Meta>{t('langNote')}</Meta>
+              <Meta><MonoNums text={t('langNote')} /></Meta>
             </Card>
           </>
         ) : null}
@@ -450,7 +464,7 @@ export default function Onboarding() {
                 help={t('acNameHelp')}
               />
               <View style={{ gap: space.s1 }}>
-                <Meta tone="ink">{t('acReach')}</Meta>
+                <Meta tone="ink"><MonoNums text={t('acReach')} /></Meta>
                 <Segmented<'phone' | 'email'>
                   value={account.via}
                   onChange={(v) => {
@@ -496,7 +510,7 @@ export default function Onboarding() {
             </Card>
             <Card tone="raised" style={{ gap: space.s2 }}>
               <View style={{ gap: space.s1 }}>
-                <Meta tone="ink">{t('mgAgeQ')}</Meta>
+                <Meta tone="ink"><MonoNums text={t('mgAgeQ')} /></Meta>
                 <Segmented<'adult' | 'minor'>
                   value={account.age ?? ('' as 'adult')}
                   onChange={(v) => {
@@ -508,18 +522,18 @@ export default function Onboarding() {
                     { value: 'minor', label: t('mgMinor') },
                   ]}
                 />
-                <Meta size={14}>{t('mgAgeHelp')}</Meta>
+                <Meta size={14}><MonoNums text={t('mgAgeHelp')} /></Meta>
               </View>
               {minor ? (
                 <View style={{ gap: space.s2 }} accessibilityLiveRegion="polite">
-                  <Body>{t('mgMinorBody')}</Body>
+                  <Body><MonoNums text={t('mgMinorBody')} /></Body>
                   {guardian.status === 'verified' ? (
                     <View style={{ flexDirection: 'row', gap: space.s2, alignItems: 'flex-start' }}>
                       <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.ink, alignItems: 'center', justifyContent: 'center' }}>
                         <Icon name="check" size={20} color={c.paper} />
                       </View>
                       <View style={{ flex: 1, gap: 4 }}>
-                        <Body weight="medium">{t('mgVerified', { name: guardian.name.trim(), phone: guardianPhone(guardian.phone) })}</Body>
+                        <Body weight="medium"><MonoNums text={t('mgVerified', { name: guardian.name.trim(), phone: guardianPhone(guardian.phone) })} /></Body>
                         <Button variant="link" onPress={() => setAccount((a) => ({ ...a, guardian: EMPTY_GUARDIAN }))}>
                           {t('mgChange')}
                         </Button>
@@ -527,7 +541,7 @@ export default function Onboarding() {
                     </View>
                   ) : guardian.status === 'sent' ? (
                     <View style={{ gap: space.s2 }}>
-                      <Body>{t('mgSent', { name: guardian.name.trim(), phone: guardianPhone(guardian.phone) })}</Body>
+                      <Body><MonoNums text={t('mgSent', { name: guardian.name.trim(), phone: guardianPhone(guardian.phone) })} /></Body>
                       <Field
                         label={t('mgCodeLabel')}
                         value={gCode}
@@ -569,7 +583,7 @@ export default function Onboarding() {
                         placeholder="98400 12345"
                         error={gTouched && gProbs.phone ? t(gProbs.phone) : null}
                       />
-                      <Meta size={14}>{t('mgConsentCopy')}</Meta>
+                      <Meta size={14}><MonoNums text={t('mgConsentCopy')} /></Meta>
                       <Button variant="ink" icon="send" onPress={sendGuardianCode} style={{ alignSelf: 'flex-start' }}>
                         {t('mgSend')}
                       </Button>
@@ -589,7 +603,7 @@ export default function Onboarding() {
                     <View style={{ flex: 1, gap: 6 }}>
                       <Body weight="medium">{account.verified === 'passkey' ? t('acPkCreated') : t('acCodeVerified')}</Body>
                       <Mono tone="ink" size={20} accessibilityLabel={t('acIdA11y', { id: account.aiwoId.split('').join(' ') })}>{account.aiwoId}</Mono>
-                      <Meta size={14}>{t('acYourId', { id: account.aiwoId, name: account.name.trim(), contact: contactLabel(account) })}</Meta>
+                      <Meta size={14}><MonoNums text={t('acYourId', { id: account.aiwoId, name: account.name.trim(), contact: contactLabel(account) })} /></Meta>
                       <Button variant="link" onPress={() => setAccount((a) => ({ ...a, verified: null, aiwoId: null }))}>
                         {t('acDiffMethod')}
                       </Button>
@@ -597,7 +611,7 @@ export default function Onboarding() {
                   </View>
                 ) : secure === 'code' ? (
                   <View style={{ gap: space.s2 }}>
-                    <Body>{t('acEnterCode', { c: contactLabel(account) })}</Body>
+                    <Body><MonoNums text={t('acEnterCode', { c: contactLabel(account) })} /></Body>
                     <Field
                       label={t('acCodeLabel')}
                       value={code}
@@ -645,7 +659,7 @@ export default function Onboarding() {
                     </View>
                     {fieldsNote && !fieldsOk ? (
                       <Meta tone="error" accessibilityRole="alert">
-                        {t(account.via === 'phone' ? 'acFieldsPhone' : 'acFieldsEmail')}
+                        <MonoNums text={t(account.via === 'phone' ? 'acFieldsPhone' : 'acFieldsEmail')} />
                       </Meta>
                     ) : null}
                   </View>
@@ -698,15 +712,15 @@ export default function Onboarding() {
                       <CheckLine key={a}>{tx(ct.allows[ai], a)}</CheckLine>
                     ))}
                     <Meta size={14} tone="ink3">
-                      {tx(ct.never, ci.never)}
+                      <MonoNums text={tx(ct.never, ci.never)} />
                     </Meta>
                   </View>
                 }
               />
               )
             })}
-            <Meta size={14}>{t('consVersionNote')}</Meta>
-            <Meta size={14}>{t('consNote')}</Meta>
+            <Meta size={14}><MonoNums text={t('consVersionNote')} /></Meta>
+            <Meta size={14}><MonoNums text={t('consNote')} /></Meta>
           </>
         ) : null}
 
@@ -750,14 +764,14 @@ export default function Onboarding() {
             </View>
             <Card tone="sunk" style={{ gap: space.s1 + 4 }}>
               <Eyebrow>{dev.id === 'none' ? t('noDevice') : t('whatShares', { name: devName })}</Eyebrow>
-              <Body>{tx(DEVICE_TEXT[dev.id]?.reads, dev.reads)}</Body>
+              <Body><MonoNums text={tx(DEVICE_TEXT[dev.id]?.reads, dev.reads)} /></Body>
               {dev.id !== 'none' ? (
                 <Button variant={linked[device] === 'linked' ? 'secondary' : 'ink'} icon={linked[device] === 'linked' ? 'check' : 'link'} onPress={link} disabled={!!linked[device]}>
                   {linked[device] === 'linking' ? t('linking') : linked[device] === 'linked' ? t('linkedSpec') : t('linkName', { name: devName })}
                 </Button>
               ) : null}
             </Card>
-            <Meta size={14}>{t('devNote')}</Meta>
+            <Meta size={14}><MonoNums text={t('devNote')} /></Meta>
           </>
         ) : null}
 
@@ -778,7 +792,7 @@ export default function Onboarding() {
                 <TimeStepper label={tc('from')} value={quiet.from} onChange={(v) => { setQuiet((q) => ({ ...q, from: v })); setError(null) }} />
                 <TimeStepper label={tc('until')} value={quiet.to} onChange={(v) => { setQuiet((q) => ({ ...q, to: v })); setError(null) }} />
               </View>
-              <Meta size={14}>{tc('quietException')}</Meta>
+              <Meta size={14}><MonoNums text={tc('quietException')} /></Meta>
             </Card>
             <Card tone="raised" style={{ gap: space.s2 }}>
               <Eyebrow>{tc('remindersADay')}</Eyebrow>
@@ -790,7 +804,7 @@ export default function Onboarding() {
                 }}
                 items={['0', '1', '2', '3'].map((n) => ({ value: n, label: n }))}
               />
-              <Meta>{tc(perDayKey(perDay))}</Meta>
+              <Meta><MonoNums text={tc(perDayKey(perDay))} /></Meta>
             </Card>
             <Card tone="raised" style={{ gap: space.s2 }}>
               <Eyebrow>{tc('howToReach')}</Eyebrow>
@@ -798,7 +812,7 @@ export default function Onboarding() {
               <Toggle checked={channels.whatsapp} onChange={(v) => { setChannels((x) => ({ ...x, whatsapp: v })); setError(null) }} label={tc('chWa')} description={tc('chWaD')} />
               <Toggle checked={channels.email} onChange={(v) => { setChannels((x) => ({ ...x, email: v })); setError(null) }} label={tc('chEmail')} description={tc('chEmailD')} />
             </Card>
-            <Meta size={14}>{t('fallNote')}</Meta>
+            <Meta size={14}><MonoNums text={t('fallNote')} /></Meta>
           </>
         ) : null}
 
@@ -828,11 +842,11 @@ export default function Onboarding() {
                 error={invErr.name}
               />
               <View style={{ gap: space.s1 }}>
-                <Meta tone="ink">{t('hhRelation')}</Meta>
+                <Meta tone="ink"><MonoNums text={t('hhRelation')} /></Meta>
                 <Segmented<(typeof RELATIONS)[number]['value']> value={invRelation} onChange={setInvRelation} items={RELATIONS.map((r) => ({ value: r.value, label: t(r.key) }))} />
               </View>
               <View style={{ gap: space.s1 }}>
-                <Meta tone="ink">{t('hhAgeLabel')}</Meta>
+                <Meta tone="ink"><MonoNums text={t('hhAgeLabel')} /></Meta>
                 <Segmented<(typeof AGES)[number]['value']>
                   value={invAge}
                   onChange={(v) => {
@@ -845,25 +859,25 @@ export default function Onboarding() {
               {invAge === 'minor' ? (
                 <View style={{ gap: 4 }}>
                   <Toggle checked={invConsent} onChange={(v) => { setInvConsent(v); setInvErr((e) => ({ ...e, consent: undefined })) }} label={t('hhConsent')} description={t('hhConsentD')} />
-                  {invErr.consent ? <Meta tone="error" accessibilityLiveRegion="polite">{invErr.consent}</Meta> : null}
+                  {invErr.consent ? <Meta tone="error" accessibilityLiveRegion="polite"><MonoNums text={invErr.consent} /></Meta> : null}
                 </View>
               ) : null}
               <Button variant="secondary" icon="user-plus" onPress={addInvite}>
                 {t('hhAdd')}
               </Button>
-              <Meta size={14}>{t('hhInvHelp')}</Meta>
+              <Meta size={14}><MonoNums text={t('hhInvHelp')} /></Meta>
             </Card>
             {invAdded ? <Done>{invAdded}</Done> : null}
             <Card tone="sunk" style={{ gap: space.s1 }}>
               <Eyebrow>{t('hhInvList')}</Eyebrow>
               {invites.length === 0 ? (
-                <Meta>{t('hhNone')}</Meta>
+                <Meta><MonoNums text={t('hhNone')} /></Meta>
               ) : (
                 invites.map((iv, i) => (
                   <View key={iv.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: c.line, paddingVertical: 6 }}>
                     <View style={{ flex: 1, gap: 2 }}>
                       <Body weight="medium">{iv.name}</Body>
-                      <Meta size={14}>{t('hhLine', { relation: relLabel(iv.relation), age: ageLabel(iv.age), date: fmtDate(iv.expires) })}</Meta>
+                      <Meta size={14}><MonoNums text={t('hhLine', { relation: relLabel(iv.relation), age: ageLabel(iv.age), date: fmtDate(iv.expires) })} /></Meta>
                     </View>
                     <Button variant="ghost" size="sm" onPress={() => removeInvite(iv.id)} accessibilityLabel={t('hhRemoveA11y', { name: iv.name })}>
                       {t('hhRemove')}
@@ -872,7 +886,7 @@ export default function Onboarding() {
                 ))
               )}
             </Card>
-            <Meta size={14}>{t('hhPrivate')}</Meta>
+            <Meta size={14}><MonoNums text={t('hhPrivate')} /></Meta>
           </>
         ) : null}
 
@@ -931,11 +945,11 @@ export default function Onboarding() {
                 <View style={{ gap: 2 }}>
                   <Mono tone="ink" size={17}>{account.aiwoId ?? SPECIMEN_AIWO_ID}</Mono>
                   {account.aiwoId ? (
-                    <Meta size={14}>{`${account.name.trim()} · ${contactLabel(account)} · ${account.verified === 'passkey' ? t('acVPasskey') : account.verified === 'code' ? t('acVCode') : t('acVNone')}`}</Meta>
+                    <Meta size={14}><MonoNums text={`${account.name.trim()} · ${contactLabel(account)} · ${account.verified === 'passkey' ? t('acVPasskey') : account.verified === 'code' ? t('acVCode') : t('acVNone')}`} /></Meta>
                   ) : null}
                 </View>
               </KeyValue>
-              {minor ? <KeyValue k={t('kAge')}>{t('mgSum', { name: guardian.name.trim() })}</KeyValue> : null}
+              {minor ? <KeyValue k={t('kAge')}><Body><MonoNums text={t('mgSum', { name: guardian.name.trim() })} /></Body></KeyValue> : null}
               <KeyValue k={tc('language')}>{LANGS.find((l) => l.value === lang)!.native}</KeyValue>
               <KeyValue k={t('kConsents')}>{`${t('consSum')}${consents.publishing ? t('consPub') : t('consNoPub')}`}</KeyValue>
               <KeyValue k={t('kDevice')}>{device === 'none' ? t('noneForNow') : `${devName}${linked[device] === 'linked' ? t('devLinked') : t('devLater')}`}</KeyValue>
@@ -955,7 +969,7 @@ export default function Onboarding() {
           <View style={{ flexDirection: 'row', gap: 8 }} accessibilityLiveRegion="assertive" accessibilityRole="alert">
             <Icon name="alert-circle" size={16} color={c.error} />
             <Meta tone="error" style={{ flex: 1 }}>
-              {error}
+              <MonoNums text={error} />
             </Meta>
           </View>
         ) : null}
@@ -1037,7 +1051,7 @@ export default function Onboarding() {
         <KeyValue k={t('kReminders')} last>
           <Mono tone="ink" size={17}>{t('remSum', { n: perDay, from: quiet.from, to: quiet.to })}</Mono>
         </KeyValue>
-        <Meta>{t('untilNote')}</Meta>
+        <Meta><MonoNums text={t('untilNote')} /></Meta>
       </Sheet>
     </View>
   )

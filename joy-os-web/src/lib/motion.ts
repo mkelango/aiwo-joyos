@@ -1,4 +1,5 @@
-import { useSyncExternalStore } from 'react'
+import { MotionConfig } from 'framer-motion'
+import { createElement, useSyncExternalStore, type ReactNode } from 'react'
 
 // Motion, the brand way (Playbook p53): "Rise. Settle. Measure." One easing, four durations,
 // plus the 2.4 s daybreak for the animated mark. Reduced motion is the member's OS setting OR
@@ -35,6 +36,44 @@ function subscribe(cb: () => void) {
 /** true under the OS reduced-motion setting or the app's Reduce motion preference. */
 export function useReduceMotion(): boolean {
   return useSyncExternalStore(subscribe, prefersReducedMotion, () => false)
+}
+
+// framer-motion does not go through the CSS reduced-motion rule (index.css). MotionConfig
+// reducedMotion="always" drops its transforms, but opacity still runs at the element's own
+// duration, so every framer animation that can play under reduced motion takes one of these.
+
+/** The reduced-motion transition: a 120 ms opacity fade on the brand easing. */
+export const FADE_REDUCED = { duration: DUR.instant / 1000, ease: EASE_BRAND } as const
+
+/** A framer transition of `ms` on the brand easing, or the 120 ms fade under reduced motion. */
+export function brandTransition(reduce: boolean, ms: number = DUR.settle, delayMs = 0) {
+  return reduce ? FADE_REDUCED : { duration: ms / 1000, delay: delayMs / 1000, ease: EASE_BRAND }
+}
+
+/** "Rise. Settle." — content rises 8 px and settles in 240 ms; under reduced motion it only
+ *  fades, over 120 ms, with no rise. Spread it on a motion element: `<motion.div {...fade}>`. */
+export function riseFade(reduce: boolean, delayMs = 0) {
+  return reduce
+    ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: FADE_REDUCED }
+    : { initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0 }, transition: brandTransition(false, DUR.settle, delayMs) }
+}
+
+/** riseFade for the member's current motion setting. */
+export function useRiseFade(delayMs = 0) {
+  return riseFade(useReduceMotion(), delayMs)
+}
+
+/** A plain fade (no rise): `ms` on the brand easing, 120 ms under reduced motion. */
+export function useFade(ms: number = DUR.settle) {
+  const reduce = useReduceMotion()
+  return { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: brandTransition(reduce, ms) }
+}
+
+/** Below it, any framer animation without its own transition settles in 240 ms on the brand
+ *  easing — and under reduced motion fades over 120 ms with no transform. */
+export function BrandMotion({ children }: { children: ReactNode }) {
+  const reduce = useReduceMotion()
+  return createElement(MotionConfig, { reducedMotion: reduce ? 'always' : 'user', transition: brandTransition(reduce) }, children)
 }
 
 /** cubic-bezier(x1, y1, x2, y2) as a function of progress 0–1 (Newton, then bisection). */

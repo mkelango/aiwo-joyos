@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Platform, Pressable, View } from 'react-native'
 import { router } from 'expo-router'
 import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg'
-import { Body, Button, Card, DaybreakButton, Divider, Eyebrow, Icon, type IconName, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Serif, Sheet, SpecimenTag, TermChip, Toggle } from '@/components'
+import { Body, Button, Card, DaybreakButton, Divider, EmptyIllustration, Eyebrow, Icon, type IconName, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Serif, Sheet, SpecimenTag, TermChip, Toggle } from '@/components'
 import { useTheme } from '@/theme/ThemeProvider'
 import { palettes } from '@/theme/tokens'
 import { useApp } from '@/lib/store'
@@ -11,6 +11,7 @@ import { LEDGER_TAG } from '@/screens/b/i18n/common'
 import { DEVICES, HEALTHKIT_TYPES, WEAR_NIGHTS, type DeviceState } from '@/screens/b/accountData'
 import { devicesStore, signalsDownIn, useStore } from '@/screens/b/bStore'
 import { CheckLine, memberOnly } from '@/screens/b/parts'
+import { MonoNums } from '@/lib/monoNums'
 import { useDict } from '@/lib/i18n'
 import { DEV, DEVICE_NOTE, SIGNAL_TEXT, HK_TEXT } from '@/screens/b/i18n/devices'
 import { useCommon, useTx } from '@/screens/b/i18n/common'
@@ -19,6 +20,9 @@ import { useCommon, useTx } from '@/screens/b/i18n/common'
 // HealthKit reads and mindful-minutes write-back, Health Connect on Android, WHOOP, Garmin.
 // Freshness and data quality shown plainly; a vendor's readiness, strain or age score never
 // enters the Index. One Daybreak: "Sync now".
+// The data-quality panel follows what is connected on this screen: the ring's wear chart only
+// while the Oura Ring is read, freshness from each device's own state, the sleep sources from the
+// devices and HealthKit reads switched on, and an empty state when nothing is connected.
 
 type Device = (typeof DEVICES)[number]
 
@@ -69,6 +73,12 @@ function Devices() {
     setToast(t('markedStale'))
   }
   const others = devices.filter((d) => d.state !== 'connected')
+  // Data quality from the devices as they are now.
+  const ring = connected.find((d) => d.id === 'oura')
+  const staleOnes = connected.filter((d) => d.freshness === 'stale')
+  const hkSleep = hk.find((x) => x.id === 'sleep')?.on ?? false
+  // Who reads sleep: a device whose signals include sleep; Apple Health only with its sleep read on.
+  const sleepSources = connected.filter((d) => (d.id === 'apple' ? hkSleep : d.signals.some((x) => /sleep/i.test(x))))
   const wornNights = WEAR_NIGHTS.filter((n) => n.h >= 4).length
   const gaps = WEAR_NIGHTS.filter((n) => n.h === 0)
   const short = WEAR_NIGHTS.filter((n) => n.h > 0 && n.h < 4)
@@ -205,8 +215,20 @@ function Devices() {
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{t('quality')}</SectionTitle>
         <Body tone="ink2">{t('qualityBody')}</Body>
+        {connected.length === 0 ? (
+          <Card tone="sunk" style={{ gap: space.s1, alignItems: 'flex-start' }}>
+            <EmptyIllustration kind="generic" />
+            <Meta>{t('qNoDevice')}</Meta>
+          </Card>
+        ) : !ring ? (
+          <Card tone="sunk">
+            <Meta>{t('qNoRing')}</Meta>
+          </Card>
+        ) : (
         <Card tone="raised" style={{ gap: space.s2 }}>
-          <Meta>{t('wearBody')}</Meta>
+          <Meta>
+            <MonoNums text={t('wearBody')} />
+          </Meta>
           <View
             accessible
             accessibilityRole="image"
@@ -248,14 +270,27 @@ function Devices() {
             </View>
           </View>
         </Card>
+        )}
+        {connected.length ? (
         <Card tone="raised" style={{ gap: space.s1 + 4 }}>
           {(
             [
-              [true, t('qWear'), t('qWearV', { n: wornNights }), t('qWearN')],
-              [false, t('qGaps'), t('qGapsV', { n: gaps.length }), t('qGapsN', { list: gaps.map((g) => g.d).join(t('and')) })],
-              [false, t('qShort'), `${short.length} ${short.length === 1 ? t('night') : t('nights')}`, t('qShortN', { d: short[0]?.d ?? '—' })],
-              [true, t('qOverlap'), t('qOverlapV'), t('qOverlapN')],
-              [true, t('qFresh'), t('qFreshV'), t('qFreshN')],
+              // Wear, gaps and short nights describe the ring's nights: shown only while it is read.
+              ...(ring
+                ? ([
+                    [true, t('qWear'), t('qWearV', { n: wornNights }), t('qWearN')],
+                    [false, t('qGaps'), t('qGapsV', { n: gaps.length }), t('qGapsN', { list: gaps.map((g) => g.d).join(t('and')) })],
+                    [false, t('qShort'), `${short.length} ${short.length === 1 ? t('night') : t('nights')}`, t('qShortN', { d: short[0]?.d ?? '—' })],
+                  ] as [boolean, string, string, string][])
+                : []),
+              sleepSources.length === 0
+                ? [false, t('qOverlap'), t('qOverlapNone'), t('qOverlapNoneN')]
+                : sleepSources.length === 1
+                  ? [true, t('qOverlap'), sleepSources[0].id === 'oura' ? t('qOverlapV') : t('qOverlapOne', { name: sleepSources[0].name }), connected.some((d) => d.id === 'apple') && sleepSources[0].id !== 'apple' ? t('qOverlapN') : t('qOverlapOneN', { name: sleepSources[0].name })]
+                  : [false, t('qOverlap'), t('qOverlapTwo'), t('qOverlapTwoN', { list: sleepSources.map((d) => d.name).join(t('and')), first: (sleepSources.find((d) => d.isDefault) ?? sleepSources[0]).name })],
+              staleOnes.length
+                ? [false, t('qFresh'), t('qFreshStale'), t('qFreshStaleN', { list: staleOnes.map((d) => d.name).join(t('and')) })]
+                : [true, t('qFresh'), t('qFreshV'), t('qFreshN')],
             ] as [boolean, string, string, string][]
           ).map(([ok, label, value, note]) => (
             <CheckLine key={label} icon={ok ? 'check' : 'alert-circle'}>
@@ -263,11 +298,14 @@ function Devices() {
                 <Body>
                   {label} · <Mono tone="ink" size={15}>{value}</Mono>
                 </Body>
-                <Meta size={14}>{note}</Meta>
+                <Meta size={14}>
+                  <MonoNums text={note} />
+                </Meta>
               </View>
             </CheckLine>
           ))}
         </Card>
+        ) : null}
       </View>
 
       {/* The watch: Joy Ledger complication with a quick add */}

@@ -45,9 +45,18 @@ export function MemberScoreScope({ children }: { children: ReactNode }) {
   return createElement(MemberScope.Provider, { value: true }, children)
 }
 
-/** true inside the member app when the member is a minor: draw no score, band, delta or value. */
-export function useScoresHidden(): boolean {
+/** A page inside the member app that shows only specimen figures — the Method's worked example
+ *  and published cohort results, never the member's own score — lifts the member scope again,
+ *  so a minor still sees those petals and changes. (One score can opt out instead with the
+ *  `specimen` prop on JoyspanWheel, Delta and the other score primitives.) */
+export function SpecimenScoreScope({ children }: { children: ReactNode }) {
+  return createElement(MemberScope.Provider, { value: false }, children)
+}
+
+/** true inside the member app when the member is a minor: draw no score, band, delta or value.
+ *  `specimen` marks a figure that is not the member's own (a cohort or worked example). */
+export function useScoresHidden(specimen = false): boolean {
   const inMember = useContext(MemberScope)
   const minor = useIsMinor()
-  return inMember && minor
+  return inMember && minor && !specimen
 }

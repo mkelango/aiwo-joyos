@@ -10,6 +10,7 @@ import {
   Card,
   DaybreakButton,
   Divider,
+  EmptyIllustration,
   Eyebrow,
   Icon,
   Meta,
@@ -29,7 +30,8 @@ import {
   Toggle,
   fmtDate,
 } from '@/components'
-import { HOUSEHOLD, INDEX_HISTORY, MEMBER } from '@/shared/member'
+import { HOUSEHOLD, MEMBER } from '@/shared/member'
+import type { LatestIndex } from '@/lib/indexRecord'
 import { CASELOAD } from '@/shared/platform'
 import { TERMS } from '@/shared/terms'
 import type { Band, TermKey } from '@/shared/types'
@@ -40,11 +42,12 @@ import { accountStore, householdKindStore, refCode, useStore } from '@/screens/b
 import { useApp } from '@/lib/store'
 import { useIsMinor } from '@/lib/minor'
 import { CharterCard, FjoOffice, KindCard } from '@/screens/b/charter'
-import { ChoiceCard, Done, Field, KeyValue, shareOrCopy, useAccount, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
+import { ChoiceCard, Done, Field, FigurePill, KeyValue, shareOrCopy, useAccount, useAccountIndex, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
 import { HOUSE, THEME_TEXT } from '@/screens/b/i18n/household'
 import { RELATION_TEXT } from '@/screens/b/i18n/account'
 import { BAND, LEDGER_TAG, useCommon, useTx } from '@/screens/b/i18n/common'
+import { MonoNums } from '@/lib/monoNums'
 
 // HOUSEHOLD (Memo p.19, "made for two, welcoming to one"): partners scored separately,
 // elder mode with a helper by the elder's consent, minors never scored, share grants both
@@ -52,6 +55,8 @@ import { BAND, LEDGER_TAG, useCommon, useTx } from '@/screens/b/i18n/common'
 // Couples Check: agree / differ, never who said what. One Daybreak: "Propose a share".
 // Household kind (couple | family | Family Joy Office, Arch p.13) and the Family Joy Charter the
 // family writes and every adult agrees to: see src/screens/b/charter.tsx.
+// The member's own numbers are their latest Index (a re-take on this phone included). The account
+// made in onboarding has a household of its own: just them and anyone they invite.
 
 const bandFor = (v: number): Band => (v >= 70 ? 'steady' : v >= 50 ? 'uneven' : 'thin')
 
@@ -103,6 +108,7 @@ function Household() {
   // Signed in as Lakshmi (M1), this is her household: her settings are hers to change.
   const account = useAccount()
   const asLakshmi = account.id === 'lakshmi'
+  const asNew = account.id === 'new'
   // Under 18 nothing is scored (Architecture p26): no Index tag, no per-person Index, band or term value.
   const minor = useIsMinor()
   const { setTextSize } = useApp()
@@ -121,7 +127,8 @@ function Household() {
   }
   const isPatron = acct.plan === 'Patron'
   const [kindRec] = useStore(householdKindStore)
-  const me = INDEX_HISTORY[0]
+  // The signed-in member's latest Index: Arjun's always has one; a new member's only once taken.
+  const me = useAccountIndex()
   const kavyaIndex = CASELOAD.find((x) => x.name === 'Kavya Rao')!.index
   const [arjun, kavya, lakshmi] = HOUSEHOLD
   const t = useDict(HOUSE)
@@ -139,7 +146,10 @@ function Household() {
   const live = grants.filter((g) => g.state !== 'revoked')
 
   const lakshmiDetail = elder.helper ? t('detailMother', { date: fmtDate(helperSince) }) : t('detailMotherNone')
-  const members = asLakshmi
+  const ownPlan = PLANS.find((p) => p.key === acct.plan)?.name ?? t('plus')
+  const members = asNew
+    ? [{ person: { id: 'h_me', name: account.name, initials: account.name.split(' ').map((w) => w[0] ?? '').join('').slice(0, 2).toUpperCase(), tone: arjun.tone }, role: t('roleYou'), detail: t('detailYou'), tags: [...(minor ? [t('notScored')] : []), ownPlan], index: minor || !me ? undefined : me.value }]
+    : asLakshmi
     ? [
         { person: lakshmi, role: t('lkYou'), detail: t('lkDetailYou'), tags: [] as string[], index: undefined as number | undefined },
         { person: arjun, role: elder.helper ? t('lkSonHelper') : t('lkSon'), detail: t('lkDetailOwn'), tags: [t('ownIndex'), t('ownConsents')] },
@@ -147,7 +157,7 @@ function Household() {
         { person: HOUSEHOLD_MINOR, role: t('lkGranddaughter'), detail: t('lkDetailMinor'), tags: [t('notScored')] },
       ]
     : [
-        { person: arjun, role: t('roleYou'), detail: t('detailYou'), tags: [...(minor ? [t('notScored')] : []), PLANS.find((p) => p.key === acct.plan)?.name ?? t('plus')], index: minor ? undefined : me.value },
+        { person: arjun, role: t('roleYou'), detail: t('detailYou'), tags: [...(minor ? [t('notScored')] : []), ownPlan], index: minor || !me ? undefined : me.value },
         { person: kavya, role: t('rolePartner'), detail: t('detailPartner'), tags: [t('ownIndex'), t('ownConsents')] },
         { person: lakshmi, role: t('roleMother'), detail: lakshmiDetail, tags: [t('elderMode'), t('helperArjun')] },
         { person: HOUSEHOLD_MINOR, role: t('roleDaughter'), detail: t('detailDaughter'), tags: [t('notScored'), t('parentalConsent')] },
@@ -162,7 +172,7 @@ function Household() {
     <Screen>
       <ScreenHeader
         back
-        eyebrow={MEMBER.household === HOUSE.householdName.en ? t('householdName') : MEMBER.household}
+        eyebrow={asNew ? t('yourHousehold') : MEMBER.household === HOUSE.householdName.en ? t('householdName') : MEMBER.household}
         title={
           <>
             {t('titleA')}<Serif>{t('titleSerif')}</Serif>{t('titleB')}
@@ -171,7 +181,7 @@ function Household() {
         lead={t('lead')}
       />
 
-      <KindCard people={HOUSEHOLD.length + 1} onToast={toastAfterSheet} />
+      <KindCard people={asNew ? 1 + acct.invites.length : HOUSEHOLD.length + 1} onToast={toastAfterSheet} />
 
       {/* Members */}
       <View style={{ gap: space.s2 }}>
@@ -185,14 +195,14 @@ function Household() {
               <Avatar person={m.person} size={48} />
               <View style={{ flex: 1 }}>
                 <Body weight="medium">{m.person.name}</Body>
-                <Meta size={14}>{m.role}</Meta>
+                <Meta size={14}><MonoNums text={m.role} /></Meta>
               </View>
             </View>
-            <Meta>{m.detail}</Meta>
+            <Meta><MonoNums text={m.detail} /></Meta>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
               {'index' in m && m.index != null ? <IndexTag v={m.index} /> : null}
               {(m.person.id === lakshmi.id ? [elder.largeType || elder.voice ? t('elderMode') : t('standardMode'), elder.helper ? t('helperArjun') : elder.asked ? t('elAskedPill') : t('noHelper')] : m.tags).map((tag) => (
-                <Pill key={tag}>{tag}</Pill>
+                <FigurePill key={tag}>{tag}</FigurePill>
               ))}
             </View>
             {m.person.id === lakshmi.id ? (
@@ -215,7 +225,7 @@ function Household() {
               <Body weight="medium">{iv.name}</Body>
               <Pill tone="daybreak">{t('invited')}</Pill>
             </View>
-            <Meta size={14}>{t('inviteLine', { relation: ht.relation(iv.relation), age: ht.age(iv.age), date: fmtDate(iv.expires) })}</Meta>
+            <Meta size={14}><MonoNums text={t('inviteLine', { relation: ht.relation(iv.relation), age: ht.age(iv.age), date: fmtDate(iv.expires) })} /></Meta>
             <Button variant="link" onPress={() => setAcct((a) => ({ ...a, invites: a.invites.filter((x) => x.id !== iv.id) }))}>
               {t('cancelInvite')}
             </Button>
@@ -228,7 +238,9 @@ function Household() {
         )}
       </View>
 
-      {kindRec.kind === 'fjo' ? (
+      {kindRec.kind === 'fjo' && asNew ? (
+        <FjoOffice adults={[{ name: account.name, status: 'open' }]} minor={null} onToast={setToast} />
+      ) : kindRec.kind === 'fjo' ? (
         <FjoOffice
           adults={[
             { name: arjun.name, status: 'signed', on: '2027-01-24' },
@@ -240,10 +252,17 @@ function Household() {
         />
       ) : null}
 
-      {asLakshmi || minor ? (
+      {asNew ? (
+        // Nobody else is here yet: the shared page, grants and the Couples Check need a second adult.
+        <Card tone="sunk" style={{ gap: space.s1, alignItems: 'flex-start' }}>
+          <EmptyIllustration kind="generic" />
+          <Body>{t('newAlone')}</Body>
+          <Meta>{t('newAloneBody')}</Meta>
+        </Card>
+      ) : asLakshmi || minor || !me ? (
         <Card tone="sunk" style={{ flexDirection: 'row', gap: 10 }}>
           <Icon name="lock" size={16} color={c.ink3} />
-          <Meta style={{ flex: 1 }}>{asLakshmi ? t('lkCouple') : t('minorCouple')}</Meta>
+          <Meta style={{ flex: 1 }}><MonoNums text={asLakshmi ? t('lkCouple') : t('minorCouple')} /></Meta>
         </Card>
       ) : (
       <>
@@ -256,7 +275,7 @@ function Household() {
         <Body tone="ink2">{t('bothBody')}</Body>
         <Card tone="raised" style={{ gap: space.s2 }}>
           {[
-            { p: arjun, value: me.value, of: (k: TermKey) => me.terms.find((t) => t.key === k)!.value as number },
+            { p: arjun, value: me.value, of: (k: TermKey) => me.terms.find((t) => t.key === k)?.value ?? 0 },
             { p: kavya, value: kavyaIndex, of: (k: TermKey) => KAVYA_SHARED[k] },
           ].map(({ p, value, of }, i) => (
             <View key={p.id} style={{ gap: space.s1 + 4 }}>
@@ -350,7 +369,7 @@ function Household() {
           {t('agreeA')}<Serif>{t('agreeSerif')}</Serif>{t('agreeB')}
         </Title>
         <Card tone="raised" style={{ gap: space.s1 + 4 }}>
-          <Body tone="ink2">{t('privately', { date: fmtDate(COUPLES_CHECK.takenOn) })}</Body>
+          <Body tone="ink2"><MonoNums text={t('privately', { date: fmtDate(COUPLES_CHECK.takenOn) })} /></Body>
           <Body>
             {t('agreeOnA')}<Mono tone="ink" size={17}>{String(COUPLES_CHECK.themes.filter((x) => x.agree).length)}</Mono>{t('agreeOnB')}<Mono tone="ink" size={17}>{String(COUPLES_CHECK.themes.length)}</Mono>{t('agreeOnC')}
           </Body>
@@ -372,8 +391,14 @@ function Household() {
       </>
       )}
 
-      {/* Charter */}
-      <CharterCard isPatron={isPatron} adults={[arjun, kavya, lakshmi].map((p) => p.name.split(' ')[0])} minor={HOUSEHOLD_MINOR.name.split(' ')[0]} onToast={toastAfterSheet} />
+      {/* Charter: written by the adult signed in, agreed by every other adult in the household */}
+      <CharterCard
+        isPatron={isPatron}
+        adults={asNew ? [account.firstName] : [arjun, kavya, lakshmi].map((p) => p.name.split(' ')[0])}
+        writer={asNew ? account.firstName : asLakshmi ? lakshmi.name.split(' ')[0] : arjun.name.split(' ')[0]}
+        minor={asNew ? null : HOUSEHOLD_MINOR.name.split(' ')[0]}
+        onToast={toastAfterSheet}
+      />
 
       <InviteSheet
         open={inviteOpen}
@@ -392,7 +417,7 @@ function Household() {
         {asLakshmi ? (
           elder.helper ? (
             <>
-              <Body>{t('lkHelperOn', { date: fmtDate(helperSince) })}</Body>
+              <Body><MonoNums text={t('lkHelperOn', { date: fmtDate(helperSince) })} /></Body>
               {lkWithdrawOpen ? (
                 <Card tone="sunk" padding={16} style={{ gap: space.s1 }}>
                   <Body>{t('lkWithdrawQ')}</Body>
@@ -436,7 +461,7 @@ function Household() {
           )
         ) : elder.helper ? (
           <>
-            <Body>{t('helperBody', { date: fmtDate(helperSince) })}</Body>
+            <Body><MonoNums text={t('helperBody', { date: fmtDate(helperSince) })} /></Body>
             <Button variant="secondary" icon="user-x" onPress={() => setElder({ helper: false, asked: false })}>
               {t('stepBack')}
             </Button>
@@ -477,6 +502,7 @@ function Household() {
       <ElderPreview open={previewOpen} onClose={() => setPreviewOpen(false)} elder={elder} />
 
       <ShareSheet
+        me={me}
         open={shareOpen}
         onClose={() => setShareOpen(false)}
         onPropose={(scope) => {
@@ -527,12 +553,11 @@ function Household() {
   )
 }
 
-function ShareSheet({ open, onClose, onPropose }: { open: boolean; onClose: () => void; onPropose: (s: GrantScope[]) => void }) {
+function ShareSheet({ me, open, onClose, onPropose }: { me: LatestIndex | null; open: boolean; onClose: () => void; onPropose: (s: GrantScope[]) => void }) {
   const { space } = useTheme()
   const [mode, setMode] = useState<'index' | 'terms'>('terms')
   const [terms, setTerms] = useState<GrantScope[]>(['P'])
   const [error, setError] = useState<string | null>(null)
-  const me = INDEX_HISTORY[0]
   const scope: GrantScope[] = mode === 'index' ? ['index'] : terms
   const t = useDict(HOUSE)
   const tt = useTermText()
@@ -595,11 +620,12 @@ function ShareSheet({ open, onClose, onPropose }: { open: boolean; onClose: () =
           <Meta>{t('nothingYet')}</Meta>
         ) : (
           scope.map((s) => {
-            const v = s === 'index' ? me.value : me.terms.find((t) => t.key === s)!.value
+            // The same latest numbers the household page shows (a re-take on this phone included).
+            const v = !me ? null : s === 'index' ? me.value : me.terms.find((t) => t.key === s)?.value ?? null
             return (
               <View key={s} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <Meta tone="ink">{s === 'index' ? t('yourIndex') : tt.name(s)}</Meta>
-                <Mono tone="ink">{s === 'B' ? `−${v}` : String(v)}</Mono>
+                <Mono tone="ink">{v == null ? '—' : s === 'B' ? `−${v}` : String(v)}</Mono>
               </View>
             )
           })
@@ -734,7 +760,7 @@ function InviteSheet({ open, onClose, onInvite }: { open: boolean; onClose: () =
           ) : null}
           {errors.consent ? (
             <Meta tone="error" accessibilityLiveRegion="polite">
-              {errors.consent}
+              <MonoNums text={errors.consent} />
             </Meta>
           ) : null}
         </>

@@ -15,16 +15,18 @@ import { useDict, useLang, useTermText } from '@/lib/i18n'
 import { COHORT_TERMS } from './_data'
 import { formulaText } from '@/routes/member/core/_extra'
 import { E, MT, regTx } from './_i18n'
-import { JoyspanCredit, LMethodLine, LSpecimenTag, LTermChip, Section, rich, useBand, useFmtDate } from './_parts'
+import { JoyspanCredit, LMethodLine, LSpecimenTag, LTermChip, Section, SpecimenScores, nums, rich, useBand, useFmtDate } from './_parts'
 
 // THE METHOD (Memo p.10–11, Playbook): the formula, the worked example computed live
 // by the engine, three grades, six terms, the instrument registry with licences,
-// method versions, what the engine guarantees, the signal model and the AI's limits.
+// method versions, what the engine commits to, the signal model and the AI's limits.
+// The worked example and the cohort results are specimen figures, never the member's own, so
+// they stay drawn for a member under 18 (SpecimenScores).
 
 const WORKED = INDEX_HISTORY[0]
 const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 
-const NAV = ['formula', 'grades', 'terms', 'instruments', 'versions', 'guarantees', 'signals', 'ai', 'results'] as const
+const NAV = ['formula', 'grades', 'terms', 'instruments', 'versions', 'commitments', 'signals', 'ai', 'results'] as const
 
 function useFmt() {
   const f = useFmtDate()
@@ -38,9 +40,9 @@ export default function Method() {
   return (
     <div className="pb-8">
       <PageHeader
-        eyebrow={t('eyebrow', { label: t('ml_v1.0'), date: fmt(METHODS['v1.0'].published) })}
+        eyebrow={<>{rich(t('eyebrow'), { label: nums(t('ml_v1.0')), date: <span className="num">{fmt(METHODS['v1.0'].published)}</span> })}</>}
         title={<>{rich(t('title'), { em: <em>{t('titleEm')}</em> })}</>}
-        lead={<>{t('lead')}<JoyspanCredit className="mt-2" /></>}
+        lead={<>{nums(t('lead'))}<JoyspanCredit className="mt-2" /></>}
         actions={
           <>
             <a href="#results" className="inline-flex h-11 items-center gap-2 rounded-full border border-line-strong bg-paper-raised px-4 text-[15px] font-medium text-ink hover:bg-paper-sunk focus-ring">
@@ -63,7 +65,7 @@ export default function Method() {
       <TermsSection />
       <InstrumentsSection />
       <VersionsSection />
-      <GuaranteesSection />
+      <CommitmentsSection />
       <SignalsSection />
       <AiSection />
       <ResultsSection />
@@ -118,7 +120,7 @@ function FormulaSection() {
             </div>
             <div>
               <dt className="eyebrow text-paper/70">B</dt>
-              <dd className="mt-1 text-paper/90">{t('fB')}</dd>
+              <dd className="mt-1 text-paper/90">{nums(t('fB'))}</dd>
             </div>
             <div>
               <dt className="eyebrow text-paper/70">λ</dt>
@@ -130,10 +132,11 @@ function FormulaSection() {
             </div>
           </dl>
           <p className="mt-8 border-t border-paper/20 pt-5 text-[15px] leading-relaxed text-paper/80">
-            {t('fWhy')}
+            {nums(t('fWhy'))}
           </p>
         </div>
 
+        <SpecimenScores>
         <Card className="min-w-0 md:p-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Eyebrow>{t('worked')}</Eyebrow>
@@ -150,7 +153,7 @@ function FormulaSection() {
             <div className="min-w-0">
               <p className="flex flex-wrap items-end gap-x-3 gap-y-1">
                 <span className="num text-[3.6rem] font-light leading-none text-ink sm:text-[4.5rem]">{r.value}</span>
-                <span className="eyebrow mb-2 text-ink-2">{t('ofHundred', { band: band.label(bandFor(r.value)) })}</span>
+                <span className="eyebrow mb-2 text-ink-2">{nums(t('ofHundred', { band: band.label(bandFor(r.value)) }))}</span>
               </p>
             </div>
           </div>
@@ -167,8 +170,9 @@ function FormulaSection() {
             ))}
           </div>
           <LMethodLine className="mt-5" method="v1.0" grade="index" takenOn={WORKED.takenOn} />
-          <p className="mt-1 text-[13px] text-ink-3">{t('live')}</p>
+          <p className="mt-1 text-[13px] text-ink-3">{nums(t('live'))}</p>
         </Card>
+        </SpecimenScores>
       </div>
     </Section>
   )
@@ -214,13 +218,13 @@ function GradesSection() {
           <Card key={g.n} className="flex flex-col">
             <div className="flex items-baseline justify-between gap-3">
               <span className="num text-[2.6rem] font-light leading-none text-ink-3">{g.n}</span>
-              <span className="eyebrow text-right text-ink-3">{g.who}</span>
+              <span className="eyebrow text-right text-ink-3">{nums(g.who)}</span>
             </div>
-            <h3 className="mt-4 text-[1.5rem] font-light text-ink">{g.name}</h3>
-            <p className="mt-2 text-[15px] leading-relaxed text-ink-2">{g.what}</p>
+            <h3 className="mt-4 text-[1.5rem] font-light text-ink">{nums(g.name)}</h3>
+            <p className="mt-2 text-[15px] leading-relaxed text-ink-2">{nums(g.what)}</p>
             <div className="mt-5 rounded-card bg-paper-sunk px-4 py-3">
               <p className="eyebrow text-ink-3">{t('output')}</p>
-              <p className="mt-1 text-[15px] text-ink">{g.output}</p>
+              <p className="mt-1 text-[15px] text-ink">{nums(g.output)}</p>
             </div>
             <Link to={g.to} className="mt-auto inline-flex items-center gap-1.5 pt-5 text-[15px] text-ink underline-offset-4 hover:underline focus-ring">
               {g.cta} <ArrowRight size={15} aria-hidden />
@@ -228,7 +232,7 @@ function GradesSection() {
           </Card>
         ))}
       </div>
-      <p className="mt-5 text-[14px] text-ink-3">{t('gNote')}</p>
+      <p className="mt-5 text-[14px] text-ink-3">{nums(t('gNote'))}</p>
     </Section>
   )
 }
@@ -248,17 +252,17 @@ function TermsSection() {
               <LTermChip term={x.key} size="md" />
               <span className="eyebrow text-ink-3">{t('spaceLabel', { space: tt.space(x.key) })}</span>
             </div>
-            <p className="mt-4 text-[15px] leading-relaxed text-ink-2">{lang === 'en' ? x.framework : t(`fw_${x.key}`)}</p>
+            <p className="mt-4 text-[15px] leading-relaxed text-ink-2">{nums(lang === 'en' ? x.framework : t(`fw_${x.key}`))}</p>
             <p className="num mt-4 break-words rounded-card bg-paper-sunk px-4 py-3 text-[14px] leading-relaxed text-ink">{formulaText(x.formula, lang)}</p>
             <div className="mt-4">
               <p className="eyebrow mb-2 text-ink-3">{t('instruments')}</p>
               <ul className="flex flex-wrap gap-1.5">
                 {x.instruments.map((i) => (
-                  <li key={i} className="rounded-full border border-line px-2.5 py-1 text-[13px] text-ink-2">{regTx(i, lang)}</li>
+                  <li key={i} className="rounded-full border border-line px-2.5 py-1 text-[13px] text-ink-2">{nums(regTx(i, lang))}</li>
                 ))}
               </ul>
             </div>
-            <p className="mt-auto pt-4 text-[14px] text-ink-3"><span className="text-ink-2">{t('whatMoves')}</span> {lang === 'en' ? x.whatMoves : t(`wm_${x.key}`)}{x.inverse ? t('inverseNote') : t('stop')}</p>
+            <p className="mt-auto pt-4 text-[14px] text-ink-3"><span className="text-ink-2">{t('whatMoves')}</span> {nums(lang === 'en' ? x.whatMoves : t(`wm_${x.key}`))}{x.inverse ? t('inverseNote') : t('stop')}</p>
           </Card>
         ))}
       </div>
@@ -319,7 +323,7 @@ function InstrumentsSection() {
               <span className="eyebrow min-w-0 text-ink-3">{STATUS_COPY(s).label}</span>
               <span className="num text-[1.6rem] font-light text-ink">{counts[s]}</span>
             </span>
-            <span className="mt-1 block text-[14px] text-ink-2">{STATUS_COPY(s).help}</span>
+            <span className="mt-1 block text-[14px] text-ink-2">{nums(STATUS_COPY(s).help)}</span>
           </button>
         ))}
       </div>
@@ -361,7 +365,7 @@ function InstrumentsSection() {
 
         {rows.length === 0 ? (
           <div className="mt-4 rounded-card border border-dashed border-line-strong p-8 text-center">
-            <p className="text-[17px] text-ink">{t('noMatch')}</p>
+            <p className="text-[17px] text-ink">{nums(t('noMatch'))}</p>
             <p className="mt-1 text-[15px] text-ink-2">{t('noMatchHint')}</p>
             <Button variant="link" className="mt-3" onClick={() => { setQ(''); setTerm('all'); setStatus('all') }}>{t('clearAll')}</Button>
           </div>
@@ -375,12 +379,12 @@ function InstrumentsSection() {
                 <li key={r.code} className="py-3.5">
                   <div className="flex items-start justify-between gap-3">
                     <span className="min-w-0">
-                      <span className="block text-[16px] font-medium text-ink">{regTx(r.code, lang)}</span>
+                      <span className="block text-[16px] font-medium text-ink">{nums(regTx(r.code, lang))}</span>
                       <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[14px] text-ink-2"><TermDot term={r.term} size={8} /> {tt.name(r.term)} · {rich(t('nItems'), { n: <span className="num">{r.items}</span> })}</span>
                     </span>
                     <Pill tone={st.tone} className="shrink-0">{r.status === 'gated' && <Lock size={11} aria-hidden />}{st.label}</Pill>
                   </div>
-                  <p className="mt-1.5 text-[14px] text-ink-3">{regTx(r.licence, lang)} · {regTx(r.translation, lang)}</p>
+                  <p className="mt-1.5 text-[14px] text-ink-3">{nums(regTx(r.licence, lang))} · {nums(regTx(r.translation, lang))}</p>
                 </li>
               )
             })}
@@ -391,11 +395,11 @@ function InstrumentsSection() {
             rows={rows}
             rowKey={(r) => r.code}
             columns={[
-              { key: 'code', header: t('colInstrument'), render: (r) => <span className="font-medium text-ink">{regTx(r.code, lang)}</span> },
+              { key: 'code', header: t('colInstrument'), render: (r) => <span className="font-medium text-ink">{nums(regTx(r.code, lang))}</span> },
               { key: 'term', header: t('colTerm'), render: (r) => <span className="inline-flex items-center gap-2 whitespace-nowrap text-ink-2"><TermDot term={r.term} size={8} /> {tt.name(r.term)}</span> },
               { key: 'items', header: t('colItems'), align: 'right', render: (r) => <span className="num">{r.items}</span> },
-              { key: 'licence', header: t('colLicence'), render: (r) => <span className="text-ink-2">{regTx(r.licence, lang)}</span> },
-              { key: 'lang', header: t('colLanguages'), render: (r) => <span className="whitespace-nowrap text-ink-2">{regTx(r.translation, lang)}</span> },
+              { key: 'licence', header: t('colLicence'), render: (r) => <span className="text-ink-2">{nums(regTx(r.licence, lang))}</span> },
+              { key: 'lang', header: t('colLanguages'), render: (r) => <span className="whitespace-nowrap text-ink-2">{nums(regTx(r.translation, lang))}</span> },
               { key: 'status', header: t('colStatus'), render: (r) => { const s = STATUS_COPY(r.status as Exclude<Status, 'all'>); return <Pill tone={s.tone}>{r.status === 'gated' && <Lock size={11} aria-hidden />}{s.label}</Pill> } },
             ]}
           />
@@ -425,53 +429,53 @@ function VersionsSection() {
             rowKey={([v]) => v}
             columns={[
               { key: 'v', header: t('colVersion'), render: ([v]) => <span className="num text-ink">{v}</span> },
-              { key: 'label', header: t('colMethod'), render: ([v, m]) => <span className="text-ink">{lang === 'en' ? m.label : t(`ml_${v}`)}</span> },
+              { key: 'label', header: t('colMethod'), render: ([v, m]) => <span className="text-ink">{nums(lang === 'en' ? m.label : t(`ml_${v}`))}</span> },
               { key: 'lambda', header: 'λ', align: 'right', render: ([, m]) => <span className="num">{m.lambda.toFixed(2)}</span> },
               { key: 'pub', header: t('colPublished'), render: ([, m]) => <span className="num whitespace-nowrap text-ink-2">{fmt(m.published)}</span> },
-              { key: 'status', header: t('colStatus'), render: ([v, m]) => <Pill tone={m.status === 'In use' ? 'positive' : 'neutral'}>{lang === 'en' ? m.status : t(`ms_${v}`)}</Pill> },
+              { key: 'status', header: t('colStatus'), render: ([v, m]) => <Pill tone={m.status === 'In use' ? 'positive' : 'neutral'}>{nums(lang === 'en' ? m.status : t(`ms_${v}`))}</Pill> },
             ]}
           />
         </Card>
         <Card tone="sunk" className="min-w-0">
           <Eyebrow>{t('twoMethods')}</Eyebrow>
-          <p className="mt-3 text-[15px] text-ink-2">{t('twoMethodsB')}</p>
+          <p className="mt-3 text-[15px] text-ink-2">{nums(t('twoMethodsB'))}</p>
           <ol className="mt-5 space-y-3">
             <li className="flex items-center justify-between gap-3 rounded-card bg-paper-raised px-4 py-3">
               <span className="min-w-0">
                 <span className="num block text-[14px] text-ink">v1.0 · λ {METHODS['v1.0'].lambda}</span>
-                <span className="block text-[13px] text-ink-3">{t('asMeasured', { date: fmt(WORKED.takenOn) })}</span>
+                <span className="block text-[13px] text-ink-3">{rich(t('asMeasured'), { date: <span className="num">{fmt(WORKED.takenOn)}</span> })}</span>
               </span>
               <span className="num text-[2rem] font-light text-ink">{v10.value}</span>
             </li>
             <li className="flex items-center justify-between gap-3 rounded-card border border-dashed border-line-strong px-4 py-3">
               <span className="min-w-0">
                 <span className="num block text-[14px] text-ink">v1.1 · λ {METHODS['v1.1'].lambda}</span>
-                <span className="block text-[13px] text-ink-3">{t('alongside')}</span>
+                <span className="block text-[13px] text-ink-3">{nums(t('alongside'))}</span>
               </span>
               <span className="num text-[2rem] font-light text-ink-2">{v11.value}</span>
             </li>
           </ol>
-          <p className="mt-4 text-[13px] text-ink-3">{t('v11note')}</p>
+          <p className="mt-4 text-[13px] text-ink-3">{nums(t('v11note'))}</p>
         </Card>
       </div>
     </Section>
   )
 }
 
-// ─── What the engine guarantees ────────────────────────────────────────────
+// ─── What the engine commits to ────────────────────────────────────────────
 
-function GuaranteesSection() {
+function CommitmentsSection() {
   const t = useDict(MT)
   const g = ([1, 2, 3, 4, 5, 6] as const).map((n) => [t(`gu${n}h`), t(`gu${n}b`)])
   const display = ([1, 2, 3, 4, 5] as const).map((n) => t(`d${n}`))
   return (
-    <Section id="guarantees" eyebrow={t('guEyebrow')} title={t('guTitle')}>
+    <Section id="commitments" eyebrow={t('guEyebrow')} title={t('guTitle')}>
       <div className="grid gap-x-10 gap-y-8 md:grid-cols-2 xl:grid-cols-3">
         {g.map(([h, b], i) => (
           <div key={h} className="border-t border-line pt-5">
             <span className="num text-[13px] text-ink-3">{String(i + 1).padStart(2, '0')}</span>
-            <h3 className="mt-2 text-[1.2rem] text-ink">{h}</h3>
-            <p className="mt-2 text-[15px] leading-relaxed text-ink-2">{b}</p>
+            <h3 className="mt-2 text-[1.2rem] text-ink">{nums(h)}</h3>
+            <p className="mt-2 text-[15px] leading-relaxed text-ink-2">{nums(b)}</p>
           </div>
         ))}
       </div>
@@ -479,7 +483,7 @@ function GuaranteesSection() {
         <Eyebrow>{t('rulesH')}</Eyebrow>
         <ul className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {display.map((d) => (
-            <li key={d} className="flex gap-2 text-[15px] text-ink"><Check size={16} className="mt-1 shrink-0 text-ink-2" aria-hidden /> {d}</li>
+            <li key={d} className="flex gap-2 text-[15px] text-ink"><Check size={16} className="mt-1 shrink-0 text-ink-2" aria-hidden /> <span>{nums(d)}</span></li>
           ))}
         </ul>
       </Card>
@@ -515,16 +519,16 @@ function SignalsSection() {
               </span>
             ))}
           </div>
-          <p className="mt-6 text-[15px] text-ink-2">{t('sFeatures')}</p>
+          <p className="mt-6 text-[15px] text-ink-2">{nums(t('sFeatures'))}</p>
           <ul className="mt-3 grid gap-2 sm:grid-cols-2">
             {features.map((f) => (
               <li key={f.name} className="flex items-center justify-between gap-3 rounded-card border border-line px-4 py-2.5">
-                <span className="min-w-0 text-[15px] text-ink">{f.name}</span>
+                <span className="min-w-0 text-[15px] text-ink">{nums(f.name)}</span>
                 <span className="flex shrink-0 items-center gap-1.5 text-[13px] text-ink-3"><TermDot term={f.term} size={8} /> {tt.space(f.term)}</span>
               </li>
             ))}
           </ul>
-          <p className="mt-5 text-[14px] text-ink-3">{t('sInform')}</p>
+          <p className="mt-5 text-[14px] text-ink-3">{nums(t('sInform'))}</p>
         </Card>
         <Card tone="sunk">
           <Eyebrow>{t('neverH')}</Eyebrow>
@@ -532,11 +536,11 @@ function SignalsSection() {
             {never.map((n) => (
               <li key={n} className="flex items-center gap-3 text-[16px] text-ink">
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-line-strong"><X size={13} className="text-ink-2" aria-hidden /></span>
-                {n}
+                <span>{nums(n)}</span>
               </li>
             ))}
           </ul>
-          <p className="mt-6 text-[14px] leading-relaxed text-ink-2">{t('neverB')}</p>
+          <p className="mt-6 text-[14px] leading-relaxed text-ink-2">{nums(t('neverB'))}</p>
         </Card>
       </div>
     </Section>
@@ -558,8 +562,8 @@ function AiSection() {
               {i === 0 ? <ShieldCheck size={17} aria-hidden /> : <span className="num text-[13px]">{i + 1}</span>}
             </span>
             <span className="min-w-0">
-              <span className="block text-[17px] text-ink">{h}</span>
-              <span className="mt-1 block text-[15px] leading-relaxed text-ink-2">{b}</span>
+              <span className="block text-[17px] text-ink">{nums(h)}</span>
+              <span className="mt-1 block text-[15px] leading-relaxed text-ink-2">{nums(b)}</span>
             </span>
           </li>
         ))}
@@ -597,14 +601,15 @@ function ResultsSection() {
             onClick={() => setCohort(n)}
             className={clsx('inline-flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-1.5 text-[14px] focus-ring', cohort === n ? 'border-ink bg-ink text-paper' : 'border-line text-ink-2 hover:bg-paper-sunk')}
           >
-            <TermDot term={x.primary} size={8} /> {x.cohort}
+            <TermDot term={x.primary} size={8} /> {nums(x.cohort)}
           </button>
         ))}
       </div>
       <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
+        <SpecimenScores>
         <Card className="min-w-0" role="tabpanel" aria-label={c.cohort}>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Eyebrow>{t(primary.key === 'B' ? 'designedEase' : 'designedRaise', { cohort: c.cohort, name: tt.name(primary.key) })}</Eyebrow>
+            <Eyebrow>{nums(t(primary.key === 'B' ? 'designedEase' : 'designedRaise', { cohort: c.cohort, name: tt.name(primary.key) }))}</Eyebrow>
             <LSpecimenTag />
           </div>
           <p className="mt-3 text-[15px] text-ink-2">
@@ -629,11 +634,12 @@ function ResultsSection() {
           </ul>
           <LMethodLine className="mt-4" method="v1.0" grade="index" />
         </Card>
+        </SpecimenScores>
         <Card tone="sunk" className="min-w-0">
           <Eyebrow>{t('learned')}</Eyebrow>
-          <p className="mt-3 text-[17px] leading-relaxed text-ink">{note}</p>
+          <p className="mt-3 text-[17px] leading-relaxed text-ink">{nums(note)}</p>
           <p className="mt-5 text-[14px] leading-relaxed text-ink-3">
-            {t('falls')}
+            {nums(t('falls'))}
           </p>
         </Card>
       </div>

@@ -57,46 +57,76 @@ export function recordSessionRead(e: Omit<SessionRead, 'at' | 'console'> & { con
 
 // ─── Coach's next-best-action override ─────────────────────────────────────
 
+/**
+ * One override per member, keyed by member id ({ m_0001: {...}, m_0287: {...} }), so
+ * overriding one member's action never changes another's. A key written before the map (a
+ * single override object) is read as that one member's entry.
+ */
 export const NBA_OVERRIDE_KEY = 'joyos:coach:nba-override'
 /** The override as Today reads it. term and until ride along so the digest can show it again. */
 export type NbaOverride = { memberId: string; action: string; reason: string; by: string; at: string; term?: TermKey; until?: number }
+type NbaOverrideMap = Record<string, NbaOverride>
 
-export function writeNbaOverride(o: Omit<NbaOverride, 'at'>) {
+const isOverride = (v: unknown): v is NbaOverride =>
+  !!v && typeof v === 'object' && typeof (v as NbaOverride).memberId === 'string' && typeof (v as NbaOverride).action === 'string'
+
+function parseOverrides(raw: string | null): NbaOverrideMap {
+  if (!raw) return {}
   try {
-    localStorage.setItem(NBA_OVERRIDE_KEY, JSON.stringify({ ...o, at: new Date(consoleNowMs()).toISOString() }))
+    const p = JSON.parse(raw) as unknown
+    if (isOverride(p)) return { [p.memberId]: p }
+    if (!p || typeof p !== 'object' || Array.isArray(p)) return {}
+    const out: NbaOverrideMap = {}
+    for (const [id, v] of Object.entries(p as Record<string, unknown>)) if (isOverride(v) && v.memberId === id) out[id] = v
+    return out
+  } catch {
+    return {}
+  }
+}
+
+function readOverrideRaw() {
+  try { return localStorage.getItem(NBA_OVERRIDE_KEY) } catch { return null }
+}
+
+function writeOverrides(map: NbaOverrideMap) {
+  try {
+    if (Object.keys(map).length) localStorage.setItem(NBA_OVERRIDE_KEY, JSON.stringify(map))
+    else localStorage.removeItem(NBA_OVERRIDE_KEY)
   } catch {
     /* storage unavailable */
   }
   notify()
+  // The member core's own hooks listen for this, so an open Today in this tab updates at once.
+  window.dispatchEvent(new CustomEvent('joyos:core-change', { detail: 'nba-override' }))
 }
 
-/** Back to the engine's choice: removes the override if it is this member's. */
+/** Set this member's override; every other member's stays as it is. */
+export function writeNbaOverride(o: Omit<NbaOverride, 'at'>) {
+  writeOverrides({ ...parseOverrides(readOverrideRaw()), [o.memberId]: { ...o, at: new Date(consoleNowMs()).toISOString() } })
+}
+
+/** Back to the engine's choice: removes this member's override and nobody else's. */
 export function clearNbaOverride(memberId: string) {
-  const cur = readJson<NbaOverride | null>(NBA_OVERRIDE_KEY, null)
-  if (!cur || cur.memberId !== memberId) return
-  try { localStorage.removeItem(NBA_OVERRIDE_KEY) } catch { /* storage unavailable */ }
-  notify()
+  const map = parseOverrides(readOverrideRaw())
+  if (!map[memberId]) return
+  const { [memberId]: _gone, ...rest } = map
+  void _gone
+  writeOverrides(rest)
 }
 
-let nbaRaw: string | null = null
-let nbaCache: NbaOverride | null = null
+let nbaRaw: string | null | undefined
+let nbaCache: NbaOverrideMap = {}
 function nbaSnapshot() {
-  let raw: string | null = null
-  try { raw = localStorage.getItem(NBA_OVERRIDE_KEY) } catch { /* storage unavailable */ }
+  const raw = readOverrideRaw()
   if (raw !== nbaRaw) {
     nbaRaw = raw
-    try {
-      const p = raw ? JSON.parse(raw) : null
-      nbaCache = p && typeof p.memberId === 'string' && typeof p.action === 'string' ? p : null
-    } catch {
-      nbaCache = null
-    }
+    nbaCache = parseOverrides(raw)
   }
   return nbaCache
 }
 
-/** The override the member app shows, if it is for this member. */
+/** The override the member app shows, if this member has one. */
 export function useNbaOverride(memberId: string) {
-  const o = useSyncExternalStore(subscribe, nbaSnapshot, nbaSnapshot)
-  return o && o.memberId === memberId ? o : null
+  const map = useSyncExternalStore(subscribe, nbaSnapshot, nbaSnapshot)
+  return map[memberId] ?? null
 }

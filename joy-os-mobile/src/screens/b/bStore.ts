@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useCallback, useSyncExternalStore } from 'react'
 import { CONSENTS, MEMBER } from '@/shared/member'
+import type { MeasuredIndex } from '@/shared/indexScoring'
 import type { TermKey } from '@/shared/types'
 import { DEVICES, GRANTS, SPECIMEN_NOW, specimenThreads, type DeviceState, type Grant, type Msg, type Thread } from './accountData'
 
@@ -124,12 +125,14 @@ export interface NotifPrefs {
   savedAt?: string
 }
 const [qFrom, qTo] = MEMBER.quietHours.split('–').map((s) => s.trim())
-export const notifPrefsStore = createStore<NotifPrefs>('notifPrefs', {
+/** Where every account's preferences start (each account keeps its own from then on). */
+export const NOTIF_PREFS_START: NotifPrefs = {
   quiet: { from: qFrom, to: qTo },
   perDay: 2,
   channels: { app: true, whatsapp: false, email: true },
   kinds: { action: true, ledger: true, circle: true, letter: true },
-})
+}
+export const notifPrefsStore = createStore<NotifPrefs>('notifPrefs', NOTIF_PREFS_START)
 
 export function validatePrefs(p: Pick<NotifPrefs, 'quiet' | 'perDay' | 'channels'>): string | null {
   if (p.quiet.from === p.quiet.to) return 'Quiet hours need a different start and end time.'
@@ -169,6 +172,41 @@ export interface MessagesState {
   read: string[]
 }
 export const messagesStore = createStore<MessagesState>('messages', { sent: {}, started: [], read: [] })
+
+/** Who a message from another screen goes to: the coach, the physician or the concierge. */
+export type MessageTo = 'coach' | 'physician' | 'concierge'
+const PERSON_FOR: Record<MessageTo, string> = { coach: 'p_priya', physician: 'p_meera', concierge: 'p_ravi' }
+/** The signed-in account's thread with that person (its specimen one, or one it started), if any. */
+function threadWith(to: MessageTo): Thread | undefined {
+  const pid = PERSON_FOR[to]
+  const st = messagesStore.get()
+  return [...st.started, ...specimenThreads(sessionStore.get().account ?? 'arjun')].find((t) => t.personId === pid)
+}
+/** Where to read the account's thread with that person: the thread, or a new message to them. */
+export function threadHref(to: MessageTo): string {
+  const th = threadWith(to)
+  return th ? `/messages?t=${th.id}` : `/messages?compose=1&to=${PERSON_FOR[to]}`
+}
+/**
+ * A message written on another screen (VIVA's routing, Body's "Ask about this", a Day 45 review
+ * note), appended to the signed-in account's thread with that person, or a new thread when it has
+ * none. Messages shows it with what the member sent; nothing leaves the phone in this build.
+ * from 'viva': VIVA wrote it with the member, so it carries "drafted with VIVA".
+ */
+export function postMemberMessage(m: { to: MessageTo; subject: string; body: string; from: 'member' | 'viva' }): { threadId: string; href: string } {
+  const d = new Date()
+  const at = `${SPECIMEN_NOW}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  const msg: Msg = { id: `s${Date.now()}`, from: 'me', at, body: m.body.trim(), subject: m.subject.trim() || undefined, ...(m.from === 'viva' ? { drafted: true } : {}) }
+  const th = threadWith(m.to)
+  if (th) {
+    messagesStore.set((s) => ({ ...s, sent: { ...s.sent, [th.id]: [...(s.sent[th.id] ?? []), msg] } }))
+    return { threadId: th.id, href: `/messages?t=${th.id}` }
+  }
+  const id = `t_new_${Date.now()}`
+  const thread: Thread = { id, personId: PERSON_FOR[m.to], subject: m.subject.trim() || m.body.trim().slice(0, 60), clinical: m.to === 'physician', unread: 0, messages: [msg] }
+  messagesStore.set((s) => ({ ...s, started: [thread, ...s.started], read: [...s.read, id] }))
+  return { threadId: id, href: `/messages?t=${id}` }
+}
 
 // ─── Practice ─────────────────────────────────────────────────────────────
 
@@ -378,13 +416,15 @@ export interface LockState {
   after: 'now' | '1m' | '5m' | '15m'
   passkeys: { id: string; name: string; added: string }[]
 }
+/** The specimen member's passkeys: this phone and his laptop. Each account keeps its own. */
+const ARJUN_PASSKEYS: LockState['passkeys'] = [
+  { id: 'pk1', name: 'This iPhone', added: '2026-10-04' }, // shown as ts('pkThisIphone') in Settings
+  { id: 'pk2', name: 'MacBook Air · iCloud Keychain', added: '2026-11-12' },
+]
 export const lockStore = createStore<LockState>('lock', {
   appLock: false,
   after: '5m',
-  passkeys: [
-    { id: 'pk1', name: 'This iPhone', added: '2026-10-04' }, // shown as ts('pkThisIphone') in Settings
-    { id: 'pk2', name: 'MacBook Air · iCloud Keychain', added: '2026-11-12' },
-  ],
+  passkeys: ARJUN_PASSKEYS,
 })
 
 // ─── Devices: connections, HealthKit reads and the mindful-minutes write-back ───
@@ -419,7 +459,20 @@ export interface Charter {
   /** The shared joy marked as had this week (date). Never counted, never a streak. */
   week?: string
 }
-export const charterStore = createStore<Charter>('charter', { values: [], rituals: [], joy: { what: '', day: 0 }, written: false, agreed: [] })
+export const CHARTER_START: Charter = { values: [], rituals: [], joy: { what: '', day: 0 }, written: false, agreed: [] }
+export const charterStore = createStore<Charter>('charter', CHARTER_START)
+
+/**
+ * Each household's kind and charter, kept while another household's account is signed in. Arjun
+ * and Lakshmi share the Rao household (and so its kind and charter); the account made in
+ * onboarding starts its own, with nobody else in it yet.
+ */
+type HouseholdId = 'rao' | 'new'
+interface HouseholdRecord { kind: { kind: HouseholdKind; since: string }; charter: Charter }
+export const householdsStore = createStore<Partial<Record<HouseholdId, HouseholdRecord>>>('households', {})
+const householdOf = (a: AccountId): HouseholdId => (a === 'new' ? 'new' : 'rao')
+const householdStart = (h: HouseholdId): HouseholdRecord =>
+  h === 'rao' ? { kind: { kind: 'family', since: '2026-07-06' }, charter: CHARTER_START } : { kind: { kind: 'couple', since: SPECIMEN_NOW }, charter: CHARTER_START }
 
 // ─── Joyspan Occasions (Memo p.20, p.29) ────────────────────────────────────────
 
@@ -477,19 +530,27 @@ interface AccountSnapshot {
   messages?: MessagesState
   notifRead?: NotifRead
   circleReports?: CircleReport[]
+  /** Quiet hours, reminders a day and channels. Older snapshots lack them: the account's start is used. */
+  notifPrefs?: NotifPrefs
+  /** The account's own passkeys (the lock itself belongs to the phone). */
+  passkeys?: LockState['passkeys']
 }
+type SideStart = Required<Pick<AccountSnapshot, 'trust' | 'nominee' | 'abha' | 'messages' | 'notifRead' | 'circleReports' | 'notifPrefs' | 'passkeys'>>
 /** The per-account stores beyond the account record, at each account's starting point. */
-function sideStart(id: AccountId): Required<Pick<AccountSnapshot, 'trust' | 'nominee' | 'abha' | 'messages' | 'notifRead' | 'circleReports'>> {
-  const empty = { messages: { sent: {}, started: [], read: [] }, notifRead: { read: [], cleared: [] }, circleReports: [] }
+function sideStart(id: AccountId): SideStart {
+  const empty = { messages: { sent: {}, started: [], read: [] }, notifRead: { read: [], cleared: [] }, circleReports: [], notifPrefs: NOTIF_PREFS_START }
   if (id === 'arjun') {
-    return { ...empty, trust: { research: true, eraseScheduled: false, insurer: 'not-granted' }, nominee: { name: 'Kavya Rao', relation: 'Spouse', email: 'kavya.rao@example.in' }, abha: { linked: true, address: 'arjun.rao@abdm', since: '2026-10-04' } }
+    return { ...empty, trust: { research: true, eraseScheduled: false, insurer: 'not-granted' }, nominee: { name: 'Kavya Rao', relation: 'Spouse', email: 'kavya.rao@example.in' }, abha: { linked: true, address: 'arjun.rao@abdm', since: '2026-10-04' }, passkeys: ARJUN_PASSKEYS }
   }
   if (id === 'lakshmi') {
-    // Her son is her nominee; her ABHA is not linked yet.
-    return { ...empty, trust: { research: true, eraseScheduled: false, insurer: 'not-granted' }, nominee: { name: ACCOUNT_PROFILES.arjun.profile.name, relation: 'Child', email: ACCOUNT_PROFILES.arjun.profile.email }, abha: { linked: false, address: '', since: '' } }
+    // Her son is her nominee; her ABHA is not linked yet. Her one passkey is this phone, set up
+    // the day Arjun became her helper.
+    return { ...empty, trust: { research: true, eraseScheduled: false, insurer: 'not-granted' }, nominee: { name: ACCOUNT_PROFILES.arjun.profile.name, relation: 'Child', email: ACCOUNT_PROFILES.arjun.profile.email }, abha: { linked: false, address: '', since: '' }, passkeys: [{ id: 'pk1', name: 'This iPhone', added: '2027-01-08' }] }
   }
-  // A new member was never asked about research use in setup, so it starts off (no event says otherwise).
-  return { ...empty, trust: { research: false, eraseScheduled: false, insurer: 'not-granted' }, nominee: NO_NOMINEE, abha: { linked: false, address: '', since: '' } }
+  // A new member was never asked about research use in setup, so it starts off (no event says
+  // otherwise). It has a passkey only if it secured its AIWO ID with one in onboarding.
+  const onb = storeByKey<{ verified: null | 'passkey' | 'code' }>('onbAccount')?.get()
+  return { ...empty, trust: { research: false, eraseScheduled: false, insurer: 'not-granted' }, nominee: NO_NOMINEE, abha: { linked: false, address: '', since: '' }, passkeys: onb?.verified === 'passkey' ? [{ id: 'pk1', name: 'This iPhone', added: SPECIMEN_NOW }] : [] }
 }
 export const accountSnapshotsStore = createStore<Partial<Record<AccountId, AccountSnapshot>>>('accountSnapshots', {})
 
@@ -530,6 +591,8 @@ const takeSnapshot = (): AccountSnapshot => {
     messages: messagesStore.get(),
     notifRead: notifReadStore.get(),
     circleReports: circleReportsStore.get().reports,
+    notifPrefs: notifPrefsStore.get(),
+    passkeys: lockStore.get().passkeys,
   }
 }
 function putSnapshot(id: AccountId, s: AccountSnapshot, profile: AccountState['profile']) {
@@ -545,6 +608,8 @@ function putSnapshot(id: AccountId, s: AccountSnapshot, profile: AccountState['p
   messagesStore.set(s.messages ?? start.messages)
   notifReadStore.set(s.notifRead ?? start.notifRead)
   circleReportsStore.set({ reports: s.circleReports ?? start.circleReports })
+  notifPrefsStore.set(s.notifPrefs ?? start.notifPrefs)
+  lockStore.set((l) => ({ ...l, passkeys: s.passkeys ?? start.passkeys }))
 }
 /** The specimen accounts start from the specimen record. */
 const specimenStart = (id: 'arjun' | 'lakshmi'): AccountSnapshot => ({ own: ownStart(id, ACCOUNT_PROFILES[id].profile), consents: {}, events: CONSENT_SEED, devices: {}, ...sideStart(id) })
@@ -570,6 +635,17 @@ export function applyDemoAccount(id: AccountId) {
     const next = snaps[id] ?? (id === 'new' ? { consents: {}, events: CONSENT_SEED, devices: {}, ...sideStart('new') } : specimenStart(id))
     accountSnapshotsStore.set({ ...snaps, [prev]: takeSnapshot() })
     putSnapshot(id, next, next.own?.profile ?? next.profile ?? profileFor())
+    // Moving between households puts one household's kind and charter away and brings the other's.
+    const from = householdOf(prev)
+    const to = householdOf(id)
+    if (from !== to) {
+      const hh = householdsStore.get()
+      householdsStore.set({ ...hh, [from]: { kind: householdKindStore.get(), charter: charterStore.get() } })
+      const rec = hh[to] ?? householdStart(to)
+      householdKindStore.set(rec.kind)
+      charterStore.set(rec.charter)
+    }
+    claimPhoneRecords(prev)
   } else if (id === 'new' && !accountSnapshotsStore.get().new?.own && !accountSnapshotsStore.get().new?.profile) {
     accountStore.set((a) => ({ ...a, profile: newAccountProfile() }))
   }
@@ -619,12 +695,101 @@ export function seedFromOnboarding({ consents, device }: { consents: { care: boo
   const invited = new Set(storeByKey<{ invited: string[] }>('onbAccount')?.get().invited ?? [])
   const current = accountStore.get()
   const own: OwnAccount = { ...ownStart('new', newAccountProfile()), invites: current.invites.filter((iv) => invited.has(iv.id)) }
-  const snap: AccountSnapshot = { own, consents: choice, events, devices: states, ...sideStart('new') }
+  // The quiet hours, reminders and channels chosen in onboarding's own step are the new member's.
+  const snap: AccountSnapshot = { own, consents: choice, events, devices: states, ...sideStart('new'), notifPrefs: notifPrefsStore.get() }
   if ((sessionStore.get().account ?? 'arjun') === 'new') putSnapshot('new', snap, own.profile)
   else accountStore.set((a) => ({ ...a, invites: a.invites.filter((iv) => !invited.has(iv.id)) }))
   // Kept as the new account's starting point; applyDemoAccount('new') brings it in.
   accountSnapshotsStore.set((s) => ({ ...s, new: snap }))
 }
+
+// ─── Records Lane A keeps for the whole phone, claimed per account ─────────────
+// The Index measured on this phone ('measuredIndex') and ’Cation requests ('cationRequests') are
+// kept by Lane A under one phone-wide key. Each is claimed by the account signed in when it was
+// made: a record already on the phone at a switch belongs to the account signing out, and one
+// that appears while an account is signed in is that account's. Each account keeps a copy of its
+// own measured Index, so another account re-taking it on this phone never replaces it. A record
+// already on the phone before ownership was first checked (an earlier build) was made by someone
+// we cannot know: it is set aside as nobody's, so it is never shown to the wrong person as theirs.
+
+const LANE_A = 'joyos:a:'
+export interface PhoneRecordOwners {
+  /** Each account's own Index measured on this phone. */
+  measured: Partial<Record<AccountId, NonNullable<MeasuredIndex>>>
+  /** ’Cation request ref → the account that made it ('unowned': made before ownership was kept). */
+  cation: Record<string, AccountId | 'unowned'>
+  /** A measured Index made before ownership was kept: nobody's own. */
+  unowned?: NonNullable<MeasuredIndex>
+  /** True once the phone's records from before ownership was kept have been set aside. */
+  checked?: boolean
+  /** Set while a switch reads the phone's records for the account signing out. */
+  pending?: AccountId | null
+}
+export const phoneOwnersStore = createStore<PhoneRecordOwners>('phoneOwners', { measured: {}, cation: {} })
+const sameRecord = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+/** True when this measured Index already belongs to some account. */
+export const measuredClaimed = (o: PhoneRecordOwners, m: NonNullable<MeasuredIndex>) => sameRecord(o.unowned, m) || Object.values(o.measured).some((x) => sameRecord(x, m))
+/** The owners with anything on the phone not yet claimed given to `account`. */
+export function claimFor(o: PhoneRecordOwners, account: AccountId, measured: MeasuredIndex | undefined, cationRefs: string[]): PhoneRecordOwners {
+  let next = o
+  if (measured && !measuredClaimed(o, measured)) next = { ...next, measured: { ...next.measured, [account]: measured } }
+  const fresh = cationRefs.filter((r) => !(r in next.cation))
+  if (fresh.length) next = { ...next, cation: { ...next.cation, ...Object.fromEntries(fresh.map((r) => [r, account])) } }
+  return next
+}
+/** Runs fn once the store has read what the phone keeps (a set() before that would replace it). */
+function whenHydrated<T>(store: Store<T>, fn: () => void) {
+  if (store.hydrated()) return fn()
+  const off = store.subscribe(() => {
+    if (!store.hydrated()) return
+    off()
+    fn()
+  })
+}
+function claimPhoneRecords(account: AccountId) {
+  whenHydrated(phoneOwnersStore, () => claimNow(account))
+}
+const parseRaw = (raw: string | null) => {
+  try {
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+/** The phone-wide measured Index and ’Cation request refs Lane A keeps. */
+function readPhoneRecords() {
+  return AsyncStorage.multiGet([`${LANE_A}measuredIndex`, `${LANE_A}cationRequests`]).then((rows) => {
+    const measured = parseRaw(rows[0]?.[1] ?? null) as MeasuredIndex
+    const requests = (parseRaw(rows[1]?.[1] ?? null) ?? {}) as Record<string, { ref: string }>
+    return { measured: measured ?? undefined, refs: Object.values(requests).map((r) => r.ref) }
+  })
+}
+function claimNow(account: AccountId) {
+  phoneOwnersStore.set((o) => ({ ...o, pending: account }))
+  readPhoneRecords()
+    .then(({ measured, refs }) => phoneOwnersStore.set((o) => claimFor(o, account, measured, refs)))
+    .catch(() => {})
+    .finally(() => phoneOwnersStore.set((o) => ({ ...o, pending: null })))
+}
+// Once per phone, at the first start with ownership kept: what is already there and unclaimed was
+// made under an earlier build, by an account we cannot know, so it is nobody's (not the account
+// that happens to be signed in now). Claims wait for `checked`, so none is given away first.
+whenHydrated(phoneOwnersStore, () => {
+  if (phoneOwnersStore.get().checked) return
+  readPhoneRecords()
+    .then(({ measured, refs }) =>
+      phoneOwnersStore.set((o) => {
+        const fresh = refs.filter((r) => !(r in o.cation))
+        return {
+          ...o,
+          unowned: measured && !measuredClaimed(o, measured) ? measured : o.unowned,
+          cation: { ...o.cation, ...Object.fromEntries(fresh.map((r) => [r, 'unowned' as const])) },
+          checked: true,
+        }
+      }),
+    )
+    .catch(() => phoneOwnersStore.set((o) => ({ ...o, checked: true })))
+})
 
 // ─── Account-scoped reads (L2): what the signed-in person sees as their own ───
 

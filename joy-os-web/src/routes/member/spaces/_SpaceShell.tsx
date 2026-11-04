@@ -10,12 +10,15 @@ import { INDEX_HISTORY } from '@/data/member'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { CATIONS, PRACTICE_WEEKS } from '@/data/platform'
 import { termByKey, termColor } from '@/data/terms'
-import type { TermKey } from '@/domain/types'
-import { LE8, LE8_KEY, LE8_LOG_START, ROOM_VERDICT, VIVA_DRAFT, VIVA_MATCH, VIVA_MORE, actionsFor, le8Latest, le8Score, termHistory, type Le8Key } from './_data'
-import { useSpaceText } from './_i18n'
+import type { IndexScore, TermKey } from '@/domain/types'
+import { LE8, LE8_KEY, LE8_LOG_START, VIVA_DRAFT, VIVA_MATCH, VIVA_MORE, actionWhy, actionsFor, le8Latest, le8Score, roomVerdict, termHistory, todayActionFor, type Le8Key } from './_data'
+import { mono, useSpaceText } from './_i18n'
 import { TermIcon } from '@/components/joy/icons'
 import { useIsMinor } from '@/lib/minor'
-import { readCalendarProvider, readSpaceState, readTrustConsent, useSpaceState } from './_state'
+import { readCalendarProvider, readSpaceState, readTrustConsent, useCalendarConnected, useSpaceState } from './_state'
+import { MEMBER } from '@/data/member'
+import { useIndexHistory } from '@/routes/member/core/_latest'
+import { useNbaOverride } from '@/routes/console/care/_memberShare'
 
 // Shared shell for the six spaces (Memo p.19): the term, its score with method,
 // its 90-day history, what moves it, three actions, the VIVA tool, the lead
@@ -29,9 +32,11 @@ export const inkColor: Record<TermKey, string> = {
   H: 'var(--term-h-ink)', P: 'var(--term-p-ink)', R: 'var(--term-r-ink)', F: 'var(--term-f-ink)', D: 'var(--term-d-ink)', B: 'var(--term-b-ink)',
 }
 
-export function termScore(key: TermKey) {
-  const latest = INDEX_HISTORY[0]
-  const prev = INDEX_HISTORY[1]
+/** A term's score in the latest Index and the one before it. Pass the history from
+ *  useIndexHistory() so a signed Day-90 re-measure leads; the specimen history otherwise. */
+export function termScore(key: TermKey, history: IndexScore[] = INDEX_HISTORY) {
+  const latest = history[0]
+  const prev = history[1]
   const s = latest.terms.find((t) => t.key === key)!
   const p = prev.terms.find((t) => t.key === key)!
   return { ...s, prev: p.value, latest, prevIndex: prev }
@@ -152,12 +157,14 @@ function ScoreHero({ term }: { term: TermKey }) {
   const t = termByKey(term)
   const { t: tx, r, tt, d, dm, my } = useSpaceText()
   const name = tt.name(term)
-  const s = termScore(term)
+  // The latest Index leads: a signed Day-90 re-measure moves the score, the pulse's end and the full measures.
+  const { history: indexHistory } = useIndexHistory()
+  const s = termScore(term, indexHistory)
   const isB = term === 'B'
   // Burden is always signed with a minus (U+2212), on the axis and tooltip as on the tiles.
   const sign = isB ? '−' : ''
-  const history = termHistory(term)
-  const fulls = INDEX_HISTORY.slice().reverse().map((ix) => ({ on: ix.takenOn, v: ix.terms.find((x) => x.key === term)!.value, grade: ix.grade }))
+  const history = termHistory(term, indexHistory)
+  const fulls = indexHistory.slice().reverse().map((ix) => ({ on: ix.takenOn, v: ix.terms.find((x) => x.key === term)!.value, grade: ix.grade }))
   const diff = s.delta ?? 0
   // Every number in the sentence is set in Mono, Burden's minus included.
   const sv = { n: <span className="num">{Math.abs(diff)}</span>, prev: <span className="num">{sign}{s.prev ?? ''}</span> }
@@ -184,7 +191,7 @@ function ScoreHero({ term }: { term: TermKey }) {
           <dl className="mt-5 space-y-3 border-t border-line pt-4 text-[14px]">
             <div>
               <dt className="eyebrow text-ink-3">{tx('sh.framework')}</dt>
-              <dd className="mt-1 break-words text-ink">{d(t.framework)}</dd>
+              <dd className="mt-1 break-words text-ink">{mono(d(t.framework))}</dd>
             </div>
             <div>
               <dt className="eyebrow text-ink-3">{tx('sh.instruments')}</dt>
@@ -219,7 +226,7 @@ function ScoreHero({ term }: { term: TermKey }) {
             </ResponsiveContainer>
           </div>
           <p className="sr-only">
-            {tx('sh.pulseSr', { name, list: history.map((h) => `${dm(h.on)} ${sign}${h.value}`).join(', ') })}
+            {mono(tx('sh.pulseSr', { name, list: history.map((h) => `${dm(h.on)} ${sign}${h.value}`).join(', ') }))}
           </p>
           <ol className="mt-4 grid grid-cols-3 gap-2" aria-label={tx('sh.fullMeasures')}>
             {fulls.map((f) => (
@@ -247,13 +254,13 @@ function MinorHero({ term }: { term: TermKey }) {
       <div className="grid gap-8 p-5 md:grid-cols-2 md:p-7">
         <div className="min-w-0">
           <Eyebrow>{tt.name(term)}</Eyebrow>
-          <p className="mt-3 text-[1.6rem] font-light leading-snug text-ink">{tx('mn.title')}</p>
-          <p className="mt-2 max-w-[48ch] text-[16px] text-ink-2">{tx('mn.body')}</p>
+          <p className="mt-3 text-[1.6rem] font-light leading-snug text-ink">{mono(tx('mn.title'))}</p>
+          <p className="mt-2 max-w-[48ch] text-[16px] text-ink-2">{mono(tx('mn.body'))}</p>
         </div>
         <dl className="min-w-0 space-y-3 text-[14px] md:border-l md:border-line md:pl-6">
           <div>
             <dt className="eyebrow text-ink-3">{tx('sh.framework')}</dt>
-            <dd className="mt-1 break-words text-ink">{d(t.framework)}</dd>
+            <dd className="mt-1 break-words text-ink">{mono(d(t.framework))}</dd>
           </div>
           <div>
             <dt className="eyebrow text-ink-3">{tx('sh.instruments')}</dt>
@@ -277,7 +284,7 @@ function WhatMoves({ term }: { term: TermKey }) {
   const { t: tx, d } = useSpaceText()
   const parts = [...t.formula.split('=')[1].matchAll(/([0-9.]+)·([^+]+)/g)].map((m) => ({ w: Number(m[1]), ws: m[1], name: m[2].trim() }))
   return (
-    <ToolCard eyebrow={tx('sh.whatMoves')} title={d(t.whatMoves)} sub={tx(term === 'B' ? 'sh.whatMovesSubB' : 'sh.whatMovesSub')}>
+    <ToolCard eyebrow={tx('sh.whatMoves')} title={mono(d(t.whatMoves))} sub={mono(tx(term === 'B' ? 'sh.whatMovesSubB' : 'sh.whatMovesSub'))}>
       <ul className="space-y-3">
         {parts.map((p) => (
           <li key={p.name}>
@@ -302,12 +309,29 @@ function WhatMoves({ term }: { term: TermKey }) {
   )
 }
 
+/**
+ * The id of the action Today shows as its one action, or null when the coach's override has
+ * replaced it (Today then keeps the replaced action in the pool, so a space may add it).
+ * It follows the latest Index's lowest term, as Today does; under 18 it is the specimen action.
+ */
+function useTodayActionId(): string | null {
+  const { latest } = useIndexHistory()
+  const minor = useIsMinor()
+  const override = useNbaOverride(MEMBER.id)
+  if (override) return null
+  return todayActionFor(minor ? null : latest.lowestTerm).id
+}
+
 function ThreeActions({ term }: { term: TermKey }) {
   const actions = actionsFor(term)
-  const { t: tx, tt, d } = useSpaceText()
+  const { t: tx, tt, dn } = useSpaceText()
   const [added, setAdded] = useSpaceState<Record<string, boolean>>(`actions.${term}.added.v1`, {})
   const [open, setOpen] = useState<string | null>(null)
-  const addedCount = actions.filter((a) => added[a.id]).length
+  const todayId = useTodayActionId()
+  // Calendar-derived reasons wait for a connected calendar (see _data WHY_NO_CAL).
+  const calendar = useCalendarConnected()
+  // Today's own action is never counted as added to the pool: Today already shows it.
+  const addedCount = actions.filter((a) => added[a.id] && a.id !== todayId).length
   return (
     <ToolCard eyebrow={tx('sh.threeActions', { name: tt.name(term) })} sub={tx('sh.threeSub')}>
       <ul className="divide-y divide-line">
@@ -315,8 +339,8 @@ function ThreeActions({ term }: { term: TermKey }) {
           <li key={a.id} className="py-4 first:pt-0 last:pb-0">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[17px] text-ink">{d(a.title)}</p>
-                <p className="mt-0.5 text-[14px] text-ink-2">{d(a.detail)}</p>
+                <p className="text-[17px] text-ink">{dn(a.title)}</p>
+                <p className="mt-0.5 text-[14px] text-ink-2">{dn(a.detail)}</p>
                 <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-3">
                   <span className="inline-flex items-center gap-1"><Clock size={13} /> <span className="num">{a.minutes}</span> {tx('c.min')}</span>
                   <span>{tx(`tod.${a.timeOfDay}`)}</span>
@@ -328,14 +352,18 @@ function ThreeActions({ term }: { term: TermKey }) {
                 <AnimatePresence initial={false}>
                   {open === a.id && (
                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
-                      <p className="mt-3 rounded-xl bg-paper-sunk p-3 text-[14px] text-ink-2"><b className="font-medium text-ink">{d(a.why)}</b> {d(a.evidence)}</p>
+                      <p className="mt-3 rounded-xl bg-paper-sunk p-3 text-[14px] text-ink-2"><b className="font-medium text-ink">{dn(actionWhy(a, calendar))}</b> {dn(a.evidence)}</p>
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
-              <Button size="sm" variant={added[a.id] ? 'ghost' : 'secondary'} onClick={() => setAdded((s) => ({ ...s, [a.id]: !s[a.id] }))} aria-pressed={!!added[a.id]} className="shrink-0">
-                {added[a.id] ? <><Check size={15} /> {tx('sh.added')}</> : tx('sh.add')}
-              </Button>
+              {a.id === todayId ? (
+                <Link to="/app" className="inline-flex shrink-0 items-center gap-1 rounded pt-1 text-[14px] text-ink underline-offset-4 hover:underline focus-ring">{tx('sh.isToday')} <ArrowRight size={14} aria-hidden /></Link>
+              ) : (
+                <Button size="sm" variant={added[a.id] ? 'ghost' : 'secondary'} onClick={() => setAdded((s) => ({ ...s, [a.id]: !s[a.id] }))} aria-pressed={!!added[a.id]} className="shrink-0">
+                  {added[a.id] ? <><Check size={15} /> {tx('sh.added')}</> : tx('sh.add')}
+                </Button>
+              )}
             </div>
           </li>
         ))}
@@ -343,7 +371,7 @@ function ThreeActions({ term }: { term: TermKey }) {
       {addedCount > 0 && (
         // Added actions join Today's pool (Today reads this same record); the card says so and links there.
         <p role="status" className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line pt-4 text-[14px] text-ink-2">
-          <span className="inline-flex items-center gap-1.5"><Check size={14} aria-hidden /> {tx('sh.inToday', { n: addedCount })}</span>
+          <span className="inline-flex items-center gap-1.5"><Check size={14} aria-hidden /> {mono(tx('sh.inToday', { n: addedCount }))}</span>
           <Link to="/app" className="inline-flex items-center gap-1 rounded text-ink underline-offset-4 hover:underline focus-ring">{tx('sh.seeToday')} <ArrowRight size={14} /></Link>
         </p>
       )}
@@ -473,7 +501,7 @@ function VivaTool({ term }: { term: TermKey }) {
             <div className="mt-4 space-y-2">
               {drafts.map((dr) => (
                 <button key={dr.tool} onClick={() => askTool(dr)} className="block w-full rounded-2xl border border-line bg-paper-raised px-4 py-3 text-left text-[15px] text-ink hover:border-line-strong focus-ring">
-                  “{dx(dr.ask)}”
+                  “{mono(dx(dr.ask))}”
                   <span className="eyebrow mt-1 block text-ink-3">{tx('sh.tapToAsk', { tool: dr.tool })}</span>
                 </button>
               ))}
@@ -497,8 +525,8 @@ function VivaTool({ term }: { term: TermKey }) {
               ) : (
                 <>
                   <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24 }} className="rounded-2xl rounded-bl-md bg-paper-raised p-4">
-                    <p className="text-[15px] leading-relaxed text-ink">{turn.text}</p>
-                    <p className="eyebrow mt-3 break-words text-ink-3">{turn.by}</p>
+                    <p className="text-[15px] leading-relaxed text-ink">{mono(turn.text)}</p>
+                    <p className="eyebrow mt-3 break-words text-ink-3">{mono(turn.by)}</p>
                     {turn.link && (turn.link.to
                       ? <Link to={turn.link.to} className="mt-3 inline-flex items-center gap-1.5 rounded text-[14px] text-ink underline underline-offset-4 focus-ring">{turn.link.label} <ArrowRight size={14} aria-hidden /></Link>
                       : <button type="button" onClick={() => focusCard(turn.link!.focus!)} className="mt-3 inline-flex items-center gap-1.5 rounded text-[14px] text-ink underline underline-offset-4 focus-ring">{turn.link.label} <ArrowRight size={14} aria-hidden /></button>)}
@@ -529,11 +557,11 @@ function LeadCation({ term }: { term: TermKey }) {
   const list = t.leadCations.map((n) => CATIONS.find((c) => c.name === n)).filter(Boolean) as typeof CATIONS
   const lead = list[0]
   return (
-    <ToolCard eyebrow={tx('sh.lead', { space })} title={lead.name} sub={d(lead.promise)} aside={<Pill tone={lead.status === 'LIVE' ? 'positive' : 'neutral'}>{tx(`status.${lead.status}`)}</Pill>}>
+    <ToolCard eyebrow={tx('sh.lead', { space })} title={lead.name} sub={mono(d(lead.promise))} aside={<Pill tone={lead.status === 'LIVE' ? 'positive' : 'neutral'}>{tx(`status.${lead.status}`)}</Pill>}>
       <dl className="grid grid-cols-2 gap-3 text-[14px]">
-        <div><dt className="eyebrow text-ink-3">{tx('sh.stay')}</dt><dd className="mt-0.5 text-ink">{tx('sh.nights', { n: parseInt(lead.nights, 10) })}</dd></div>
+        <div><dt className="eyebrow text-ink-3">{tx('sh.stay')}</dt><dd className="mt-0.5 text-ink">{mono(tx('sh.nights', { n: parseInt(lead.nights, 10) }))}</dd></div>
         <div><dt className="eyebrow text-ink-3">{tx('sh.from')}</dt><dd className="num mt-0.5 text-ink">{lead.priceFrom}</dd></div>
-        <div className="col-span-2"><dt className="eyebrow text-ink-3">{tx('sh.day90')}</dt><dd className="mt-0.5 break-words text-ink-2">{d(lead.day90Measure)}</dd></div>
+        <div className="col-span-2"><dt className="eyebrow text-ink-3">{tx('sh.day90')}</dt><dd className="mt-0.5 break-words text-ink-2">{mono(d(lead.day90Measure))}</dd></div>
         <div className="col-span-2"><dt className="eyebrow text-ink-3">{tx('sh.where')}</dt><dd className="mt-0.5 flex items-center gap-1.5 text-ink-2"><MapPin size={13} aria-hidden /> {lead.venues.join(' · ')}</dd></div>
       </dl>
       {list.length > 1 && <p className="mt-4 text-[13px] text-ink-3">{tx('sh.alsoFor', { space, list: list.slice(1).map((c) => c.name).join(', ') })}</p>}
@@ -555,7 +583,7 @@ function PracticeLink({ term }: { term: TermKey }) {
         ))}
       </ol>
       <Link to={`/app/practice/week/${week.week}`} className="mt-auto inline-flex items-center gap-1.5 pt-5 text-[15px] text-ink underline-offset-4 hover:underline focus-ring rounded">
-        <BookOpen size={16} /> {tx('sh.openWeek', { n: week.week })} <ArrowRight size={15} />
+        <BookOpen size={16} /> {mono(tx('sh.openWeek', { n: week.week }))} <ArrowRight size={15} />
       </Link>
     </ToolCard>
   )
@@ -565,6 +593,7 @@ export function SpaceShell({ term, title, headerActions, children }: { term: Ter
   const t = termByKey(term)
   const { t: tx, tt, d } = useSpaceText()
   const minor = useIsMinor()
+  const calendar = useCalendarConnected()
   const space = tt.space(term)
   const name = tt.name(term)
   return (
@@ -575,7 +604,7 @@ export function SpaceShell({ term, title, headerActions, children }: { term: Ter
       <PageHeader
         eyebrow={<span className="inline-flex items-center gap-2 text-ink"><span className="inline-flex shrink-0" style={{ color: inkColor[term] }} aria-hidden><TermIcon term={term} size={18} /></span> {t.space === t.name ? space : `${space} · ${name}`}</span>}
         title={title}
-        lead={minor ? tx(`mn.lead.${term}`) : d(ROOM_VERDICT[term])}
+        lead={mono(minor ? tx(`mn.lead.${term}`) : d(roomVerdict(term, calendar)))}
         actions={headerActions}
       />
       <Reveal>{minor ? <MinorHero term={term} /> : <ScoreHero term={term} />}</Reveal>

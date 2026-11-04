@@ -1,18 +1,23 @@
 import clsx from 'clsx'
-import { ArrowRight, CalendarClock, FileSignature, Hourglass, RotateCcw } from 'lucide-react'
+import { ArrowRight, CalendarClock, FileSignature, FlaskConical, Hourglass, MessageCircle, RotateCcw } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Eyebrow, useFmtDate } from '@/components/joy/primitives'
 import { Button, Card } from '@/components/ui'
 import { INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
 import { DAY90_DATES } from './_data'
 import { rich, useCore } from './_i18n'
-import { useX } from './_i18nX'
+import { RETURN_REASON_TEXT, useX } from './_i18nX'
+import { careThreadHref } from '@/routes/member/account/_careInbox'
 import { REMEASURE_OPENS, useRemeasure, type ClinicalRemeasure } from './_store'
 import { useMemberName } from '@/lib/memberName'
+import { nums } from './_parts'
 
 // THE RE-MEASURE CHAIN, member side (Architecture 8b-14; Memo p19 "Day 76 · 90").
 // Day-76 invite → the Clinical-grade assessment (/app/index/take?grade=clinical) →
-// awaiting physician sign-off → the Day-90 card. The specimen member lives on Day 23, so
+// awaiting physician sign-off → the Day-90 card. A draft the physician returns to the lab
+// (status 'returned', written by the clinical portal) says who returned it, why, and that the
+// concierge is arranging a home redraw; it moves back to awaiting when the portal re-queues it
+// after the redraw is received. The specimen member lives on Day 23, so
 // opening the invite moves this one flow onto Day 76 and says so; the record then
 // moves on only by what the member and the physician do.
 
@@ -20,6 +25,20 @@ export const CLINICAL_TAKE = '/app/index/take?grade=clinical'
 
 /** The physician who signs (the specimen's named clinician). */
 export const SIGNER = TEAM.find((p) => p.id === 'p_meera')!
+/** The concierge who arranges a home redraw. */
+export const CONCIERGE = TEAM.find((p) => p.id === 'p_ravi')!
+
+/** Who returned the draft, why (in the member's language) and when, for a returned record. */
+export function useReturned(rec: ClinicalRemeasure | null) {
+  const { lang } = useCore()
+  const x = useX()
+  if (!rec || rec.status !== 'returned') return null
+  // The copy adds its own full stop after the reason, so a typed one is dropped.
+  const raw = rec.returnReason?.trim().replace(/[.।]+$/, '')
+  const known = raw ? RETURN_REASON_TEXT[raw] : undefined
+  const reason = known ? known[lang] : raw ? (lang === 'en' ? raw.charAt(0).toLowerCase() + raw.slice(1) : raw) : x('rmReasonNone')
+  return { who: rec.returnedBy || SIGNER.name, reason, at: rec.returnedAt?.slice(0, 10) ?? null, concierge: CONCIERGE.name.split(' ')[0] }
+}
 
 /** A fresh invite record: Day 76 on the specimen clock. */
 export function newInvite(member: string = `${MEMBER.firstName} ${MEMBER.lastName}`): ClinicalRemeasure {
@@ -49,6 +68,7 @@ export function RemeasureCard({ className, compact = false }: { className?: stri
   // The name given at setup (falls back to the specimen member).
   const who = useMemberName()
   const status = rec?.status ?? null
+  const returned = useReturned(rec)
 
   const reset = (
     <Button variant="ghost" size="sm" onClick={() => setRec(null)} aria-label={x('rmResetAria')}>
@@ -62,7 +82,7 @@ export function RemeasureCard({ className, compact = false }: { className?: stri
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
             <Eyebrow>{x('rmUpcomingEyebrow', { date: fmtDate(REMEASURE_OPENS) })}</Eyebrow>
-            <p className="mt-2 max-w-2xl text-[17px] text-ink">{x('rmUpcomingBody')}</p>
+            <p className="mt-2 max-w-2xl text-[17px] text-ink">{nums(x('rmUpcomingBody'))}</p>
             {!compact && (
               <p className="mt-2 max-w-2xl rounded-card border border-dashed border-line-strong px-3 py-2 text-[13px] text-ink-2">
                 {rich(x('rmSpecimenClock'), { name: who.firstName, d: <span className="num">{MEMBER.dayOfLoop}</span>, date: <span className="num">{fmtDate(REMEASURE_OPENS)}</span> })}
@@ -70,7 +90,7 @@ export function RemeasureCard({ className, compact = false }: { className?: stri
             )}
           </div>
           <Button variant="secondary" className="shrink-0 self-start md:self-center" onClick={() => setRec(newInvite(who.fullName))}>
-            <CalendarClock size={16} /> {x('rmOpenInvite')}
+            <CalendarClock size={16} /> {nums(x('rmOpenInvite'))}
           </Button>
         </div>
       </Card>
@@ -95,7 +115,36 @@ export function RemeasureCard({ className, compact = false }: { className?: stri
     )
   }
 
+  if (returned) {
+    return (
+      <Card tone="outline" className={className} aria-live="polite">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <FlaskConical size={18} className="mt-0.5 shrink-0 text-ink-3" aria-hidden />
+            <div className="min-w-0">
+              <Eyebrow>{x('rmReturnedEyebrow', { date: fmtDate(returned.at ?? rec!.takenOn ?? REMEASURE_OPENS) })}</Eyebrow>
+              <p className="mt-2 max-w-2xl text-[17px] text-ink">{nums(x('rmReturnedBody', { who: returned.who, reason: returned.reason, concierge: returned.concierge }))}</p>
+              <p className="mt-1 max-w-2xl text-[14px] text-ink-2">{x('rmReturnedNext', { who: returned.who, concierge: returned.concierge })}</p>
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <Link to="/app/index/day-90" className="inline-flex h-11 items-center gap-2 rounded-full border border-line-strong px-4 text-[15px] text-ink hover:bg-paper-sunk focus-ring">
+              {nums(c('scSeeDay90'))} <ArrowRight size={15} />
+            </Link>
+            <Link to={careThreadHref('concierge')} className="inline-flex h-11 items-center gap-2 rounded-full px-3 text-[15px] text-ink-2 hover:bg-paper-sunk hover:text-ink focus-ring">
+              <MessageCircle size={15} aria-hidden /> {x('rmMessageConcierge', { who: returned.concierge })}
+            </Link>
+            {reset}
+          </div>
+        </div>
+      </Card>
+    )
+  }
+
   const signed = status === 'signed'
+  // Back in the queue after a return: the redraw is in, and the physician signs the record again.
+  const redrawIn = !signed && !!rec!.redrawReceivedAt
+  const lastReturn = rec!.priorReturns?.[rec!.priorReturns.length - 1]
   return (
     <Card tone={signed ? 'raised' : 'outline'} className={className}>
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -108,13 +157,14 @@ export function RemeasureCard({ className, compact = false }: { className?: stri
                 : x('rmAwaitingEyebrow', { date: fmtDate(rec!.takenOn ?? REMEASURE_OPENS) })}
             </Eyebrow>
             <p className="mt-2 text-[17px] text-ink">
-              {signed ? x('rmSignedBody', { who: rec!.signedBy ?? SIGNER.name }) : x('rmAwaitingBody', { who: SIGNER.name })}
+              {nums(signed ? x('rmSignedBody', { who: rec!.signedBy ?? SIGNER.name }) : x('rmAwaitingBody', { who: SIGNER.name }))}
             </p>
+            {redrawIn && <p className="mt-1 text-[14px] text-ink-2">{nums(x('rmRedrawIn', { who: lastReturn?.by || SIGNER.name }))}</p>}
           </div>
         </div>
         <div className={clsx('flex shrink-0 flex-wrap items-center gap-2')}>
           <Link to="/app/index/day-90" className="inline-flex h-11 items-center gap-2 rounded-full border border-line-strong px-4 text-[15px] text-ink hover:bg-paper-sunk focus-ring">
-            {c('scSeeDay90')} <ArrowRight size={15} />
+            {nums(c('scSeeDay90'))} <ArrowRight size={15} />
           </Link>
           {reset}
         </div>

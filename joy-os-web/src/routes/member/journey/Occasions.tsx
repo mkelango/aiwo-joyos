@@ -9,9 +9,10 @@ import { HOUSEHOLD, MEMBER, TEAM } from '@/data/member'
 import type { TermKey } from '@/domain/types'
 // One shared emergency intercept for every member free-text field (Memo p.24).
 import { useCrisisGuard } from '@/routes/member/spaces/_SpaceShell'
-import { JourneyEmpty, PrimaryChip, fade } from './_parts'
+import { JourneyEmpty, PrimaryChip, useFade } from './_parts'
 import { addOccasionRequest, useJourney, withdrawOccasionRequest, type OccasionGeneration, type OccasionGuest, type OccasionRequest } from './_store'
 import { useJ, type JourneyKey } from './_i18n'
+import { monoDigits } from './_mono'
 
 // JOYSPAN OCCASIONS (Memo p.20, p.29): a 60th birthday, an anniversary, a
 // homecoming — templates on the ’cation engine, “three generations measured
@@ -51,6 +52,7 @@ const CONCIERGE = TEAM.find((p) => p.role === 'Concierge')!.name.split(' ')[0]
 const COACH = TEAM.find((p) => p.role === 'Coach')!.name.split(' ')[0]
 
 export default function Occasions() {
+  const fade = useFade()
   const journey = useJourney()
   const { t, r, tx } = useJ()
   const { hash } = useLocation()
@@ -76,7 +78,7 @@ export default function Occasions() {
 
   const tpl = TEMPLATES.find((x) => x.id === selected)
 
-  return (
+  return monoDigits(
     <div>
       <PageHeader
         eyebrow={t('occEyebrow')}
@@ -167,7 +169,7 @@ function OccasionPlan({ tpl, onWithdrawn }: { tpl: Template; onWithdrawn: () => 
   if (sent) {
     const measured = sent.guests.filter((g) => g.measured)
     const gens = GENS.filter((g) => measured.some((x) => x.generation === g))
-    return (
+    return monoDigits(
       <Card tone="soft" className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
         <div>
           <span className="flex h-11 w-11 items-center justify-center rounded-full bg-paper-raised text-daybreak-ink" aria-hidden><Check size={20} /></span>
@@ -228,6 +230,7 @@ function OccasionPlan({ tpl, onWithdrawn }: { tpl: Template; onWithdrawn: () => 
 }
 
 function OccasionForm({ id, tpl, existing, onSent, onKeep }: { id: string; tpl: Template; existing?: OccasionRequest; onSent: () => void; onKeep?: () => void }) {
+  const fade = useFade()
   const { t, r, tx } = useJ()
   const guard = useCrisisGuard()
   const [honoree, setHonoree] = useState(existing?.honoree ?? '')
@@ -281,7 +284,7 @@ function OccasionForm({ id, tpl, existing, onSent, onKeep }: { id: string; tpl: 
 
   const field = 'mt-2 h-11 w-full rounded-full border bg-paper-raised px-4 text-[15px] text-ink placeholder:text-ink-3 focus-ring'
 
-  return (
+  return monoDigits(
     <Card as="div" className="p-5 md:p-7">
       <form onSubmit={submit} noValidate data-occ-form={id}>
         <div className="flex flex-wrap items-center justify-between gap-3">

@@ -6,29 +6,33 @@ import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
 import { BandLabel, DaybreakButton, Delta, Eyebrow, MethodLine, SpecimenTag, TermChip, TermDot, fmtDate } from '@/components/joy/primitives'
 import { Button, Card, LoopRing, Sheet } from '@/components/ui'
 import { CIRCLE } from '@/data/platform'
-import { INDEX_HISTORY, MEMBER, PAYMENTS_GRACE, TODAY_ACTION } from '@/data/member'
+import { MEMBER, PAYMENTS_GRACE, TODAY_ACTION } from '@/data/member'
 import type { Action, TermKey } from '@/domain/types'
 import { termByKey } from '@/data/terms'
 import { useApp } from '@/lib/store'
 import { useT } from '@/lib/i18n'
-import { ACTION_TEXT, fmtLocal, rich, useCore } from './_i18n'
+import { fmtLocal, rich, useCore } from './_i18n'
 import { SPECIMEN_TODAY, addDays, liveLedger, specimenWeek, useCoachOverride, useLedgerRemoved, useLocal, useMeasured, useSignalsDown, weekCounts } from './_store'
 import { COACH_ACTION_TEXT, COACH_REASON_TEXT } from './_extra'
 import { CountUp } from '@/components/joy/CountUp'
 import { useIsMinor } from '@/lib/minor'
 import { CURATED_ACTIONS } from '@/routes/console/care/_data'
 import { DAY90_DATES } from './_data'
-import { RemeasureCard } from './_remeasure'
+import { RemeasureCard, SIGNER } from './_remeasure'
+import { todayActionFor, useActionText, useIndexHistory } from './_latest'
+import { nums } from './_parts'
+import { useTrustConsent } from '@/routes/member/spaces/_state'
 import { useX } from './_i18nX'
 import { playSound } from '@/lib/sound'
 import { useA11yPrefs } from '@/routes/member/account/_prefs'
 import { actionsFor } from '@/routes/member/spaces/_data'
-import { useSpaceText } from '@/routes/member/spaces/_i18n'
 
 const TERMS: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 
 /** The actions a member added from a space's three actions. Read from the spaces' own record
- *  (joyos:spaces:actions.<term>.added.v1, { [actionId]: true }); Today never rewrites it. */
+ *  (joyos:spaces:actions.<term>.added.v1, { [actionId]: true }); Today never rewrites it.
+ *  Today's one action is left out where the pool is drawn, not here, because which action that
+ *  is depends on the latest Index and on the coach's override. */
 function readAddedActions(): Action[] {
   const out: Action[] = []
   for (const k of TERMS) {
@@ -40,8 +44,7 @@ function readAddedActions(): Action[] {
     } catch {
       added = {}
     }
-    // Today's one action already has its own card above; the pool holds the rest.
-    for (const a of actionsFor(k)) if (added[a.id] && a.id !== TODAY_ACTION.id) out.push(a)
+    for (const a of actionsFor(k)) if (added[a.id]) out.push(a)
   }
   return out
 }
@@ -61,13 +64,14 @@ export default function Today() {
   const x = useX()
   const { t: c, lang, name, space, pick, tag, when } = useCore()
   const { actionDone, setActionDone, ledger, offline, syncQueue, queueSync, unqueueSync, paymentsGrace } = useApp()
-  const { d: spaceData } = useSpaceText()
+  const atx = useActionText()
   const { voice } = useA11yPrefs()
   const signalsDown = useSignalsDown()
+  // The calendar's free time is named only while a calendar is connected (Trust centre c_cal).
+  const calendarOn = useTrustConsent('c_cal').on
   // The pool: actions added from the spaces, read once per visit (the spaces are another screen).
-  const [pool] = useState(readAddedActions)
+  const [added] = useState(readAddedActions)
   const [poolDone, setPoolDone] = useLocal<Record<string, boolean>>(`pool-done:${SPECIMEN_TODAY}`, {})
-  const poolDoneCount = pool.filter((a) => poolDone[a.id]).length
   const actionQueueId = `action:${SPECIMEN_TODAY}`
   const actionQueued = syncQueue.some((q) => q.id === actionQueueId)
   const [speaking, setSpeaking] = useState(false)
@@ -77,20 +81,34 @@ export default function Today() {
   // "Not today" is kept like "Done": a reload never brings back an action the member declined.
   const [skipped, setSkipped] = useLocal<boolean>('today-skipped', false)
   const [removed] = useLedgerRemoved()
-  const latest = INDEX_HISTORY[0]
-  const previous = INDEX_HISTORY[1]
+  // The Index the member sees on My Index: their own signed Day-90 re-measure once there is one.
+  const { latest, previous, own } = useIndexHistory()
   const lowest = termByKey(latest.lowestTerm)
   const lowestValue = latest.terms.find((s) => s.key === latest.lowestTerm)!.value
   // Minors are never scored (Architecture p26): no Index, band, delta or Wheel value here.
   const minor = useIsMinor()
   const [measured] = useMeasured()
   const notYet = measured ? measured.terms.filter((s) => s.value === null).map((s) => s.key) : []
+  // The engine's one action follows the latest Index's lowest term (the step My Index names).
+  const engine = todayActionFor(latest.lowestTerm)
   // The coach's override of the next-best action (console), shown as today's action.
   const override = useCoachOverride()
   const curated = override ? CURATED_ACTIONS.find((a) => a.id === override.action || a.title === override.action) : undefined
   const action: Omit<Action, 'minutes'> & { minutes: number } = override
-    ? { ...TODAY_ACTION, detail: '', id: `coach:${curated?.id ?? override.action}`, term: curated?.term ?? override.term ?? TODAY_ACTION.term, title: curated?.title ?? override.action, minutes: curated?.minutes ?? TODAY_ACTION.minutes, shared: false, why: override.reason, evidence: curated?.evidence ?? TODAY_ACTION.evidence }
-    : TODAY_ACTION
+    ? { ...engine, detail: '', id: `coach:${curated?.id ?? override.action}`, term: curated?.term ?? override.term ?? engine.term, title: curated?.title ?? override.action, minutes: curated?.minutes ?? engine.minutes, timeOfDay: 'any', shared: false, why: override.reason, evidence: curated?.evidence ?? engine.evidence }
+    : engine
+  // Today's pool: what the member added from the spaces, without the action shown above. When the
+  // coach's choice replaces the engine's, the replaced action stays here so it is still one tap away.
+  const pool = useMemo(() => {
+    const list = override ? [engine, ...added] : added.filter((a) => a.id !== engine.id)
+    return list.filter((a, i) => list.findIndex((b) => b.id === a.id) === i)
+  }, [added, override, engine])
+  const poolDoneCount = pool.filter((a) => poolDone[a.id]).length
+  // Say who put each item here: the member's own additions, the action the coach's choice
+  // replaced (which the member never added), or both.
+  const replacedInPool = !!override && !added.some((a) => a.id === engine.id)
+  const memberAdded = pool.some((a) => added.some((b) => b.id === a.id))
+  const poolSub = replacedInPool ? x(memberAdded ? 'tdPoolSubMixed' : 'tdPoolSubReplaced') : c('tdPoolSub')
   const coach = CIRCLE.coach.split(' ')[0]
   const others = CIRCLE.members.length - 1
   const { weekDays, kept, top } = useMemo(() => {
@@ -99,10 +117,13 @@ export default function Today() {
     return { weekDays: days, kept: days.filter((x) => x.has).length, top: weekCounts(ledger, removed) }
   }, [ledger, removed])
   const weekLetter = (iso: string) => fmtLocal(new Date(`${iso}T12:00`), lang, { weekday: 'narrow' })
-  const at = override ? undefined : ACTION_TEXT[action.id]
-  const actionTitle = override ? pick(COACH_ACTION_TEXT[action.title], action.title) : pick(at?.title, action.title)
+  const actionTitle = override ? pick(COACH_ACTION_TEXT[action.title], action.title) : atx(engine, 'title')
   const overrideReason = override ? pick(COACH_REASON_TEXT[override.reason], override.reason) : ''
   const lowName = name(lowest.key)
+  // The reason: the member's own signed re-measure moved the lowest term, or the library's own.
+  const engineWhy = own && engine.id !== TODAY_ACTION.id ? x('tdWhyOwn', { term: lowName, who: latest.signedBy ?? SIGNER.name }) : atx(engine, 'why')
+  const fitWhen = ({ morning: 'tdTodMorning', afternoon: 'tdTodAfternoon', evening: 'tdTodEvening', any: 'tdTodAny' } as const)[action.timeOfDay]
+  const mins = (n: number) => rich(c('min'), { n: <span className="num">{n}</span> })
   const tagWord = (s: string) => (lang === 'en' ? s.toLowerCase() : tag(s))
   // Offline, the action's state waits in the sync queue; Undo takes it back out.
   // The morning check-in: one tap, kept for the specimen day, with the motif's two notes.
@@ -135,7 +156,7 @@ export default function Today() {
     const parts = [
       minor ? x('mnSpeak') : c('tdSpeakIndex', { v: latest.value, term: lowName }),
       !actionDone && !skipped ? c('tdSpeakAction', { title: actionTitle }) : '',
-      pool.length > 0 ? c('tdSpeakPool', { list: pool.map((a) => spaceData(a.title).replace(/[.।]$/, '')).join(', ') }) : '',
+      pool.length > 0 ? c('tdSpeakPool', { list: pool.map((a) => atx(a, 'title').replace(/[.।]$/, '')).join(', ') }) : '',
       c('tdSpeakDay', { n: MEMBER.dayOfLoop }),
     ].filter(Boolean)
     const u = new window.SpeechSynthesisUtterance(parts.join(' '))
@@ -169,8 +190,8 @@ export default function Today() {
         </div>
         {minor ? (
           <div className="mt-5" role="note">
-            <p className="text-[1.6rem] font-light leading-snug text-ink">{x('mnTitle')}</p>
-            <p className="mt-3 max-w-[48ch] text-[16px] text-ink-2">{x('mnBody')}</p>
+            <p className="text-[1.6rem] font-light leading-snug text-ink">{nums(x('mnTitle'))}</p>
+            <p className="mt-3 max-w-[48ch] text-[16px] text-ink-2">{nums(x('mnBody'))}</p>
             <ul className="mt-5 flex flex-wrap gap-2 border-t border-line pt-5">
               {TERMS.map((k) => (
                 <li key={k}>
@@ -180,7 +201,7 @@ export default function Today() {
                 </li>
               ))}
             </ul>
-            <Link to="/app/index" className="mt-5 inline-flex items-center gap-1.5 text-[15px] text-ink underline-offset-4 hover:underline focus-ring">{x('mnLink')} <ArrowRight size={14} /></Link>
+            <Link to="/app/index" className="mt-5 inline-flex items-center gap-1.5 text-[15px] text-ink underline-offset-4 hover:underline focus-ring">{nums(x('mnLink'))} <ArrowRight size={14} /></Link>
           </div>
         ) : (
           <>
@@ -223,7 +244,7 @@ export default function Today() {
         {notYet.length > 0 && measured && (
           <Link to="/app/index" className="mt-4 flex items-center gap-2 rounded-card border border-dashed border-line-strong px-4 py-2.5 text-[14px] text-ink-2 hover:text-ink focus-ring">
             <CircleDashed size={15} className="shrink-0 text-ink-3" aria-hidden />
-            <span className="min-w-0">{x('nyToday', { date: fmtDate(measured.takenOn, lang), terms: notYet.map((k) => name(k)).join(x('skJoin')) })} <span className="text-ink underline underline-offset-4">{x('nyTodayLink')}</span></span>
+            <span className="min-w-0">{nums(x('nyToday', { date: fmtDate(measured.takenOn, lang), terms: notYet.map((k) => name(k)).join(x('skJoin')) }))} <span className="text-ink underline underline-offset-4">{x('nyTodayLink')}</span></span>
           </Link>
         )}
         {signalsDown && (
@@ -239,13 +260,13 @@ export default function Today() {
       <Card tone="sunk" className="flex flex-col">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <Eyebrow tone="daybreak">{t('today')}{minor ? '' : ` · ${override ? name(action.term) : lowName}`}</Eyebrow>
-          <span className="flex items-center gap-1.5 text-[13px] text-ink-3"><Clock size={14} /> {c('min', { n: action.minutes })} · {action.shared ? c('tdWithKavya') : c('tdSolo')}</span>
+          <span className="flex items-center gap-1.5 text-[13px] text-ink-3"><Clock size={14} /> {mins(action.minutes)} · {action.shared ? c('tdWithKavya') : c('tdSolo')}</span>
         </div>
         <AnimatePresence mode="wait">
           {!actionDone && !skipped ? (
             <motion.div key="todo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-1 flex-col">
               <p className="mt-4 text-[1.6rem] font-light leading-snug text-ink">
-                {override ? actionTitle : rich(c('tdHeadline'), { title: actionTitle.replace(/[.।]$/, '') })}
+                {override ? nums(actionTitle) : engine.id === TODAY_ACTION.id ? rich(c('tdHeadline'), { title: actionTitle.replace(/[.।]$/, '') }) : nums(`${actionTitle} ${atx(engine, 'detail')}`)}
               </p>
               {override && (
                 <div className="mt-3 rounded-card border border-line bg-paper-raised px-4 py-3 text-[14px] text-ink-2">
@@ -280,7 +301,7 @@ export default function Today() {
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
         <Card>
           <Eyebrow>{c('tdCircle', { when: when(CIRCLE.when) })}</Eyebrow>
-          <p className="mt-3 text-[17px] text-ink">{c('tdCoachOthers', { coach, n: lang === 'en' ? WORDS[others] ?? others : others })}</p>
+          <p className="mt-3 text-[17px] text-ink">{nums(c('tdCoachOthers', { coach, n: lang === 'en' ? WORDS[others] ?? others : others }))}</p>
           <div className="mt-4 flex -space-x-2" aria-hidden>
             {/* People are never coloured with the Spectrum: those six colours belong to the terms. */}
             {CIRCLE.members.map((m, i) => (
@@ -290,7 +311,7 @@ export default function Today() {
             ))}
           </div>
           <Link to="/app/circles" className="mt-5 inline-flex items-center gap-1.5 text-[15px] text-ink hover:underline underline-offset-4 focus-ring">
-            <Users size={16} /> {c('tdWeekOf', { n: CIRCLE.week })} <ArrowRight size={15} />
+            <Users size={16} /> {nums(c('tdWeekOf', { n: CIRCLE.week }))} <ArrowRight size={15} />
           </Link>
         </Card>
         <Card>
@@ -355,11 +376,12 @@ export default function Today() {
           </p>
         ) : (
           <>
-            <p className="mt-2 text-[15px] text-ink-2">{c('tdPoolSub')}</p>
+            <p className="mt-2 text-[15px] text-ink-2">{poolSub}</p>
             <ul className="mt-4 divide-y divide-line">
               {pool.map((a) => {
                 const done = !!poolDone[a.id]
-                const title = spaceData(a.title)
+                const title = atx(a, 'title')
+                const replaced = !!override && a.id === engine.id
                 return (
                   <li key={a.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
                     <button
@@ -372,10 +394,11 @@ export default function Today() {
                       {done && <Check size={13} aria-hidden />}
                     </button>
                     <div className="min-w-0 flex-1">
-                      <p className={`text-[16px] ${done ? 'text-ink-2' : 'text-ink'}`}>{title}</p>
+                      <p className={`text-[16px] ${done ? 'text-ink-2' : 'text-ink'}`}>{nums(title)}</p>
+                      {replaced && <p className="mt-0.5 flex items-center gap-1.5 text-[13px] text-ink-2"><UserCheck size={13} aria-hidden className="shrink-0" /> {x('tdPoolReplaced')}</p>}
                       <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-3">
                         <span className="inline-flex items-center gap-1.5"><TermDot term={a.term} /> {space(a.term)}</span>
-                        <span className="inline-flex items-center gap-1"><Clock size={12} aria-hidden /> {c('min', { n: a.minutes })}</span>
+                        <span className="inline-flex items-center gap-1"><Clock size={12} aria-hidden /> {mins(a.minutes)}</span>
                         <span>{a.shared ? c('tdTogether') : c('tdSoloShort')}</span>
                         {done && <span className="text-ink-2">{c('tdPoolDone')}</span>}
                       </p>
@@ -396,10 +419,10 @@ export default function Today() {
         <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
           <div>
             <Eyebrow>{c('tdNinety')}</Eyebrow>
-            <p className="mt-2 text-[17px] text-ink">{c('tdLoopLine', { n: MEMBER.dayOfLoop })}</p>
+            <p className="mt-2 text-[17px] text-ink">{nums(c('tdLoopLine', { n: MEMBER.dayOfLoop }))}</p>
             {paymentsGrace && (
               <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px] text-ink-2">
-                <CreditCard size={14} aria-hidden className="shrink-0 text-ink-3" /> {c('tdGrace', { date: fmtDate(PAYMENTS_GRACE.until, lang) })}
+                <CreditCard size={14} aria-hidden className="shrink-0 text-ink-3" /> {nums(c('tdGrace', { date: fmtDate(PAYMENTS_GRACE.until, lang) }))}
                 <Link to="/app/membership" className="text-ink underline-offset-4 hover:underline focus-ring">{c('tdGraceLink')}</Link>
               </p>
             )}
@@ -416,7 +439,7 @@ export default function Today() {
             })}
           </ol>
           <Link to="/app/day-40" className="inline-flex items-center gap-1.5 text-[14px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring">
-            <FileText size={14} aria-hidden /> {x('tdDay40', { date: fmtDate(addDays(DAY90_DATES.day0, 40), lang) })} <ArrowRight size={13} />
+            <FileText size={14} aria-hidden /> {nums(x('tdDay40', { date: fmtDate(addDays(DAY90_DATES.day0, 40), lang) }))} <ArrowRight size={13} />
           </Link>
           </div>
         </div>
@@ -430,15 +453,17 @@ export default function Today() {
           <TermChip term={action.term} withSpace />
           <span className="eyebrow text-ink-3">{override ? x('coChose') : 'next_best_action · rules v1.0'}</span>
         </div>
-        <p className="mt-4 text-[17px] leading-relaxed text-ink">{override ? x('coWhy', { reason: overrideReason }) : pick(at?.why, action.why)}</p>
+        <p className="mt-4 text-[17px] leading-relaxed text-ink">{nums(override ? x('coWhy', { reason: overrideReason }) : engineWhy)}</p>
         {override && <p className="mt-2 text-[14px] text-ink-2">{x('coNote')}</p>}
         <ol className="mt-5 space-y-3 text-[15px] text-ink-2">
           <li><span className="num mr-2 text-ink-3">1</span><b className="font-medium text-ink">{c('tdStep1h')}</b> {minor ? x('mnStep1') : rich(c('tdStep1'), { term: lowName, v: <span className="num">{lowestValue}</span> })}</li>
-          <li><span className="num mr-2 text-ink-3">2</span><b className="font-medium text-ink">{c('tdStep2h')}</b> {c('tdStep2', { space: space('D') })}</li>
-          <li><span className="num mr-2 text-ink-3">3</span><b className="font-medium text-ink">{c('tdStep3h')}</b> {c('tdStep3')}</li>
+          <li><span className="num mr-2 text-ink-3">2</span><b className="font-medium text-ink">{c('tdStep2h')}</b> {nums(c('tdStep2', { space: space(action.term) }))}</li>
+          <li><span className="num mr-2 text-ink-3">3</span><b className="font-medium text-ink">{c('tdStep3h')}</b> {rich(x('tdFit'), { n: <span className="num">{action.minutes}</span>, when: x(fitWhen), who: action.shared ? x('tdFitKavya') : x('tdFitSolo') })}{' '}
+            {/* A calendar fact only while a calendar is connected and consented; never by default. */}
+            {calendarOn ? (action.id === TODAY_ACTION.id ? rich(x('tdFitCal'), { t: <span className="num">7</span>, s: <span className="num">18:12</span> }) : null) : x('tdFitNoCal')}</li>
           <li><span className="num mr-2 text-ink-3">4</span><b className="font-medium text-ink">{c('tdStep4h')}</b> {c('tdStep4')}</li>
         </ol>
-        <p className="mt-5 rounded-card bg-paper-sunk p-4 text-[14px] text-ink-2"><b className="font-medium text-ink">{c('tdEvidence')}</b> {pick(at?.evidence, action.evidence)}</p>
+        <p className="mt-5 rounded-card bg-paper-sunk p-4 text-[14px] text-ink-2"><b className="font-medium text-ink">{c('tdEvidence')}</b> {nums(override ? action.evidence : atx(engine, 'evidence'))}</p>
         <Link to="/app/viva?ask=next_best_action" className="mt-5 inline-flex items-center gap-2 text-[15px] text-ink hover:underline underline-offset-4"><Sparkles size={16} /> {c('tdAskViva')}</Link>
       </Sheet>
     </div>

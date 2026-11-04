@@ -8,6 +8,7 @@ import type { Grade, MethodVersion, TermKey, TermScore } from '@/domain/types'
 import { JoyspanEquation } from '@/components/joy/JoyspanEquation'
 import { useX } from './_i18nX'
 import { useCore } from './_i18n'
+import { nums } from './_parts'
 
 // THE INDEX CARD (Brand Identity Playbook p59). "The most valuable object AIWO makes."
 // Ten fields and no marketing copy, front and back, 85.6 × 54 mm, a Daybreak painted edge
@@ -164,7 +165,7 @@ export function IndexCardView({ id, value, terms, takenOn, method, grade, next, 
         <p className="eyebrow mt-3 text-center text-ink-3">{x('icCaption')}</p>
       </div>
 
-      <p className="mt-3 text-[13px] text-ink-3">{note}</p>
+      <p className="mt-3 text-[13px] text-ink-3">{nums(note)}</p>
     </article>
   )
 }

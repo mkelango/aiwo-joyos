@@ -6,13 +6,14 @@ import { Link } from 'react-router-dom'
 import { BandLabel, DaybreakButton, MethodLine, SpecimenTag, TermChip, TermDot, fmtDate } from '@/components/joy/primitives'
 import { Avatar, Button, Card, PageHeader, Pill, Sheet } from '@/components/ui'
 import { CASELOAD } from '@/data/platform'
-import { HOUSEHOLD, INDEX_HISTORY, MEMBER } from '@/data/member'
+import { HOUSEHOLD, MEMBER } from '@/data/member'
+import { useIndexHistory } from '@/routes/member/core/_latest'
 import { TERMS } from '@/data/terms'
 import type { TermKey } from '@/domain/types'
 import { bandFor } from '@/domain/indexEngine'
 import { COUPLES_CHECK, GRANTS, HOUSEHOLD_MINOR, KAVYA_SHARED, SPECIMEN_NOW, type Grant, type GrantScope } from './_data'
 import { Checkbox, Field, Section, Segmented, Toggle } from './_parts'
-import { inputCls, rich, usePersisted, useToast } from './_util'
+import { inputCls, nums, rich, usePersisted, useToast } from './_util'
 import { useDict, useTermText } from '@/lib/i18n'
 import { HH, useData } from './_i18n'
 import { ReadAloud, SpeakAnswer } from './_voice'
@@ -53,7 +54,7 @@ export default function Household() {
   const [cancelInvite, setCancelInvite] = useState<Invite | null>(null)
   const [elderOpen, setElderOpen] = useState(false)
   const [kindRec, setKind] = useHouseholdKind()
-  const me = INDEX_HISTORY[0]
+  const { latest: me } = useIndexHistory()
   // Under 18: never scored, so no Index tag on the member's own card.
   const minor = useIsMinor()
   const kavyaIndex = CASELOAD.find((c) => c.name === 'Kavya Rao')!.index
@@ -541,9 +542,9 @@ function MemberCard({ person, role, detail, tags, extra, icon }: { person: { nam
         <Avatar person={person} size={48} />
         <div className="min-w-0 flex-1">
           <p className="text-[17px] text-ink">{person.name}</p>
-          <p className="eyebrow mt-0.5 flex items-center gap-1.5 text-ink-3">{icon}{role}</p>
-          <p className="mt-3 text-[15px] leading-relaxed text-ink-2">{detail}</p>
-          <div className="mt-3 flex flex-wrap gap-1.5">{tags.map((t, i) => <Pill key={typeof t === 'string' ? t : i}>{t}</Pill>)}</div>
+          <p className="eyebrow mt-0.5 flex items-center gap-1.5 text-ink-3">{icon}{nums(role)}</p>
+          <p className="mt-3 text-[15px] leading-relaxed text-ink-2">{nums(detail)}</p>
+          <div className="mt-3 flex flex-wrap gap-1.5">{tags.map((t, i) => <Pill key={typeof t === 'string' ? t : i}>{nums(t)}</Pill>)}</div>
         </div>
       </div>
       {extra}
@@ -564,7 +565,7 @@ function ShareSheet({ open, offered, onClose, onPropose }: { open: boolean; offe
     setTerms((['P'] as GrantScope[]).filter((k) => !offered.includes(k)))
     setError(null)
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
-  const me = INDEX_HISTORY[0]
+  const { latest: me } = useIndexHistory()
   const scope: GrantScope[] = mode === 'index' ? ['index'] : terms
   const toggle = (k: GrantScope) => { setError(null); setTerms((t) => (t.includes(k) ? t.filter((x) => x !== k) : [...t, k])) }
   return (

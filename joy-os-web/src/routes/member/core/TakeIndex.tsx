@@ -14,12 +14,12 @@ import { termByKey, termColor } from '@/data/terms'
 import { bandFor } from '@/domain/indexEngine'
 import type { TermKey } from '@/domain/types'
 import { SIGNAL_READINGS, SITTINGS, TERM_DETAIL, type InstrumentBlock, type SampleItem } from './_data'
-import { HumanWritten, Switch } from './_parts'
+import { HumanWritten, Switch, nums } from './_parts'
 import { ALL_SIGNAL_IDS, ITEM_TERM, ORDER, WEARABLE_SIGNAL_IDS, isWearableSignal, scaleOf, scoreAnswers, signalId, signalSources, withoutSkipped } from './_scoring'
 import { IN_REMEASURE_WINDOW, REMEASURE_OPENS, REMEASURE_TAKEN, SPECIMEN_TODAY, addDays, amendRemeasure, amendedAnswers, useMeasured, useRemeasure, useSignalsDown, type Amendment } from './_store'
 import { specimenNow } from './_amend'
 import { DAY90_DATES } from './_data'
-import { SIGNER } from './_remeasure'
+import { SIGNER, useReturned } from './_remeasure'
 import { ATTRIBUTION_TEXT, BLOCK_NAME_TEXT, txOf, useX } from './_i18nX'
 import { regTx } from '@/routes/entry/_i18n'
 import { BLOCK_TEXT, SIGNAL_READING_TEXT, SIGNAL_SOURCE_TEXT, SITTING_TITLE, fmtLocal, rich, useCore } from './_i18n'
@@ -110,13 +110,13 @@ export default function TakeIndex() {
   const [rec, setRec] = useRemeasure()
   const x = useX()
   // Decided on arrival only: submitting moves the record on, and the scoring screen must stay.
-  const [gate] = useState<null | 'closed' | 'submitted'>(() => (!clinical ? null : !rec ? 'closed' : rec.status === 'awaiting' || rec.status === 'signed' ? 'submitted' : null))
+  const [gate] = useState<null | 'closed' | 'submitted'>(() => (!clinical ? null : !rec ? 'closed' : rec.status === 'awaiting' || rec.status === 'returned' || rec.status === 'signed' ? 'submitted' : null))
   // A term skipped at the sitting, measured later (/app/index/take?term=F). A term skipped in
   // the Clinical-grade sitting is measured later from Day 90 (?grade=clinical&term=F) and joins
   // that record, which then goes back to the physician to sign.
   const term = params.get('term') as TermKey | null
   if (term && ORDER.includes(term)) return <TermFlow term={term} clinical={clinical} key={`${clinical ? 'c' : 'i'}${term}`} />
-  if (gate) return <ClinicalGate submitted={gate === 'submitted'} />
+  if (gate) return <ClinicalGate submitted={gate === 'submitted'} rec={rec} />
   return <TakeFlow clinical={clinical} key={clinical ? 'clinical' : 'index'} onClinicalStart={() => setRec((r) => (r && r.status === 'invited' ? { ...r, status: 'in-progress', startedAt: new Date().toISOString() } : r))} onClinicalSubmit={(patch) => setRec((r) => (r ? { ...r, ...patch } : r))} x={x} />
 }
 
@@ -124,9 +124,11 @@ type X = ReturnType<typeof useX>
 type RemeasurePatch = Partial<NonNullable<ReturnType<typeof useRemeasure>[0]>>
 
 /** The Clinical-grade take, opened without its invite (or after it was submitted). */
-function ClinicalGate({ submitted }: { submitted: boolean }) {
+function ClinicalGate({ submitted, rec }: { submitted: boolean; rec: ReturnType<typeof useRemeasure>[0] }) {
   const x = useX()
   const { t: c } = useCore()
+  // Returned to the lab: the sitting stands; a home redraw is what comes next, not a new sitting.
+  const returned = useReturned(rec)
   return (
     <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-2xl flex-col">
       <div className="flex items-center justify-between gap-3 pb-5">
@@ -140,9 +142,9 @@ function ClinicalGate({ submitted }: { submitted: boolean }) {
       </div>
       <Eyebrow tone="daybreak">{c('gradeFullClinical')}</Eyebrow>
       <h1 className="mt-3 break-words text-[2.2rem] font-light leading-tight text-ink">{rich(x(submitted ? 'tkClDoneTitle' : 'tkClGateTitle'))}</h1>
-      <p className="mt-4 text-[17px] leading-relaxed text-ink-2">{x(submitted ? 'tkClDoneBody' : 'tkClGateBody', { who: SIGNER.name })}</p>
+      <p className="mt-4 text-[17px] leading-relaxed text-ink-2">{nums(returned ? x('rmReturnedBody', { who: returned.who, reason: returned.reason, concierge: returned.concierge }) : x(submitted ? 'tkClDoneBody' : 'tkClGateBody', { who: SIGNER.name }))}</p>
       <div className="mt-auto flex flex-col gap-2 pt-10">
-        <Link to={submitted ? '/app/index/day-90' : '/app'} className="btn-daybreak w-full focus-ring">{submitted ? c('scSeeDay90') : x('tkClGateToday')}</Link>
+        <Link to={submitted ? '/app/index/day-90' : '/app'} className="btn-daybreak w-full focus-ring">{nums(submitted ? c('scSeeDay90') : x('tkClGateToday'))}</Link>
       </div>
     </div>
   )
@@ -521,7 +523,7 @@ function Overview({ resumable, resumeLabel, answered, clinical, onStart, onResta
       )}
       {!IN_REMEASURE_WINDOW && !clinical && (
         <p className="mt-3 text-[15px] text-ink-2">
-          {rich(c('ovOpens'), { n: <span className="num">76</span>, date: fmtLocal(new Date(`${REMEASURE_OPENS}T12:00`), lang, { day: 'numeric', month: 'short' }) })}
+          {rich(c('ovOpens'), { n: <span className="num">76</span>, date: <span className="num">{fmtLocal(new Date(`${REMEASURE_OPENS}T12:00`), lang, { day: 'numeric', month: 'short' })}</span> })}
         </p>
       )}
 
@@ -566,7 +568,7 @@ function Overview({ resumable, resumeLabel, answered, clinical, onStart, onResta
 
       <div className="mt-auto flex flex-col gap-2 pt-8">
         {resumable && <p className="text-center text-[14px] text-ink-2">{rich(c('ovKept'), { n: <span className="num">{answered}</span>, where: resumeLabel })}</p>}
-        <DaybreakButton onClick={onStart} className="w-full">{resumable ? c('ovContinue') : c('ovBegin1')}</DaybreakButton>
+        <DaybreakButton onClick={onStart} className="w-full">{nums(resumable ? c('ovContinue') : c('ovBegin1'))}</DaybreakButton>
         {resumable && <Button variant="ghost" onClick={onRestart} className="self-center">{c('ovRestart')}</Button>}
       </div>
     </div>
@@ -708,7 +710,7 @@ function SignalsStep({ sitting, off, down, fromReview, onToggle, onConfirm, onBa
         {rich(c('sgTitle'))}
       </h1>
       <p className="mt-4 text-[17px] leading-relaxed text-ink-2">
-        {c('sgBody')}
+        {nums(c('sgBody'))}
       </p>
       {(down || wearableOff) && (
         <div role="status" className="mt-5 rounded-card border border-line bg-paper-sunk px-4 py-3">
@@ -769,7 +771,7 @@ function SittingBreak({ onContinue, onLater }: { onContinue: () => void; onLater
       <Eyebrow tone="daybreak">{c('brEyebrow')}</Eyebrow>
       <h1 className="mt-3 text-[2.2rem] font-light leading-tight text-ink">{rich(c('brTitle'))}</h1>
       <p className="mt-4 text-[17px] leading-relaxed text-ink-2">
-        {c('brBody', { s1: pick(SITTING_TITLE[1], SITTINGS[0].title), s2: pick(SITTING_TITLE[2], SITTINGS[1].title), tail: IN_REMEASURE_WINDOW ? c('brTail') : '' })}
+        {nums(c('brBody', { s1: pick(SITTING_TITLE[1], SITTINGS[0].title), s2: pick(SITTING_TITLE[2], SITTINGS[1].title), tail: IN_REMEASURE_WINDOW ? c('brTail') : '' }))}
       </p>
       <Card tone="sunk" className="mt-6">
         <p className="eyebrow text-ink-3">{c('brNext')}</p>
@@ -782,7 +784,7 @@ function SittingBreak({ onContinue, onLater }: { onContinue: () => void; onLater
         </ul>
       </Card>
       <div className="mt-auto flex flex-col gap-2 pt-10">
-        <DaybreakButton onClick={onContinue} className="w-full">{c('brBegin2')}</DaybreakButton>
+        <DaybreakButton onClick={onContinue} className="w-full">{nums(c('brBegin2'))}</DaybreakButton>
         <Button variant="ghost" onClick={onLater} className="self-center">{c('brLater')}</Button>
       </div>
     </div>
@@ -809,7 +811,7 @@ function ClinicalStep({ parts, onChange, fromReview, onContinue, onBack, x }: { 
       <Card tone="raised" as="div" className="mt-6 !p-5">
         <fieldset>
           <legend className="flex items-center gap-2 text-[17px] text-ink"><Droplet size={16} className="text-ink-3" aria-hidden /> {x('clDraw')}</legend>
-          <p className="mt-1 text-[14px] text-ink-2">{x('clDrawBody')}</p>
+          <p className="mt-1 text-[14px] text-ink-2">{nums(x('clDrawBody'))}</p>
           <div className="mt-4 space-y-2">
             {DRAW_SLOTS.map((slot) => {
               const on = parts.slot === slot
@@ -844,7 +846,7 @@ function ClinicalStep({ parts, onChange, fromReview, onContinue, onBack, x }: { 
             aria-describedby="sit-hint"
             className="num mt-1.5 block h-12 w-36 rounded-lg border border-line-strong bg-paper-raised px-3 text-[17px] text-ink focus-ring"
           />
-          <span id="sit-hint" className={clsx('mt-1 block text-[13px]', touched && parts.sitToStand !== '' && secs === null ? 'text-error' : 'text-ink-3')}>{x('clSecondsHint')}</span>
+          <span id="sit-hint" className={clsx('mt-1 block text-[13px]', touched && parts.sitToStand !== '' && secs === null ? 'text-error' : 'text-ink-3')}>{nums(x('clSecondsHint'))}</span>
         </label>
       </Card>
 
@@ -1099,7 +1101,7 @@ function Scoring({ answers, signalsOff, skipped, offline, clinical, x, onSee }: 
             </Card>
             {result.phqFlag && (
               <div className="mt-4 rounded-card border border-line p-4">
-                <p className="text-[15px] text-ink-2">{c('scPhq', { space: space('B') })}</p>
+                <p className="text-[15px] text-ink-2">{nums(c('scPhq', { space: space('B') }))}</p>
                 <HumanWritten by={c('clinicalOffice')} className="mt-3" />
               </div>
             )}
@@ -1108,10 +1110,10 @@ function Scoring({ answers, signalsOff, skipped, offline, clinical, x, onSee }: 
       </AnimatePresence>
 
       <div className="mt-auto flex flex-col gap-2 pt-10">
-        <DaybreakButton onClick={onSee} disabled={!finished} className="w-full">{IN_REMEASURE_WINDOW || clinical ? c('scSeeDay90') : c('scSeeIndex')}</DaybreakButton>
+        <DaybreakButton onClick={onSee} disabled={!finished} className="w-full">{nums(IN_REMEASURE_WINDOW || clinical ? c('scSeeDay90') : c('scSeeIndex'))}</DaybreakButton>
         {finished && !IN_REMEASURE_WINDOW && !clinical && (
           <Link to="/app/index/day-90" className="inline-flex items-center justify-center gap-1.5 self-center py-2 text-[15px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring">
-            {c('scHowDay90')} <ArrowRight size={14} />
+            {nums(c('scHowDay90'))} <ArrowRight size={14} />
           </Link>
         )}
       </div>
@@ -1145,7 +1147,7 @@ function TermFlow({ term, clinical }: { term: TermKey; clinical: boolean }) {
   useEffect(() => () => window.clearTimeout(timer.current), [])
   // The record the term joins: the sitting on My Index, or the Clinical-grade re-measure.
   const src = clinical
-    ? rec && (rec.status === 'awaiting' || rec.status === 'signed') && rec.answers
+    ? rec && (rec.status === 'awaiting' || rec.status === 'returned' || rec.status === 'signed') && rec.answers
       ? { answers: rec.answers, amendments: rec.amendments, skipped: rec.skipped ?? [], signalsOff: rec.signalsOff ?? [], value: rec.value ?? null, takenOn: rec.takenOn ?? REMEASURE_TAKEN }
       : null
     : m && m.answers
@@ -1153,7 +1155,7 @@ function TermFlow({ term, clinical }: { term: TermKey; clinical: boolean }) {
       : null
   const open = !!src && src.skipped.includes(term)
   const home = clinical ? '/app/index/day-90' : '/app/index'
-  const homeLabel = clinical ? x('tmBackDay90') : x('tmBack')
+  const homeLabel = nums(clinical ? x('tmBackDay90') : x('tmBack'))
   const answered = items.filter((i) => answers[i.id] !== undefined).length
 
   const go = (n: number) => {

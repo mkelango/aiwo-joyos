@@ -6,14 +6,16 @@ import { Link } from 'react-router-dom'
 import { Delta, Eyebrow, MethodLine, SpecimenTag, TermChip, TermDot, useFmtDate } from '@/components/joy/primitives'
 import { Avatar, Button, Card, LoopRing, PageHeader, Pill, SectionTitle, Tabs, Toggle } from '@/components/ui'
 import { CATIONS, CATION_PHASES, CIRCLE } from '@/data/platform'
-import { INDEX_HISTORY, MEMBER, TEAM } from '@/data/member'
+import { MEMBER, TEAM } from '@/data/member'
+import { useIndexHistory } from '@/routes/member/core/_latest'
 import { useScoresHidden } from '@/lib/minor'
 import { TERMS } from '@/data/terms'
 import type { TermKey } from '@/domain/types'
 import { MY_CATION, SIGNAL_READINGS } from './_data'
-import { HereMarker, JourneyEmpty, OccasionsCard, PrimaryChip, fade } from './_parts'
+import { HereMarker, JourneyEmpty, OccasionsCard, PrimaryChip, useFade } from './_parts'
 import { addDays, setDemoNoCation, useJourney } from './_store'
 import { useJ } from './_i18n'
+import { monoDigits } from './_mono'
 
 // ’CATION HOME (Memo p.20): the member's current ’cation journey — before, during,
 // after; the hand-off, readings from Signal Points, the named outcome, the 90 days;
@@ -32,11 +34,12 @@ const phaseState = (key: string): 'done' | 'now' | 'next' => {
 }
 
 export default function CationHome() {
+  const fade = useFade()
   const { t, r, tx, term } = useJ()
   // A member under 18 is never scored (Architecture p26): no term values.
   const minor = useScoresHidden()
   const fmtDate = useFmtDate()
-  const latest = INDEX_HISTORY[0]
+  const { latest } = useIndexHistory()
   const lowestName = term.name(latest.lowestTerm)
   const joycation = CATIONS.find((c) => c.slug === MY_CATION.slug)!
   const suggested = CATIONS.find((c) => c.slug === 'savourcation')!
@@ -50,7 +53,7 @@ export default function CationHome() {
 
   if (journey.demoNoCation) return <NoCation />
 
-  return (
+  return monoDigits(
     <div>
       <PageHeader
         eyebrow={r('homeEyebrow', { name: joycation.name, day: MEMBER.dayOfLoop, total: 90 })}
@@ -255,7 +258,7 @@ function Catalogue({ suggestedSlug, noCation = false }: { suggestedSlug: string;
   const [filter, setFilter] = useState<Filter>('all')
   const { t, r, tx, term, status } = useJ()
   const journey = useJourney()
-  const latest = INDEX_HISTORY[0]
+  const { latest } = useIndexHistory()
   const lowestName = term.name(latest.lowestTerm)
   const suggested = CATIONS.find((c) => c.slug === suggestedSlug)!
   const lowestCations = CATIONS.filter((c) => c.primary === latest.lowestTerm)
@@ -265,7 +268,7 @@ function Catalogue({ suggestedSlug, noCation = false }: { suggestedSlug: string;
   const groups: (TermKey | 'ALL')[] = ['ALL', 'H', 'P', 'R', 'F', 'D', 'B']
 
   // Catalogue
-  return (
+  return monoDigits(
       <section id="catalogue" className="mt-12 scroll-mt-24" aria-labelledby="cat-title">
         <div className="mb-6 flex flex-col gap-4">
           <div>
@@ -328,7 +331,7 @@ function Catalogue({ suggestedSlug, noCation = false }: { suggestedSlug: string;
 function DemoSwitch() {
   const { t } = useJ()
   const on = useJourney().demoNoCation
-  return (
+  return monoDigits(
     <div className="mb-6 flex flex-col gap-2 rounded-card border border-dashed border-line px-4 py-3 sm:flex-row sm:items-center sm:gap-4">
       <SpecimenTag className="self-start sm:self-center" />
       <div className="min-w-0 flex-1">
@@ -343,7 +346,7 @@ function NoCation() {
   const { t, r, tx, term } = useJ()
   const minor = useScoresHidden()
   const journey = useJourney()
-  const latest = INDEX_HISTORY[0]
+  const { latest } = useIndexHistory()
   const lowest = latest.lowestTerm
   const lowestName = term.name(lowest)
   const lowestCations = CATIONS.filter((c) => c.primary === lowest)
@@ -353,7 +356,7 @@ function NoCation() {
   const req = invite ? journey.cationRequests.find((x) => x.slug === invite.slug) : undefined
   const score = latest.terms.find((x) => x.key === lowest)?.value ?? ''
 
-  return (
+  return monoDigits(
     <div>
       <PageHeader
         eyebrow={t('noneEyebrow')}

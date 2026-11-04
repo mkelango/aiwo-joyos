@@ -6,7 +6,7 @@ import { interceptsCrisis, useApp } from '@/lib/store'
 import { trustStore, useStore } from '@/screens/b/bStore'
 import { CONSENTS } from '@/shared/member'
 import { useLocal } from '@/screens/a/local'
-import { Chip, IconButton, TextField } from '@/screens/a/parts'
+import { Chip, IconButton, monoNums, TextField } from '@/screens/a/parts'
 import { NO_SUGGESTIONS, PEACE_OF_MIND, TIME_AUDIT, TIME_KINDS } from '@/screens/a/spacesData'
 import { useTheme } from '@/theme/ThemeProvider'
 import { useA } from '../i18n'
@@ -144,7 +144,7 @@ function CalendarOptIn({ disconnected, onConnect }: { disconnected: boolean; onC
                   </View>
                   <View style={{ flex: 1, gap: 2 }}>
                     <Body weight="medium">{CAL_NAME[p]}</Body>
-                    <Meta size={14} tone="ink3">{t('Read-only · the last 14 days')}</Meta>
+                    <Meta size={14} tone="ink3">{monoNums(t('Read-only · the last 14 days'))}</Meta>
                   </View>
                 </Pressable>
               )
@@ -173,7 +173,7 @@ function CalendarOptIn({ disconnected, onConnect }: { disconnected: boolean; onC
             <Eyebrow>{t('Joy OS can')}</Eyebrow>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <Icon name="check" size={15} color={c.ink} />
-              <Meta tone="ink" style={{ flex: 1 }}>{t('See the times and titles of your events from 11 to 24 Jan, once')}</Meta>
+              <Meta tone="ink" style={{ flex: 1 }}>{monoNums(t('See the times and titles of your events from 11 to 24 Jan, once'))}</Meta>
             </View>
           </View>
           <View style={{ borderWidth: 1, borderColor: c.line, borderRadius: radius.card, padding: space.s2, gap: 8 }}>
@@ -181,7 +181,7 @@ function CalendarOptIn({ disconnected, onConnect }: { disconnected: boolean; onC
             {[t('Create, change or delete events'), t('Invite, email or share with anyone'), t('Read again without asking you first')].map((x) => (
               <View key={x} style={{ flexDirection: 'row', gap: 8 }}>
                 <Icon name="x" size={15} color={c.ink2} />
-                <Meta style={{ flex: 1 }}>{x}</Meta>
+                <Meta style={{ flex: 1 }}>{monoNums(x)}</Meta>
               </View>
             ))}
           </View>
@@ -205,7 +205,7 @@ function CalendarOptIn({ disconnected, onConnect }: { disconnected: boolean; onC
             {reading.map((x, i) => (
               <View key={x} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 {i < phase ? <Icon name="check" size={15} color={c.ink} /> : <View style={{ width: 8, height: 8, marginHorizontal: 3, borderRadius: 4, backgroundColor: i === phase ? c.ink : undefined, borderWidth: i === phase ? 0 : 1, borderColor: c.lineStrong }} />}
-                <Meta tone={i <= phase ? 'ink' : 'ink3'} style={{ flex: 1 }}>{x}</Meta>
+                <Meta tone={i <= phase ? 'ink' : 'ink3'} style={{ flex: 1 }}>{monoNums(x)}</Meta>
               </View>
             ))}
           </View>
@@ -223,7 +223,7 @@ function CalendarOff({ provider, onDisconnect }: { provider: CalProvider | null;
       <Body size={20} style={{ lineHeight: 28 }}>
         {t('The time audit is off.')}
       </Body>
-      {provider ? <Meta tone="ink">{t('Your {p} connection is paused until you give consent again.', { p: CAL_NAME[provider] })}</Meta> : null}
+      {provider ? <Meta tone="ink">{monoNums(t('Your {p} connection is paused until you give consent again.', { p: CAL_NAME[provider] }))}</Meta> : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.s1 }}>
         <Button variant="secondary" icon="shield" onPress={() => router.push('/trust')}>
           {t('Turn calendar back on in the Trust centre')}
@@ -296,7 +296,7 @@ function AuditView({ provider, rerun, onRerun, onDisconnect }: { provider: CalPr
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: 1, borderTopColor: c.line, paddingTop: space.s1 }}>
         <Icon name="shield" size={14} color={c.ink3} />
         <Meta size={14} tone="ink3" style={{ flex: 1 }}>
-          {t('{p} · entries summarised, then discarded. Priya sees totals only.', { p: CAL_NAME[provider] })}
+          {monoNums(t('{p} · entries summarised, then discarded. Priya sees totals only.', { p: CAL_NAME[provider] }))}
         </Meta>
       </View>
       <VivaExchange state={viva.state} turn={viva.turn} />
@@ -312,7 +312,7 @@ function AuditView({ provider, rerun, onRerun, onDisconnect }: { provider: CalPr
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.s1 }}>
         {rerun ? (
           <Meta tone="ink2" accessibilityLiveRegion="polite" style={{ flexBasis: '100%' }}>
-            {t('Scheduled for 7 Feb. We will ask again before reading.')}
+            {monoNums(t('Scheduled for 7 Feb. We will ask again before reading.'))}
           </Meta>
         ) : (
           <Button size="sm" variant="secondary" icon="calendar" onPress={onRerun}>
@@ -363,7 +363,7 @@ function NoList() {
             <Mono size={13} tone="ink3">
               {String(i + 1)}
             </Mono>
-            <Body style={{ flex: 1 }}>{tx(n)}</Body>
+            <Body style={{ flex: 1 }}>{monoNums(tx(n))}</Body>
             <IconButton icon="x" label={t('Remove {n}', { n: tx(n) })} onPress={() => setList((l) => l.filter((_, j) => j !== i))} />
           </View>
         ))}
@@ -434,8 +434,8 @@ function PeaceOfMind() {
                 {x.done ? <Icon name="check" size={14} color={c.paper} /> : null}
               </View>
               <View style={{ flex: 1, gap: 2 }}>
-                <Body weight="medium">{tx(x.title)}</Body>
-                <Meta size={14}>{tx(x.detail)}</Meta>
+                <Body weight="medium">{monoNums(tx(x.title))}</Body>
+                <Meta size={14}>{monoNums(tx(x.detail))}</Meta>
               </View>
             </Pressable>
           </View>

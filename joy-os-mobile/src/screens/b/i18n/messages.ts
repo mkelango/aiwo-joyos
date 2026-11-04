@@ -67,6 +67,6 @@ export const REPLIES_TEXT: Record<string, L3> = {
 export const SUBJECT_T: Record<string, L3 & { date?: string }> = {
   t_priya: { en: 'Day 15 review and this week', ta: 'நாள் 15 மதிப்பாய்வும் இந்த வாரமும்', hi: 'दिन 15 की समीक्षा और यह हफ़्ता' },
   t_meera: { en: 'January panel · signed', ta: 'ஜனவரி பரிசோதனை · கையொப்பமிடப்பட்டது', hi: 'जनवरी की जाँच · हस्ताक्षरित' },
-  t_ravi: { en: 'Joyspan Session · Chennai, {d}', ta: 'ஜாய்ஸ்பான் Session · சென்னை, {d}', hi: 'जॉयस्पैन Session · चेन्नई, {d}', date: '2027-02-20' },
-  t_ravi_lk: { en: 'Joyspan Session · Chennai, {d}', ta: 'ஜாய்ஸ்பான் Session · சென்னை, {d}', hi: 'जॉयस्पैन Session · चेन्नई, {d}', date: '2027-02-20' },
+  t_ravi: { en: 'Joyspan Session · Chennai, {d}', ta: 'ஜாய்ஸ்பான் அமர்வு · சென்னை, {d}', hi: 'जॉयस्पैन सेशन · चेन्नई, {d}', date: '2027-02-20' },
+  t_ravi_lk: { en: 'Joyspan Session · Chennai, {d}', ta: 'ஜாய்ஸ்பான் அமர்வு · சென்னை, {d}', hi: 'जॉयस्पैन सेशन · चेन्नई, {d}', date: '2027-02-20' },
 }

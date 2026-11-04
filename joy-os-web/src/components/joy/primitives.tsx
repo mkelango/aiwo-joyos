@@ -6,14 +6,15 @@ import { termColor } from '@/data/terms'
 import { activeLang, type Lang } from '@/lib/store'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
 import { useScoresHidden } from '@/lib/minor'
+import { nums } from '@/lib/nums'
 import { SHARED } from '@/components/_i18n'
 import { CountUp } from './CountUp'
 import { TermIcon } from './icons'
 
 /** The Index numeral — always the largest element, Mono 300 (Memo p.18). */
-export function IndexNumeral({ value, size = 'xl', className, count = false }: { value: number | null; size?: 'md' | 'lg' | 'xl' | 'hero'; className?: string; count?: boolean }) {
+export function IndexNumeral({ value, size = 'xl', className, count = false, specimen = false }: { value: number | null; size?: 'md' | 'lg' | 'xl' | 'hero'; className?: string; count?: boolean; /** Not the member's own Index (a cohort or worked example): shown to a minor too. */ specimen?: boolean }) {
   const t = useDict(SHARED)
-  const hidden = useScoresHidden()
+  const hidden = useScoresHidden(specimen)
   const sz = { md: 'text-5xl', lg: 'text-7xl', xl: 'text-[7rem] leading-none', hero: 'text-[9rem] md:text-[11rem] leading-none' }[size]
   // A minor is never scored: no numeral at all, only the calm note.
   if (hidden) return <NotScoredNote className={className} />
@@ -29,8 +30,8 @@ export function NotScoredNote({ className, detail = true }: { className?: string
   const t = useDict(SHARED)
   return (
     <span role="note" className={clsx('block max-w-md text-left', className)}>
-      <span className="block text-[16px] text-ink">{t('minorNotScored')}</span>
-      {detail && <span className="mt-1 block text-[14px] text-ink-2">{t('minorNotScoredSub')}</span>}
+      <span className="block text-[16px] text-ink">{nums(t('minorNotScored'))}</span>
+      {detail && <span className="mt-1 block text-[14px] text-ink-2">{nums(t('minorNotScoredSub'))}</span>}
     </span>
   )
 }
@@ -44,10 +45,10 @@ export function useBandText() {
   return (band: Band) => t(BAND_KEY[band])
 }
 
-export function BandLabel({ band, className }: { band: Band; className?: string }) {
+export function BandLabel({ band, className, specimen = false }: { band: Band; className?: string; /** A cohort or worked-example band: shown to a minor too. */ specimen?: boolean }) {
   const text = useBandText()(band)
   const t = useDict(SHARED)
-  if (useScoresHidden()) return <span className={clsx('eyebrow text-ink-3', className)}>{t('minorBand')}</span>
+  if (useScoresHidden(specimen)) return <span className={clsx('eyebrow text-ink-3', className)}>{t('minorBand')}</span>
   return <span className={clsx('eyebrow text-ink-2', className)}>{text}</span>
 }
 
@@ -77,10 +78,11 @@ export function TermDot({ term, size = 10 }: { term: TermKey; size?: number }) {
 /** Delta — shown both ways, never red (Memo p.18; Playbook p39 state table). A positive change
  *  is Jade with the arrow and the value; a change down is Ink with ↓ and the value. For Burden
  *  (`inverse`) the positive change is easing, so a fall in Burden is the Jade one. A minor sees
- *  no delta at all. */
-export function Delta({ value, className, inverse = false }: { value: number | null | undefined; className?: string; inverse?: boolean }) {
+ *  no delta of their own; a `specimen` (cohort or worked-example) change still shows. */
+export function Delta({ value, className, inverse = false, specimen = false }: { value: number | null | undefined; className?: string; inverse?: boolean; specimen?: boolean }) {
   const t = useDict(SHARED)
-  if (useScoresHidden()) return null
+  const hidden = useScoresHidden(specimen)
+  if (hidden) return null
   if (value === null || value === undefined) return <span className={clsx('font-mono text-ink-3', className)}>—</span>
   const Icon = value > 0 ? ArrowUp : value < 0 ? ArrowDown : Minus
   const key = inverse ? (value < 0 ? 'deltaEased' : value > 0 ? 'deltaRose' : 'deltaSame') : value > 0 ? 'deltaUp' : value < 0 ? 'deltaDown' : 'deltaSame'

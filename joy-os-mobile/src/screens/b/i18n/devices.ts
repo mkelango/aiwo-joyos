@@ -22,7 +22,7 @@ export const DEV = {
   feeds: { en: 'Feeds', ta: 'சேர்க்கும் அம்சங்கள்', hi: 'किसमें जाता है' },
   hkRead: { en: 'HealthKit · read, per type', ta: 'HealthKit · வகை வாரியாகப் படித்தல்', hi: 'HealthKit · हर प्रकार अलग से पढ़ना' },
   writeBack: { en: 'Write back', ta: 'திரும்ப எழுதுதல்', hi: 'वापस लिखना' },
-  mindful: { en: 'Mindful minutes', ta: 'Mindful minutes', hi: 'Mindful minutes' },
+  mindful: { en: 'Mindful minutes', ta: 'கவன நிமிடங்கள்', hi: 'माइंडफ़ुल मिनट' },
   mindfulD: { en: 'When you finish a Practice or today’s action. Nothing else is ever written to Apple Health.', ta: 'நீங்கள் ஒரு பயிற்சியையோ இன்றைய செயலையோ முடிக்கும்போது. Apple Health-இல் வேறு எதுவும் ஒருபோதும் எழுதப்படாது.', hi: 'जब आप कोई अभ्यास या आज का काम पूरा करें। Apple Health में और कुछ कभी नहीं लिखा जाता।' },
   disconnect: { en: 'Disconnect', ta: 'துண்டி', hi: 'डिस्कनेक्ट करें' },
   quality: { en: 'Data quality', ta: 'தரவுத் தரம்', hi: 'डेटा की गुणवत्ता' },
@@ -91,6 +91,17 @@ export const DEV = {
   sigDownNoFall: { en: 'Nothing is lost and nothing is counted against you.', ta: 'எதுவும் இழக்கப்படவில்லை; எதுவும் உங்களுக்கு எதிராகக் கணக்கிடப்படாது.', hi: 'कुछ नहीं खोता, और कुछ भी आपके ख़िलाफ़ नहीं गिना जाता।' },
   markStale: { en: 'Specimen: show my devices as stale', ta: 'மாதிரி: என் சாதனங்களைப் பழையதாகக் காட்டு', hi: 'नमूना: मेरे डिवाइस पुराने दिखाएँ' },
   markedStale: { en: 'Shown as stale. Sync now brings them back.', ta: 'பழையதாகக் காட்டப்படுகிறது. “இப்போது ஒத்திசை” அவற்றைத் திரும்பக் கொண்டுவரும்.', hi: 'पुराने दिखाए गए। “अभी सिंक करें” से वे लौट आएँगे।' },
+  // Data quality follows what is connected: no device, no ring, a stale signal, two sources for sleep
+  qNoDevice: { en: 'No device is connected, so there is nothing to grade. Your Index takes your answers alone until one is.', ta: 'எந்தச் சாதனமும் இணைக்கப்படவில்லை, அதனால் மதிப்பிட எதுவும் இல்லை. ஒன்று இணையும் வரை உங்கள் குறியீடு உங்கள் பதில்களை மட்டுமே எடுக்கும்.', hi: 'कोई डिवाइस जुड़ा नहीं, इसलिए जाँचने को कुछ नहीं। जब तक कोई न जुड़े, आपका इंडेक्स सिर्फ़ आपके जवाब लेता है।' },
+  qNoRing: { en: 'Nightly wear is charted for the Oura Ring. It is not connected, so there is no wear to grade.', ta: 'இரவு அணிதல் Oura Ring-க்கு வரைபடமாகக் காட்டப்படும். அது இணைக்கப்படவில்லை, அதனால் மதிப்பிட அணிதல் இல்லை.', hi: 'रात में पहनने का चार्ट Oura Ring के लिए है। वह जुड़ी नहीं, इसलिए पहनने की जाँच नहीं।' },
+  qOverlapOne: { en: 'Sleep from {name}', ta: 'உறக்கம் {name}-இலிருந்து', hi: 'नींद {name} से' },
+  qOverlapOneN: { en: '{name} is the only source for sleep, so there is one source of truth.', ta: '{name} மட்டுமே உறக்கத்துக்கான மூலம், அதனால் ஒரே நம்பகமான மூலம்.', hi: 'नींद का अकेला स्रोत {name} है, इसलिए एक ही भरोसेमंद स्रोत है।' },
+  qOverlapTwo: { en: 'Two sources for sleep', ta: 'உறக்கத்துக்கு இரண்டு மூலங்கள்', hi: 'नींद के दो स्रोत' },
+  qOverlapTwoN: { en: '{list} both read sleep. Only {first} is counted, so a night is never counted twice. Switch one off to keep a single source.', ta: '{list} இரண்டும் உறக்கத்தைப் படிக்கின்றன. {first} மட்டுமே கணக்கிடப்படும், அதனால் ஒரு இரவு இருமுறை கணக்கில் வராது. ஒரே மூலம் இருக்க ஒன்றை அணையுங்கள்.', hi: '{list} दोनों नींद पढ़ते हैं। सिर्फ़ {first} गिना जाता है, ताकि कोई रात दो बार न गिने। एक ही स्रोत रखने के लिए एक बंद करें।' },
+  qOverlapNone: { en: 'No sleep source', ta: 'உறக்க மூலம் இல்லை', hi: 'नींद का कोई स्रोत नहीं' },
+  qOverlapNoneN: { en: 'No connected device reads sleep, so sleep regularity is left out rather than guessed.', ta: 'இணைக்கப்பட்ட எந்தச் சாதனமும் உறக்கத்தைப் படிக்கவில்லை, அதனால் உறக்க ஒழுங்கு ஊகிக்கப்படாமல் விடப்படுகிறது.', hi: 'कोई जुड़ा डिवाइस नींद नहीं पढ़ता, इसलिए नींद की नियमितता अंदाज़े के बजाय छोड़ दी जाती है।' },
+  qFreshStale: { en: 'Over 72 h', ta: '72 மணிக்கு மேல்', hi: '72 घंटे से ज़्यादा' },
+  qFreshStaleN: { en: '{list} last synced over 72 hours ago. Stale signals never pick today’s action; Sync now brings them back.', ta: '{list} கடைசியாக 72 மணிநேரத்துக்கு முன் ஒத்திசைந்தது. பழைய சமிக்ஞைகள் இன்றைய செயலை ஒருபோதும் தேர்ந்தெடுக்காது; “இப்போது ஒத்திசை” அவற்றை மீட்கும்.', hi: '{list} आख़िरी बार 72 घंटे से पहले सिंक हुए। पुराने संकेत आज का काम कभी नहीं चुनते; अभी सिंक करें उन्हें वापस लाता है।' },
 } satisfies Dict
 
 export const DEVICE_NOTE: Record<string, { via?: L3; note: L3; lastSync?: L3 }> = {
@@ -111,7 +122,7 @@ export const SIGNAL_TEXT: Record<string, L3> = {
   Steps: { en: 'Steps', ta: 'அடிகள்', hi: 'क़दम' },
   Workouts: { en: 'Workouts', ta: 'உடற்பயிற்சிகள்', hi: 'वर्कआउट' },
   'VO₂max': { en: 'VO₂max', ta: 'VO₂max', hi: 'VO₂max' },
-  'Mindful minutes': { en: 'Mindful minutes', ta: 'Mindful minutes', hi: 'Mindful minutes' },
+  'Mindful minutes': { en: 'Mindful minutes', ta: 'கவன நிமிடங்கள்', hi: 'माइंडफ़ुल मिनट' },
   Sleep: { en: 'Sleep', ta: 'உறக்கம்', hi: 'नींद' },
   'Heart rate': { en: 'Heart rate', ta: 'இதயத் துடிப்பு', hi: 'दिल की धड़कन' },
   Exercise: { en: 'Exercise', ta: 'உடற்பயிற்சி', hi: 'व्यायाम' },
@@ -125,5 +136,5 @@ export const HK_TEXT: Record<string, L3> = {
   vo2: { en: 'VO₂max (estimate)', ta: 'VO₂max (மதிப்பீடு)', hi: 'VO₂max (अनुमान)' },
   rhr: { en: 'Resting heart rate', ta: 'ஓய்வு இதயத் துடிப்பு', hi: 'आराम के समय दिल की धड़कन' },
   sleep: { en: 'Sleep analysis', ta: 'உறக்கப் பகுப்பாய்வு', hi: 'नींद का विश्लेषण' },
-  mindful: { en: 'Mindful minutes (read)', ta: 'Mindful minutes (படித்தல்)', hi: 'Mindful minutes (पढ़ना)' },
+  mindful: { en: 'Mindful minutes (read)', ta: 'கவன நிமிடங்கள் (படித்தல்)', hi: 'माइंडफ़ुल मिनट (पढ़ना)' },
 }

@@ -10,9 +10,10 @@ import { CIRCLE, PRACTICE_WEEKS } from '@/data/platform'
 import { INDEX_HISTORY, TEAM } from '@/data/member'
 import { useScoresHidden } from '@/lib/minor'
 import { PRACTICE_CONTENT, PRACTICE_PULSE } from './_data'
-import { AudioPlayer, PrimaryChip, Quote, Verse, fade, useAfterIndex } from './_parts'
+import { AudioPlayer, PrimaryChip, Quote, Verse, useFade, useAfterIndex } from './_parts'
 import { practisedToday, togglePractisedToday, useJourney, weekPractised } from './_store'
 import { useJ } from './_i18n'
+import { monoDigits } from './_mono'
 
 // THE JOYSPIRATION PRACTICE (Memo p.21): eight weeks; five-minute audio in the
 // Mentor's voice, a science note from the faculty, one practice daily, weekly
@@ -22,6 +23,7 @@ const CURRENT = CIRCLE.week
 const COACH_FIRST = TEAM.find((p) => p.role === 'Coach')!.name.split(' ')[0]
 
 export default function Practice() {
+  const fade = useFade()
   const week = PRACTICE_WEEKS.find((w) => w.week === CURRENT)!
   const content = PRACTICE_CONTENT.find((p) => p.week === CURRENT)!
   const before = INDEX_HISTORY[0]
@@ -42,7 +44,7 @@ export default function Practice() {
     if (el && rail && rail.scrollWidth > rail.clientWidth) rail.scrollLeft += el.getBoundingClientRect().left - rail.getBoundingClientRect().left - (rail.clientWidth - el.offsetWidth) / 2
   }, [])
 
-  return (
+  return monoDigits(
     <div>
       <PageHeader
         eyebrow={r('prEyebrow', { w: CURRENT, n: 8 })}

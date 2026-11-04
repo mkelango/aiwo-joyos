@@ -34,10 +34,22 @@ export function fmtShortDate(iso: string) {
   return d.toLocaleDateString(`${lang}-IN`, { day: 'numeric', month: 'short', numberingSystem: 'latn' })
 }
 
-/** Fill a translated string whose {slots} hold styled nodes (numbers in Mono, an <em>). */
+/** Fill a translated string whose {slots} hold styled nodes (numbers in Mono, an <em>).
+ *  Numbers written into the sentence itself are set in Mono too (see nums). */
 export function rich(s: string, nodes: Record<string, ReactNode>): ReactNode {
   const parts = s.split(/\{(\w+)\}/)
-  return parts.map((p, i) => (i % 2 ? <Fragment key={i}>{p in nodes ? nodes[p] : `{${p}}`}</Fragment> : p))
+  return parts.map((p, i) => <Fragment key={i}>{i % 2 ? (p in nodes ? nodes[p] : `{${p}}`) : nums(p)}</Fragment>)
+}
+
+// A number inside running text: digits with their separators (19:00, 60,000, 3.2, v1.0's 1.0).
+const NUM_RUN = /(\d+(?:[.,:]\d+)*)/
+
+/** Mono for every number (brand): the digits inside a sentence in Mono, the words in the sans.
+ *  For JSX children only; anything that is not a plain string (already styled) passes through. */
+export function nums(s: ReactNode): ReactNode {
+  if (typeof s !== 'string') return s
+  const parts = s.split(NUM_RUN)
+  return parts.length === 1 ? s : parts.map((p, i) => (i % 2 ? <span key={i} className="num">{p}</span> : p))
 }
 
 /** A quiet toast — a status line, never a celebration. */
@@ -61,7 +73,7 @@ export function useToast() {
             transition={{ duration: 0.2 }}
             className="pointer-events-auto max-w-md rounded-full bg-ink px-5 py-2.5 text-center text-[14px] text-paper shadow-lift"
           >
-            {msg}
+            {nums(msg)}
           </motion.p>
         )}
       </AnimatePresence>

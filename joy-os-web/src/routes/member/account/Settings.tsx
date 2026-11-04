@@ -11,7 +11,7 @@ import { useApp, type TextSize } from '@/lib/store'
 import { playSound } from '@/lib/sound'
 import { DEFAULT_NOTIF_PREFS, LEDGER_TIMES, NOTIF_TYPES, pushesPerDay, type Channel, type NotifPrefs } from './_data'
 import { Field, LinkButton, Section, Segmented, Select, Toggle } from './_parts'
-import { applyReducedMotion, inputCls, rich, usePersisted, useToast } from './_util'
+import { applyReducedMotion, inputCls, nums, rich, usePersisted, useToast } from './_util'
 import { SET, useData } from './_i18n'
 import { A11Y_DEFAULTS } from './_prefs'
 import { ReadAloud, SpeakAnswer, useSpeech } from './_voice'
@@ -234,7 +234,7 @@ export default function Settings() {
                   {passkeys.map((k) => (
                     <li key={k} className="flex items-center gap-3 px-4 py-3">
                       <KeyRound size={16} className="shrink-0 text-ink-3" />
-                      <span className="min-w-0 flex-1 truncate text-[15px] text-ink">{k}</span>
+                      <span className="min-w-0 flex-1 truncate text-[15px] text-ink">{nums(k)}</span>
                       <Button size="sm" variant="ghost" disabled={passkeys.length < 2} title={passkeys.length < 2 ? t('lastPasskey') : undefined} onClick={() => setRemoveKey(k)} aria-label={t('removePasskey', { k })}><Trash2 size={15} /> <span className="hidden sm:inline">{t('remove')}</span></Button>
                     </li>
                   ))}

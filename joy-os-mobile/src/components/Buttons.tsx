@@ -1,9 +1,11 @@
 import * as Haptics from 'expo-haptics'
 import type { ReactNode } from 'react'
 import { Platform, Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native'
+import { MonoNums } from '../lib/monoNums'
 import { useReduceMotion } from '../lib/store'
 import { useTheme } from '../theme/ThemeProvider'
 import { Icon, type IconName } from './Icon'
+import { JoyIcon, type JoyIconName } from './JoyIcons'
 import { useToneColor } from './Text'
 
 function tap() {
@@ -23,12 +25,13 @@ interface DaybreakProps {
 
 /**
  * Daybreak — ONE per screen, the one primary action (Principle 01).
- * Label 19pt bold so white-on-Daybreak meets AA-large contrast.
+ * Label 19pt bold so white-on-Daybreak meets AA-large contrast; in Tamil and Hindi one step
+ * larger (19→20, as the web's .btn-daybreak) with +10% leading.
  */
 export function DaybreakButton({ children, onPress, disabled, icon, block = true, accessibilityHint, style }: DaybreakProps) {
   const t = useTheme()
   const reduce = useReduceMotion()
-  const fs = 19 * t.textScale
+  const fs = t.step(19) * t.textScale
   return (
     <Pressable
       onPress={() => {
@@ -61,8 +64,9 @@ export function DaybreakButton({ children, onPress, disabled, icon, block = true
       ]}
     >
       {icon && <Icon name={icon} size={20} color={t.c.daybreakLabel} />}
-      <Text maxFontSizeMultiplier={1.6} style={{ fontFamily: t.fonts.sansBold, fontSize: fs, lineHeight: Math.round(fs * 1.3), color: t.c.daybreakLabel, letterSpacing: 0.1, textAlign: 'center', flexShrink: 1 }}>
-        {children}
+      <Text maxFontSizeMultiplier={1.6} style={{ fontFamily: t.fonts.sansBold, fontSize: fs, lineHeight: Math.round(fs * 1.3 * t.script.leading), color: t.c.daybreakLabel, letterSpacing: 0.1, textAlign: 'center', flexShrink: 1 }}>
+        {/* Numbers in the label ("Call 14416") are set in Mono; the label stays the screen-reader text. */}
+        <MonoNums text={children} />
       </Text>
     </Pressable>
   )
@@ -84,12 +88,13 @@ interface ButtonProps {
   style?: StyleProp<ViewStyle>
 }
 
-/** Every other action: secondary (outlined), ghost, ink (filled Ink) or link (underlined). */
+/** Every other action: secondary (outlined), ghost, ink (filled Ink) or link (underlined).
+ *  Labels step up one size in Tamil and Hindi, with +10% leading. */
 export function Button({ children, onPress, variant = 'secondary', size = 'md', icon, iconRight, disabled, block, accessibilityLabel, accessibilityHint, style }: ButtonProps) {
   const t = useTheme()
   const ink = useToneColor('ink')
   const ink2 = useToneColor('ink2')
-  const fs = (size === 'sm' ? 15 : 17) * t.textScale
+  const fs = t.step(size === 'sm' ? 15 : 17) * t.textScale
   const v: Record<ButtonVariant, { box: ViewStyle; color: string }> = {
     secondary: { box: { borderWidth: 1, borderColor: t.c.lineStrong, backgroundColor: t.c.paperRaised }, color: t.c.ink },
     ghost: { box: {}, color: ink2 },
@@ -135,14 +140,14 @@ export function Button({ children, onPress, variant = 'secondary', size = 'md', 
           style={{
             fontFamily: t.fonts.sansSemi,
             fontSize: fs,
-            lineHeight: Math.round(fs * 1.35),
+            lineHeight: Math.round(fs * 1.35 * t.script.leading),
             color: v[variant].color,
             textDecorationLine: variant === 'link' ? 'underline' : 'none',
             textDecorationColor: t.c.lineStrong,
             flexShrink: 1,
           }}
         >
-          {children}
+          <MonoNums text={children} />
         </Text>
       ) : (
         <View style={{ flexShrink: 1 }}>{children}</View>
@@ -152,11 +157,12 @@ export function Button({ children, onPress, variant = 'secondary', size = 'md', 
   )
 }
 
-/** A plain text row link with a trailing arrow — "Add to the Ledger →". */
-export function ArrowLink({ children, onPress, icon, accessibilityHint }: { children: string; onPress: () => void; icon?: IconName; accessibilityHint?: string }) {
+/** A plain text row link with a trailing arrow — "Add to the Ledger →". One step larger in Tamil and Hindi.
+ *  `joyIcon` draws a brand JoyIcon (the circle, the Practice) in place of a line icon. */
+export function ArrowLink({ children, onPress, icon, joyIcon, accessibilityHint }: { children: string; onPress: () => void; icon?: IconName; joyIcon?: JoyIconName; accessibilityHint?: string }) {
   const t = useTheme()
   const ink = useToneColor('ink')
-  const fs = 17 * t.textScale
+  const fs = t.step(17) * t.textScale
   return (
     <Pressable
       onPress={onPress}
@@ -166,9 +172,9 @@ export function ArrowLink({ children, onPress, icon, accessibilityHint }: { chil
       hitSlop={8}
       style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, opacity: pressed ? 0.6 : 1, alignSelf: 'flex-start', maxWidth: '100%' })}
     >
-      {icon && <Icon name={icon} size={17} color={ink} />}
-      <Text maxFontSizeMultiplier={2} style={{ fontFamily: t.fonts.sans, fontSize: fs, lineHeight: Math.round(fs * 1.4), color: ink, flexShrink: 1 }}>
-        {children}
+      {joyIcon ? <JoyIcon name={joyIcon} size={18} color={ink} /> : icon && <Icon name={icon} size={17} color={ink} />}
+      <Text maxFontSizeMultiplier={2} style={{ fontFamily: t.fonts.sans, fontSize: fs, lineHeight: Math.round(fs * 1.4 * t.script.leading), color: ink, flexShrink: 1 }}>
+        <MonoNums text={children} />
       </Text>
       <Icon name="arrow-right" size={16} color={ink} />
     </Pressable>

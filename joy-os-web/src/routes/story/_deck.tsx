@@ -8,7 +8,7 @@ import { JoyspanEquation } from '@/components/joy/JoyspanEquation'
 import { BandLabel, Delta, MethodLine, TermDot, fmtDate } from '@/components/joy/primitives'
 import { DEMO_ROLES } from '@/layouts/DemoBar'
 import { useApp } from '@/lib/store'
-import { DEMO_ACCOUNTS, OPS_ACCOUNT } from '@/routes/entry/_data'
+import { ROLE_ACCOUNTS } from '@/routes/entry/_data'
 import { DAY90_SPECIMEN, INDEX_HISTORY, LEDGER_TAGS, LEDGER_WEEK, MEMBER, TODAY_ACTION } from '@/data/member'
 import { JOURNEYS, RELEASES, SCOREBOARD } from '@/data/platform'
 import { TERMS, termByKey } from '@/data/terms'
@@ -1032,20 +1032,22 @@ function Walk() {
         <span className="eyebrow mb-2 shrink-0 rounded-full border border-dashed border-line-strong px-3 py-1 !text-[12px] text-ink-3">Specimen accounts · no real sign-in</span>
       </div>
       <Lead>Every surface in this deck is live on specimen data. Choose a role to open its screen: the member lands in the app, everyone else in their console, and every console says it is specimen.</Lead>
-      <ul className="mt-[30px] grid grid-cols-4 content-start gap-[16px]">
-        {DEMO_ACCOUNTS.map((a, i) => {
+      {/* Nine roles, one card each (the concierge acts at its own desk, Engineering & ops on
+          the Control plane), plus the threads: two rows of five on the canvas. */}
+      <ul className="mt-[30px] grid grid-cols-5 content-start gap-[16px]">
+        {ROLE_ACCOUNTS.map((a, i) => {
           const r = DEMO_ROLES.find((d) => d.role === a.role)
           if (!r) return null
           const body = (
             <>
               <span className="flex items-baseline justify-between gap-3">
-                <span className="text-[24px] font-light leading-tight text-ink">{a.title}</span>
-                <span className="num text-[13px] text-ink-3">{pad(i + 1)}</span>
+                <span className="min-w-0 text-[24px] font-light leading-tight text-ink">{a.title}</span>
+                <span className="flex shrink-0 items-center gap-1.5"><span className="num text-[13px] text-ink-3">{pad(i + 1)}</span>{!st && <ArrowUpRight size={16} className="text-ink-2" aria-hidden />}</span>
               </span>
               <span className="mt-1 block text-[16px] text-ink-2">{r.who}</span>
               <span className="mt-auto block border-t border-line pt-3">
-                <span className="num block truncate text-[14px] text-ink">{a.email}</span>
-                <span className="num mt-1 flex items-center justify-between text-[14px] text-ink-3">{r.to}{!st && <ArrowUpRight size={16} className="text-ink-2" aria-hidden />}</span>
+                <span className="num block truncate text-[13px] text-ink">{a.email}</span>
+                <span className="num mt-1 block truncate text-[13px] text-ink-3">{r.to}</span>
               </span>
             </>
           )
@@ -1070,11 +1072,6 @@ function Walk() {
         <li className="flex h-[200px] flex-col justify-between rounded-[14px] bg-paper p-[20px]">
           <p className="text-[18px] leading-snug text-ink">Or follow the threads.</p>
           <div className="flex flex-col gap-1.5 text-[16px]">
-            {st ? (
-              <span className="num text-ink-2">{OPS_ACCOUNT.title} · {OPS_ACCOUNT.to}</span>
-            ) : (
-              <button type="button" data-no-advance onClick={() => { setRole(OPS_ACCOUNT.role); nav(OPS_ACCOUNT.to) }} aria-label={`Open ${OPS_ACCOUNT.to} as ${OPS_ACCOUNT.title}, ${OPS_ACCOUNT.who}`} className="inline-flex items-center gap-1.5 text-left text-ink underline-offset-4 hover:underline focus-ring">{OPS_ACCOUNT.title} <ArrowUpRight size={15} /></button>
-            )}
             {[['Journeys', '/journeys'], ['Platform map', '/platform-map'], ['Sign-in, as a member would', '/signin']].map(([l, to]) => st ? (
               <span key={to} className="num text-ink-2">{l} · {to}</span>
             ) : (
@@ -1127,7 +1124,7 @@ const OUTLINES: Record<string, string[]> = {
   scoreboard: [...SCOREBOARD.map((r) => `${r.measure}: now ${r.now}, J5 ${r.j5}.`), ...REFUSE.map((r) => `We refuse: ${r.toLowerCase()}.`)],
   team: [...TEAM_ROLES.map((r) => `${r.role}: ${r.j02 || '—'} at J0–J2, ${r.j3} at J3, ${r.j4} at J4. ${r.owns}.`), ...TEAM_GOVERNANCE.map(([w, x]) => `${w}: ${x}`)],
   ask: DECISIONS.map((d) => `${d.n}. ${d.d} · ${d.owner} · by ${d.by}`),
-  walk: [...DEMO_ACCOUNTS.map((a) => { const r = DEMO_ROLES.find((d) => d.role === a.role); return `${a.title}: ${r?.who ?? ''} · ${a.email} → ${r?.to ?? ''}` }), `${OPS_ACCOUNT.title}: ${OPS_ACCOUNT.who} · ${OPS_ACCOUNT.email} → ${OPS_ACCOUNT.to}`],
+  walk: ROLE_ACCOUNTS.map((a) => { const r = DEMO_ROLES.find((d) => d.role === a.role); return `${a.title}: ${r?.who ?? a.who} · ${a.email} → ${r?.to ?? a.to}` }),
 }
 
 export const SLIDES: SlideDef[] = [

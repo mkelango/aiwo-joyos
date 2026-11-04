@@ -1,13 +1,14 @@
 import { router } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Platform, Share, View } from 'react-native'
-import { Avatar, Body, Button, Card, DaybreakButton, Divider, Eyebrow, ListRow, Meta, Mono, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, Title } from '@/components'
+import { Avatar, Body, Button, Card, DaybreakButton, Divider, Eyebrow, Meta, Mono, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, Title } from '@/components'
 import { useApp, type Lang } from '@/lib/store'
 import { HOUSEHOLD, MEMBER } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
 import { PLANS } from '@/screens/b/_data'
 import { abhaStore, accountStore, maskPhone, nomineeStore, sessionStore, useStore, type AccountState } from '@/screens/b/bStore'
-import { Done, Field, useAccount, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
+import { FigureListRow, Done, Field, useAccount, usePlanLabel, useSheetCrisisGuard, memberOnly } from '@/screens/b/parts'
+import { HOUSE } from '@/screens/b/i18n/household'
 import { useDict } from '@/lib/i18n'
 import { PROFILE, SETTINGS, RELATION_TEXT } from '@/screens/b/i18n/account'
 import { useCommon, useTx } from '@/screens/b/i18n/common'
@@ -33,7 +34,8 @@ function Profile() {
   // signed-in account's own (L2), kept with it when another account signs in.
   const [nominee] = useStore(nomineeStore)
   const [abha] = useStore(abhaStore)
-  const planName = `${PLANS.find((p) => p.key === acct.plan)?.name ?? MEMBER.plan} + ${MEMBER.membership}`
+  // The account's own plan; Circle membership only where the account has it (L2).
+  const planName = usePlanLabel()
   const [, setSession] = useStore(sessionStore)
   // The account signed in (M1): Arjun, Lakshmi in elder mode, or the one made in onboarding.
   const account = useAccount()
@@ -54,7 +56,9 @@ function Profile() {
   const ts = useDict(SETTINGS)
   const tc = useCommon()
   const tx = useTx()
-  const householdName = MEMBER.household === SETTINGS.householdName.en ? ts('householdName') : MEMBER.household
+  const th = useDict(HOUSE)
+  // The account made in onboarding has a household of its own, not the Raos'.
+  const householdName = account.id === 'new' ? th('yourHousehold') : MEMBER.household === SETTINGS.householdName.en ? ts('householdName') : MEMBER.household
   const city = MEMBER.city === PROFILE.city.en ? t('city') : MEMBER.city
 
   useEffect(() => {
@@ -162,13 +166,13 @@ function Profile() {
       <View style={{ gap: space.s1 }}>
         <SectionTitle aside={<Button variant="link" onPress={() => setDetailsOpen(true)}>{tc('edit')}</Button>}>{t('details')}</SectionTitle>
         <Card tone="raised" padding={8} style={{ paddingHorizontal: 16 }}>
-          <ListRow title={tc('name')} sub={draft.name} />
+          <FigureListRow title={tc('name')} sub={draft.name} />
           <Divider />
-          <ListRow title={t('mobile')} sub={draft.phone ? maskPhone(draft.phone) : '—'} />
+          <FigureListRow title={t('mobile')} sub={draft.phone ? maskPhone(draft.phone) : '—'} />
           <Divider />
-          <ListRow title={tc('email')} sub={draft.email || '—'} />
+          <FigureListRow title={tc('email')} sub={draft.email || '—'} />
           <Divider />
-          <ListRow title={tc('language')} sub={draft.language} />
+          <FigureListRow title={tc('language')} sub={draft.language} />
         </Card>
       </View>
 
@@ -206,17 +210,17 @@ function Profile() {
       <View style={{ gap: space.s1 }}>
         <SectionTitle>{t('account')}</SectionTitle>
         <Card tone="raised" padding={8} style={{ paddingHorizontal: 16 }}>
-          <ListRow icon="home" title={ts('household')} sub={householdName} onPress={() => router.push('/household')} />
+          <FigureListRow icon="home" title={ts('household')} sub={householdName} onPress={() => router.push('/household')} />
           <Divider />
-          <ListRow icon="credit-card" title={ts('passport')} sub={ts('passportSub')} onPress={() => router.push('/passport')} />
+          <FigureListRow icon="credit-card" title={ts('passport')} sub={ts('passportSub')} onPress={() => router.push('/passport')} />
           <Divider />
-          <ListRow icon="star" title={ts('membership')} sub={planName} onPress={() => router.push('/membership')} />
+          <FigureListRow icon="star" title={ts('membership')} sub={planName} onPress={() => router.push('/membership')} />
           <Divider />
-          <ListRow icon="book-open" title={ts('method')} sub={ts('methodSub')} onPress={() => router.push('/method')} />
+          <FigureListRow icon="book-open" title={ts('method')} sub={ts('methodSub')} onPress={() => router.push('/method')} />
           <Divider />
-          <ListRow icon="shield" title={ts('trust')} sub={t('trustSub')} onPress={() => router.push('/trust')} />
+          <FigureListRow icon="shield" title={ts('trust')} sub={t('trustSub')} onPress={() => router.push('/trust')} />
           <Divider />
-          <ListRow icon="settings" title={ts('eyebrow')} sub={t('settingsSub')} onPress={() => router.push('/settings')} />
+          <FigureListRow icon="settings" title={ts('eyebrow')} sub={t('settingsSub')} onPress={() => router.push('/settings')} />
         </Card>
       </View>
 

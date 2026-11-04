@@ -55,6 +55,8 @@ export const TRUST = {
   shareCopy: { en: 'Share copy (specimen)', ta: 'நகலைப் பகிர் (மாதிரி)', hi: 'कॉपी साझा करें (नमूना)' },
   cancelReq: { en: 'Cancel request', ta: 'கோரிக்கையை ரத்துசெய்', hi: 'अनुरोध रद्द करें' },
   earlier: { en: 'Earlier', ta: 'முன்னதாக', hi: 'पहले' },
+  noEarlier: { en: 'No earlier exports.', ta: 'முந்தைய ஏற்றுமதிகள் இல்லை.', hi: 'पहले का कोई निर्यात नहीं।' },
+  noLooks: { en: 'Nobody has opened your record yet. When someone does, a line appears here: who, what and why.', ta: 'இதுவரை யாரும் உங்கள் பதிவைத் திறக்கவில்லை. யாராவது திறந்தால், இங்கே ஒரு வரி தோன்றும்: யார், எதை, ஏன்.', hi: 'अभी तक किसी ने आपका रिकॉर्ड नहीं खोला। जब कोई खोलेगा, यहाँ एक पंक्ति दिखेगी: किसने, क्या और क्यों।' },
   exDownloaded: { en: 'Downloaded on this device · link open 7 days', ta: 'இந்தச் சாதனத்தில் பதிவிறக்கப்பட்டது · இணைப்பு 7 நாட்கள் திறந்திருக்கும்', hi: 'इसी डिवाइस पर डाउनलोड हुआ · लिंक 7 दिन खुला रहेगा' },
   exShared: { en: 'Shared from this phone · link open 7 days', ta: 'இந்தத் தொலைபேசியிலிருந்து பகிரப்பட்டது · இணைப்பு 7 நாட்கள் திறந்திருக்கும்', hi: 'इस फ़ोन से साझा किया · लिंक 7 दिन खुला रहेगा' },
   exReady: { en: 'Ready · not taken yet · link open 7 days', ta: 'தயார் · இன்னும் எடுக்கப்படவில்லை · இணைப்பு 7 நாட்கள் திறந்திருக்கும்', hi: 'तैयार · अभी लिया नहीं · लिंक 7 दिन खुला रहेगा' },
@@ -205,6 +207,13 @@ export const TRUST = {
   suOtp: { en: 'Code by SMS', ta: 'SMS குறியீடு', hi: 'SMS से कोड' },
   suOtpBody: { en: 'We send a six-digit code to your registered mobile {phone}.', ta: 'உங்கள் பதிவுசெய்த மொபைல் {phone}-க்கு ஆறு இலக்கக் குறியீட்டை அனுப்புவோம்.', hi: 'हम आपके रजिस्टर्ड मोबाइल {phone} पर छह अंकों का कोड भेजते हैं।' },
   suSend: { en: 'Send code', ta: 'குறியீட்டை அனுப்பவும்', hi: 'कोड भेजें' },
+  // No mobile on the account (made with an email): the code goes by email instead
+  suEmail: { en: 'Code by email', ta: 'மின்னஞ்சல் குறியீடு', hi: 'ईमेल से कोड' },
+  suEmailBody: { en: 'There is no mobile number on this account, so we send a six-digit code to your email {email}.', ta: 'இந்தக் கணக்கில் மொபைல் எண் இல்லை, எனவே உங்கள் மின்னஞ்சல் {email}-க்கு ஆறு இலக்கக் குறியீட்டை அனுப்புவோம்.', hi: 'इस खाते पर कोई मोबाइल नंबर नहीं है, इसलिए हम आपके ईमेल {email} पर छह अंकों का कोड भेजते हैं।' },
+  suEmailSent: { en: 'Code sent to {email}. It works once, for 10 minutes.', ta: '{email}-க்கு குறியீடு அனுப்பப்பட்டது. இது ஒருமுறை, 10 நிமிடங்களுக்கு மட்டும் செல்லும்.', hi: '{email} पर कोड भेजा गया। यह एक बार, 10 मिनट तक काम करता है।' },
+  suSpecimenEmail: { en: 'Specimen · no email is sent. The code is {code}.', ta: 'மாதிரி · மின்னஞ்சல் அனுப்பப்படவில்லை. குறியீடு {code}.', hi: 'नमूना · कोई ईमेल नहीं भेजा जाता। कोड {code} है।' },
+  suNoContact: { en: 'There is no mobile number or email on this account to send a code to. Add one in Profile, then come back.', ta: 'குறியீடு அனுப்ப இந்தக் கணக்கில் மொபைல் எண்ணோ மின்னஞ்சலோ இல்லை. சுயவிவரத்தில் ஒன்றைச் சேர்த்துவிட்டுத் திரும்புங்கள்.', hi: 'कोड भेजने के लिए इस खाते पर कोई मोबाइल नंबर या ईमेल नहीं है। प्रोफ़ाइल में एक जोड़ें, फिर लौटें।' },
+  suNoPasskey: { en: 'No passkey on this account yet, so we confirm with a code. You can add a passkey in Settings.', ta: 'இந்தக் கணக்கில் இன்னும் பாஸ்கீ இல்லை, எனவே குறியீட்டின் மூலம் உறுதிசெய்கிறோம். அமைப்புகளில் பாஸ்கீ சேர்க்கலாம்.', hi: 'इस खाते पर अभी कोई पासकी नहीं, इसलिए हम कोड से पुष्टि करते हैं। सेटिंग्स में पासकी जोड़ सकते हैं।' },
   suSent: { en: 'Code sent to {phone}. It works once, for 10 minutes.', ta: '{phone}-க்கு குறியீடு அனுப்பப்பட்டது. இது ஒருமுறை, 10 நிமிடங்களுக்கு மட்டும் செல்லும்.', hi: '{phone} पर कोड भेजा गया। यह एक बार, 10 मिनट तक काम करता है।' },
   suSpecimen: { en: 'Specimen · no SMS is sent. The code is {code}.', ta: 'மாதிரி · SMS அனுப்பப்படவில்லை. குறியீடு {code}.', hi: 'नमूना · कोई SMS नहीं भेजा जाता। कोड {code} है।' },
   suCode: { en: 'Six-digit code', ta: 'ஆறு இலக்கக் குறியீடு', hi: 'छह अंकों का कोड' },
@@ -248,12 +257,14 @@ export const CONSENT_T: Record<string, { name: L3; purpose: L3 }> = {
 }
 
 export const ACCESS_T: Record<string, { what: L3; purpose: L3; who?: L3 }> = {
+  lk1: { what: { en: 'Name, accessibility note', ta: 'பெயர், அணுகல் குறிப்பு', hi: 'नाम, सुगमता का नोट' }, purpose: { en: 'Joyspan Session booking', ta: 'ஜாய்ஸ்பான் அமர்வு முன்பதிவு', hi: 'जॉयस्पैन सेशन की बुकिंग' } },
+  lk2: { what: { en: 'Elder-mode settings, as your helper', ta: 'மூத்தோர் முறை அமைப்புகள், உங்கள் உதவியாளராக', hi: 'बुज़ुर्ग मोड की सेटिंग्स, आपके सहायक के रूप में' }, purpose: { en: 'Helper, by your consent', ta: 'உங்கள் ஒப்புதலுடன் உதவியாளர்', hi: 'आपकी सहमति से सहायक' } },
   e1: { what: { en: 'Quarter digest, Ledger counts', ta: 'காலாண்டுச் சுருக்கம், லெட்ஜர் எண்ணிக்கைகள்', hi: 'तिमाही सार, लेजर की गिनती' }, purpose: { en: 'Weekly review (Day 15 · 45)', ta: 'வாராந்திர மறுஆய்வு (நாள் 15 · 45)', hi: 'साप्ताहिक समीक्षा (दिन 15 · 45)' } },
   e2: { what: { en: 'Biomarker vault, LE8', ta: 'பயோமார்க்கர் தொகுப்பு, LE8', hi: 'बायोमार्कर वॉल्ट, LE8' }, purpose: { en: 'Clinical grade sign-off', ta: 'மருத்துவ நிலை ஒப்புதல்', hi: 'क्लिनिकल ग्रेड पर हस्ताक्षर' } },
   e3: { who: { en: 'Index engine', ta: 'குறியீட்டு இயந்திரம்', hi: 'इंडेक्स इंजन' }, what: { en: 'Instrument answers', ta: 'அளவுகருவிப் பதில்கள்', hi: 'प्रश्नावली के जवाब' }, purpose: { en: 'Score computation · method v1.0', ta: 'மதிப்பெண் கணக்கீடு · method v1.0', hi: 'स्कोर की गणना · method v1.0' } },
   e4: { what: { en: 'Name, booking, dietary note', ta: 'பெயர், முன்பதிவு, உணவுக் குறிப்பு', hi: 'नाम, बुकिंग, खाने का नोट' }, purpose: { en: 'Savourcation pre-arrival', ta: 'Savourcation வருகைக்கு முன்', hi: 'Savourcation आगमन से पहले' } },
   e5: { who: { en: 'Science Office', ta: 'அறிவியல் அலுவலகம்', hi: 'साइंस ऑफ़िस' }, what: { en: 'De-identified six-term record', ta: 'அடையாளம் நீக்கப்பட்ட ஆறு அம்சப் பதிவு', hi: 'पहचान हटाया गया छह पहलुओं का रिकॉर्ड' }, purpose: { en: 'Cohort aggregate (Publishing consent)', ta: 'குழு மொத்தம் (வெளியீட்டு ஒப்புதல்)', hi: 'समूह का सामूहिक आँकड़ा (प्रकाशन सहमति)' } },
-  e6: { what: { en: 'Name, household, accessibility note', ta: 'பெயர், குடும்பம், அணுகல் குறிப்பு', hi: 'नाम, परिवार, सुगमता का नोट' }, purpose: { en: 'Joyspan Session booking', ta: 'ஜாய்ஸ்பான் Session முன்பதிவு', hi: 'जॉयस्पैन Session की बुकिंग' } },
+  e6: { what: { en: 'Name, household, accessibility note', ta: 'பெயர், குடும்பம், அணுகல் குறிப்பு', hi: 'नाम, परिवार, सुगमता का नोट' }, purpose: { en: 'Joyspan Session booking', ta: 'ஜாய்ஸ்பான் அமர்வு முன்பதிவு', hi: 'जॉयस्पैन सेशन की बुकिंग' } },
   e7: { what: { en: 'Your Index (shared by agreement)', ta: 'உங்கள் குறியீடு (ஒப்புதலின் பேரில் பகிரப்பட்டது)', hi: 'आपका इंडेक्स (सहमति से साझा)' }, purpose: { en: 'Household page', ta: 'குடும்பப் பக்கம்', hi: 'परिवार वाला पेज' } },
   e8: { what: { en: 'Name, room, dietary note — no health data', ta: 'பெயர், அறை, உணவுக் குறிப்பு — உடல்நலத் தரவு இல்லை', hi: 'नाम, कमरा, खाने का नोट — सेहत का डेटा नहीं' }, purpose: { en: '’Cation check-out', ta: '’கேஷன் புறப்பாடு', hi: '’केशन चेकआउट' } },
 }
