@@ -2,12 +2,13 @@ import { router } from 'expo-router'
 import { useState } from 'react'
 import { View } from 'react-native'
 import { ArrowLink, Body, Button, Card, DaybreakButton, Divider, Eyebrow, Icon, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, SpecimenTag, Title, Toggle, fmtDate } from '@/components'
-import { HOUSEHOLD, MEMBER, TEAM } from '@/shared/member'
+import { HOUSEHOLD, TEAM } from '@/shared/member'
 import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { useDict } from '@/lib/i18n'
 import { occasionsStore, useStore, type OccasionGeneration, type OccasionGuest, type OccasionRequest, type OccasionTemplate } from '@/screens/b/bStore'
-import { CheckLine, ChoiceCard, Done, Field, KeyValue, PrimaryChip, memberOnly, useFigures, useSheetCrisisGuard } from '@/screens/b/parts'
+import { CheckLine, ChoiceCard, Done, Field, KeyValue, PrimaryChip, memberOnly, useAccount, useFigures, useSheetCrisisGuard } from '@/screens/b/parts'
+import { useIsMinor } from '@/lib/minor'
 import { OCC, VENUE_T } from '@/screens/b/i18n/occasions'
 import { useCommon, useTx } from '@/screens/b/i18n/common'
 import { MonoNums } from '@/lib/monoNums'
@@ -17,7 +18,8 @@ import { MonoNums } from '@/lib/monoNums'
 // measured together. Each guest who is measured consents for themselves and keeps their own
 // record; the household page shows only what both agree to share. Request, change and
 // withdraw; nothing is booked or paid here (the concierge confirms first). SPECIMEN.
-// One Daybreak: request the Occasion (in the plan sheet).
+// One Daybreak: request the Occasion (in the plan sheet). Requests are the account's own (L2), and
+// the first guests are its own household: the Raos for them, just the member for a new account.
 
 type OccKey = keyof typeof OCC
 interface Template {
@@ -51,7 +53,9 @@ const householdGuests = (): OccasionGuest[] =>
     const elder = p.role.toLowerCase().includes('elder')
     return { id: p.id, name: p.name.split(' ')[0], generation: elder ? 'elders' : 'middle', measured: true, elder }
   })
-const fromHousehold = (id: string) => HOUSEHOLD.some((p) => p.id === id)
+/** The guest row of the account made in onboarding, which has a household of its own. */
+const SELF_GUEST = 'g-self'
+const fromHousehold = (id: string) => id === SELF_GUEST || HOUSEHOLD.some((p) => p.id === id)
 const fmtWindow = (w: string) => {
   const [a, b] = w.split('/')
   return `${fmtDate(a)} – ${fmtDate(b)}`
@@ -275,10 +279,13 @@ function PlanSheet({ tpl, existing, onClose, onSent }: { tpl: Template; existing
   const tc = useCommon()
   const tx = useTx()
   const guard = useSheetCrisisGuard()
+  const account = useAccount()
+  const minor = useIsMinor()
   const [honoree, setHonoree] = useState(existing?.honoree ?? '')
   const [win, setWin] = useState(existing?.window ?? '')
   const [venue, setVenue] = useState(existing?.venue ?? tpl.venues[0])
-  const [guests, setGuests] = useState<OccasionGuest[]>(existing?.guests ?? householdGuests())
+  // Under 18 nothing is measured, so a member under 18 starts unticked.
+  const [guests, setGuests] = useState<OccasionGuest[]>(existing?.guests ?? (account.id === 'new' ? [{ id: SELF_GUEST, name: account.firstName, generation: 'middle', measured: !minor, elder: false }] : householdGuests()))
   const [outcome, setOutcome] = useState(existing?.outcome ?? '')
   const [newName, setNewName] = useState('')
   const [newGen, setNewGen] = useState<OccasionGeneration>('young')
@@ -312,7 +319,7 @@ function PlanSheet({ tpl, existing, onClose, onSent }: { tpl: Template; existing
     if (errs.honoree || errs.win || errs.guests || errs.outcome) return
     const code = tpl.id === 'birthday60' ? 'B60' : tpl.id === 'anniversary' ? 'ANV' : 'HOM'
     onSent({
-      ref: existing?.ref ?? `OCC-${code}-${MEMBER.id.slice(-4)}-${String(Date.now()).slice(-4)}`,
+      ref: existing?.ref ?? `OCC-${code}-${account.aiwoId.slice(-4)}-${String(Date.now()).slice(-4)}`,
       template: tpl.id,
       honoree: honoree.trim(),
       window: win,

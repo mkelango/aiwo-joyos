@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { ArrowRight, Check, Printer } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AiwoMark } from '@/components/joy/Brand'
 import { EmptyIllustration } from '@/components/joy/EmptyIllustration'
@@ -88,6 +88,9 @@ export default function Letter() {
   const { setCrisisOpen } = useApp()
   const [sel, setSel] = useState(LATEST)
   const [read, setRead] = useLocal<number[]>('letter-read', [])
+  // Whether the latest issue was unread when the member arrived. The issue is marked read as
+  // soon as it is shown, so the "New" pill goes by this until they move on, then never again.
+  const [newOnArrival, setNewOnArrival] = useState(() => !read.includes(LATEST))
   const [replies, setReplies] = useLocal<Reply[]>('letter-replies', [])
   const [draft, setDraft] = useState('')
   const [sent, setSent] = useState<string | null>(null)
@@ -96,12 +99,17 @@ export default function Letter() {
   const issue = ISSUES.find((i) => i.n === sel) ?? ISSUES[0]
   const mine = replies.filter((r) => r.issue === issue.n)
 
+  // An issue on screen is an issue read, the one shown on arrival included.
+  useEffect(() => {
+    setRead((r) => (r.includes(sel) ? r : [...r, sel]))
+  }, [sel, setRead])
+
   const open = (n: number) => {
     setSel(n)
+    setNewOnArrival(false)
     setSent(null)
     setHeld(false)
     setDraft('')
-    if (!read.includes(n)) setRead((r) => [...new Set([...r, n])])
   }
   const send = () => {
     const text = draft.trim()
@@ -135,7 +143,7 @@ export default function Letter() {
           <ul className="space-y-1.5">
             {ISSUES.map((i) => {
               const on = i.n === sel
-              const unread = i.n === LATEST && !read.includes(i.n) && !on
+              const unread = i.n === LATEST && newOnArrival
               return (
                 <li key={i.n}>
                   <button

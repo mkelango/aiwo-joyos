@@ -24,16 +24,17 @@ import {
   Title,
 } from '@/components'
 import { useT } from '@/lib/i18n'
-import { useLatestIndex } from '@/lib/indexRecord'
+import { useHasIndex, useLatestIndex } from '@/lib/indexRecord'
 import { useIsMinor } from '@/lib/minor'
 import { Rich, useA } from '@/screens/a/i18n'
 import { formulaIn } from '@/screens/a/i18n/formula'
 import { H2, usePlanned } from '@/screens/a/local'
-import { HumanWritten, NotScored, Sparkline, monoNums } from '@/screens/a/parts'
+import { HumanWritten, NoIndexYet, NotScored, Sparkline, monoNums, useIsSpecimen } from '@/screens/a/parts'
 import { VIVA_DRAFT, actionsFor, roomVerdict, termHistory, todayActionFor } from '@/screens/a/spacesData'
 import { SPACE_TITLE, SpaceTools } from '@/screens/a/tools'
 import { RoomViva } from '@/screens/a/viva'
 import { TERMS } from '@/shared/terms'
+import type { Action } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 
 // ONE SPACE (Memo p.19; Plan §4A): score, band, delta, framework, instruments and method;
@@ -43,6 +44,9 @@ import { useTheme } from '@/theme/ThemeProvider'
 // "not scored" note; the framework, actions and tools stay. The score is the latest Index's (shared
 // contract L1), so a room opened from Today shows the number Today showed. Every room ends with
 // the privacy line, one tap from the Trust centre (Playbook p62).
+// A member with no Index yet (U2) sees the way to take it where the score would be. The change, the
+// pulse, each action's "why", the "with Kavya" notes and the room's VIVA drafts come from Arjun's
+// record, so only he is shown them; each room's tools keep to what is the member's own (SpaceTools).
 
 export default function SpaceDetail() {
   const { slug } = useLocalSearchParams<{ slug: string }>()
@@ -55,6 +59,8 @@ export default function SpaceDetail() {
   const minor = useIsMinor()
   const tt = useT()
   const latest = useLatestIndex()
+  const hasIndex = useHasIndex()
+  const specimen = useIsSpecimen()
 
   if (!term) {
     return (
@@ -74,10 +80,12 @@ export default function SpaceDetail() {
   const history = termHistory(k, score.value == null ? undefined : { cur: score.value, prev: score.value - (score.delta ?? 0) })
   const first = history[0]
   const last = history[history.length - 1]
-  const actions = actionsFor(k, todayActionFor(minor ? null : latest.lowestTerm).id)
+  const actions = actionsFor(k, todayActionFor(minor || !hasIndex ? null : latest.lowestTerm).id, specimen)
   const draft = VIVA_DRAFT[k]
   const col = th.term(k)
   const plannedAction = actions.find((a) => a.id === plannedBySpace[k])
+  // A detail that names Kavya is Arjun's; anyone else gets the action without it.
+  const detailOf = (a: Action) => (specimen || !a.detail.includes('Kavya') ? tx(a.detail) : '')
 
   return (
     <Screen inTabs>
@@ -96,6 +104,8 @@ export default function SpaceDetail() {
           </View>
           <NotScored body={t('Joy OS never scores anyone under 18, so this room shows no number, band or change. What it measures, the three small things and its tools are all yours to use.')} />
         </Card>
+      ) : !hasIndex ? (
+        <NoIndexYet body={t('This room shows your score and band once you have taken your own Index. What it measures, the three small things and its tools are open now.')} />
       ) : (
         <Card tone="raised" style={{ gap: space.s2 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s1, flexWrap: 'wrap' }}>
@@ -107,23 +117,25 @@ export default function SpaceDetail() {
               {shown}
             </Numeral>
             <View style={{ paddingBottom: 10, gap: 4 }}>
-              <Delta value={score.delta} inverse={inverse} size={17} />
+              {specimen ? <Delta value={score.delta} inverse={inverse} size={17} /> : null}
               <BandLabel band={score.band} />
             </View>
           </View>
           <Body tone="ink2">{monoNums(tx(verdict.text, verdict.vars))}</Body>
           {inverse ? <Meta>{t('Burden is the one term where lower is better. It is subtracted from the Index at a quarter of its weight.')}</Meta> : null}
-          <View style={{ gap: space.s1, marginTop: space.half }}>
-            <Meta>
-              <Rich text={t('Your weekly pulse over the last ninety days, from *{a}* to *{b}*.', { a: String(first.value), b: String(last.value) })} wrap={(w) => <Mono tone="ink">{w}</Mono>} />
-            </Meta>
-            <Sparkline
-              values={history.map((h) => h.value)}
-              labels={[date(first.label), date(last.label)]}
-              color={col.main}
-              label={t('{name} weekly pulse, fourteen weeks from {from} to {to}: {a} to {b}.', { name: name(k), from: date(first.label), to: date(last.label), a: first.value, b: last.value })}
-            />
-          </View>
+          {specimen ? (
+            <View style={{ gap: space.s1, marginTop: space.half }}>
+              <Meta>
+                <Rich text={t('Your weekly pulse over the last ninety days, from *{a}* to *{b}*.', { a: String(first.value), b: String(last.value) })} wrap={(w) => <Mono tone="ink">{w}</Mono>} />
+              </Meta>
+              <Sparkline
+                values={history.map((h) => h.value)}
+                labels={[date(first.label), date(last.label)]}
+                color={col.main}
+                label={t('{name} weekly pulse, fourteen weeks from {from} to {to}: {a} to {b}.', { name: name(k), from: date(first.label), to: date(last.label), a: first.value, b: last.value })}
+              />
+            </View>
+          ) : null}
           <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />
         </Card>
       )}
@@ -170,7 +182,7 @@ export default function SpaceDetail() {
               <Title size={24}>
                 <Rich text={t('{title} *Kept.*', { title: tx(plannedAction.title) })} wrap={(w) => <Serif>{w}</Serif>} />
               </Title>
-              <Meta>{t('It sits on Today beside your one action, kept on this phone. Missing it is fine; nothing is counted against you.')}</Meta>
+              <Meta>{minor || hasIndex ? t('It sits on Today beside your one action, kept on this phone. Missing it is fine; nothing is counted against you.') : t('It sits on Today, kept on this phone. Missing it is fine; nothing is counted against you.')}</Meta>
               <ArrowLink icon="sun" onPress={() => router.push('/')}>
                 {t('See it on Today')}
               </ArrowLink>
@@ -191,7 +203,7 @@ export default function SpaceDetail() {
                     accessibilityRole="radio"
                     accessibilityState={{ checked: on }}
                     aria-checked={on}
-                    accessibilityLabel={t('{title} {detail} {n} minutes{shared}.', { title: tx(a.title), detail: tx(a.detail), n: a.minutes, shared: a.shared ? t(', shared') : '' })}
+                    accessibilityLabel={t('{title} {detail} {n} minutes{shared}.', { title: tx(a.title), detail: detailOf(a), n: a.minutes, shared: a.shared ? t(', shared') : '' })}
                     style={({ pressed }) => ({
                       borderRadius: 12,
                       borderWidth: on ? 2 : 1,
@@ -207,7 +219,7 @@ export default function SpaceDetail() {
                       </View>
                       <View style={{ flex: 1, gap: 4 }}>
                         <Body weight="medium">{monoNums(tx(a.title))}</Body>
-                        <Meta>{monoNums(tx(a.detail))}</Meta>
+                        {detailOf(a) ? <Meta>{monoNums(detailOf(a))}</Meta> : null}
                       </View>
                     </View>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12, paddingLeft: 34 }}>
@@ -217,15 +229,20 @@ export default function SpaceDetail() {
                       </View>
                       <Meta size={13} tone="ink3">
                         {a.timeOfDay === 'any' ? t('any time') : tx(a.timeOfDay)}
-                        {a.shared ? t(' · with Kavya') : ''}
+                        {a.shared && specimen ? t(' · with Kavya') : ''}
                       </Meta>
                     </View>
                     {on ? (
                       <Meta size={14} style={{ paddingLeft: 34 }}>
-                        <Meta size={14} tone="ink" weight="semibold">
-                          {t('Why.')}
-                        </Meta>{' '}
-                        {tx(a.why)} <Meta size={14} tone="ink3">{monoNums(tx(a.evidence))}</Meta>
+                        {specimen ? (
+                          <>
+                            <Meta size={14} tone="ink" weight="semibold">
+                              {t('Why.')}
+                            </Meta>{' '}
+                            {tx(a.why)}{' '}
+                          </>
+                        ) : null}
+                        <Meta size={14} tone="ink3">{monoNums(tx(a.evidence))}</Meta>
                       </Meta>
                     ) : null}
                   </Pressable>
@@ -242,9 +259,9 @@ export default function SpaceDetail() {
       {/* Signature tools */}
       <SpaceTools term={k} />
 
-      {/* The room's VIVA tool — never on Ease */}
+      {/* The room's VIVA tool — never on Ease; its specimen drafts are read from Arjun's record */}
       {draft ? (
-        <RoomViva term={k} />
+        specimen ? <RoomViva term={k} /> : null
       ) : (
         <Card tone="outline" style={{ gap: space.s1 }}>
           <Eyebrow {...H2}>{t('Why VIVA is quiet here')}</Eyebrow>

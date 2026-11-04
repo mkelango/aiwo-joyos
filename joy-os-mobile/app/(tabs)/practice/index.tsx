@@ -1,4 +1,5 @@
 import { router } from 'expo-router'
+import { useEffect } from 'react'
 import { Pressable, ScrollView, View } from 'react-native'
 import {
   AppBar,
@@ -35,20 +36,22 @@ import { PrimaryChip } from '@/screens/b/parts'
 import { AudioPlayer, audioMB, useOfflineAudio } from '@/screens/a/audio'
 import { Rich, useA } from '@/screens/a/i18n'
 import { useLocal } from '@/screens/a/local'
-import { NotScored, Verse, monoNums } from '@/screens/a/parts'
+import { NoIndexYet, NotScored, Verse, monoNums, useIsSpecimen } from '@/screens/a/parts'
 import { useApp } from '@/lib/store'
+import { useHasIndex, useLatestIndex } from '@/lib/indexRecord'
 import { useIsMinor } from '@/lib/minor'
 import { SPACE_TODAY, SPACE_TODAY_INDEX } from '@/screens/a/spacesData'
 import type { TermKey } from '@/shared/types'
-import type { MeasuredIndex } from '@/shared/indexScoring'
+import { measuredScore, type MeasuredIndex } from '@/shared/indexScoring'
 
 // THE JOYSPIRATION PRACTICE (Memo p.21): eight weeks; five-minute audio in the Mentor's
 // voice, a science note from the faculty, one practice daily / weekly / yearly, the weekly
 // circle, and the Index before and after. One Daybreak: “Practised today”. The Mentor's words
 // sit beside the Practice register's verse: the Thirukkural in Tamil with the English beneath
 // (Playbook p63). Under 18 nothing is scored (minors gate): no Index before and after.
-
-const CURRENT = CIRCLE.week
+// Arjun is in Week 4 of it with his circle; anyone else starts at Week 1, with no earlier days, no
+// circle and no pulse of his. Their before column is the first Index of theirs seen here, and a
+// member with no Index yet (U2) is shown the way to take it instead.
 
 const PRACTISED = [true, true, false, true, false, false, false]
 
@@ -56,12 +59,23 @@ export default function Practice() {
   const { c, space, radius } = useTheme()
   const { t, tx, lang, name, week: DAYS, weekFull: DAYS_FULL } = useA()
   const minor = useIsMinor()
+  const hasIndex = useHasIndex()
+  const specimen = useIsSpecimen()
+  const latest = useLatestIndex()
+  const CURRENT = specimen ? CIRCLE.week : 1
   const week = PRACTICE_WEEKS.find((w) => w.week === CURRENT)!
   const content = PRACTICE_CONTENT.find((p) => p.week === CURRENT)!
-  const before = INDEX_HISTORY[0]
   // The after column: the Index the member re-took on this phone (saved by Take the Index),
-  // measured the same way, or null before they do. Never hidden when it falls.
-  const [measured] = useLocal<MeasuredIndex>('measuredIndex', null)
+  // measured the same way, or null before they do. Never hidden when it falls. Only Arjun has a
+  // recorded measure for the before column, and the phone keeps just an account's latest Index, so
+  // anyone else's first is kept here and a later one becomes the after.
+  const [saved, , savedReady] = useLocal<MeasuredIndex>('measuredIndex', null)
+  const [baseline, setBaseline, baselineReady] = useLocal<MeasuredIndex>('practiceBaseline', null)
+  useEffect(() => {
+    if (!specimen && savedReady && baselineReady && saved && !baseline) setBaseline(saved)
+  }, [specimen, savedReady, baselineReady, saved, baseline, setBaseline])
+  const before = specimen ? INDEX_HISTORY[0] : baseline ? measuredScore(baseline, null) : latest
+  const measured = specimen || (baseline && saved && (saved.at !== baseline.at || saved.ji !== baseline.ji)) ? saved : null
   const after = measured ? { ji: Math.round(measured.ji), terms: Object.fromEntries(Object.entries(measured.terms).map(([k, v]) => [k, Math.round(v)])) as Record<TermKey, number> } : null
   const [prac, setPrac] = useStore(practiceStore)
   // The specimen is pinned to Thursday 28 Jan 2027, the same day Today and the spaces call today,
@@ -71,7 +85,7 @@ export default function Practice() {
   const doneToday = prac.days.includes(today)
   const setDoneToday = (v: boolean) => setPrac((p) => ({ ...p, days: v ? Array.from(new Set([...p.days, today])) : p.days.filter((d) => d !== today) }))
   // Earlier days this week come from the specimen; today is yours; later days are still to come.
-  const practised = DAYS.map((_, i) => (i === todayIdx ? doneToday : i < todayIdx ? PRACTISED[i] : false))
+  const practised = DAYS.map((_, i) => (i === todayIdx ? doneToday : i < todayIdx ? specimen && PRACTISED[i] : false))
   const maxPulse = 3.5
   // Weeks saved for offline (the Mentor's audio, kept on this phone by the player's switch).
   const { weeks: offlineWeeks } = useOfflineAudio()
@@ -85,7 +99,7 @@ export default function Practice() {
       <ScreenHeader
         eyebrow={t('The Joyspiration Practice · Week {n} of 8', { n: CURRENT })}
         title={<Rich text={t('Don’t postpone *joy*.')} wrap={(w) => <Serif>{w}</Serif>} />}
-        lead={minor ? t('Five minutes a day in the Mentor’s voice, a note from the faculty on why it works, and your circle every Monday. Eight weeks.') : t('Five minutes a day in the Mentor’s voice, a note from the faculty on why it works, and your circle every Monday. Eight weeks, measured before and after.')}
+        lead={!specimen ? (minor ? t('Five minutes a day in the Mentor’s voice and a note from the faculty on why it works. Eight weeks.') : t('Five minutes a day in the Mentor’s voice and a note from the faculty on why it works. Eight weeks, measured before and after.')) : minor ? t('Five minutes a day in the Mentor’s voice, a note from the faculty on why it works, and your circle every Monday. Eight weeks.') : t('Five minutes a day in the Mentor’s voice, a note from the faculty on why it works, and your circle every Monday. Eight weeks, measured before and after.')}
       />
 
       {/* The eight weeks */}
@@ -93,7 +107,7 @@ export default function Practice() {
         {PRACTICE_WEEKS.map((w) => {
           const st = w.week < CURRENT ? 'done' : w.week === CURRENT ? 'now' : 'next'
           // Earlier weeks count as practised unless the member un-marked them in the week screen.
-          const kept = prac.weeks.includes(w.week) || (st === 'done' && !prac.unmarked.includes(w.week))
+          const kept = prac.weeks.includes(w.week) || (specimen && st === 'done' && !prac.unmarked.includes(w.week))
           const onPhone = savedWeeks.includes(w.week)
           const state = st === 'now' ? `${t('This week')}${kept ? t(', practised') : ''}` : st === 'next' ? (kept ? t('Upcoming, practised ahead') : t('Upcoming')) : kept ? t('Practised') : t('Earlier week, not marked')
           return (
@@ -154,7 +168,7 @@ export default function Practice() {
           <Meta size={14}>{t('C. Sivasankaran, Mentor, AIWO Limited · English')}</Meta>
           <PrimaryChip primary={week.term} />
         </View>
-        <AudioPlayer week={CURRENT} title={tx(content.audioTitle)} seconds={content.seconds} transcript={content.transcript} startAt={74} />
+        <AudioPlayer week={CURRENT} title={tx(content.audioTitle)} seconds={content.seconds} transcript={content.transcript} startAt={specimen ? 74 : undefined} />
       </Card>
 
       {/* Today's practice */}
@@ -228,6 +242,7 @@ export default function Practice() {
       </Card>
 
       {/* Weekly circle */}
+      {specimen ? (
       <Card tone="raised" style={{ gap: space.s1 + 4 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
           <Eyebrow style={{ flexShrink: 1 }}>{t('Weekly circle · {when}', { when: tx(CIRCLE.when) })}</Eyebrow>
@@ -241,6 +256,7 @@ export default function Practice() {
           {t('Your circle of eight')}
         </ArrowLink>
       </Card>
+      ) : null}
 
       {/* Mentor quote */}
       <Card tone="soft" style={{ gap: space.s2 }}>
@@ -262,6 +278,8 @@ export default function Practice() {
           <Card tone="raised" style={{ gap: space.s2 }}>
             <NotScored body={t('The Practice is yours in full. Your Index is not taken while you are under 18, so there is no before and after to show here.')} />
           </Card>
+        ) : !hasIndex ? (
+          <NoIndexYet body={t('The before column fills when you take your own Index, and the after column when you re-take it in Week 8.')} />
         ) : (
         <>
         <View style={{ gap: 8 }}>
@@ -307,7 +325,7 @@ export default function Practice() {
                   <TermDot term={x.key} />
                   <View style={{ flex: 1, gap: 4 }}>
                     <Meta tone="ink">{name(x.key)}</Meta>
-                    {x.key === before.lowestTerm ? <Pill tone="daybreak">{t('Week 4')}</Pill> : null}
+                    {specimen && x.key === before.lowestTerm ? <Pill tone="daybreak">{t('Week 4')}</Pill> : null}
                   </View>
                 </View>
                 <Mono tone="ink" style={{ width: 72, textAlign: 'right' }}>
@@ -330,6 +348,7 @@ export default function Practice() {
         </>
         )}
 
+        {specimen ? (
         <Card tone="sunk" style={{ gap: space.s2 }}>
           <Eyebrow>{t('Between the measures')}</Eyebrow>
           <Body tone="ink2">{t('Joy moments a day in your Ledger, averaged by Practice week.')}</Body>
@@ -356,6 +375,7 @@ export default function Practice() {
             <Meta size={14} style={{ flexShrink: 1 }}>{monoNums(t('Daily Pleasure · Joy Ledger density · W4 so far'))}</Meta>
           </View>
         </Card>
+        ) : null}
       </View>
 
       <View style={{ gap: space.s1 }}>

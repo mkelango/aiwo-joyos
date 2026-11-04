@@ -2,10 +2,9 @@ import { router, useLocalSearchParams } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { View } from 'react-native'
 import { Avatar, Body, Button, Card, DaybreakButton, Eyebrow, Icon, Meta, Mono, Screen, ScreenHeader, Serif, SpecimenTag, Title } from '@/components'
-import { MEMBER } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
 import { accountStore, useStore } from '@/screens/b/bStore'
-import { ChoiceCard, KeyValue } from '@/screens/b/parts'
+import { ChoiceCard, KeyValue, useAccount } from '@/screens/b/parts'
 import { useCareConsults } from '@/screens/a/care'
 import { localDate, Rich, useA } from '@/screens/a/i18n'
 import { monoNums } from '@/screens/a/parts'
@@ -24,6 +23,7 @@ export default function ConsultRoom() {
   const { t, tx, lang } = useA()
   const ld = (s: string) => localDate(s, lang)
   const [acct] = useStore(accountStore)
+  const account = useAccount()
   const { rows, markJoined, ready } = useCareConsults()
   const cs = rows.find((r) => r.id === id)
   const [me, setMe] = useState(false)
@@ -89,10 +89,10 @@ export default function ConsultRoom() {
               kind="checkbox"
               selected={me}
               onPress={() => setMe(!me)}
-              accessibilityLabel={t('I am {name}, {age}, AIWO ID {id}. I am somewhere private.', { name: acct.profile.name, age: MEMBER.age, id: MEMBER.aiwoId })}
+              accessibilityLabel={account.age == null ? t('I am {name}, AIWO ID {id}. I am somewhere private.', { name: acct.profile.name, id: account.aiwoId }) : t('I am {name}, {age}, AIWO ID {id}. I am somewhere private.', { name: acct.profile.name, age: account.age, id: account.aiwoId })}
               title={
                 <Body>
-                  <Rich text={t('I am {name}, *{age}*, AIWO ID *{id}*. I am somewhere private.', { name: acct.profile.name, age: MEMBER.age, id: MEMBER.aiwoId })} wrap={(w) => <Mono tone="ink">{w}</Mono>} />
+                  <Rich text={account.age == null ? t('I am {name}, AIWO ID *{id}*. I am somewhere private.', { name: acct.profile.name, id: account.aiwoId }) : t('I am {name}, *{age}*, AIWO ID *{id}*. I am somewhere private.', { name: acct.profile.name, age: account.age, id: account.aiwoId })} wrap={(w) => <Mono tone="ink">{w}</Mono>} />
                 </Body>
               }
             />

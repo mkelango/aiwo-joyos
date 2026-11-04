@@ -6,7 +6,7 @@ import { interceptsCrisis, useApp } from '@/lib/store'
 import { ledgerStamp, ledgerWhen, madeHere, useLocal } from '@/screens/a/local'
 import { trustStore, useStore } from '@/screens/b/bStore'
 import { CONSENTS } from '@/shared/member'
-import { BarRow, IconButton, TextField, monoNums } from '@/screens/a/parts'
+import { BarRow, IconButton, TextField, monoNums, useIsSpecimen } from '@/screens/a/parts'
 import { FILMS, PLANNED_START, SAVOURING_PROMPTS } from '@/screens/a/spacesData'
 import { LEDGER, LEDGER_WEEK } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
@@ -19,10 +19,12 @@ import { ToolCard, ToolsHeading } from './common'
 
 export function PleasureTools() {
   const { t } = useA()
+  // The week's insight is read from Arjun's Ledger; planned pleasures start empty.
+  const specimen = useIsSpecimen()
   return (
     <>
       <ToolsHeading>{t('Pleasure tools')}</ToolsHeading>
-      <LedgerInsight />
+      {specimen ? <LedgerInsight /> : null}
       <Planned />
       <Savour />
       <Moments />
@@ -80,7 +82,8 @@ function Planned() {
   const { space } = useTheme()
   const { t, tx, lang } = useA()
   const { setCrisisOpen } = useApp()
-  const [items, setItems] = useLocal('plannedPleasures', PLANNED_START)
+  const specimen = useIsSpecimen()
+  const [items, setItems] = useLocal('plannedPleasures', specimen ? PLANNED_START : [])
   const [what, setWhat] = useState('')
   const [withWho, setWithWho] = useState('')
   const [day, setDay] = useState('Thu')
@@ -128,7 +131,7 @@ function Planned() {
       </View>
       <View style={{ gap: space.s1 }}>
         <TextField label={t('Plan one more')} value={what} onChangeText={(v) => (setWhat(v), setAdded(null))} placeholder={t('A small pleasure')} onSubmitEditing={add} />
-        <TextField label={t('With · optional')} value={withWho} onChangeText={setWithWho} placeholder={t('Kavya, or no one')} />
+        <TextField label={t('With · optional')} value={withWho} onChangeText={setWithWho} placeholder={specimen ? t('Kavya, or no one') : t('A name, or no one')} />
         <Segmented value={day} onChange={setDay} items={DAYS.slice(3).map((d) => ({ value: d, label: dayShort(d, lang) }))} />
         <Segmented value={when} onChange={setWhen} items={WHEN.map((w) => ({ value: w.value, label: tx(w.label) }))} />
         <Button onPress={add} disabled={!what.trim()} icon="calendar">

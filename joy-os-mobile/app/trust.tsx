@@ -201,7 +201,7 @@ function Trust() {
     const bundle = {
       specimen: true,
       format: format === 'fhir' ? 'FHIR R4 bundle (specimen excerpt)' : 'JSON',
-      member: { aiwoId: account.aiwoId, name: account.name, city: MEMBER.city, plan: acctState.plan },
+      member: { aiwoId: account.aiwoId, name: account.name, ...(account.id === 'new' ? {} : { city: MEMBER.city }), plan: acctState.plan },
       ...(minor
         ? { index: [], indexNote: 'Nothing is scored under 18: this copy carries no Index.' }
         : { index: ownIndex.map((x) => ({ takenOn: x.takenOn, value: x.value, grade: x.grade, method: x.method, terms: x.terms.map((t) => ({ key: t.key, value: t.value })) })) }),
@@ -337,9 +337,12 @@ function Trust() {
               <ButtonFigures variant="link" text={showAll ? t('showFewer') : t('showAll', { n: rows.length })} />
             </Button>
           ) : null}
-          <Button variant="ghost" size="sm" icon="help-circle" onPress={() => openAsk()} style={{ marginTop: space.s1 }}>
-            {t('askEntry')}
-          </Button>
+          {/* Nothing to ask about until someone has looked: an account made today has no entries. */}
+          {all.length ? (
+            <Button variant="ghost" size="sm" icon="help-circle" onPress={() => openAsk()} style={{ marginTop: space.s1 }}>
+              {t('askEntry')}
+            </Button>
+          ) : null}
         </Card>
       </View>
 

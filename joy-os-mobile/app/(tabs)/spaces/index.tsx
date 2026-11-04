@@ -21,11 +21,11 @@ import {
   SpecimenTag,
   TermDot,
 } from '@/components'
-import { useLatestIndex } from '@/lib/indexRecord'
+import { useHasIndex, useLatestIndex } from '@/lib/indexRecord'
 import { useIsMinor } from '@/lib/minor'
 import { Rich, useA } from '@/screens/a/i18n'
 import { H2 } from '@/screens/a/local'
-import { monoNums, NotScored } from '@/screens/a/parts'
+import { monoNums, NoIndexYet, NotScored, useIsSpecimen } from '@/screens/a/parts'
 import { ROOM_PLAIN, roomVerdict } from '@/screens/a/spacesData'
 import { termByKey } from '@/shared/terms'
 import type { TermKey } from '@/shared/types'
@@ -35,7 +35,8 @@ import { useTheme } from '@/theme/ThemeProvider'
 // The lowest term is marked "Start here"; tap a petal or a card to enter a room.
 // Under 18 nothing is scored: no Wheel values, numbers, bands, deltas or "lowest", only the rooms.
 // The Wheel and the six cards read the latest Index (shared contract L1): one re-taken on this phone
-// replaces the specimen, so the hub agrees with Today.
+// replaces the specimen, so the hub agrees with Today. A member with no Index yet (U2) sees the way
+// to take it and the rooms without numbers, as under 18. Only Arjun has an earlier measure to change from.
 
 const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 
@@ -50,6 +51,9 @@ export default function SpacesHome() {
   const focusTerm = termByKey(focus)
   const focusScore = latest.terms.find((s) => s.key === focus)!
   const minor = useIsMinor()
+  const hasIndex = useHasIndex()
+  const specimen = useIsSpecimen()
+  const scored = !minor && hasIndex
 
   return (
     <Screen inTabs top={<AppBar />}>
@@ -64,6 +68,8 @@ export default function SpacesHome() {
           <SpecimenTag />
           <NotScored body={t('Joy OS never scores anyone under 18, so the Wheel and the six numbers are not shown. Every room is open: what it measures, three small things to try, and its tools.')} />
         </Card>
+      ) : !hasIndex ? (
+        <NoIndexYet primary body={t('The Wheel and the six numbers come from your own Index. Every room is open meanwhile: what it measures, three small things to try, and its tools.')} />
       ) : (
         <Card tone="raised" style={{ gap: space.s2 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: space.s1 }}>
@@ -84,7 +90,7 @@ export default function SpacesHome() {
                 {focus === 'B' ? `−${focusScore.value}` : String(focusScore.value)}
               </Mono>
               <View style={{ paddingBottom: 8, gap: 2 }}>
-                <Delta value={focusScore.delta} inverse={focus === 'B'} />
+                {specimen ? <Delta value={focusScore.delta} inverse={focus === 'B'} /> : null}
                 <BandLabel band={focusScore.band} />
               </View>
             </View>
@@ -102,7 +108,7 @@ export default function SpacesHome() {
         {ORDER.map((k) => {
           const term = termByKey(k)
           const s = latest.terms.find((x) => x.key === k)!
-          const lowest = !minor && k === latest.lowestTerm
+          const lowest = scored && k === latest.lowestTerm
           const shown = k === 'B' ? `−${s.value}` : String(s.value)
           return (
             <Pressable
@@ -110,7 +116,7 @@ export default function SpacesHome() {
               onPress={() => router.push(`/spaces/${term.slug}`)}
               accessibilityRole="link"
               accessibilityLabel={
-                minor
+                !scored
                   ? `${spaceName(k)}${term.name !== term.space ? `, ${name(k)}` : ''}. ${tx(ROOM_PLAIN[k])}.`
                   : `${t('{space}, {name} {minus}{value}, {band}', { space: spaceName(k), name: name(k), minus: k === 'B' ? t('minus ') : '', value: String(s.value), band: tx(s.band) })}${lowest ? t(', lowest term, start here') : ''}. ${tx(ROOM_PLAIN[k])}.`
               }
@@ -134,19 +140,19 @@ export default function SpacesHome() {
                   </View>
                   <Meta>{monoNums(tx(ROOM_PLAIN[k]))}</Meta>
                 </View>
-                {minor ? (
+                {!scored ? (
                   <Icon name="chevron-right" size={18} color={c.ink3} />
                 ) : (
                   <View style={{ alignItems: 'flex-end', gap: 2 }}>
                     <Mono size={28} weight="light" tone="ink">
                       {shown}
                     </Mono>
-                    <Delta value={s.delta} inverse={k === 'B'} size={14} />
+                    {specimen ? <Delta value={s.delta} inverse={k === 'B'} size={14} /> : null}
                   </View>
                 )}
               </View>
-              {minor ? null : <Divider />}
-              {minor ? null : (
+              {scored ? <Divider /> : null}
+              {!scored ? null : (
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                   <BandLabel band={s.band} />
                   {lowest ? (

@@ -2,7 +2,7 @@ import { router } from 'expo-router'
 import { useState } from 'react'
 import { Platform, Pressable, View } from 'react-native'
 import { ArrowLink, BandLabel, Body, Button, Card, DaybreakButton, EmptyIllustration, Eyebrow, Icon, LoopRing, Meta, MethodLine, Mono, Numeral, Pill, Screen, ScreenHeader, SectionTitle, Serif, Sheet, SpecimenTag, Title, fmtDate } from '@/components'
-import { MEMBER } from '@/shared/member'
+import { MEMBER, TEAM } from '@/shared/member'
 import { CATIONS } from '@/shared/platform'
 import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
@@ -42,6 +42,7 @@ type WalletKind = 'apple' | 'google'
 const WALLET_NAME: Record<WalletKind, string> = { apple: 'Apple Wallet', google: 'Google Wallet' }
 /** The wallet this phone has: Apple on an iPhone, Google on Android; the web build offers both. */
 const WALLETS: WalletKind[] = Platform.OS === 'ios' ? ['apple'] : Platform.OS === 'android' ? ['google'] : ['apple', 'google']
+const CONCIERGE = TEAM.find((p) => p.role === 'Concierge')!.name.split(' ')[0]
 
 export default memberOnly(Passport)
 
@@ -265,8 +266,9 @@ function Passport() {
           <Card tone="raised" style={{ gap: 0 }}>
             {opens.map((e, i) => {
               const et = ENTITLEMENT_TEXT[e.label]
-              // Arjun's circle meets on Mondays with Priya; another account's is formed for it later.
-              const detail = !isArjun && e.label === 'Circle of eight' ? t('circleToForm') : tx(et?.detail, e.detail)
+              // Arjun's circle meets on Mondays with Priya; another account's starts with its Index
+              // and asking to join in Circles.
+              const detail = !isArjun && e.label === 'Circle of eight' ? (minor ? t('circleMinor') : !latest ? t('circleToForm') : acct.circleRequests?.next ? t('circleAsked', { c: CONCIERGE }) : t('circleAskNow')) : tx(et?.detail, e.detail)
               return (
               <KeyValue key={e.label} k={tx(et?.label, e.label)} last={i === opens.length - 1}>
                 <Meta tone="ink">

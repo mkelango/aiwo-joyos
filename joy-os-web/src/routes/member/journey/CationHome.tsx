@@ -11,7 +11,7 @@ import { useIndexHistory } from '@/routes/member/core/_latest'
 import { useScoresHidden } from '@/lib/minor'
 import { TERMS } from '@/data/terms'
 import type { TermKey } from '@/domain/types'
-import { MY_CATION, SIGNAL_READINGS } from './_data'
+import { MY_CATION, SIGNAL_READINGS, cationForTerm } from './_data'
 import { HereMarker, JourneyEmpty, OccasionsCard, PrimaryChip, useFade } from './_parts'
 import { addDays, setDemoNoCation, useJourney } from './_store'
 import { useJ } from './_i18n'
@@ -39,10 +39,10 @@ export default function CationHome() {
   // A member under 18 is never scored (Architecture p26): no term values.
   const minor = useScoresHidden()
   const fmtDate = useFmtDate()
-  const { latest } = useIndexHistory()
+  const { latest, previous } = useIndexHistory()
   const lowestName = term.name(latest.lowestTerm)
   const joycation = CATIONS.find((c) => c.slug === MY_CATION.slug)!
-  const suggested = CATIONS.find((c) => c.slug === 'savourcation')!
+  const suggested = cationForTerm(latest.lowestTerm)
   const coach = TEAM.find((p) => p.role === 'Coach')!
   const concierge = TEAM.find((p) => p.role === 'Concierge')!
   const physician = TEAM.find((p) => p.role === 'Physician')!
@@ -229,7 +229,7 @@ export default function CationHome() {
               <span className="eyebrow text-ink-3">{minor ? t('forLowest') : r('lowestTermScore', { v: { n: latest.terms.find((x) => x.key === latest.lowestTerm)?.value ?? '' } })}</span>
             </div>
             <h2 className="mt-4 text-[2rem] font-light leading-tight text-ink">{suggested.name}</h2>
-            <p className="mt-2 text-[17px] text-ink-2">{r('suggestedBody', { promise: tx(suggested.promise), lowest: lowestName, day: MEMBER.dayOfLoop, d60: 60, coach: coachFirst })}</p>
+            <p className="mt-2 text-[17px] text-ink-2">{latest.lowestTerm === previous.lowestTerm ? r('suggestedBody', { promise: tx(suggested.promise), lowest: lowestName, day: MEMBER.dayOfLoop, d60: 60, coach: coachFirst }) : r('suggestedBodyMoved', { promise: tx(suggested.promise), lowest: lowestName })}</p>
             <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-[14px] text-ink-2">
               <li>{r('nightsN', { n: parseInt(suggested.nights, 10) })}</li>
               <li className="flex items-center gap-1"><MapPin size={14} /> {suggested.venues.map((v) => tx(v)).join(' · ')}</li>
@@ -238,7 +238,7 @@ export default function CationHome() {
           </div>
           <div className="flex flex-col gap-3 md:items-end">
             <p className="text-[14px] text-ink-2 md:text-right">{t('day90Colon', { m: tx(suggested.day90Measure) })}</p>
-            {suggestedReq && <Pill tone="daybreak">{r('requestedRef', { ref: { n: suggestedReq.ref } })}</Pill>}
+            {suggestedReq && <Pill tone="daybreak">{r(suggestedReq.interestOnly ? 'interestRef' : 'requestedRef', { ref: { n: suggestedReq.ref } })}</Pill>}
             <Link to={`/app/cation/${suggested.slug}${suggestedReq ? '#request' : ''}`} className="btn-daybreak w-full md:w-auto">
               {suggestedReq ? t('seeYourRequest') : t('seeName', { name: suggested.name })} <ArrowRight size={16} />
             </Link>
@@ -248,19 +248,19 @@ export default function CationHome() {
 
       <OccasionsCard />
 
-      <Catalogue suggestedSlug={suggested.slug} />
+      <Catalogue />
     </div>
   )
 }
 
 /** The catalogue of ten, filterable by term. `noCation` hides the line for the ’cation the specimen member took. */
-function Catalogue({ suggestedSlug, noCation = false }: { suggestedSlug: string; noCation?: boolean }) {
+function Catalogue({ noCation = false }: { noCation?: boolean }) {
   const [filter, setFilter] = useState<Filter>('all')
   const { t, r, tx, term, status } = useJ()
   const journey = useJourney()
   const { latest } = useIndexHistory()
   const lowestName = term.name(latest.lowestTerm)
-  const suggested = CATIONS.find((c) => c.slug === suggestedSlug)!
+  const suggested = cationForTerm(latest.lowestTerm)
   const lowestCations = CATIONS.filter((c) => c.primary === latest.lowestTerm)
   /** A request already sent for a ’cation of the lowest term: the empty state points to it, not to “Start with”. */
   const lowestReq = journey.cationRequests.find((x) => lowestCations.some((c) => c.slug === x.slug))
@@ -350,10 +350,10 @@ function NoCation() {
   const lowest = latest.lowestTerm
   const lowestName = term.name(lowest)
   const lowestCations = CATIONS.filter((c) => c.primary === lowest)
-  // The invitation leads with the ’cation already suggested for this term, else the first open one for it.
-  const invite = lowestCations.find((c) => c.slug === 'savourcation') ?? lowestCations.find((c) => c.status !== 'FY28') ?? lowestCations[0]
-  const others = lowestCations.filter((c) => c.slug !== invite?.slug)
-  const req = invite ? journey.cationRequests.find((x) => x.slug === invite.slug) : undefined
+  // The invitation leads with the ’cation suggested for this term; the others for it follow.
+  const invite = cationForTerm(lowest)
+  const others = lowestCations.filter((c) => c.slug !== invite.slug)
+  const req = journey.cationRequests.find((x) => x.slug === invite.slug)
   const score = latest.terms.find((x) => x.key === lowest)?.value ?? ''
 
   return monoDigits(
@@ -367,21 +367,19 @@ function NoCation() {
 
       <DemoSwitch />
 
-      {invite && (
-        <section aria-labelledby="none-invite">
-          <JourneyEmpty
-            kind="cation"
-            title={<span id="none-invite" className="flex flex-col items-center gap-3"><TermChip term={lowest} withSpace size="md" /><span className="text-[1.6rem] font-light leading-tight">{t('noneTitle', { name: invite.name })}</span></span>}
-            body={<>{minor ? r('noneBodyMinor', { lowest: lowestName, cation: invite.name, promise: tx(invite.promise) }) : r('noneBody', { lowest: lowestName, v: { n: score }, cation: invite.name, promise: tx(invite.promise) })}<span className="mt-3 block text-[14px] text-ink-3">{t('day90Colon', { m: tx(invite.day90Measure) })} · {r('nightsN', { n: parseInt(invite.nights, 10) })} · {r('fromLower', { p: { n: invite.priceFrom } })}</span>{others.length > 0 && <span className="mt-1 block text-[14px] text-ink-3">{t('noneMore', { lowest: lowestName, list: others.map((c) => c.name).join(t('andJoin')) })}</span>}</>}
-            action={
-              <div className="flex flex-col items-center gap-2">
-                {req && <Pill tone="daybreak">{r('requestedRef', { ref: { n: req.ref } })}</Pill>}
-                <Link to={`/app/cation/${invite.slug}${req ? '#request' : ''}`} className="btn-daybreak">{req ? t('seeYourRequest') : t('noneSee', { name: invite.name })} <ArrowRight size={16} /></Link>
-              </div>
-            }
-          />
-        </section>
-      )}
+      <section aria-labelledby="none-invite">
+        <JourneyEmpty
+          kind="cation"
+          title={<span id="none-invite" className="flex flex-col items-center gap-3"><TermChip term={lowest} withSpace size="md" /><span className="text-[1.6rem] font-light leading-tight">{t('noneTitle', { name: invite.name })}</span></span>}
+          body={<>{minor ? r('noneBodyMinor', { lowest: lowestName, cation: invite.name, promise: tx(invite.promise) }) : r('noneBody', { lowest: lowestName, v: { n: score }, cation: invite.name, promise: tx(invite.promise) })}<span className="mt-3 block text-[14px] text-ink-3">{t('day90Colon', { m: tx(invite.day90Measure) })} · {r('nightsN', { n: parseInt(invite.nights, 10) })} · {r('fromLower', { p: { n: invite.priceFrom } })}</span>{others.length > 0 && <span className="mt-1 block text-[14px] text-ink-3">{t('noneMore', { lowest: lowestName, list: others.map((c) => c.name).join(t('andJoin')) })}</span>}</>}
+          action={
+            <div className="flex flex-col items-center gap-2">
+              {req && <Pill tone="daybreak">{r(req.interestOnly ? 'interestRef' : 'requestedRef', { ref: { n: req.ref } })}</Pill>}
+              <Link to={`/app/cation/${invite.slug}${req ? '#request' : ''}`} className="btn-daybreak">{req ? t('seeYourRequest') : t('noneSee', { name: invite.name })} <ArrowRight size={16} /></Link>
+            </div>
+          }
+        />
+      </section>
 
       <Card tone="sunk" className="mt-8">
         <Eyebrow>{t('promiseTitle')}</Eyebrow>
@@ -393,7 +391,7 @@ function NoCation() {
 
       <OccasionsCard />
 
-      <Catalogue suggestedSlug={invite?.slug ?? 'savourcation'} noCation />
+      <Catalogue noCation />
     </div>
   )
 }

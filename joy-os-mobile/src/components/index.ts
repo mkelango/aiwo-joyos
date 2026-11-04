@@ -1,6 +1,6 @@
 // Joy OS mobile component kit. Import from '@/components' (or relative '../src/components').
 export { AiwoMark, AppBar } from './Brand'
-export { AppBanners, GRACE_UNTIL } from './AppBanners'
+export { AppBanners } from './AppBanners'
 export { ArrowLink, Button, DaybreakButton, type ButtonVariant } from './Buttons'
 export { Card, type CardTone } from './Card'
 export { CountUp, useCountUp, useFadeIn } from './CountUp'

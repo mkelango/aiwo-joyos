@@ -85,7 +85,14 @@ const OWN_ACTIONS: Action[] = [
   { id: 'a_r_018', term: 'R', title: 'Eat one meal this week with someone in your 15.', detail: 'At the table, not at a desk.', minutes: 30, timeOfDay: 'any', shared: true, evidence: 'Shared meals and social connection (LSNS-6).', why: 'Time together is what your 15 are made of.' },
   { id: 'a_f_013', term: 'F', title: 'Leave one evening this week unplanned.', detail: 'No calls, no plans. See what you choose.', minutes: 30, timeOfDay: 'evening', shared: false, evidence: 'Unscheduled time and autonomy (Whillans; BPNSFS).', why: 'An evening that is yours is the simplest Freedom.' },
   { id: 'a_b_015', term: 'B', title: 'Breathe out slowly for two minutes.', detail: 'Out longer than in, ten times.', minutes: 2, timeOfDay: 'any', shared: false, evidence: 'Slow exhalation lowers arousal (paced breathing).', why: 'A small way to set some weight down.' },
+  // In place of Arjun's own below, so these two rooms also offer three to anyone else. Last, so
+  // his three never change.
+  { id: 'a_r_021', term: 'R', title: 'Send one message of thanks.', detail: 'To someone who helped you this year. Two lines.', minutes: 2, timeOfDay: 'any', shared: false, evidence: 'Close-tie contact and perceived support (LSNS-6).', why: 'Saying thanks keeps a tie warm.' },
+  { id: 'a_f_016', term: 'F', title: 'Hand back one thing this week.', detail: 'One yes you did not choose.', minutes: 10, timeOfDay: 'any', shared: false, evidence: 'Autonomy satisfaction (BPNSFS).', why: 'Time handed back is time that is yours.' },
 ]
+
+/** Arjun's own actions: his State of Us and his succession conversation mean nothing to anyone else. */
+const SPECIMEN_ACTIONS = new Set(['a_r_011', 'a_f_010'])
 
 /**
  * Today's one action follows the lowest term on the latest Index: the specimen action when that is
@@ -97,10 +104,14 @@ export function todayActionFor(lowest: TermKey | null): Action {
   return ACTION_LIBRARY.find((a) => a.term === lowest) ?? OWN_ACTIONS.find((a) => a.term === lowest) ?? TODAY_ACTION
 }
 
-/** A room's three actions. Today's one action (`todayId`) is never offered again: planning it would only repeat it on Today. */
-export function actionsFor(key: TermKey, todayId: string = TODAY_ACTION.id): Action[] {
+/**
+ * A room's three actions. Today's one action (`todayId`) is never offered again: planning it would
+ * only repeat it on Today. `specimen` false leaves out Arjun's own.
+ */
+export function actionsFor(key: TermKey, todayId: string = TODAY_ACTION.id, specimen = true): Action[] {
   const lib = ACTION_LIBRARY.filter((a) => a.term === key && a.id !== todayId)
-  return [...lib, ...OWN_ACTIONS.filter((a) => a.term === key && a.id !== todayId)].slice(0, 3)
+  const own = OWN_ACTIONS.filter((a) => a.term === key && a.id !== todayId && (specimen || !SPECIMEN_ACTIONS.has(a.id)))
+  return [...lib, ...own].slice(0, 3)
 }
 
 /** True when this Index is the specimen's (not one taken on this phone). */
@@ -109,14 +120,19 @@ export const isSpecimenIndex = (ix: IndexScore) => ix.id === INDEX_HISTORY[0].id
 /**
  * A room's one-line verdict. The specimen Index has its written verdicts (ROOM_VERDICT); an Index
  * taken on this phone gets a plain one from its own numbers (no number in the sentence: the score
- * and the change sit beside it in Mono). Returns English copy and its vars for tx().
+ * and the change sit beside it in Mono). A term with no delta has nothing before it to compare, so
+ * it says so rather than reading as level. Returns English copy and its vars for tx().
  */
 export function roomVerdict(k: TermKey, latest: IndexScore): { text: string; vars?: Record<string, string> } {
   if (isSpecimenIndex(latest)) return { text: ROOM_VERDICT[k] }
-  const d = latest.terms.find((s) => s.key === k)?.delta ?? 0
+  const d = latest.terms.find((s) => s.key === k)?.delta
   const lowest = latest.lowestTerm === k
-  if (k === 'B') return { text: d < 0 ? 'Burden eased since your last measure.' : d > 0 ? 'Burden is heavier than at your last measure. That is useful to know.' : 'Burden held level since your last measure.' }
+  if (k === 'B') {
+    if (d == null) return { text: 'Your latest Burden measure. There is no earlier one here to compare it with.' }
+    return { text: d < 0 ? 'Burden eased since your last measure.' : d > 0 ? 'Burden is heavier than at your last measure. That is useful to know.' : 'Burden held level since your last measure.' }
+  }
   if (lowest) return { text: 'This is your lowest term on the Index you took on this phone. Start here.' }
+  if (d == null) return { text: 'Your latest measure. There is no earlier one here to compare it with.' }
   return { text: d > 0 ? 'Higher than at your last measure.' : d < 0 ? 'Lower than at your last measure. That is useful to know.' : 'Level with your last measure.' }
 }
 

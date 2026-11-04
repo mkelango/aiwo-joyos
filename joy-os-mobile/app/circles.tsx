@@ -2,19 +2,20 @@ import { router } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { Animated, Modal, Pressable, ScrollView, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Avatar, Body, Button, Card, DaybreakButton, Eyebrow, Icon, type IconName, InkSurface, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, TermChip, Title, fmtDate, useReducedFade } from '@/components'
+import { ArrowLink, Avatar, Body, Button, Card, DaybreakButton, EmptyIllustration, Eyebrow, Icon, type IconName, InkSurface, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Segmented, Serif, Sheet, TermChip, Title, fmtDate, useReducedFade } from '@/components'
 import { CIRCLE } from '@/shared/platform'
-import { MEMBER } from '@/shared/member'
+import { MEMBER, TEAM } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
 import { palettes } from '@/theme/tokens'
 import { useApp, useReduceMotion } from '@/lib/store'
 import { CAPTIONS, CIRCLE_NEXT, CIRCLE_SESSIONS, OTHER_CIRCLES, PRACTICE_CONTENT, SALONS } from '@/screens/b/journeyData'
-import { a11yStore, accountStore, circleReportsStore, refCode, useStore, type BookedPass } from '@/screens/b/bStore'
-import { CheckLine, ChoiceCard, Done, Field, FilterChips, TimelineStep, fmtWhen, memberOnly, useAccount, useSheetCrisisGuard, FigurePill, useFigures, FigureToggle } from '@/screens/b/parts'
+import { a11yStore, accountStore, circleReportsStore, postMemberMessage, refCode, threadHref, useStore, type BookedPass } from '@/screens/b/bStore'
+import { CheckLine, ChoiceCard, Done, Field, FilterChips, TimelineStep, fmtWhen, hasCircle, memberOnly, useAccount, useAccountIndex, useSheetCrisisGuard, FigurePill, useFigures, FigureToggle } from '@/screens/b/parts'
 import { useDict } from '@/lib/i18n'
 import { CIRCLES, OTHER_CIRCLE_TEXT, CIRCLE_STATUS, SALON_TITLE, CIRCLE_PROMPT } from '@/screens/b/i18n/journey'
 import { PRACTICE_TITLE, useCommon, useTx } from '@/screens/b/i18n/common'
 import { MonoNums } from '@/lib/monoNums'
+import { useIsMinor } from '@/lib/minor'
 
 // CIRCLES (Memo p.21): the circle of eight — the same eight people and a lead, Monday at
 // 7 pm, thirty minutes, for the ninety days. First names only, cameras optional, nothing
@@ -23,6 +24,10 @@ import { MonoNums } from '@/lib/monoNums'
 // coach and AIWO's safety team see it; the person is never told who raised it. Kept on the phone.
 // The circle's own seat is the account signed in (L2): its first name is shown as You, and its
 // concerns are its own (kept with the account when another signs in).
+// The circle of eight is the specimen member's (hasCircle). Any other account sees no one else's
+// seats, history or invitations: Free is offered Plus, Plus the Index and then asking to join,
+// which goes to the concierge in Messages and shows here and on the Passport. Under 18, on any
+// plan, nothing is scored, so no circle can form: an honest line, and no plan or circle on offer.
 
 /**
  * The circle as the signed-in account sees it: its own seat carries its own first name. The own
@@ -31,6 +36,7 @@ import { MonoNums } from '@/lib/monoNums'
  */
 type Seat = { key: string; name: string; me: boolean }
 const seatsOf = (me: string): Seat[] => CIRCLE.members.map((m, i) => ({ key: `seat-${i}`, name: m === MEMBER.firstName ? me : m, me: m === MEMBER.firstName }))
+const CONCIERGE = TEAM.find((p) => p.role === 'Concierge')!.name.split(' ')[0]
 
 export default memberOnly(Circles)
 
@@ -70,23 +76,29 @@ function Circles() {
   const coachFirst = CIRCLE.coach.split(' ')[0]
   const [reportOpen, setReportOpen] = useState(false)
   const [reports, setReports] = useStore(circleReportsStore)
-  const me = useAccount().firstName
-  const seats = seatsOf(me)
+  const account = useAccount()
+  const seats = seatsOf(account.firstName)
+  const inCircle = hasCircle(account.id)
+  const minor = useIsMinor()
+  // Other circles carry Arjun's invitations and the Rao household: another account sees only what is open to it.
+  const otherCircles = inCircle ? OTHER_CIRCLES : minor || acct.plan === 'Free' ? [] : OTHER_CIRCLES.filter((oc) => oc.id === 'founders' || (oc.id === 'family' && account.id === 'lakshmi'))
   // Avatars are neutral: the Spectrum is reserved for the six terms, never for people.
 
   return (
     <Screen>
       <ScreenHeader
         back
-        eyebrow={tx(CIRCLES.eyebrow, CIRCLE.name)}
+        eyebrow={inCircle ? tx(CIRCLES.eyebrow, CIRCLE.name) : t('noneEyebrow')}
         title={
           <>
             {t('titleA')}<Serif>{t('titleSerif')}</Serif>{t('titleB')}
           </>
         }
-        lead={t('lead', { coach: CIRCLE.coach.split(' ')[0], when: CIRCLE.when })}
+        lead={inCircle ? t('lead', { coach: CIRCLE.coach.split(' ')[0], when: CIRCLE.when }) : t('noneLead')}
       />
 
+      {inCircle ? (
+      <>
       {/* Next call */}
       <Card tone="raised" style={{ gap: space.s2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: space.s1 }}>
@@ -195,12 +207,17 @@ function Circles() {
           ))}
         </Card>
       </View>
+      </>
+      ) : (
+        <NoCircle />
+      )}
 
       {/* Other circles */}
+      {otherCircles.length ? (
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{t('others')}</SectionTitle>
-        <Body tone="ink2">{t('othersBody')}</Body>
-        {OTHER_CIRCLES.map((oc) => {
+        <Body tone="ink2">{inCircle ? t('othersBody') : t('othersBodyNone')}</Body>
+        {otherCircles.map((oc) => {
           const done = requested[oc.id]
           const ot = OTHER_CIRCLE_TEXT[oc.id]
           return (
@@ -254,6 +271,7 @@ function Circles() {
           )
         })}
       </View>
+      ) : null}
 
       {/* Salons */}
       <View style={{ gap: space.s2 }}>
@@ -384,6 +402,70 @@ function Circles() {
         />
       ) : null}
     </Screen>
+  )
+}
+
+// ─── No circle yet ───────────────────────────────────────────────────────────
+
+/** An account with no circle: what stands between it and one, and the one step to take. */
+function NoCircle() {
+  const { space } = useTheme()
+  const t = useDict(CIRCLES)
+  const [acct, setAcct] = useStore(accountStore)
+  const latest = useAccountIndex()
+  const minor = useIsMinor()
+  const asked = !!acct.circleRequests?.next
+  const [withdrawn, setWithdrawn] = useState(false)
+  const free = acct.plan === 'Free'
+  const noIndex = !latest
+  const ask = (on: boolean) => {
+    setAcct((a) => ({ ...a, circleRequests: { ...(a.circleRequests ?? {}), next: on } }))
+    postMemberMessage({ to: 'concierge', subject: t('noneMsgSubject'), body: on ? t('noneMsgAsk') : t('noneMsgWithdraw'), from: 'member' })
+    setWithdrawn(!on)
+  }
+  return (
+    <Card tone="sunk" style={{ gap: space.s1, alignItems: 'flex-start' }}>
+      <EmptyIllustration kind="circle" />
+      <Body weight="medium">{t('noneTitle')}</Body>
+      {minor ? (
+        <Meta><MonoNums text={t('noneMinor')} /></Meta>
+      ) : free ? (
+        <>
+          <Meta>{t('noneFree')}</Meta>
+          <DaybreakButton icon="arrow-up-right" onPress={() => router.push('/membership')}>
+            {t('noneSeePlus')}
+          </DaybreakButton>
+          {noIndex ? <ArrowLink onPress={() => router.push('/index-take')}>{t('noneTake')}</ArrowLink> : null}
+        </>
+      ) : noIndex ? (
+        <>
+          <Meta>{t('noneNoIndex')}</Meta>
+          <DaybreakButton icon="arrow-right" onPress={() => router.push('/index-take')}>
+            {t('noneTake')}
+          </DaybreakButton>
+        </>
+      ) : asked ? (
+        <>
+          <Done>{t('noneAsked', { c: CONCIERGE })}</Done>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s2 }}>
+            <Button variant="link" onPress={() => router.push(threadHref('concierge'))}>
+              {t('noneOpenThread')}
+            </Button>
+            <Button variant="link" onPress={() => ask(false)}>
+              {t('withdraw')}
+            </Button>
+          </View>
+        </>
+      ) : (
+        <>
+          {withdrawn ? <Meta accessibilityLiveRegion="polite">{t('noneWithdrawn', { c: CONCIERGE })}</Meta> : null}
+          <Meta>{t('noneReady', { c: CONCIERGE })}</Meta>
+          <DaybreakButton icon="users" onPress={() => ask(true)}>
+            {t('noneAsk')}
+          </DaybreakButton>
+        </>
+      )}
+    </Card>
   )
 }
 

@@ -3,16 +3,13 @@ import type { ReactNode } from 'react'
 import { View } from 'react-native'
 import { useDict } from '../lib/i18n'
 import { useApp } from '../lib/store'
-import { sessionStore, useStore } from '../screens/b/bStore'
+import { useGraceInvoice } from '../screens/b/grace'
 import { useTheme } from '../theme/ThemeProvider'
 import { Button } from './Buttons'
 import { Icon, type IconName } from './Icon'
 import { fmtDate } from './MethodLine'
 import { Meta } from './Text'
 import { KIT } from './_i18n'
-
-/** The last day of the 14-day grace after the failed February renewal (specimen, matches the web). */
-export const GRACE_UNTIL = '2027-02-15'
 
 /**
  * App-wide state banners (Plan §4B global states), rendered by <Screen> above the content:
@@ -24,8 +21,8 @@ export const GRACE_UNTIL = '2027-02-15'
  * Never red, never urgent: a fall or a missed payment is not an alarm.
  */
 export function AppBanners() {
-  const { offline, setOffline, syncQueue, syncState, syncedCount, paymentsGrace, deviceAtRisk, rootedAck } = useApp()
-  const [session] = useStore(sessionStore)
+  const { offline, setOffline, syncQueue, syncState, syncedCount, deviceAtRisk, rootedAck } = useApp()
+  const grace = useGraceInvoice()
   const path = usePathname()
   const t = useDict(KIT)
   const queued = syncQueue.length
@@ -44,13 +41,13 @@ export function AppBanners() {
     rows.push(<Banner key="synced" icon="check" text={t('synced', { n: syncedCount })} />)
   }
   // Membership shows the grace state in full, with its own pay action.
-  if (paymentsGrace && session.signedIn && path !== '/membership') {
+  if (grace?.show && path !== '/membership') {
     rows.push(
       <Banner
         key="grace"
         icon="credit-card"
-        text={t('graceBanner', { date: fmtDate(GRACE_UNTIL) })}
-        action={{ label: t('gracePay'), hint: t('gracePayHint'), onPress: () => router.push('/membership') }}
+        text={t(grace.yearly ? 'graceBannerPatron' : 'graceBanner', { month: grace.month, date: fmtDate(grace.until) })}
+        action={{ label: t('gracePay', { amount: grace.amountLabel }), hint: t('gracePayHint'), onPress: () => router.push('/membership') }}
       />,
     )
   }

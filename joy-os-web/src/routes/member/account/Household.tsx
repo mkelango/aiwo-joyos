@@ -15,6 +15,7 @@ import { COUPLES_CHECK, GRANTS, HOUSEHOLD_MINOR, KAVYA_SHARED, SPECIMEN_NOW, typ
 import { Checkbox, Field, Section, Segmented, Toggle } from './_parts'
 import { inputCls, nums, rich, usePersisted, useToast } from './_util'
 import { useDict, useTermText } from '@/lib/i18n'
+import { interceptsCrisis, useApp } from '@/lib/store'
 import { HH, useData } from './_i18n'
 import { ReadAloud, SpeakAnswer } from './_voice'
 import { useCore } from '@/routes/member/core/_i18n'
@@ -417,6 +418,7 @@ async function copyLink(link: string) {
 
 function InviteSheet({ open, onClose, onInvite }: { open: boolean; onClose: () => void; onInvite: (iv: Invite) => void }) {
   const tr = useDict(HH)
+  const { setCrisisOpen } = useApp()
   const [role, setRole] = useState<InviteRole>('adult')
   const [name, setName] = useState('')
   const [contact, setContact] = useState('')
@@ -437,7 +439,9 @@ function InviteSheet({ open, onClose, onInvite }: { open: boolean; onClose: () =
         noValidate
         className="flex flex-col gap-5"
         onSubmit={(e) => {
-          e.preventDefault(); setTried(true)
+          e.preventDefault()
+          if (interceptsCrisis(name)) { setCrisisOpen(true); return }
+          setTried(true)
           if (errs.name || errs.contact || errs.agree) return
           const code = Math.random().toString(36).slice(2, 8).toUpperCase()
           onInvite({ id: `iv${Date.now()}`, role, name: name.trim(), contact: contact.trim(), link: `https://joy.aiwo.in/join/${code}`, expires: '2027-02-04' })

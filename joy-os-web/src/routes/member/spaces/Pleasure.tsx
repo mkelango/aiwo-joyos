@@ -5,11 +5,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { DaybreakButton, Eyebrow, SpecimenTag } from '@/components/joy/primitives'
 import { Button, Sheet } from '@/components/ui'
-import { SPECIMEN_TODAY, addDays, liveLedger, specimenWeek, useLedgerRemoved, weekCounts, weekEntryCount } from '@/routes/member/core/_store'
+import { SPECIMEN_TODAY, addDays, liveLedger, useLedgerRemoved, weekCounts, weekEntryCount } from '@/routes/member/core/_store'
 import { useA11yPrefs } from '@/routes/member/account/_prefs'
 import { useApp } from '@/lib/store'
-import { FILMS, PLANNED_START, SAVOURING_PROMPTS } from './_data'
-import { CopyDetails, SpaceShell, ToolCard, rovingRadio, useCrisisGuard, Toggle } from './_SpaceShell'
+import { FILMS, PLANNED_START, SAVOURING_PROMPTS, weekTop } from './_data'
+import { CopyDetails, SpaceShell, ToolCard, rovingRadio, thisWeek, useCrisisGuard, Toggle } from './_SpaceShell'
 import { mono, useSpaceText, type SpKey } from './_i18n'
 import { CAL_NAME, KEPT_KEY, useCalendarProvider, useSpaceState, useTrustConsent, type KeptPrompt } from './_state'
 
@@ -60,18 +60,16 @@ function LedgerInsights() {
   const pct = useMemo(() => largestRemainder([byPrompt[1], byPrompt[2], byPrompt[3]]), [byPrompt])
   // liveLedger places new moments on the specimen clock, so newest first is a plain sort by `at`.
   const best = useMemo(() => live.find((e) => e.word), [live])
-  // The headline is read from the same counts as the bars: the top tag, and the second when it
-  // stands alone in second place. A tie of three or more at the top is said as such.
+  // The headline is read from the same counts as the bars, the same way VIVA's weekly story reads them.
   const tagWord = (tag: string) => (lang === 'en' ? tag.toLowerCase() : d(tag))
-  const [first, second, third] = week
-  const tiedTop = week.filter((l) => first && l.count === first.count).length
-  const title = !first
-    ? t('pl.lg.titleNone')
-    : tiedTop > 2
-      ? r('pl.lg.titleEven', { n: <span className="num">{tiedTop}</span> })
-      : second && (!third || third.count < second.count)
-        ? r('pl.lg.titleTwo', { a: <em>{tagWord(first.tag)}</em>, b: tagWord(second.tag) })
-        : r('pl.lg.titleOne', { a: <em>{tagWord(first.tag)}</em> })
+  const top = weekTop(week)
+  const title = top.kind === 'none'
+    ? t(live.length ? 'pl.lg.titleUntagged' : 'pl.lg.titleNone')
+    : top.kind === 'even'
+      ? r('pl.lg.titleEven', { n: <span className="num">{top.n}</span> })
+      : top.kind === 'two'
+        ? r('pl.lg.titleTwo', { a: <em>{tagWord(top.a)}</em>, b: tagWord(top.b) })
+        : r('pl.lg.titleOne', { a: <em>{tagWord(top.a)}</em> })
   return (
     <ToolCard
       className="w-full"
@@ -108,7 +106,7 @@ function LedgerInsights() {
         <figure className="mt-6 rounded-2xl border border-line p-4">
           <Eyebrow>{r('pl.lg.keep', { d: <span className="num">{dm(best.at)}</span> })}</Eyebrow>
           <blockquote className="mt-2 text-[1.25rem] font-light leading-snug text-ink">“{best.word}”</blockquote>
-          <figcaption className="mt-1 text-[13px] text-ink-3">{best.tags.map(d).join(' · ')} · <span className="num">{clock(best.at)}</span></figcaption>
+          <figcaption className="mt-1 text-[13px] text-ink-3">{best.tags.map((tag) => `${d(tag)} · `).join('')}<span className="num">{clock(best.at)}</span></figcaption>
         </figure>
       )}
       <Link to="/app/ledger" className="mt-auto inline-flex items-center gap-1.5 pt-5 text-[15px] text-ink underline-offset-4 hover:underline focus-ring rounded">{t('pl.lg.add')} <ArrowRight size={15} /></Link>
@@ -446,11 +444,6 @@ function Films() {
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
 /** This specimen week's moments still in the Ledger, newest first, on the specimen clock. */
-function thisWeek(ledger: Parameters<typeof liveLedger>[0], removed: string[]) {
-  const week = new Set(specimenWeek())
-  return liveLedger(ledger, removed).filter((e) => week.has(e.at.slice(0, 10)))
-}
-
 /** Rounds shares to whole percentages that always sum to 100 (largest remainder). */
 function largestRemainder(counts: number[]) {
   const total = counts.reduce((a, b) => a + b, 0)

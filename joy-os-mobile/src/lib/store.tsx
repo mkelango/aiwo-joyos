@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import * as Device from 'expo-device'
 import { AccessibilityInfo, AppState as RNAppState, Platform } from 'react-native'
+import { sessionStore, useStore } from '../screens/b/bStore'
 import { LEDGER } from '../shared/member'
 import type { LedgerEntry } from '../shared/types'
 import { playSound, setSoundEnabled } from './sound'
@@ -12,6 +13,11 @@ import { playSound, setSoundEnabled } from './sound'
 // offline (the simulated flight mode) with its sync queue, payments grace, reduce motion,
 // sound (silent by default), the biometric lock and its delay, and the jailbreak/root demo
 // switch with the member's acknowledgement of that warning.
+// The Joy Ledger, payments grace and today's action belong to the account signed in, like everything
+// in Lane A's account-scoped keys: Arjun keeps the plain keys and the seeded moments, anyone else
+// starts empty under 'accountLedgers', 'accountGrace' and 'accountActions', by the same scope Lane A
+// uses, so a second person made in onboarding does not inherit the first one's. The rest here
+// belongs to the phone.
 // In memory only: crisisOpen, the sync state of the last reconnect, whether the app is locked
 // right now, and what expo-device reported about this phone.
 
@@ -43,6 +49,7 @@ interface AppState {
   /** Convenience mirror of actionState === 'done' (matches the web store). */
   actionDone: boolean
   setActionDone: (v: boolean) => void
+  /** The signed-in account's own moments. */
   ledger: LedgerEntry[]
   addLedger: (e: Omit<LedgerEntry, 'id' | 'at'>) => void
   offline: boolean
@@ -56,7 +63,7 @@ interface AppState {
   syncState: SyncState
   /** How many changes the last reconnect sent. */
   syncedCount: number
-  /** Payments grace: a failed renewal, 14 days of unchanged access (specimen demo switch). */
+  /** Payments grace on the signed-in account: a failed renewal, 14 days of unchanged access (specimen demo switch). */
   paymentsGrace: boolean
   setPaymentsGrace: (v: boolean) => void
   /** The member's own Reduce motion setting; the system setting is honoured as well (useReduceMotion). */
@@ -121,7 +128,12 @@ function usePersisted<T>(key: string, initial: T, ready: Record<string, unknown>
   return [v, setV] as const
 }
 
-const KEYS = ['themePref', 'textSize', 'lang', 'actionState', 'ledger', 'offline', 'syncQueue', 'paymentsGrace', 'reduceMotion', 'sound', 'biometricLock', 'lockAfter', 'rootedDemo', 'rootedAck', 'lastMorning'] as const
+const KEYS = ['themePref', 'textSize', 'lang', 'actionState', 'accountActions', 'ledger', 'accountLedgers', 'offline', 'syncQueue', 'paymentsGrace', 'accountGrace', 'reduceMotion', 'sound', 'biometricLock', 'lockAfter', 'rootedDemo', 'rootedAck', 'lastMorning'] as const
+
+/** What each account other than Arjun keeps for itself (Arjun's stays under the plain key). */
+/** Keyed by account, or by the session's newScope for the latest account made in onboarding. */
+type OtherAccounts<T> = Partial<Record<string, T>>
+const NO_MOMENTS: LedgerEntry[] = []
 
 /** Local calendar date, YYYY-MM-DD. */
 function localDay(d = new Date()) {
@@ -163,13 +175,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [textSize, setTextSize] = usePersisted<TextSize>('textSize', 'default', stored)
   const [lang, setLang] = usePersisted<Lang>('lang', 'en', stored)
   ACTIVE_LANG = lang
-  const [actionState, setActionStateRaw] = usePersisted<ActionState>('actionState', 'todo', stored)
-  const [ledger, setLedger] = usePersisted<LedgerEntry[]>('ledger', LEDGER, stored)
+  const [session] = useStore(sessionStore)
+  const account = session.account ?? 'arjun'
+  const scope = account === 'new' ? session.newScope ?? 'new' : account
+  const [arjunAction, setArjunAction] = usePersisted<ActionState>('actionState', 'todo', stored)
+  const [otherActions, setOtherActions] = usePersisted<OtherAccounts<ActionState>>('accountActions', {}, stored)
+  const actionState = account === 'arjun' ? arjunAction : otherActions[scope] ?? 'todo'
+  const [arjunLedger, setArjunLedger] = usePersisted<LedgerEntry[]>('ledger', LEDGER, stored)
+  const [otherLedgers, setOtherLedgers] = usePersisted<OtherAccounts<LedgerEntry[]>>('accountLedgers', {}, stored)
+  const ledger = account === 'arjun' ? arjunLedger : otherLedgers[scope] ?? NO_MOMENTS
   const [offline, setOffline] = usePersisted<boolean>('offline', false, stored)
   const [syncQueue, setSyncQueue] = usePersisted<SyncItem[]>('syncQueue', [], stored)
   const [syncState, setSyncState] = useState<SyncState>('idle')
   const [syncedCount, setSyncedCount] = useState(0)
-  const [paymentsGrace, setPaymentsGrace] = usePersisted<boolean>('paymentsGrace', false, stored)
+  const [arjunGrace, setArjunGrace] = usePersisted<boolean>('paymentsGrace', false, stored)
+  const [otherGrace, setOtherGrace] = usePersisted<OtherAccounts<boolean>>('accountGrace', {}, stored)
+  const paymentsGrace = account === 'arjun' ? arjunGrace : !!otherGrace[scope]
+  const setPaymentsGrace = useCallback(
+    (v: boolean) => {
+      if (account === 'arjun') setArjunGrace(v)
+      else setOtherGrace((g) => ({ ...g, [scope]: v }))
+    },
+    [account, scope, setArjunGrace, setOtherGrace],
+  )
   const [reduceMotion, setReduceMotion] = usePersisted<boolean>('reduceMotion', false, stored)
   const [crisisOpen, setCrisisOpen] = useState(false)
   const [override] = useState(urlThemeOverride)
@@ -300,12 +328,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addLedger = useCallback(
     (e: Omit<LedgerEntry, 'id' | 'at'>) => {
       const id = `l${Date.now()}`
-      setLedger((l) => [{ ...e, id, at: new Date().toISOString() }, ...l])
+      const entry = { ...e, id, at: new Date().toISOString() }
+      if (account === 'arjun') setArjunLedger((l) => [entry, ...l])
+      else setOtherLedgers((all) => ({ ...all, [scope]: [entry, ...(all[scope] ?? [])] }))
       // Written offline: kept here and counted in the banner until the connection is back.
       queueSync({ id, kind: 'ledger' })
       playSound('complete')
     },
-    [setLedger, queueSync],
+    [account, scope, setArjunLedger, setOtherLedgers, queueSync],
   )
   // The action sound: one soft note when the day's one action is marked done.
   const actionRef = useRef(actionState)
@@ -313,9 +343,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setActionState = useCallback(
     (s: ActionState) => {
       if (s === 'done' && actionRef.current !== 'done') playSound('action')
-      setActionStateRaw(s)
+      if (account === 'arjun') setArjunAction(s)
+      else setOtherActions((a) => ({ ...a, [scope]: s }))
     },
-    [setActionStateRaw],
+    [account, scope, setArjunAction, setOtherActions],
   )
   const setActionDone = useCallback((v: boolean) => setActionState(v ? 'done' : 'todo'), [setActionState])
 

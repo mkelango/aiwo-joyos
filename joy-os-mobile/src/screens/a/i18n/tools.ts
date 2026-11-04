@@ -248,6 +248,7 @@ export const TOOLS = dict({
   'A small pleasure': ['ஒரு சிறிய மகிழ்ச்சி', 'एक छोटा-सा आनंद'],
   'With · optional': ['யாருடன் · விருப்பத்தேர்வு', 'किसके साथ · वैकल्पिक'],
   'Kavya, or no one': ['Kavya, அல்லது யாரும் இல்லை', 'Kavya, या कोई नहीं'],
+  'A name, or no one': ['ஒரு பெயர், அல்லது யாரும் இல்லை', 'कोई नाम, या कोई नहीं'],
   'Plan it for {day} {time}': ['{day} {time}-க்குத் திட்டமிடுங்கள்', '{day} {time} के लिए तय करें'],
   'Planned: {what} · {day} {time}. In your calendar like a meeting.': ['திட்டமிடப்பட்டது: {what} · {day} {time}. ஒரு கூட்டம் போல உங்கள் நாட்காட்டியில்.', 'तय हो गया: {what} · {day} {time}। मीटिंग की तरह आपके कैलेंडर में।'],
   'Savour one thing': ['ஒன்றை ரசித்து அனுபவியுங்கள்', 'एक चीज़ का आनंद लें'],
@@ -683,6 +684,7 @@ export const TOOLS = dict({
   'Close the summary': ['சுருக்கத்தை மூடு', 'सार बंद करें'],
   // Ease · weights in Mono, and all four screens taken on the phone with routing to Care
   '{k} · weight *{w}*': ['{k} · எடை *{w}*', '{k} · वज़न *{w}*'],
+  '*{date}* · {cadence}': ['*{date}* · {cadence}', '*{date}* · {cadence}'],
   '*{date}* · {cadence} · earlier *{list}*': ['*{date}* · {cadence} · முன்பு *{list}*', '*{date}* · {cadence} · पहले *{list}*'],
   'One rating, 0 to 10': ['ஒரே மதிப்பீடு, 0 முதல் 10 வரை', 'एक ही रेटिंग, 0 से 10'],
   '{k} questions, about {m} min': ['{k} கேள்விகள், ஏறக்குறைய {m} நிமி.', '{k} सवाल, लगभग {m} मिनट'],

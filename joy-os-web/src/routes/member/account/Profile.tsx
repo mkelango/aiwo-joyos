@@ -7,7 +7,7 @@ import { Avatar, Button, Card, PageHeader, Pill, Sheet } from '@/components/ui'
 import { HOUSEHOLD, MEMBER } from '@/data/member'
 import { MEMBERSHIPS } from '@/data/platform'
 import { LANGS, useDict, useTermText } from '@/lib/i18n'
-import { useApp, type Lang } from '@/lib/store'
+import { interceptsCrisis, useApp, type Lang } from '@/lib/store'
 import { AbhaCard } from './_abha'
 import { DEFAULT_EMERGENCY, DEFAULT_NOMINEE, DEVICES, HOUSEHOLD_MINOR } from './_data'
 import { Checkbox, Field, LinkButton, Section, Select } from './_parts'
@@ -301,6 +301,7 @@ export default function Profile() {
 function EditForm({ initial, onSave, onCancel }: { initial: { firstName: string; lastName: string; city: string; lang: Lang }; onSave: (v: { firstName: string; lastName: string; city: string; lang: Lang }) => void; onCancel: () => void }) {
   const t = useDict(PROF)
   const dx = useData()
+  const { setCrisisOpen } = useApp()
   const [f, setF] = useState(initial)
   const [tried, setTried] = useState(false)
   const name = (v: string) => (v.trim().length < 1 ? t('required') : /^[\p{L}\s.'’-]+$/u.test(v.trim()) ? null : t('lettersOnly'))
@@ -309,7 +310,7 @@ function EditForm({ initial, onSave, onCancel }: { initial: { firstName: string;
     <form
       noValidate
       className="flex flex-col gap-5"
-      onSubmit={(e) => { e.preventDefault(); setTried(true); if (errs.firstName || errs.lastName) return; onSave({ ...f, firstName: f.firstName.trim(), lastName: f.lastName.trim() }) }}
+      onSubmit={(e) => { e.preventDefault(); if (interceptsCrisis(`${f.firstName} ${f.lastName}`)) { setCrisisOpen(true); return } setTried(true); if (errs.firstName || errs.lastName) return; onSave({ ...f, firstName: f.firstName.trim(), lastName: f.lastName.trim() }) }}
     >
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t('firstName')} error={tried ? errs.firstName : null}>{(id, d) => <input id={id} aria-describedby={d} value={f.firstName} onChange={(e) => setF({ ...f, firstName: e.target.value })} autoComplete="given-name" className={inputCls} />}</Field>
@@ -339,6 +340,7 @@ function EditForm({ initial, onSave, onCancel }: { initial: { firstName: string;
 function EmergencyForm({ initial, onSave, onCancel, onRemove }: { initial: { name: string; relation: string; phone: string } | null; onSave: (v: { name: string; relation: string; phone: string }) => void; onCancel: () => void; onRemove?: () => void }) {
   const t = useDict(PROF)
   const dx = useData()
+  const { setCrisisOpen } = useApp()
   const [f, setF] = useState(initial ?? { name: '', relation: 'Spouse', phone: '' })
   const [consent, setConsent] = useState(false)
   const [tried, setTried] = useState(false)
@@ -348,7 +350,7 @@ function EmergencyForm({ initial, onSave, onCancel, onRemove }: { initial: { nam
     consent: consent ? null : t('errTick'),
   }
   return (
-    <form noValidate className="flex flex-col gap-5" onSubmit={(e) => { e.preventDefault(); setTried(true); if (errs.name || errs.phone || errs.consent) return; onSave({ name: f.name.trim(), relation: f.relation, phone: f.phone.trim() }) }}>
+    <form noValidate className="flex flex-col gap-5" onSubmit={(e) => { e.preventDefault(); if (interceptsCrisis(f.name)) { setCrisisOpen(true); return } setTried(true); if (errs.name || errs.phone || errs.consent) return; onSave({ name: f.name.trim(), relation: f.relation, phone: f.phone.trim() }) }}>
       <p className="text-[16px] text-ink-2">{t('ecIntro')}</p>
       <Field label={t('fullName')} error={tried ? errs.name : null}>{(id, d) => <input id={id} aria-describedby={d} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} autoComplete="off" className={inputCls} />}</Field>
       <Field label={t('relationship')}>{(id) => <Select id={id} value={f.relation} onChange={(v) => setF({ ...f, relation: v })} options={RELATIONS.map((r) => ({ value: r, label: dx(r) }))} />}</Field>

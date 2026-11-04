@@ -1,4 +1,4 @@
-import type { TermKey } from '@/domain/types'
+import type { Cation, TermKey } from '@/domain/types'
 import { CATIONS } from '@/data/platform'
 
 // Lane data for ’Cation, Practice, Circles and Events (Memo p.20–21).
@@ -35,6 +35,24 @@ export const SIGNAL_READINGS: { id: string; term: TermKey; label: string; value:
   { id: 'r7', term: 'D', label: 'SPANE balance', value: '+6', unit: 'of ±24', baseline: '+3', point: 'Signal Point 3 · Quiet room tablet', at: '2027-01-04T17:20' },
   { id: 'r8', term: 'P', label: 'Ikigai map', value: 'Drafted', unit: '', point: 'Faculty session · Harbour room', at: '2027-01-03T11:00', note: 'Saved to your Purpose space' },
 ]
+
+// ─── The ’cation for a term ───────────────────────────────────────────────
+
+/**
+ * The one ’cation suggested for each term. The ’Cation tab, the catalogue's empty state and the
+ * Passport's next stamp all read it with the latest Index's lowest term (useIndexHistory), so a
+ * signed re-measure that moves the lowest term moves the suggestion with it.
+ */
+export const CATION_FOR_TERM: Record<TermKey, string> = {
+  H: 'healthcation',
+  P: 'mindcation',
+  R: 'lovecation',
+  F: 'wealthcation',
+  D: 'savourcation',
+  B: 'sleepcation',
+}
+
+export const cationForTerm = (term: TermKey): Cation => CATIONS.find((c) => c.slug === CATION_FOR_TERM[term])!
 
 // ─── Per-’cation detail (the template is configuration, not code) ─────────
 

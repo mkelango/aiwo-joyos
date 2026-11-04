@@ -6,7 +6,7 @@ import { interceptsCrisis, useApp } from '@/lib/store'
 import { trustStore, useStore } from '@/screens/b/bStore'
 import { CONSENTS } from '@/shared/member'
 import { useLocal } from '@/screens/a/local'
-import { Chip, IconButton, monoNums, TextField } from '@/screens/a/parts'
+import { Chip, IconButton, monoNums, TextField, useIsSpecimen } from '@/screens/a/parts'
 import { NO_SUGGESTIONS, PEACE_OF_MIND, TIME_AUDIT, TIME_KINDS } from '@/screens/a/spacesData'
 import { useTheme } from '@/theme/ThemeProvider'
 import { useA } from '../i18n'
@@ -19,13 +19,15 @@ import { ToolCard, ToolsHeading } from './common'
 
 export function FreedomTools() {
   const { t } = useA()
+  // The time audit and the peace-of-mind list are read from Arjun's record; the No list starts empty.
+  const specimen = useIsSpecimen()
   return (
     <>
       <ToolsHeading>{t('Freedom tools')}</ToolsHeading>
-      <TimeAudit />
+      {specimen ? <TimeAudit /> : null}
       <NoList />
       <Sabbath />
-      <PeaceOfMind />
+      {specimen ? <PeaceOfMind /> : null}
     </>
   )
 }
@@ -331,7 +333,7 @@ function NoList() {
   const { space } = useTheme()
   const { t, tx } = useA()
   const { setCrisisOpen } = useApp()
-  const [list, setList] = useLocal<string[]>('noList', ['Checking email after 21:00'])
+  const [list, setList] = useLocal<string[]>('noList', useIsSpecimen() ? ['Checking email after 21:00'] : [])
   const [draft, setDraft] = useState('')
   const [already, setAlready] = useState(false)
   const full = list.length >= 3

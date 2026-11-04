@@ -9,6 +9,7 @@ export const DAY40 = {
   titleSerif: { en: 'in', ta: 'கடந்துவிட்டன', hi: 'बीत गए' },
   titleB: { en: '.', ta: '.', hi: '।' },
   lead: { en: 'One page, printed at Day 40: where your ninety days stand, what your signals say so far, and the one thing to keep. There is no new Index until Day 90.', ta: 'நாள் 40-இல் அச்சிடப்படும் ஒரு பக்கம்: உங்கள் தொண்ணூறு நாட்கள் எங்கே நிற்கின்றன, இதுவரை உங்கள் சமிக்ஞைகள் என்ன சொல்கின்றன, தொடர வேண்டிய ஒன்று. நாள் 90 வரை புதிய குறியீடு இல்லை.', hi: 'दिन 40 पर छपने वाला एक पन्ना: आपके नब्बे दिन कहाँ हैं, अब तक आपके संकेत क्या कहते हैं, और एक चीज़ जो जारी रखनी है। दिन 90 तक कोई नया इंडेक्स नहीं।' },
+  previewOwn: { en: 'Specimen: issued on Day 40 ({date}). Shown early.', ta: 'மாதிரி: நாள் 40 ({date}) அன்று வழங்கப்படும். முன்கூட்டியே காட்டப்படுகிறது.', hi: 'नमूना: दिन 40 ({date}) को जारी होगा। पहले दिखाया जा रहा है।' },
   preview: { en: 'Specimen: issued on Day 40 ({date}). Shown early because the app is at Day {n}.', ta: 'மாதிரி: நாள் 40 ({date}) அன்று வழங்கப்படும். செயலி நாள் {n}-இல் இருப்பதால் முன்கூட்டியே காட்டப்படுகிறது.', hi: 'नमूना: दिन 40 ({date}) को जारी होता है। ऐप दिन {n} पर है, इसलिए पहले दिखाया गया है।' },
   pageHead: { en: 'The Day-40 page · {name}', ta: 'நாள்-40 பக்கம் · {name}', hi: 'दिन-40 पन्ना · {name}' },
   dayOf: { en: 'Day 40 of 90', ta: '90 இல் நாள் 40', hi: '90 में से दिन 40' },
@@ -33,6 +34,9 @@ export const DAY40 = {
   minorNote: { en: 'Not scored while under 18. Your ninety days run without a number: the Ledger, the practice and your people are all here.', ta: '18 வயதுக்குக் கீழ் இருக்கும்வரை மதிப்பெண் இல்லை. உங்கள் தொண்ணூறு நாட்கள் எண் இல்லாமல் நடக்கின்றன: லெட்ஜர், பயிற்சி, உங்கள் மனிதர்கள் எல்லாம் இங்கே இருக்கின்றன.', hi: '18 से कम उम्र तक कोई स्कोर नहीं। आपके नब्बे दिन बिना नंबर के चलते हैं: लेजर, अभ्यास और आपके लोग, सब यहीं हैं।' },
   minorFocus: { en: 'Keep the one practice you chose. It is the thing that carries the next fifty days.', ta: 'நீங்கள் தேர்ந்தெடுத்த ஒரு பயிற்சியைத் தொடருங்கள். அடுத்த ஐம்பது நாட்களை அதுதான் எடுத்துச் செல்லும்.', hi: 'जो एक अभ्यास आपने चुना, उसे जारी रखें। अगले पचास दिन वही आगे ले जाएगा।' },
   minorNext90: { en: 'Your ninety days close, with your coach', ta: 'உங்கள் தொண்ணூறு நாட்கள் உங்கள் பயிற்சியாளருடன் நிறைவடைகின்றன', hi: 'आपके नब्बे दिन आपके कोच के साथ पूरे होते हैं' },
+  // No Index yet, and an account the specimen's signal lines were not written for.
+  noneLead: { en: 'The Day-40 page starts from your Day-0 Wheel, and you have not taken your first Index yet. Take it, and this page is drawn from it.', ta: 'நாள்-40 பக்கம் உங்கள் நாள்-0 சக்கரத்திலிருந்து தொடங்குகிறது, நீங்கள் இன்னும் முதல் குறியீட்டை எடுக்கவில்லை. அதை எடுங்கள், இந்தப் பக்கம் அதிலிருந்து வரையப்படும்.', hi: 'दिन-40 पन्ना आपके दिन-0 चक्र से शुरू होता है, और आपने अभी अपना पहला इंडेक्स नहीं लिया है। उसे लें, और यह पन्ना उसी से बनेगा।' },
+  signalsNone: { en: 'No signal summary for you yet. Signals are not a score.', ta: 'உங்களுக்கு இன்னும் சமிக்ஞைச் சுருக்கம் இல்லை. சமிக்ஞைகள் மதிப்பெண் அல்ல.', hi: 'आपके लिए अभी संकेतों का सारांश नहीं है। संकेत स्कोर नहीं होते।' },
   seeIndex: { en: 'Your Index, explained', ta: 'உங்கள் குறியீடு, விளக்கமாக', hi: 'आपका इंडेक्स, समझाया हुआ' },
 } satisfies Dict
 

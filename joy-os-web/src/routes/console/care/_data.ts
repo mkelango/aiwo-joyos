@@ -396,12 +396,27 @@ export const SAFETY_ALERTS: SafetyAlert[] = [
 
 export const CLOSE_OUTCOMES = ['Reached the member; safe; plan agreed', 'Reached; referred to psychologist / psychiatry', 'Reached; emergency services involved', 'Repeat test ordered; member informed', 'Not reached; emergency contact called', 'False positive after review']
 
-export const SCREEN_QUEUE = [
-  { id: 'q1', member: 'Nikhil Sharma', instrument: 'PHQ-4', score: 10, threshold: 6, max: 12, taken: '28 Jan · 20:58', lang: 'EN', route: 'P0 open · Dr Sanjay Menon' },
-  { id: 'q2', member: 'Farah Khan', instrument: 'PHQ-4', score: 7, threshold: 6, max: 12, taken: '28 Jan · 09:05', lang: 'EN', route: 'P1 open · Dr Sanjay Menon' },
+export interface ScreenRow {
+  id: string
+  member: string
+  instrument: string
+  score: number
+  threshold: number
+  max: number
+  taken: string
+  lang: string
+  /** As it was routed. A row linked to an alert reads the board instead (screenRouteLabel). */
+  route: string
+  /** The safety-board alert this row follows, once it has one. */
+  alert?: string
+}
+
+export const SCREEN_QUEUE: ScreenRow[] = [
+  { id: 'q1', member: 'Nikhil Sharma', instrument: 'PHQ-4', score: 10, threshold: 6, max: 12, taken: '28 Jan · 20:58', lang: 'EN', route: 'P0 open · Dr Sanjay Menon', alert: 's1' },
+  { id: 'q2', member: 'Farah Khan', instrument: 'PHQ-4', score: 7, threshold: 6, max: 12, taken: '28 Jan · 09:05', lang: 'EN', route: 'P1 open · Dr Sanjay Menon', alert: 's3' },
   { id: 'q3', member: 'Leela Thomas', instrument: 'ISI', score: 18, threshold: 15, max: 28, taken: '27 Jan · 22:40', lang: 'TA', route: 'Unassigned' },
-  { id: 'q4', member: 'Rahul Menon', instrument: 'PHQ-4', score: 6, threshold: 6, max: 12, taken: '27 Jan · 18:10', lang: 'HI', route: 'P1 open · Dr Sanjay Menon' },
-  { id: 'q5', member: 'Vikram Patel', instrument: 'ISI', score: 16, threshold: 15, max: 28, taken: '24 Jan · 15:02', lang: 'EN', route: 'Closed · sleep study' },
+  { id: 'q4', member: 'Rahul Menon', instrument: 'PHQ-4', score: 6, threshold: 6, max: 12, taken: '27 Jan · 18:10', lang: 'HI', route: 'P1 open · Dr Sanjay Menon', alert: 's4' },
+  { id: 'q5', member: 'Vikram Patel', instrument: 'ISI', score: 16, threshold: 15, max: 28, taken: '24 Jan · 15:02', lang: 'EN', route: 'Closed · sleep study', alert: 's5' },
 ]
 
 export const SCREEN_ROUTES = ['Psychologist tele-consult (48 h)', 'Physician consult', 'Home sleep study', 'EAP / partner counsellor', 'Watchful waiting · re-screen in 14 days']
@@ -696,6 +711,8 @@ export const MEMBER_IDS: Record<string, string> = {
 
 type Lab = { name: string; unit: string; ref: string; series: (number | string)[]; flag?: 'H' | 'L' }
 type Med = { drug: string; dose: string; freq: string; since: string; by: string }
+/** A record's order. The links name what its status follows: a sign-off draft, a safety alert, a queued screen. */
+export type SpecimenOrder = { test: string; when: string; status: string; signoff?: string; alert?: string; screen?: string }
 export interface ClinicalRecord {
   id: string
   name: string
@@ -705,7 +722,7 @@ export interface ClinicalRecord {
   labs: Lab[]
   meds: Med[]
   chart: { lab: string; target: number; targetLabel: string; domain: [number, number]; sentence: string }
-  orders: { test: string; when: string; status: string }[]
+  orders: SpecimenOrder[]
   suggestedOrder?: { test: string; urgency: string; why: string }
 }
 
@@ -745,7 +762,7 @@ export const CLINICAL_RECORDS: Record<string, ClinicalRecord> = {
     ],
     meds: [{ drug: 'Amlodipine', dose: '5 mg', freq: 'Once daily', since: 'Feb 2025', by: 'Outside physician' }],
     chart: { lab: 'Vitamin D (25-OH)', target: 30, targetLabel: 'lower limit 30', domain: [0, 60], sentence: 'Vitamin D over three panels, with the lower limit of the range at 30 ng/mL.' },
-    orders: [{ test: 'Day 23 interim panel · home draw', when: '28 Jan 2027 · 06:40', status: 'Final · awaiting your sign-off' }],
+    orders: [{ test: 'Day 23 interim panel · home draw', when: '28 Jan 2027 · 06:40', status: 'Final · awaiting your sign-off', signoff: 'so2' }],
     suggestedOrder: { test: 'Vitamin D (25-OH) after loading', urgency: 'Routine · in 8 weeks', why: 'Low at 18 ng/mL on three panels. Recheck after a loading course.' },
   },
   m_0310: {
@@ -759,7 +776,7 @@ export const CLINICAL_RECORDS: Record<string, ClinicalRecord> = {
     ],
     meds: [],
     chart: { lab: 'LDL-C', target: 100, targetLabel: 'target 100', domain: [80, 160], sentence: 'LDL-C at Day 0 and at the Day 90 re-measure, with the target line at 100 mg/dL.' },
-    orders: [{ test: 'Day 90 panel · home draw', when: '26 Jan 2027', status: 'Final · score drafted for sign-off' }],
+    orders: [{ test: 'Day 90 panel · home draw', when: '26 Jan 2027', status: 'Final · score drafted for sign-off', signoff: 'so1' }],
   },
   m_0119: {
     id: 'm_0119', name: 'Vikram Patel', age: 44, care: 'Lovecation · Day 77 · Dr Meera Iyer', labDates: ['12 Nov 2026', '27 Jan 2027'],
@@ -772,7 +789,7 @@ export const CLINICAL_RECORDS: Record<string, ClinicalRecord> = {
     meds: [{ drug: 'Melatonin', dose: '2 mg PR', freq: 'At night × 4 weeks', since: 'Jan 2027', by: 'Dr Meera Iyer' }],
     chart: { lab: 'LDL-C', target: 100, targetLabel: 'target 100', domain: [80, 140], sentence: 'LDL-C at Day 0 and at the Day 76 re-measure, with the target line at 100 mg/dL.' },
     orders: [
-      { test: 'Re-measure panel · home draw', when: '27 Jan 2027 · 06:30', status: 'Final · score drafted for sign-off' },
+      { test: 'Re-measure panel · home draw', when: '27 Jan 2027 · 06:30', status: 'Final · score drafted for sign-off', signoff: 'so3' },
       { test: 'Home sleep study (level 3)', when: 'Booked 02 Feb 2027', status: 'Ordered after ISI review' },
     ],
   },
@@ -786,7 +803,7 @@ export const CLINICAL_RECORDS: Record<string, ClinicalRecord> = {
     ],
     meds: [],
     chart: { lab: 'Haemoglobin', target: 12, targetLabel: 'lower limit 12', domain: [10, 14], sentence: 'Haemoglobin at the Day 0 panel, with the lower limit at 12 g/dL.' },
-    orders: [{ test: 'Psychologist tele-consult', when: 'Within 48 h', status: 'P1 open · Dr Sanjay Menon · PHQ-4 review' }],
+    orders: [{ test: 'Psychologist tele-consult', when: 'Within 48 h', status: 'P1 open · Dr Sanjay Menon · PHQ-4 review', alert: 's3' }],
   },
   m_0142: {
     id: 'm_0142', name: 'Nikhil Sharma', age: 47, care: 'Mindcation · Day 41 · Dr Sanjay Menon', labDates: ['18 Dec 2026'],
@@ -797,7 +814,7 @@ export const CLINICAL_RECORDS: Record<string, ClinicalRecord> = {
     ],
     meds: [],
     chart: { lab: 'Vitamin D (25-OH)', target: 30, targetLabel: 'lower limit 30', domain: [0, 60], sentence: 'Vitamin D at the Day 0 panel, with the lower limit at 30 ng/mL.' },
-    orders: [{ test: 'Crisis contact and safety plan', when: 'Tonight', status: 'P0 open · Dr Sanjay Menon' }],
+    orders: [{ test: 'Crisis contact and safety plan', when: 'Tonight', status: 'P0 open · Dr Sanjay Menon', alert: 's1' }],
   },
   m_0234: {
     id: 'm_0234', name: 'Rahul Menon', age: 46, care: 'Wealthcation · Day 44 · Dr Sanjay Menon', labDates: ['15 Dec 2026'],
@@ -808,7 +825,7 @@ export const CLINICAL_RECORDS: Record<string, ClinicalRecord> = {
     ],
     meds: [],
     chart: { lab: 'LDL-C', target: 100, targetLabel: 'target 100', domain: [80, 140], sentence: 'LDL-C at the Day 0 panel, with the target line at 100 mg/dL.' },
-    orders: [{ test: 'Coach concern review', when: 'Within 48 h', status: 'P1 open · Dr Sanjay Menon' }],
+    orders: [{ test: 'Coach concern review', when: 'Within 48 h', status: 'P1 open · Dr Sanjay Menon', alert: 's4' }],
   },
   m_0287: {
     id: 'm_0287', name: 'Leela Thomas', age: 56, care: 'Sleepcation · Day 79 · Dr Meera Iyer', labDates: ['10 Nov 2026'],
@@ -819,7 +836,7 @@ export const CLINICAL_RECORDS: Record<string, ClinicalRecord> = {
     ],
     meds: [{ drug: 'Levothyroxine', dose: '25 mcg', freq: 'Once daily, empty stomach', since: 'Nov 2026', by: 'Dr Meera Iyer' }],
     chart: { lab: 'TSH', target: 4, targetLabel: 'upper limit 4.0', domain: [0, 6], sentence: 'TSH at the Day 0 panel, with the upper limit at 4.0 mIU/L.' },
-    orders: [{ test: 'ISI review', when: 'Within 48 h', status: 'Awaiting routing' }],
+    orders: [{ test: 'ISI review', when: 'Within 48 h', status: 'Awaiting routing', screen: 'q3' }],
   },
 }
 

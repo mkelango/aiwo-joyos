@@ -8,6 +8,7 @@ import {
   Card,
   DaybreakButton,
   Divider,
+  EmptyIllustration,
   Eyebrow,
   Icon,
   Meta,
@@ -29,7 +30,7 @@ import { H2, isSpecimenToday, ledgerStamp, madeHere, ledgerWhen, shiftTime, useL
 import { BarRow, Chip, IconButton, Provenance, TextField } from '@/screens/a/parts'
 import { LEDGER as SEED_LEDGER, LEDGER_TAGS, LEDGER_WEEK } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
-import { notifPrefsStore, useStore } from '@/screens/b/bStore'
+import { notifPrefsStore, useAccountId, useStore } from '@/screens/b/bStore'
 import { memberOnly } from '@/screens/b/parts'
 import { txFor } from '@/screens/a/i18n'
 import { MonoNums } from '@/lib/monoNums'
@@ -37,6 +38,8 @@ import { MonoNums } from '@/lib/monoNums'
 // JOY LEDGER (Memo p.17 · Daily Pleasure): three light prompts a day, a tag or two and
 // an optional word — ten seconds. Then, weekly, where joy came from. No streaks, no counts
 // held against you; an empty day is fine.
+// The Ledger is the signed-in account's own (useApp().ledger). The specimen week, calendar and
+// story are Arjun's, so anyone else sees only the moments they kept here.
 
 /** Three full weeks and Monday to Wednesday of this one; today (Thursday 28 Jan) follows. */
 const CAL = LEDGER_CALENDAR.slice(-24)
@@ -52,6 +55,8 @@ function Ledger() {
   const slotLabel = (s: { prompt: number; label: string }) => tx(SCHEDULE_LABEL[s.prompt], s.label)
   const { c, space, term } = useTheme()
   const { ledger, addLedger, setCrisisOpen, lang } = useApp()
+  const seeded = useAccountId() === 'arjun'
+  const calendar = useMemo(() => (seeded ? CAL : CAL.map(() => 0)), [seeded])
   const WEEKDAYS = WEEKDAY_LETTERS[lang]
   const [tags, setTags] = useState<string[]>([])
   const [word, setWord] = useState('')
@@ -70,6 +75,7 @@ function Ledger() {
   const latestPrompt = toMin(prefs.quiet.from) >= 18 * 60 ? toMin(prefs.quiet.from) - 15 : 21 * 60 + 30
   const schedule = LEDGER_SCHEDULE.map((s, i) => ({ ...s, time: times[i] ?? s.time }))
   const prompt = schedule[1]
+  const tagWord = (tg: string) => (lang === 'en' ? tg.toLowerCase() : tag(tg))
   const nextPrompt = schedule[2]
   const todayCount = ledger.filter(isSpecimenToday).length
   const recent = useMemo(
@@ -79,12 +85,12 @@ function Ledger() {
 
   // The specimen week plus every moment kept on this phone today, so the bars survive a reload.
   const week = useMemo(() => {
-    const m = new Map(LEDGER_WEEK.map((w) => [w.tag, w.count]))
+    const m = new Map(seeded ? LEDGER_WEEK.map((w) => [w.tag, w.count]) : [])
     ledger.filter((e) => madeHere(e) && isSpecimenToday(e)).forEach((e) => e.tags.forEach((tg) => m.set(tg, (m.get(tg) ?? 0) + 1)))
     return [...m.entries()].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count)
-  }, [ledger])
+  }, [ledger, seeded])
   // Moments are entries, not tags (one entry can carry several): the seed week plus today's on this phone.
-  const total = SEED_LEDGER.length + ledger.filter((e) => madeHere(e) && isSpecimenToday(e)).length
+  const total = (seeded ? SEED_LEDGER.length : 0) + ledger.filter((e) => madeHere(e) && isSpecimenToday(e)).length
 
   const toggle = (tg: string) => {
     setError('')
@@ -126,7 +132,7 @@ function Ledger() {
               ))}
             </View>
           </View>
-          <TextField label={tl('word')} value={word} onChangeText={setWord} placeholder={tl('wordPh')} maxLength={60} returnKeyType="done" onSubmitEditing={save} />
+          <TextField label={tl('word')} value={word} onChangeText={setWord} placeholder={seeded ? tl('wordPh') : tl('wordPhOwn')} maxLength={60} returnKeyType="done" onSubmitEditing={save} />
           {photo ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s2 }}>
               <View
@@ -197,18 +203,26 @@ function Ledger() {
           <Eyebrow {...H2} style={{ flexShrink: 1 }}>{tl('thisWeek')}</Eyebrow>
           <TermChip term="D" />
         </View>
-        <Meta>
-          {tl('byTagA')}<Mono size={15} tone="ink">{String(total)}</Mono>{tl('byTagB', { a: lang === 'en' ? week[0].tag.toLowerCase() : tag(week[0].tag), b: lang === 'en' ? week[1].tag.toLowerCase() : tag(week[1].tag) })}
-        </Meta>
+        {week.length ? (
+          <Meta>
+            {tl('byTagA')}<Mono size={15} tone="ink">{String(total)}</Mono>{week.length > 1 ? tl('byTagB', { a: tagWord(week[0].tag), b: tagWord(week[1].tag) }) : tl('byTagOne', { a: tagWord(week[0].tag) })}
+          </Meta>
+        ) : (
+          <Meta><MonoNums text={tl('weekNone')} /></Meta>
+        )}
         <View style={{ gap: 12 }}>
           {week.slice(0, 6).map((w) => (
             <BarRow key={w.tag} label={tag(w.tag)} value={w.count} max={week[0].count} color={col.main} />
           ))}
         </View>
-        <Divider />
-        <Body><MonoNums text={txFor(lang, LEDGER_STORY.sentences)} /></Body>
-        <Provenance tool={LEDGER_STORY.tool} prompt={LEDGER_STORY.prompt} />
-        <SpecimenTag />
+        {seeded ? (
+          <>
+            <Divider />
+            <Body><MonoNums text={txFor(lang, LEDGER_STORY.sentences)} /></Body>
+            <Provenance tool={LEDGER_STORY.tool} prompt={LEDGER_STORY.prompt} />
+            <SpecimenTag />
+          </>
+        ) : null}
       </Card>
 
       {/* Four weeks */}
@@ -221,7 +235,7 @@ function Ledger() {
         <View
           accessible
           accessibilityRole="image"
-          accessibilityLabel={tl('calA11y', { days: CAL.filter((n) => n > 0).length + (todayCount ? 1 : 0), total: CAL.length + 1, n: CAL.reduce((a, b) => a + b, 0) + todayCount })}
+          accessibilityLabel={tl('calA11y', { days: calendar.filter((n) => n > 0).length + (todayCount ? 1 : 0), total: calendar.length + 1, n: calendar.reduce((a, b) => a + b, 0) + todayCount })}
           style={{ gap: 8 }}
         >
           <View style={{ flexDirection: 'row' }}>
@@ -234,8 +248,8 @@ function Ledger() {
           {[0, 1, 2, 3].map((r) => (
             <View key={r} style={{ flexDirection: 'row' }}>
               {WEEKDAYS.map((_, i) => {
-                const isToday = r * 7 + i === CAL.length
-                const n = isToday ? Math.min(todayCount, 3) : CAL[r * 7 + i]
+                const isToday = r * 7 + i === calendar.length
+                const n = isToday ? Math.min(todayCount, 3) : calendar[r * 7 + i]
                 const sz = n === undefined ? 0 : n === 0 ? 8 : 12 + n * 6
                 return (
                   <View key={i} style={{ flex: 1, height: 34, alignItems: 'center', justifyContent: 'center' }}>
@@ -260,6 +274,12 @@ function Ledger() {
       {/* Recent */}
       <Card tone="raised" style={{ gap: space.s1 }}>
         <Eyebrow {...H2}>{tl('recent')}</Eyebrow>
+        {recent.length ? null : (
+          <>
+            <EmptyIllustration kind="ledger" width={120} />
+            <Meta align="center"><MonoNums text={tl('recentNone')} /></Meta>
+          </>
+        )}
         {recent.map(({ e, stamp }, i) => {
           const when = ledgerWhen(stamp, lang)
           return (

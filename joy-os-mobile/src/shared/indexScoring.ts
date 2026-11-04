@@ -69,13 +69,14 @@ export function toMeasured(r: SittingResult, at: string): NonNullable<MeasuredIn
 /**
  * A measured Index as an IndexScore row, so the result screen and its history treat it like any
  * other measure: Index grade (self-taken, no physician sign-off), the current method, deltas
- * against the last recorded measure.
+ * against the last recorded measure. That is Arjun's unless `against` says otherwise: an account
+ * with no measure before this one passes null, and its terms then carry no delta.
  */
-export function measuredScore(m: NonNullable<MeasuredIndex>): IndexScore {
+export function measuredScore(m: NonNullable<MeasuredIndex>, against: IndexScore | null = INDEX_HISTORY[0]): IndexScore {
   const prev = INDEX_HISTORY[0]
   const terms: TermScore[] = ORDER.map((k) => {
     const value = m.terms[k]
-    const before = prev.terms.find((t) => t.key === k)?.value
+    const before = against?.terms.find((t) => t.key === k)?.value
     return { key: k, value, band: bandFor(value, k === 'B'), delta: before == null ? undefined : value - before }
   })
   const engine = joyspanIndex(terms, prev.method)

@@ -28,7 +28,7 @@ import { useApp } from '@/lib/store'
 import { playSound } from '@/lib/sound'
 import { REMEASURE_DATES, SIGN_OFF_MS, effectiveAnswers, useClinicalRemeasure, useSubmittedIndex, type Amendment } from '@/lib/indexRecord'
 import { useIsMinor } from '@/lib/minor'
-import { useSignalsDown } from '@/screens/b/bStore'
+import { useAccountId, useSignalsDown } from '@/screens/b/bStore'
 import { TERM_DETAIL } from '@/screens/a/coreData'
 import { BIOMARKERS } from '@/screens/a/spacesData'
 import { ALL_ITEMS, SITTINGS, scaleOf, type FlatItem } from '@/shared/indexItems'
@@ -104,7 +104,10 @@ function TakeIndex() {
   const clinical = params.grade === 'clinical'
   const minor = useIsMinor()
   // Signals down: no device connected, or every reading stale (devices store, M3).
-  const signalsDown = useSignalsDown()
+  const devicesDown = useSignalsDown()
+  // The specimen's readings are Arjun's: nobody else's sitting is blended with them.
+  const noReadings = useAccountId() !== 'arjun'
+  const signalsDown = devicesDown || noReadings
   const [submitted, setSubmitted] = useSubmittedIndex()
   const [rm, setRm] = useClinicalRemeasure()
   const [useLabs, setUseLabs] = useState(true)
@@ -398,23 +401,24 @@ function TakeIndex() {
   }
 
   // ── Clinical grade: the lab results, then send for sign-off ──────────────
+  // The panel is Arjun's record: anyone else has no labs here, and goes from review straight to sign-off.
+  const labs = noReadings ? [] : BIOMARKERS.filter((m) => CLINICAL_LABS.includes(m.name))
+  const sendClinical = () => {
+    const r = scoreAnswers(answers, { surveyOnly })
+    setRm({
+      stage: 'awaiting',
+      submittedAt: new Date().toISOString(),
+      signDueAt: Date.now() + SIGN_OFF_MS,
+      result: toMeasured(r, REMEASURE_DATES.day90),
+      labs: useLabs ? labs.map((m) => m.name) : [],
+    })
+    queueSync({ id: 'index-clinical-day90', kind: 'index' })
+    setSentCare(r.phqFlag || phqHigh)
+    playSound('complete')
+    setSaved(EMPTY)
+    setStep({ kind: 'sentClinical' })
+  }
   if (step.kind === 'labs') {
-    const labs = BIOMARKERS.filter((m) => CLINICAL_LABS.includes(m.name))
-    const send = () => {
-      const r = scoreAnswers(answers, { surveyOnly })
-      setRm({
-        stage: 'awaiting',
-        submittedAt: new Date().toISOString(),
-        signDueAt: Date.now() + SIGN_OFF_MS,
-        result: toMeasured(r, REMEASURE_DATES.day90),
-        labs: useLabs ? labs.map((m) => m.name) : [],
-      })
-      queueSync({ id: 'index-clinical-day90', kind: 'index' })
-      setSentCare(r.phqFlag || phqHigh)
-      playSound('complete')
-      setSaved(EMPTY)
-      setStep({ kind: 'sentClinical' })
-    }
     return (
       <Screen key={stepKey}>
         <ScreenHeader
@@ -424,7 +428,7 @@ function TakeIndex() {
               {t('labsA')}<Serif>{t('labsSerif')}</Serif>{t('labsB')}
             </>
           }
-          lead={<Body tone="ink2"><MonoNums text={t('labsLead', { date: fmtDate(REMEASURE_DATES.labsDrawn) })} /></Body>}
+          lead={<Body tone="ink2"><MonoNums text={t(surveyOnly ? 'labsLeadSurvey' : 'labsLead', { date: fmtDate(REMEASURE_DATES.labsDrawn) })} /></Body>}
         />
         <Card tone="raised" style={{ gap: space.s1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
@@ -446,9 +450,9 @@ function TakeIndex() {
             </View>
           ))}
         </Card>
-        <Toggle checked={useLabs} onChange={setUseLabs} label={t('labsUse')} description={t('labsUseD')} />
+        <Toggle checked={useLabs} onChange={setUseLabs} label={t('labsUse')} description={t(surveyOnly ? 'labsUseDSurvey' : 'labsUseD')} />
         <View style={{ gap: space.s1 }}>
-          <DaybreakButton onPress={send} accessibilityHint={t('labsSendHint')}>
+          <DaybreakButton onPress={sendClinical} accessibilityHint={t('labsSendHint')}>
             {t('labsSend')}
           </DaybreakButton>
           <Button variant="ghost" onPress={() => setStep({ kind: 'review' })} style={{ alignSelf: 'center' }}>
@@ -502,7 +506,7 @@ function TakeIndex() {
               </>
             )
           }
-          lead={<Body tone="ink2"><MonoNums text={clinical ? t('clinLead') : t('introLead')} /></Body>}
+          lead={<Body tone="ink2"><MonoNums text={clinical ? t(noReadings ? 'clinLeadOwn' : 'clinLead') : t('introLead')} /></Body>}
         />
         {clinical ? (
           <View style={{ borderWidth: 1, borderStyle: 'dashed', borderColor: c.lineStrong, borderRadius: 12, padding: 12 }}>
@@ -551,9 +555,9 @@ function TakeIndex() {
           </View>
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <Icon name="watch" size={16} color={c.ink2} />
-            <Meta style={{ flex: 1 }}>{signalsDown ? t('introSigDown') : t('introSigUp')}</Meta>
+            <Meta style={{ flex: 1 }}>{noReadings ? t('introSigNone') : signalsDown ? t('introSigDown') : t('introSigUp')}</Meta>
           </View>
-          {signalsDown ? (
+          {devicesDown ? (
             <ArrowLink icon="watch" onPress={() => router.push('/devices')}>
               {t('sigDevices')}
             </ArrowLink>
@@ -749,13 +753,15 @@ function TakeIndex() {
           <Card tone="sunk" style={{ gap: space.s1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <Icon name="watch" size={18} color={c.ink} />
-              <Body weight="semibold" style={{ flexShrink: 1 }}><MonoNums text={t('sigDownTitle')} /></Body>
+              <Body weight="semibold" style={{ flexShrink: 1 }}><MonoNums text={t(noReadings ? 'sigNoneTitle' : 'sigDownTitle')} /></Body>
               <Pill>{t('surveyOnlyTag')}</Pill>
             </View>
-            <Meta tone="ink"><MonoNums text={t('sigDownBody')} /></Meta>
-            <ArrowLink icon="watch" onPress={() => router.push('/devices')}>
-              {t('sigDevices')}
-            </ArrowLink>
+            <Meta tone="ink"><MonoNums text={t(noReadings ? 'sigNoneBody' : 'sigDownBody')} /></Meta>
+            {devicesDown ? (
+              <ArrowLink icon="watch" onPress={() => router.push('/devices')}>
+                {t('sigDevices')}
+              </ArrowLink>
+            ) : null}
           </Card>
         ) : (
           <Card tone="raised" style={{ gap: space.s1 }}>
@@ -925,11 +931,12 @@ function TakeIndex() {
               })}
           </Card>
         ))}
+        {clinical && noReadings ? <Meta><MonoNums text={t('clinNoLabs')} /></Meta> : null}
         <View style={{ gap: space.s1 }}>
           <DaybreakButton
             onPress={() => {
-              // Clinical grade: the labs come next, then it goes for sign-off unscored to the member.
-              if (clinical) return setStep({ kind: 'labs' })
+              // Clinical grade: the labs come next if there are any, then it goes for sign-off unscored to the member.
+              if (clinical) return noReadings ? sendClinical() : setStep({ kind: 'labs' })
               // Scored here by the engine and kept on the phone: the newest entry on Index result.
               const r = scoreAnswers(answers, { surveyOnly })
               setMeasured(toMeasured(r, SPACE_TODAY))
@@ -944,9 +951,9 @@ function TakeIndex() {
               setSaved(EMPTY)
             }}
             disabled={answered < items.length}
-            accessibilityHint={clinical ? undefined : t('sendHint')}
+            accessibilityHint={clinical ? (noReadings ? t('clinNoLabsHint') : undefined) : t('sendHint')}
           >
-            {clinical ? t('clinSendReview') : t('send')}
+            {clinical ? t(noReadings ? 'labsSend' : 'clinSendReview') : t('send')}
           </DaybreakButton>
           {answered < items.length ? (
             <Meta tone="ink3" align="center"><MonoNums text={t('stillTo', { n: items.length - answered })} /></Meta>

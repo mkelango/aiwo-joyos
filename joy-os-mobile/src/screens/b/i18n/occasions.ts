@@ -32,7 +32,7 @@ export const OCC = {
   occChoose: { en: 'Choose a template above to plan it. Nothing is booked until the concierge confirms with you.', ta: 'திட்டமிட மேலே ஒரு வார்ப்புருவைத் தேர்ந்தெடுங்கள். கன்சியர்ஜ் உங்களுடன் உறுதிசெய்யும் வரை எதுவும் முன்பதிவாகாது.', hi: 'तय करने के लिए ऊपर एक टेम्पलेट चुनें। जब तक कंसीयर्ज आपसे पक्का न करें, कुछ भी बुक नहीं होता।' },
   occFormTitle: { en: '{name} · your request', ta: '{name} · உங்கள் கோரிக்கை', hi: '{name} · आपका अनुरोध' },
   occHonoree: { en: 'Whose day is it?', ta: 'இது யாருடைய நாள்?', hi: 'यह किसका दिन है?' },
-  occHonoreePh: { en: 'For example: Amma, or Kavya and me', ta: 'உதாரணமாக: அம்மா, அல்லது கவ்யாவும் நானும்', hi: 'जैसे: अम्मा, या काव्या और मैं' },
+  occHonoreePh: { en: 'For example: Amma, or my partner and me', ta: 'உதாரணமாக: அம்மா, அல்லது என் துணையும் நானும்', hi: 'जैसे: अम्मा, या मेरे साथी और मैं' },
   occWindow: { en: 'When', ta: 'எப்போது', hi: 'कब' },
   occGuestsTitle: { en: 'Who is coming', ta: 'யார் வருகிறார்கள்', hi: 'कौन आ रहा है' },
   occGuestsHelp: { en: 'Each guest who is measured consents for themselves and keeps their own record. Only what they agree to share appears on the household page.', ta: 'அளக்கப்படும் ஒவ்வொரு விருந்தினரும் தாமே ஒப்புதல் தந்து, தம் பதிவைத் தாமே வைத்திருக்கிறார்கள். அவர்கள் பகிர ஒப்புக்கொள்வது மட்டுமே குடும்பப் பக்கத்தில் தெரியும்.', hi: 'मापा जाने वाला हर मेहमान खुद सहमति देता है और अपना रिकॉर्ड खुद रखता है। घर के पेज पर सिर्फ़ वही दिखता है जिसे वे साझा करने पर सहमत हों।' },

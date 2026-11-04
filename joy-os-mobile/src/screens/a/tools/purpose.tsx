@@ -4,7 +4,7 @@ import Svg, { Circle, Text as SvgText } from 'react-native-svg'
 import { Body, Button, Divider, Eyebrow, Icon, Meta, Mono, Sheet, Toggle } from '@/components'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { useLocal } from '@/screens/a/local'
-import { IconButton, monoNums, TextField } from '@/screens/a/parts'
+import { IconButton, monoNums, TextField, useIsSpecimen } from '@/screens/a/parts'
 import { CONTRIBUTIONS, IKIGAI_START, SPACE_TODAY, STATEMENT_START, TOMORROW_ANSWERS } from '@/screens/a/spacesData'
 import { useTheme } from '@/theme/ThemeProvider'
 import { useA } from '../i18n'
@@ -15,13 +15,15 @@ import { ToolCard, ToolsHeading, shortDate } from './common'
 
 export function PurposeTools() {
   const { t } = useA()
+  // The Ikigai map, statement and career Venn start from Arjun's words; the Tomorrow Question starts empty.
+  const specimen = useIsSpecimen()
   return (
     <>
       <ToolsHeading>{t('Purpose tools')}</ToolsHeading>
-      <IkigaiMap />
+      {specimen ? <IkigaiMap /> : null}
       <TomorrowQuestion />
-      <Statement />
-      <CareerVenn />
+      {specimen ? <Statement /> : null}
+      {specimen ? <CareerVenn /> : null}
     </>
   )
 }
@@ -165,7 +167,7 @@ function TomorrowQuestion() {
   const { t, tx, lang } = useA()
   const { setCrisisOpen } = useApp()
   const [text, setText] = useState('')
-  const [answers, setAnswers] = useLocal('tomorrow', TOMORROW_ANSWERS)
+  const [answers, setAnswers] = useLocal('tomorrow', useIsSpecimen() ? TOMORROW_ANSWERS : [])
   const [saved, setSaved] = useState(false)
   const save = () => {
     const v = text.trim()

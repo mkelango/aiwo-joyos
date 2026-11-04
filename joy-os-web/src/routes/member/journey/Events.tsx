@@ -428,6 +428,7 @@ function NewYearsEve() {
   const lowest = useIndexHistory().latest.lowestTerm
   const declTime = NYE_PROGRAMME.find((p) => p.declaration)!.time
   const signed = journey.declaration
+  const guard = useCrisisGuard()
   const [name, setName] = useState('')
   const [err, setErr] = useState(false)
   const [justSigned, setJustSigned] = useState(false)
@@ -438,6 +439,8 @@ function NewYearsEve() {
     e.preventDefault()
     const v = name.trim().replace(/\s+/g, ' ')
     if (!v) { setErr(true); inputRef.current?.focus(); return }
+    // Emergency intercept first: a signature is words the member typed.
+    if (guard(v)) return
     setErr(false)
     signDeclaration(v)
     setJustSigned(true)

@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { CLINICIANS, CONSULTS } from '@/screens/b/accountData'
+import { useAccountId } from '@/screens/b/bStore'
 import { TEAM } from '@/shared/member'
 import { useLocal } from './local'
 
@@ -44,12 +45,13 @@ const EMPTY: CareState = { booked: [], cancelled: [], joined: {} }
 /** Three times a clinician can do: their next opening, then two more (specimen). */
 export const slotsFor = (c: Clinician) => [c.next, 'Wed 10 Feb · 18:00', 'Sat 13 Feb · 10:30']
 
-/** The specimen's consults plus bookings, less cancellations; and what changes them. */
+/** Arjun's specimen consults (nobody else has any) plus the account's bookings, less cancellations; and what changes them. */
 export function useCareConsults() {
+  const specimen = useAccountId() === 'arjun'
   const [state, setState, ready] = useLocal<CareState>('careConsults', EMPTY)
   const st = { ...EMPTY, ...state }
   const rows: ConsultRow[] = [
-    ...CONSULTS.map((cs) => {
+    ...(specimen ? CONSULTS : []).map((cs) => {
       const p = TEAM.find((x) => x.id === cs.with)!
       return { id: cs.id, who: { name: p.name, initials: p.initials, tone: p.tone, role: p.role, reg: REG[p.name], personId: p.id }, title: cs.title, mode: cs.mode, when: cs.when, time: cs.time, minutes: cs.minutes, status: cs.status, prep: cs.prep }
     }),

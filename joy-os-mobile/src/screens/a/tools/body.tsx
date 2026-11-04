@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Pressable, View } from 'react-native'
 import { ArrowLink, Body, Button, Divider, Eyebrow, Icon, Meta, Mono, Pill, Segmented, SpecimenTag, TermChip, Toggle, fmtDate } from '@/components'
 import { useDict } from '@/lib/i18n'
-import { BarRow, Chip, Sparkline, TextField, monoNums } from '@/screens/a/parts'
+import { BarRow, Chip, Sparkline, TextField, monoNums, useIsSpecimen } from '@/screens/a/parts'
 import { BIOMARKERS, CAPACITY, CAPACITY_AT, LE8, LE8_SERIES, PANEL_META, SIGNALS, SPACE_TODAY, type Le8Key, type Le8Status, type Marker } from '@/screens/a/spacesData'
 import { DEVICES as LINKABLE } from '@/screens/b/accountData'
 import { devicesStore, postMemberMessage, threadHref, useStore } from '@/screens/b/bStore'
@@ -28,16 +28,22 @@ import { ToolCard, ToolsHeading, shortDate } from './common'
 
 export function BodyTools() {
   const { t } = useA()
+  // The signals, Essential 8, panel, stack, capacity and biological age are read from Arjun's record.
+  const specimen = useIsSpecimen()
   return (
     <>
       <ToolsHeading>{t('Body tools')}</ToolsHeading>
       <Devices />
-      <Signals />
-      <Le8 />
-      <Vault />
-      <DailyStack />
-      <Capacity />
-      <BiologicalAge />
+      {specimen ? (
+        <>
+          <Signals />
+          <Le8 />
+          <Vault />
+          <DailyStack />
+          <Capacity />
+          <BiologicalAge />
+        </>
+      ) : null}
     </>
   )
 }

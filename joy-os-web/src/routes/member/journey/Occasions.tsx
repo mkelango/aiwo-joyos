@@ -253,6 +253,7 @@ function OccasionForm({ id, tpl, existing, onSent, onKeep }: { id: string; tpl: 
   const add = () => {
     const n = newName.trim()
     if (!n) return
+    if (guard(n)) { setHeld(true); return }
     if (guests.length >= MAX_GUESTS) { setErrors((e) => ({ ...e, add: 'occErrFull' })); return }
     setGuests((gs) => [...gs, { id: `g-${Date.now().toString(36)}`, name: n, generation: newGen, measured: true, elder: newGen === 'elders' }])
     setNewName('')

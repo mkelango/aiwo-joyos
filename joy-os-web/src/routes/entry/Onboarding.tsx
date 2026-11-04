@@ -8,7 +8,8 @@ import { DaybreakButton, Eyebrow, TermDot } from '@/components/joy/primitives'
 import { Button, Card, Pill, Tabs, Toggle } from '@/components/ui'
 import type { TermKey, TermScore } from '@/domain/types'
 import { LANGS, useDict, useLang, useTermText } from '@/lib/i18n'
-import { useApp, type Lang } from '@/lib/store'
+import { interceptsCrisis, useApp, type Lang } from '@/lib/store'
+import { CrisisSheet } from '@/layouts/shared'
 import { CONSENT_ARTEFACTS } from '@/routes/member/account/_consent'
 import { COUNTRIES, DEVICES, EMAIL_RE, INTENTS, ONBOARDING_COPY, ONBOARDING_STEPS as STEPS, countryName, phoneError, type CountryCode, type DeviceId, type OnboardingStep } from './_data'
 import { E, OB, dateLocale } from './_i18n'
@@ -78,7 +79,7 @@ function contactLabel(a: Account) {
 export default function Onboarding() {
   const nav = useNavigate()
   const reduce = useReducedMotion()
-  const { lang, setLang, setRole } = useApp()
+  const { lang, setLang, setRole, setCrisisOpen } = useApp()
   const L = ONBOARDING_COPY[lang] ?? ONBOARDING_COPY.en
   const t = useDict(OB)
 
@@ -218,6 +219,8 @@ export default function Onboarding() {
       setResumable(false)
       return go(resumeTarget, 1)
     }
+    // Emergency intercept first: the name is the first thing typed here, and nothing moves on until support is offered.
+    if (STEPS[step] === 'Account' && interceptsCrisis(`${account.name} ${account.lastName ?? ''}`)) return setCrisisOpen(true)
     const err = validate()
     if (err) {
       setAttempted(true)
@@ -314,6 +317,8 @@ export default function Onboarding() {
           )}
         </div>
       </main>
+      {/* Onboarding sits outside the member layout, so the intercept needs its own sheet here. */}
+      <CrisisSheet guest />
     </div>
   )
 }
@@ -635,6 +640,7 @@ function AgeStep({ headingRef, eyebrow, value, onChange, childName, attempted }:
   const g = value.guardian ?? EMPTY_GUARDIAN
   const c = COUNTRIES.find((x) => x.code === g.country) ?? COUNTRIES[0]
   const [gErr, setGErr] = useState<{ name?: string; contact?: string }>({})
+  const { setCrisisOpen } = useApp()
   const [viewing, setViewing] = useState(false)
   const [declared, setDeclared] = useState(false)
   const [declErr, setDeclErr] = useState(false)
@@ -665,6 +671,7 @@ function AgeStep({ headingRef, eyebrow, value, onChange, childName, attempted }:
     setDeclErr(false)
   }
   const send = () => {
+    if (interceptsCrisis(g.name)) return setCrisisOpen(true)
     const e: typeof gErr = {}
     if (!g.name.trim()) e.name = t('gErrName')
     if (g.via === 'phone') {
@@ -1006,7 +1013,9 @@ function DeviceStep({ headingRef, eyebrow, device, setDevice, linked, onLink, se
 function HouseholdStep({ headingRef, eyebrow, invites, setInvites, draft, setDraft }: HeadRef & { invites: Invite[]; setInvites: (v: Invite[]) => void; draft: Invite; setDraft: (d: Invite) => void }) {
   const [err, setErr] = useState<{ name?: string; contact?: string }>({})
   const t = useDict(OB)
+  const { setCrisisOpen } = useApp()
   const add = () => {
+    if (interceptsCrisis(draft.name)) return setCrisisOpen(true)
     const e: typeof err = {}
     if (!draft.name.trim()) e.name = t('hErrName')
     const c = draft.contact.trim()

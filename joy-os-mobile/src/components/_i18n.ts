@@ -97,8 +97,9 @@ export const KIT = {
   goOnline: { en: 'I’m back online', ta: 'இணைப்பு திரும்பியது', hi: 'मैं फिर ऑनलाइन हूँ' },
   syncing: { en: 'Back online · sending {n} kept on this phone…', ta: 'இணைப்பு திரும்பியது · தொலைபேசியில் இருந்த {n} அனுப்பப்படுகிறது…', hi: 'फिर ऑनलाइन · फ़ोन पर रखे {n} भेजे जा रहे हैं…' },
   synced: { en: 'Synced · {n} sent. Nothing was lost.', ta: 'ஒத்திசைந்தது · {n} அனுப்பப்பட்டது. எதுவும் இழக்கப்படவில்லை.', hi: 'सिंक हो गया · {n} भेजे गए। कुछ नहीं खोया।' },
-  graceBanner: { en: 'Your February payment didn’t go through. Nothing changes until {date}.', ta: 'உங்கள் பிப்ரவரி கட்டணம் செல்லவில்லை. {date} வரை எதுவும் மாறாது.', hi: 'आपका फ़रवरी का भुगतान नहीं हो पाया। {date} तक कुछ नहीं बदलेगा।' },
-  gracePay: { en: 'Pay ₹499 by UPI', ta: 'UPI மூலம் ₹499 செலுத்தவும்', hi: 'UPI से ₹499 चुकाएँ' },
+  graceBanner: { en: 'Your {month} payment didn’t go through. Nothing changes until {date}.', ta: 'உங்கள் {month} கட்டணம் செல்லவில்லை. {date} வரை எதுவும் மாறாது.', hi: 'आपका {month} का भुगतान नहीं हो पाया। {date} तक कुछ नहीं बदलेगा।' },
+  graceBannerPatron: { en: 'Your Patron renewal invoice is still unpaid. Nothing changes until {date}.', ta: 'உங்கள் Patron புதுப்பிப்பு ரசீது இன்னும் செலுத்தப்படவில்லை. {date} வரை எதுவும் மாறாது.', hi: 'आपका Patron नवीनीकरण इनवॉइस अभी बाक़ी है। {date} तक कुछ नहीं बदलेगा।' },
+  gracePay: { en: 'Pay {amount}', ta: '{amount} செலுத்தவும்', hi: '{amount} चुकाएँ' },
   gracePayHint: { en: 'Opens Membership', ta: 'உறுப்பினர் பக்கத்தைத் திறக்கும்', hi: 'सदस्यता खोलता है' },
 
   // Error boundary: a screen that failed is never blank.

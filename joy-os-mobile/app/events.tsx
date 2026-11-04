@@ -8,7 +8,7 @@ import { COHORTS, EVENTS } from '@/shared/platform'
 import { useTheme } from '@/theme/ThemeProvider'
 import { EVENT_DATES, FLAGSHIP_NEXT, FLAGSHIP_RECAP, NYE_PROGRAMME, PASSES, SALONS, SESSIONS_OPEN, SESSION_SCHEDULE, ZONES, passportFor } from '@/screens/b/journeyData'
 import { accountStore, occasionsStore, refCode, useStore, type AccountState, type BadgeDiet, type BookedPass } from '@/screens/b/bStore'
-import { Done, Field, FilterChips, KeyValue, SpecimenQR, TimelineStep, fmtWhen, memberOnly, shareOrCopy, useAccount, useCrisisGuard, useSheetCrisisGuard, useFigures, FigureToggle } from '@/screens/b/parts'
+import { Done, Field, FilterChips, KeyValue, SpecimenQR, TimelineStep, fmtWhen, memberOnly, shareOrCopy, useAccount, useAccountIndex, useCrisisGuard, useSheetCrisisGuard, useFigures, FigureToggle } from '@/screens/b/parts'
 import { useIsMinor } from '@/lib/minor'
 import type { TermKey } from '@/shared/types'
 import { useDict, useTermText } from '@/lib/i18n'
@@ -30,6 +30,8 @@ import { MonoNums } from '@/lib/monoNums'
 // photography consent and diet its badge will print. Under 18 the recap shows no Wheel or Index.
 // The specimen passes, the flagship recap, its Declaration and its invitation and badge are Arjun's
 // (he was there); every other account sees its own passes, bookings and the next edition (L2).
+// So is the day's schedule (only he holds a pass for it) and Kavya as the second place: another
+// account brings a guest. An account with no Index of its own is offered it here.
 
 type Open = (typeof SESSIONS_OPEN)[number]
 type PassView = { key: string; code: string; kind: string; name: string; when: string; where: string; gate: string; seat: string; valid: boolean; booked: boolean }
@@ -88,6 +90,7 @@ function Events() {
   const account = useAccount()
   // Only Arjun was at the flagship: its pass, recap, Declaration and badge are his.
   const attended = account.id === 'arjun'
+  const ownIndex = useAccountIndex()
 
   // Passes: the specimen's two (Arjun's), then everything booked on this phone (Sessions here, salons in Circles).
   const booked = acct.passes ?? []
@@ -235,7 +238,8 @@ function Events() {
         ))}
       </View>
 
-      {/* Schedule: the member's own, editable, with clashes swapped */}
+      {/* Schedule: the member's own, editable, with clashes swapped. Only a pass for that day opens it. */}
+      {attended ? (
       <View style={{ gap: space.s2 }}>
         {/* SectionTitle takes a string; the same header with its date in Mono. */}
         <Eyebrow accessibilityRole="header" aria-level={2}>{fig(t('schedule', { date: fmtDate(EVENT_DATES.ev2.date) }))}</Eyebrow>
@@ -286,6 +290,7 @@ function Events() {
           )}
         </Card>
       </View>
+      ) : null}
 
       {/* Zones */}
       <View style={{ gap: space.s2 }}>
@@ -417,6 +422,7 @@ function Events() {
                 variant="secondary"
                 icon="calendar"
                 onPress={() => {
+                  setReqGuests(attended ? '2' : '1')
                   setReqNote('')
                   setReqPhoto('yes')
                   setReqDiet('Vegetarian')
@@ -431,6 +437,13 @@ function Events() {
       </View>
 
       {/* Index on site (Arjun's, taken at the flagship); every account reaches its Passport */}
+      {!attended && !ownIndex && !minor ? (
+        <Card tone="sunk" style={{ gap: space.s1 }}>
+          <Body>{t('noIndex')}</Body>
+          <Meta>{t('noIndexBody')}</Meta>
+          <ArrowLink onPress={() => router.push('/index-take')}>{t('takeIndex')}</ArrowLink>
+        </Card>
+      ) : null}
       {!attended ? <ArrowLink onPress={() => router.push('/passport')}>{t('passport')}</ArrowLink> : null}
       {attended ? (
       <Card tone="sunk" style={{ gap: space.s1 }}>
@@ -557,7 +570,7 @@ function Events() {
               </KeyValue>
               <KeyValue k={t('kWhere')}>{openWhere(book)}</KeyValue>
               <KeyValue k={t('kPrice')} last>{openPrice(book)}</KeyValue>
-              <Meta>{t('oneSeat')}</Meta>
+              <Meta>{attended ? t('oneSeat') : t('oneSeatGuest')}</Meta>
             </>
           )
         ) : null}
@@ -598,7 +611,7 @@ function Events() {
           onChange={setReqGuests}
           items={[
             { value: '1', label: t('justMe') },
-            { value: '2', label: t('meAnd', { p: PARTNER }) },
+            { value: '2', label: attended ? t('meAnd', { p: PARTNER }) : t('meAndGuest') },
           ]}
         />
         <Eyebrow>{t('badgePhoto')}</Eyebrow>

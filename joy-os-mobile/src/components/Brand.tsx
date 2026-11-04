@@ -1,8 +1,7 @@
 import { router } from 'expo-router'
 import type { ReactNode } from 'react'
 import { Pressable, View } from 'react-native'
-import { NOTICES } from '../screens/b/_data'
-import { notifReadStore, useStore } from '../screens/b/bStore'
+import { useUnreadNotices } from '../screens/b/bStore'
 import { useDict } from '../lib/i18n'
 import { useTheme } from '../theme/ThemeProvider'
 import { KIT } from './_i18n'
@@ -49,12 +48,12 @@ export function AppBar({ right, label = 'Joy OS' }: { right?: ReactNode; label?:
 }
 
 /** Bell in the app bar: opens Notifications; a small Daybreak dot (no count, no badge number)
- *  says something is not yet opened. Shared with the Notifications screen's read state. */
+ *  says something is not yet opened. The same count the Notifications screen reads, so
+ *  "Mark all read" clears the dot. */
 function NotificationsBell() {
   const { c } = useTheme()
   const t = useDict(KIT)
-  const [rd] = useStore(notifReadStore)
-  const unread = NOTICES.filter((n) => !rd.cleared.includes(n.id) && !rd.read.includes(n.id)).length
+  const unread = useUnreadNotices()
   return (
     <Pressable
       onPress={() => router.push('/notifications')}

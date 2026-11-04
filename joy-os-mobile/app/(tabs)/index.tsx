@@ -39,10 +39,10 @@ import { useTheme } from '@/theme/ThemeProvider'
 import { actionsFor, todayActionFor } from '@/screens/a/spacesData'
 import { isSpecimenToday, usePlanned } from '@/screens/a/local'
 import { useCalendarConsent } from '@/screens/a/tools/freedom'
-import { useLatestIndex } from '@/lib/indexRecord'
+import { useHasIndex, useLatestIndex } from '@/lib/indexRecord'
 import type { Action, TermKey } from '@/shared/types'
 import { Rich, useA } from '@/screens/a/i18n'
-import { NotScored, monoNums } from '@/screens/a/parts'
+import { NoIndexYet, NotScored, monoNums, useIsSpecimen } from '@/screens/a/parts'
 import { useIsMinor } from '@/lib/minor'
 
 // TODAY (Memo p.14, p.17, p.18; Playbook p62): the Index and Wheel, the lowest term, one
@@ -52,6 +52,10 @@ import { useIsMinor } from '@/lib/minor'
 // re-measure or signed delta in the ninety days; the action, circle and Ledger stay.
 // The one action follows the lowest term of the latest Index (re-taken on this phone or not), so
 // the eyebrow, the action and its "Why" always name the same term.
+// A member with no Index yet (U2) sees none of Arjun's: the first card is the way to take it, the
+// screen's one Daybreak, and the action that would follow from it waits. The ninety days, the circle,
+// the week's earlier Ledger days and the "with Kavya" reasons are Arjun's own (a minor keeps a
+// ninety days of their own, from Day 0), so no other account is shown them as theirs.
 
 /** Monday to Wednesday from the specimen; Thursday (today) comes from the Ledger itself. */
 const LEDGER_PAST = [true, true, true]
@@ -96,25 +100,51 @@ export default function Today() {
   // A sitting taken on this phone is the newest Index (as on the Index result, shared contract L1);
   // a survey-only sitting (signals down) says so here too.
   const latest = useLatestIndex()
-  const previous = latest.previous
-  const change = latest.value - previous.value
+  const hasIndex = useHasIndex()
+  const specimen = useIsSpecimen()
+  // Only Arjun has an earlier measure on record: anyone else's latest stands on its own.
+  const previous = latest.firstMeasure ? null : latest.previous
+  const change = previous ? latest.value - previous.value : null
   const lowest = termByKey(latest.lowestTerm)
   const lowestScore = latest.terms.find((s) => s.key === latest.lowestTerm)?.value
   // The one action is for the current lowest term (under 18 there is none: the gentlest start).
-  const action = todayActionFor(minor ? null : latest.lowestTerm)
-  const specimenAction = action.id === TODAY_ACTION.id
+  const action = todayActionFor(minor || !hasIndex ? null : latest.lowestTerm)
+  const specimenAction = specimen && action.id === TODAY_ACTION.id
+  const withKavya = specimen && action.shared
   const calendarOn = useCalendarConsent()
   // The written "why" belongs to the specimen Index; and the specimen's names the calendar, so it
   // is shown only while calendar consent stands.
   const showWhy = !minor && !latest.onPhone && (!specimenAction || calendarOn)
-  const day = MEMBER.dayOfLoop
+  const day = specimen ? MEMBER.dayOfLoop : 0
+  const hasLoop = specimen || minor
   const ledgerToday = ledger.filter(isSpecimenToday).length
-  const ledgerDays = WEEK.map((_, i) => (i < TODAY_INDEX ? LEDGER_PAST[i] : i === TODAY_INDEX ? ledgerToday > 0 : false))
+  const ledgerDays = WEEK.map((_, i) => (i < TODAY_INDEX ? specimen && LEDGER_PAST[i] : i === TODAY_INDEX ? ledgerToday > 0 : false))
   const ledgerCount = ledgerDays.filter(Boolean).length
   // Actions planned in a space with "Plan it for today", shown beside the one action.
   const alsoPlanned = (Object.entries(planned) as [TermKey, string][])
-    .map(([k, id]) => ({ k, action: actionsFor(k, action.id).find((a) => a.id === id) }))
+    .map(([k, id]) => ({ k, action: actionsFor(k, action.id, specimen).find((a) => a.id === id) }))
     .filter((x): x is { k: TermKey; action: NonNullable<typeof x.action> } => !!x.action)
+
+  const plannedRows = alsoPlanned.length ? (
+      <View style={{ gap: 4, borderTopWidth: 1, borderTopColor: c.line, paddingTop: space.s1 }} accessibilityLiveRegion="polite">
+        {alsoPlanned.map(({ k, action: a }) => (
+          <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1, minHeight: 44 }}>
+            <View style={{ flex: 1, gap: 2 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <Eyebrow>{ta('Also planned ·')}</Eyebrow>
+                <TermChip term={k} />
+              </View>
+              <Pressable onPress={() => router.push(`/spaces/${termByKey(k).slug}`)} accessibilityRole="link" accessibilityLabel={ta('Also planned: {title} Opens the {space} space.', { title: tx(a.title), space: spaceName(k) })}>
+                <Body>{monoNums(tx(a.title))}</Body>
+              </Pressable>
+            </View>
+            <Button variant="link" size="sm" onPress={() => plan(k, null)} accessibilityLabel={ta('Undo: remove {title} from today', { title: tx(a.title) })}>
+              {ta('Undo')}
+            </Button>
+          </View>
+        ))}
+      </View>
+  ) : null
 
   return (
     <Screen inTabs top={<AppBar />}>
@@ -152,11 +182,13 @@ export default function Today() {
             </Eyebrow>
           </Pressable>
         </Card>
+      ) : !hasIndex ? (
+        <NoIndexYet h1 primary body={ta('Your Wheel, your lowest term and your one action all come from your own Index. It takes about twenty minutes and is saved as you go.')} />
       ) : (
         <Card tone="raised" padding={20} style={{ gap: space.s2 }}>
           <View style={{ gap: space.s1 }}>
             <Eyebrow accessibilityRole="header" aria-level={1}>
-              {t('yourJoyspan')} · {t('dayOf', { n: day })}
+              {specimen ? `${t('yourJoyspan')} · ${t('dayOf', { n: day })}` : t('yourJoyspan')}
             </Eyebrow>
             <SpecimenTag />
           </View>
@@ -173,7 +205,7 @@ export default function Today() {
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.s2 }}>
             <CountUp value={latest.value} size={96} accessibilityLabel={ta('Joyspan Index {n} of 100', { n: latest.value })} />
             <View style={{ paddingBottom: 14, gap: 4 }}>
-              <Delta value={change} size={17} />
+              {change === null ? null : <Delta value={change} size={17} />}
               <BandLabel band={latest.band} />
             </View>
           </View>
@@ -183,7 +215,7 @@ export default function Today() {
             </View>
           ) : null}
           <Body tone="ink2">
-            {ta(change > 0 ? 'Up from {n}. Lowest term:' : change < 0 ? 'Down from {n}. Lowest term:' : 'Level with {n}. Lowest term:', { n: previous.value })} <Body>{name(lowest.key)}</Body>{lang === 'hi' ? '।' : '.'}
+            {previous && change !== null ? ta(change > 0 ? 'Up from {n}. Lowest term:' : change < 0 ? 'Down from {n}. Lowest term:' : 'Level with {n}. Lowest term:', { n: previous.value }) : ta('Your latest measure. Lowest term:')} <Body>{name(lowest.key)}</Body>{lang === 'hi' ? '।' : '.'}
           </Body>
 
           <Divider />
@@ -218,14 +250,15 @@ export default function Today() {
         </Card>
       )}
 
-      {/* The one action */}
+      {/* The one action — it follows from the Index, so it waits for one (under 18, the gentlest start) */}
+      {minor || hasIndex ? (
       <Card tone="sunk" style={{ gap: space.s2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s1, flexWrap: 'wrap' }}>
           <Eyebrow tone="daybreak" style={{ flexShrink: 1 }}>{`${t('today')} · ${name(action.term)}`}</Eyebrow>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Icon name="clock" size={14} color={c.ink3} />
             <Meta tone="ink3" size={14}>
-              {monoNums(ta(action.shared ? '{n} min · with Kavya' : '{n} min · solo', { n: action.minutes }))}
+              {monoNums(ta(withKavya ? '{n} min · with Kavya' : '{n} min · solo', { n: action.minutes }))}
             </Meta>
           </View>
         </View>
@@ -267,7 +300,7 @@ export default function Today() {
               {actionState === 'skipped' ? (
                 ta('That’s fine. Tomorrow will bring another.')
               ) : (
-                <Rich text={ta(action.shared ? 'Done, with the family. *Thank you.*' : 'Done. *Thank you.*')} wrap={(w) => <Serif>{w}</Serif>} />
+                <Rich text={ta(withKavya ? 'Done, with the family. *Thank you.*' : 'Done. *Thank you.*')} wrap={(w) => <Serif>{w}</Serif>} />
               )}
             </Title>
             <Meta>
@@ -282,29 +315,14 @@ export default function Today() {
             </Button>
           </View>
         )}
-        {alsoPlanned.length ? (
-          <View style={{ gap: 4, borderTopWidth: 1, borderTopColor: c.line, paddingTop: space.s1 }} accessibilityLiveRegion="polite">
-            {alsoPlanned.map(({ k, action: a }) => (
-              <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1, minHeight: 44 }}>
-                <View style={{ flex: 1, gap: 2 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <Eyebrow>{ta('Also planned ·')}</Eyebrow>
-                    <TermChip term={k} />
-                  </View>
-                  <Pressable onPress={() => router.push(`/spaces/${termByKey(k).slug}`)} accessibilityRole="link" accessibilityLabel={ta('Also planned: {title} Opens the {space} space.', { title: tx(a.title), space: spaceName(k) })}>
-                    <Body>{monoNums(tx(a.title))}</Body>
-                  </Pressable>
-                </View>
-                <Button variant="link" size="sm" onPress={() => plan(k, null)} accessibilityLabel={ta('Undo: remove {title} from today', { title: tx(a.title) })}>
-                  {ta('Undo')}
-                </Button>
-              </View>
-            ))}
-          </View>
-        ) : null}
+        {plannedRows}
       </Card>
+      ) : plannedRows ? (
+      <Card tone="sunk">{plannedRows}</Card>
+      ) : null}
 
-      {/* Your circle */}
+      {/* Your circle — Arjun's; another account's circle is formed after a first Index */}
+      {specimen ? (
       <Card tone="raised" style={{ gap: space.s2 }}>
         <Eyebrow>{ta('Your circle · {when}', { when: tx(CIRCLE.when) })}</Eyebrow>
         <Body>{ta('Coach Priya and seven others')}</Body>
@@ -335,6 +353,7 @@ export default function Today() {
           {ta('Week {n} of the Practice', { n: CIRCLE.week })}
         </ArrowLink>
       </Card>
+      ) : null}
 
       {/* This week */}
       <Card tone="raised" style={{ gap: space.s2 }}>
@@ -343,7 +362,7 @@ export default function Today() {
             <Eyebrow>{ta('This week · Joy Ledger')}</Eyebrow>
             <TermChip term="D" />
           </View>
-          <LoopRing day={day} size={44} />
+          {hasLoop ? <LoopRing day={day} size={44} /> : null}
         </View>
         <View
           style={{ flexDirection: 'row', justifyContent: 'space-between' }}
@@ -372,19 +391,22 @@ export default function Today() {
             </View>
           ))}
         </View>
-        <Meta>
-          <Rich
-            text={ta('Joy came most from *{a}* and *{b}*.', {
-              a: lang === 'en' ? LEDGER_WEEK[0].tag.toLowerCase() : tx(LEDGER_WEEK[0].tag),
-              b: lang === 'en' ? LEDGER_WEEK[1].tag.toLowerCase() : tx(LEDGER_WEEK[1].tag),
-            })}
-            wrap={(w) => <Meta tone="ink">{w}</Meta>}
-          />
-        </Meta>
+        {specimen ? (
+          <Meta>
+            <Rich
+              text={ta('Joy came most from *{a}* and *{b}*.', {
+                a: lang === 'en' ? LEDGER_WEEK[0].tag.toLowerCase() : tx(LEDGER_WEEK[0].tag),
+                b: lang === 'en' ? LEDGER_WEEK[1].tag.toLowerCase() : tx(LEDGER_WEEK[1].tag),
+              })}
+              wrap={(w) => <Meta tone="ink">{w}</Meta>}
+            />
+          </Meta>
+        ) : null}
         <ArrowLink onPress={() => router.push('/ledger')}>{ta('Add to the Ledger')}</ArrowLink>
       </Card>
 
       {/* The ninety days */}
+      {hasLoop ? (
       <Card tone="outline" style={{ gap: space.s2 }}>
         <Eyebrow>{ta('The ninety days')}</Eyebrow>
         <Body>{monoNums(minor ? ta('Day {n}. Your next review with Priya is on Day 45. Nothing is re-measured: under 18 there is no score.', { n: day }) : ta('Day {n}. Your next review with Priya is on Day 45; the re-measure opens on Day 76.', { n: day }))}</Body>
@@ -435,13 +457,14 @@ export default function Today() {
         {minor ? null : (
           <>
             <Divider />
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }} accessible accessibilityLabel={`${t('nextMeasure')}, ${fmtDateDots(MEMBER.nextMeasure)}`}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }} accessible accessibilityLabel={`${t('nextMeasure')}, ${fmtDateDots(latest.nextMeasure)}`}>
               <Eyebrow>{t('nextMeasure')}</Eyebrow>
-              <Mono tone="ink">{fmtDateDots(MEMBER.nextMeasure)}</Mono>
+              <Mono tone="ink">{fmtDateDots(latest.nextMeasure)}</Mono>
             </View>
           </>
         )}
       </Card>
+      ) : null}
 
       <Sheet open={whyOpen} onClose={() => setWhyOpen(false)} title={ta('Why this, today')}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.s1, flexWrap: 'wrap' }}>
@@ -463,7 +486,7 @@ export default function Today() {
               specimenAction ? (
                 calendarOn ? ta('Calendar clear after 7 pm (consented), Kavya linked, sunset 18:12.') : ta('Your calendar is not read: consent is off in the Trust centre. Kavya linked, sunset 18:12.')
               ) : (
-                <Rich key="fit" text={ta(action.shared ? 'Fits in *{n}* minutes, {when}, with Kavya.' : 'Fits in *{n}* minutes, {when}.', { n: action.minutes, when: ta(WHEN[action.timeOfDay]) })} wrap={(w) => <Mono size={14} tone="ink2">{w}</Mono>} />
+                <Rich key="fit" text={ta(withKavya ? 'Fits in *{n}* minutes, {when}, with Kavya.' : 'Fits in *{n}* minutes, {when}.', { n: action.minutes, when: ta(WHEN[action.timeOfDay]) })} wrap={(w) => <Mono size={14} tone="ink2">{w}</Mono>} />
               ),
             ],
             [ta('One.'), ta('Shown with one reason. “Not today” is never punished.')],

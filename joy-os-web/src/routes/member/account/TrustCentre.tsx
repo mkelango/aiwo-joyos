@@ -19,6 +19,7 @@ import { CALENDAR_NAME, CALENDAR_NONE, CONSENT_DEVICE, EXTRA_DEVICE_CONSENTS, ca
 import { useMemberAccessLog, type MemberAccess } from './_access'
 import { useDict, useTermText } from '@/lib/i18n'
 import { useScoresHidden } from '@/lib/minor'
+import { interceptsCrisis, useApp } from '@/lib/store'
 import { TRUST, useData } from './_i18n'
 
 // TRUST CENTRE (Memo module 14, p.27): who has seen my data, consents by purpose,
@@ -489,6 +490,7 @@ function NomineeCard({ onSaved }: { onSaved: (m: string) => void }) {
   const t = useDict(TRUST)
   const dx = useData()
   const [editing, setEditing] = useState(false)
+  const { setCrisisOpen } = useApp()
   const [nominee, setNominee] = usePersisted('nominee', DEFAULT_NOMINEE)
   const [form, setForm] = useState(nominee)
   const [tried, setTried] = useState(false)
@@ -514,7 +516,9 @@ function NomineeCard({ onSaved }: { onSaved: (m: string) => void }) {
           noValidate
           className="mt-5 grid gap-4"
           onSubmit={(e) => {
-            e.preventDefault(); setTried(true)
+            e.preventDefault()
+            if (interceptsCrisis(form.name)) { setCrisisOpen(true); return }
+            setTried(true)
             if (errs.name || errs.email) return
             setNominee(form); setEditing(false); setTried(false)
             onSaved(t('nomineeSaved', { name: form.name }))

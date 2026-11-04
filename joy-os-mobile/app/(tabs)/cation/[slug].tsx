@@ -22,14 +22,14 @@ import {
   TermDot,
   Title,
 } from '@/components'
-import { MEMBER, TEAM } from '@/shared/member'
-import { useLatestIndex } from '@/lib/indexRecord'
+import { TEAM } from '@/shared/member'
+import { useHasIndex, useLatestIndex } from '@/lib/indexRecord'
 import { useIsMinor } from '@/lib/minor'
 import { CATIONS, CATION_PHASES } from '@/shared/platform'
 import { termByKey } from '@/shared/terms'
 import { useTheme } from '@/theme/ThemeProvider'
 import { CATION_DETAIL, buildItinerary, type ItemKind } from '@/screens/b/journeyData'
-import { CheckLine, ChoiceCard, Field, IconButton, KeyValue, PrimaryChip, useCrisisGuard } from '@/screens/b/parts'
+import { CheckLine, ChoiceCard, Field, IconButton, KeyValue, PrimaryChip, useAccount, useCrisisGuard } from '@/screens/b/parts'
 import { useCationRequests } from '@/screens/a/local'
 import { localDate, Rich, useA } from '@/screens/a/i18n'
 import { monoNums } from '@/screens/a/parts'
@@ -60,8 +60,10 @@ export default function CationDetail() {
   const itinerary = useMemo(() => buildItinerary(slug), [slug])
   const [day, setDay] = useState(1)
   const guard = useCrisisGuard()
+  const account = useAccount()
   const minor = useIsMinor()
   const latest = useLatestIndex()
+  const hasIndex = useHasIndex()
 
   // Request form
   const forTwo = slug === 'lovecation'
@@ -87,7 +89,7 @@ export default function CationDetail() {
   }
 
   const interestOnly = cation.status === 'FY28'
-  const isLowest = !minor && cation.primary === latest.lowestTerm
+  const isLowest = !minor && hasIndex && cation.primary === latest.lowestTerm
   const primaryScore = cation.primary === 'ALL' ? latest.value : latest.terms.find((t) => t.key === cation.primary)?.value
   const current = itinerary.find((x) => x.day === day) ?? itinerary[0]
   const concierge = TEAM.find((p) => p.role === 'Concierge')!.name
@@ -101,7 +103,7 @@ export default function CationDetail() {
     if (outcome.trim().length < 12) errs.outcome = t('In a sentence, what would you like to be different? It is how we measure the ’cation.')
     setErrors(errs)
     if (Object.keys(errs).length === 0)
-      setRequest(slug, { ref: `REQ-${slug.slice(0, 3).toUpperCase()}-${MEMBER.id.slice(-4)}-${String(Date.now()).slice(-4)}`, win, venue, guests, outcome: outcome.trim(), dietary: dietary.trim(), interestOnly })
+      setRequest(slug, { ref: `REQ-${slug.slice(0, 3).toUpperCase()}-${account.aiwoId.slice(-4)}-${String(Date.now()).slice(-4)}`, win, venue, guests, outcome: outcome.trim(), dietary: dietary.trim(), interestOnly })
   }
 
   return (

@@ -47,6 +47,9 @@ export const COMMON = dict({
   // Minors gate (parts NotScored) and VIVA run in a room or tool (vivaParts)
   'Under 18 · not scored': ['18-க்குக் கீழ் · மதிப்பெண் இல்லை', '18 से कम · स्कोर नहीं'],
   'Not scored while under 18.': ['18 வயதுக்குக் கீழ் இருக்கும்வரை மதிப்பெண் இல்லை.', '18 से कम उम्र तक कोई स्कोर नहीं।'],
+  // No Index yet (parts NoIndexYet)
+  'No Index yet': ['இன்னும் குறியீடு இல்லை', 'अभी कोई इंडेक्स नहीं'],
+  'Take the Index': ['குறியீட்டை எடுங்கள்', 'इंडेक्स लें'],
   'You asked: {ask}': ['நீங்கள் கேட்டது: {ask}', 'आपने पूछा: {ask}'],
   'VIVA is drafting…': ['VIVA வரைந்துகொண்டிருக்கிறது…', 'VIVA मसौदा लिख रहा है…'],
   'Drafted by VIVA · method v1.0 · no diagnosis, no advice': ['VIVA வரைந்தது · முறை v1.0 · நோயறிதல் இல்லை, ஆலோசனை இல்லை', 'VIVA का मसौदा · विधि v1.0 · न निदान, न सलाह'],

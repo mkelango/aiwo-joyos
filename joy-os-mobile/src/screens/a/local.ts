@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import type { LedgerEntry, TermKey } from '@/shared/types'
 import type { Lang } from '@/lib/store'
 import { localDate } from './i18n'
@@ -8,75 +8,137 @@ import { SPACE_TODAY } from './spacesData'
 // Lane A: small offline-first helpers kept on the phone (AsyncStorage), so plans, drafts
 // and settings made inside the Lane A screens survive navigation and a reload. The shared
 // store stays untouched; every key here is prefixed `joyos:a:`.
+// What belongs to one member is kept per account (U1): a key in ACCOUNT_SCOPED is read and written
+// under `key@account` for any account but Arjun, whose records keep the plain key they always had.
 
 const PREFIX = 'joyos:a:'
 
-// One in-memory copy per key, shared by every mounted screen. Tab screens (Today) stay
-// mounted, so a change made in a space must reach them without a remount.
-const cache = new Map<string, unknown>()
-const listeners = new Map<string, Set<(v: unknown) => void>>()
-const hydrating = new Map<string, Promise<void>>()
+/** Records of one member's own. Every other key belongs to the phone (saved audio, the contacts permission, a specimen switch). */
+export const ACCOUNT_SCOPED: ReadonlySet<string> = new Set([
+  // The Index and the re-measure
+  'measuredIndex', 'indexSubmitted', 'indexTake', 'indexTakeClinical', 'clinicalRemeasure', 'day90',
+  // ’Cation, Care, the Letter, VIVA and the Ledger's reminders
+  'cationRequests', 'careConsults', 'letterReplies', 'vivaMemory', 'vivaMemoryOn', 'ledgerTimes',
+  // Today, the Practice and the six rooms
+  'planned', 'practiceBaseline',
+  'le8Readings', 'capacityResults', 'dailyStack', 'dailyStackAsked', 'bioAgeAsked', 'bioAgeSignedView',
+  'purposeKept', 'ikigai', 'contributions', 'tomorrow', 'statement', 'careerVennShown', 'careerVenn', 'careerVennOverlap',
+  'orbitPeople', 'orbitCalls', 'twoAm', 'stateOfUsDone', 'couplesCheck', 'circleInCal', 'connections',
+  'calendarConnection', 'noList', 'sabbath', 'peaceOfMind',
+  'plannedPleasures', 'myMomentOfJoy', 'myMomentOfJoyShared',
+  'journal', 'keepMeaning', 'sleepPlan', 'phq4Retakes', 'screenRetakes',
+])
 
-function publish(key: string, v: unknown) {
-  cache.set(key, v)
-  listeners.get(key)?.forEach((fn) => fn(v))
+let localAccount = 'arjun'
+const accountListeners = new Set<() => void>()
+const onAccount = (fn: () => void) => {
+  accountListeners.add(fn)
+  return () => {
+    accountListeners.delete(fn)
+  }
 }
 
-function hydrate(key: string) {
-  if (cache.has(key)) return Promise.resolve()
-  let p = hydrating.get(key)
+/** The key a record is kept under for an account (the signed-in one unless named). */
+const scoped = (key: string, account = localAccount) => (ACCOUNT_SCOPED.has(key) && account !== 'arjun' ? `${key}@${account}` : key)
+
+/** Where AsyncStorage holds a record for an account, for code that reads the phone directly. */
+export const localStorageKey = (key: string, account?: string) => PREFIX + scoped(key, account)
+
+/** Follow the signed-in account: every mounted useLocal of a scoped key moves to that account's record. */
+export function setLocalAccount(id: string) {
+  if (id === localAccount) return
+  localAccount = id
+  accountListeners.forEach((fn) => fn())
+}
+
+// One in-memory copy per stored key, shared by every mounted screen. Tab screens (Today) stay
+// mounted, so a change made in a space must reach them without a remount.
+const cache = new Map<string, unknown>()
+const listeners = new Map<string, Set<() => void>>()
+const hydrating = new Map<string, Promise<void>>()
+
+function publish(stored: string, v: unknown) {
+  cache.set(stored, v)
+  listeners.get(stored)?.forEach((fn) => fn())
+}
+
+function hydrate(stored: string) {
+  if (cache.has(stored)) return Promise.resolve()
+  let p = hydrating.get(stored)
   if (!p) {
-    p = AsyncStorage.getItem(PREFIX + key)
+    p = AsyncStorage.getItem(PREFIX + stored)
       .then((raw) => {
-        if (raw == null || cache.has(key)) return
+        if (raw == null || cache.has(stored)) return
         try {
-          publish(key, JSON.parse(raw))
+          publish(stored, JSON.parse(raw))
         } catch {
           /* ignore a bad value */
         }
       })
       .catch(() => {})
-    hydrating.set(key, p)
+    hydrating.set(stored, p)
   }
   return p
 }
 
+/** Re-read records that were written to AsyncStorage directly, in every scope a screen has already opened. */
+export function refreshLocal(keys: string[]) {
+  const opened = [...new Set([...cache.keys(), ...hydrating.keys()])].filter((stored) => keys.includes(stored.split('@')[0]))
+  return Promise.all(
+    opened.map((stored) =>
+      AsyncStorage.getItem(PREFIX + stored).then((raw) => {
+        if (raw != null) return publish(stored, JSON.parse(raw))
+        cache.delete(stored)
+        listeners.get(stored)?.forEach((fn) => fn())
+      }),
+    ),
+  )
+}
+
 /** useState read from and written to AsyncStorage, shared live across screens. `ready` is true once hydrated. */
 export function useLocal<T>(key: string, initial: T) {
-  const initialRef = useRef(initial)
-  const [value, setValueState] = useState<T>(() => (cache.has(key) ? (cache.get(key) as T) : initial))
-  const [ready, setReady] = useState(() => cache.has(key))
+  const keyNow = () => scoped(key)
+  const stored = useSyncExternalStore(onAccount, keyNow, keyNow)
+  // The starting value goes with the record, so a seed that differs by account follows a switch.
+  const [start, setStart] = useState({ stored, value: initial })
+  if (start.stored !== stored) setStart({ stored, value: initial })
+  const subscribe = useCallback(
+    (fn: () => void) => {
+      let set = listeners.get(stored)
+      if (!set) listeners.set(stored, (set = new Set()))
+      set.add(fn)
+      return () => {
+        set!.delete(fn)
+      }
+    },
+    [stored],
+  )
+  const read = () => (cache.has(stored) ? cache.get(stored) : start.value) as T
+  const value = useSyncExternalStore(subscribe, read, read)
+  const [hydrated, setHydrated] = useState<string | null>(null)
   useEffect(() => {
     let alive = true
-    const fn = (v: unknown) => {
-      if (alive) setValueState(v as T)
-    }
-    let set = listeners.get(key)
-    if (!set) listeners.set(key, (set = new Set()))
-    set.add(fn)
-    hydrate(key).finally(() => {
-      if (!alive) return
-      if (cache.has(key)) setValueState(cache.get(key) as T)
-      setReady(true)
+    hydrate(stored).finally(() => {
+      if (alive) setHydrated(stored)
     })
     return () => {
       alive = false
-      set!.delete(fn)
     }
-  }, [key])
+  }, [stored])
+  const ready = cache.has(stored) || hydrated === stored
   const setValue = useCallback(
     (next: T | ((prev: T) => T)) => {
-      const prev = (cache.has(key) ? cache.get(key) : initialRef.current) as T
+      const prev = (cache.has(stored) ? cache.get(stored) : start.value) as T
       const v = typeof next === 'function' ? (next as (p: T) => T)(prev) : next
-      publish(key, v)
-      AsyncStorage.setItem(PREFIX + key, JSON.stringify(v)).catch(() => {})
+      publish(stored, v)
+      AsyncStorage.setItem(PREFIX + stored, JSON.stringify(v)).catch(() => {})
     },
-    [key],
+    [stored, start],
   )
   const clear = useCallback(() => {
-    publish(key, initialRef.current)
-    AsyncStorage.removeItem(PREFIX + key).catch(() => {})
-  }, [key])
+    publish(stored, start.value)
+    AsyncStorage.removeItem(PREFIX + stored).catch(() => {})
+  }, [stored, start])
   return [value, setValue, ready, clear] as const
 }
 

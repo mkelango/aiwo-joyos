@@ -115,4 +115,15 @@ export const RESULT = {
   signalsDownNote: { en: 'Signals are down: no device is connected, or its readings are old. Your next sitting will be survey-only unless you link one.', ta: 'சமிக்ஞைகள் கிடைக்கவில்லை: எந்தச் சாதனமும் இணைக்கப்படவில்லை, அல்லது அதன் அளவீடுகள் பழையவை. ஒன்றை இணைக்காவிட்டால் உங்கள் அடுத்த அமர்வு கேள்வித்தாள் மட்டுமாக இருக்கும்.', hi: 'संकेत बंद हैं: कोई डिवाइस जुड़ा नहीं, या उसकी रीडिंग पुरानी हैं। जब तक आप एक नहीं जोड़ते, आपकी अगली बैठक सिर्फ़ प्रश्नावली होगी।' },
   openDevices: { en: 'Open Devices', ta: 'சாதனங்களைத் திற', hi: 'डिवाइस खोलें' },
   historySurvey: { en: 'survey only', ta: 'கேள்வித்தாள் மட்டும்', hi: 'सिर्फ़ प्रश्नावली' },
+  // An account with no Index yet (NoIndexScreen), and one whose only measure is the one it took here.
+  noneA: { en: 'No Index ', ta: 'இன்னும் ', hi: 'अभी कोई ' },
+  noneSerif: { en: 'yet', ta: 'குறியீடு இல்லை', hi: 'इंडेक्स नहीं' },
+  noneB: { en: '.', ta: '.', hi: '।' },
+  noneLead: { en: 'You have not taken the Index yet, so there is no number to explain. It takes two sittings, about twenty minutes in all.', ta: 'நீங்கள் இன்னும் குறியீட்டை எடுக்கவில்லை, அதனால் விளக்குவதற்கு எண் எதுவும் இல்லை. இரண்டு அமர்வுகள், மொத்தம் சுமார் இருபது நிமிடங்கள்.', hi: 'आपने अभी इंडेक्स नहीं लिया है, इसलिए समझाने को कोई नंबर नहीं है। इसमें दो बैठकें लगती हैं, कुल लगभग बीस मिनट।' },
+  noneTake: { en: 'Take the Index', ta: 'குறியீட்டை எடுங்கள்', hi: 'इंडेक्स लें' },
+  onlyMeasure: { en: 'This is the only measure on record for you, so there is nothing to set it beside yet. {name} is the lowest term, so it holds the Index back most.', ta: 'உங்களுக்குப் பதிவில் உள்ள ஒரே அளவீடு இது, அதனால் ஒப்பிட இன்னும் எதுவும் இல்லை. {name} மிகக் குறைந்த அம்சம், அதனால் அதுவே குறியீட்டை அதிகம் பின்னுக்கு இழுக்கிறது.', hi: 'आपके रिकॉर्ड में यही एक माप है, इसलिए अभी तुलना के लिए कुछ नहीं है। {name} सबसे कम पहलू है, इसलिए यही इंडेक्स को सबसे ज़्यादा रोकता है।' },
+  oneMeasure: { en: 'One measure', ta: 'ஒரு அளவீடு', hi: 'एक माप' },
+  historyOwn: { en: 'The measures on record for you, newest first.', ta: 'உங்களுக்குப் பதிவில் உள்ள அளவீடுகள், புதியது முதலில்.', hi: 'आपके रिकॉर्ड के माप, सबसे नया पहले।' },
+  nextOwnA: { en: 'The re-measure opens on Day 76 and closes with a signed delta on ', ta: 'மறு அளவீடு நாள் 76 இல் திறந்து, கையொப்பமிட்ட மாற்றத்துடன் ', hi: 'दोबारा माप दिन 76 को खुलता है और हस्ताक्षरित बदलाव के साथ ' },
+  clearQOwn: { en: 'Remove the measure taken on this phone? It is your only one, so your Index will read as not yet taken.', ta: 'இந்தத் தொலைபேசியில் எடுத்த அளவீட்டை நீக்கவா? இது உங்கள் ஒரே அளவீடு, அதனால் உங்கள் குறியீடு இன்னும் எடுக்கப்படவில்லை என்றே காட்டப்படும்.', hi: 'इस फ़ोन पर लिया गया माप हटाएँ? यह आपका अकेला माप है, इसलिए आपका इंडेक्स ऐसा दिखेगा जैसे अभी लिया ही नहीं गया।' },
 } satisfies Dict

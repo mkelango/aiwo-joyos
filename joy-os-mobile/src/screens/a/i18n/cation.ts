@@ -214,6 +214,8 @@ export const CATION = dict({
 
   // Empty state (a member with no ’cation yet) and Joyspan Occasions
   'Specimen view: a member with no ’cation yet': ['மாதிரிப் பார்வை: இன்னும் ’கேஷன் எடுக்காத உறுப்பினர்', 'नमूना दृश्य: ऐसा सदस्य जिसने अभी कोई ’केशन नहीं लिया'],
+  'You have not taken a ’cation yet. Your Index will show where one would help most.': ['நீங்கள் இன்னும் ’கேஷன் எடுக்கவில்லை. எங்கு அது அதிகம் உதவும் என்பதை உங்கள் குறியீடு காட்டும்.', 'आपने अभी कोई ’cation नहीं लिया है। आपका इंडेक्स दिखाएगा कि कहाँ उससे सबसे ज़्यादा मदद मिलेगी।'],
+  'Your lowest term points to the ’cation that would help you most. All ten are here to look at meanwhile.': ['உங்கள் மிகக் குறைந்த அம்சம், உங்களுக்கு அதிகம் உதவும் ’கேஷனைக் காட்டும். அதுவரை பத்தும் இங்கே பார்க்கக் கிடைக்கின்றன.', 'आपका सबसे निचला पहलू बताता है कि कौन-सा ’cation आपकी सबसे ज़्यादा मदद करेगा। तब तक सभी दस यहाँ देखे जा सकते हैं।'],
   'See this tab as it looks before a first stay. Turn it off to return to Arjun’s Joycation.': ['முதல் தங்கலுக்கு முன் இந்தத் தாவல் எப்படித் தெரியும் என்று பாருங்கள். அர்ஜுனின் Joycation-க்குத் திரும்ப இதை அணையுங்கள்.', 'देखिए कि पहले ठहराव से पहले यह टैब कैसा दिखता है। अर्जुन के Joycation पर लौटने के लिए इसे बंद करें।'],
   'none taken yet': ['இன்னும் எதுவும் எடுக்கவில்லை', 'अभी कोई नहीं लिया'],
   'You have not taken a ’cation yet. Your Index already says where one would help most.': ['நீங்கள் இன்னும் ’கேஷன் எடுக்கவில்லை. எது அதிகம் உதவும் என்பதை உங்கள் குறியீடு ஏற்கெனவே சொல்கிறது.', 'आपने अभी कोई ’केशन नहीं लिया है। आपका इंडेक्स पहले से बताता है कि सबसे ज़्यादा मदद कहाँ होगी।'],

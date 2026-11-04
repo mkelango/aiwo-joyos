@@ -23,6 +23,9 @@ import { ALL_PURPOSES, consentAllows, readConsents, setDeviceConsent, termsFor, 
 // A device is connected only while its consent is given (see _links): connecting grants it with
 // the purposes chosen here, disconnecting withdraws it, and a withdrawal in the Trust centre
 // disconnects the device. Each change is a consent_event in the Trust centre's history.
+// "Mark as not syncing" is a specimen control: with no real device to fall silent, it sets the
+// freshness in the device record, which is what Body's signal trends read. Sync now or the
+// same button undoes it.
 type Device = (typeof DEVICES)[number] & { purposes?: DevicePurpose[] }
 type DeviceOverride = { state: DeviceState; lastSync?: string; freshness?: 'fresh' | 'stale'; purposes?: DevicePurpose[] }
 function applyDeviceStates(states: Record<string, DeviceOverride>, consents: ConsentRecord): Device[] {
@@ -36,6 +39,9 @@ function applyDeviceStates(states: Record<string, DeviceOverride>, consents: Con
 }
 /** A wear-chart night (day of January 2027) as a localised day and month. */
 const wearDay = (d: string) => fmtShortDate(`2027-01-${d.padStart(2, '0')}`)
+
+/** The last sync of a device marked as not syncing: the morning Body's trend line ends on, with last night missing. */
+const STALE_SYNC = 'Wed 27 Jan · 06:42'
 
 /** Specimen samples per sync, per source. */
 const SAMPLES: Record<string, number> = { oura: 288, apple: 124 }
@@ -104,6 +110,12 @@ export default function Devices() {
     }, 1400)
   }
 
+  const markStale = (d: Device, on: boolean) => {
+    setDevices((ds) => ds.map((x) => (x.id === d.id ? { ...x, freshness: on ? 'stale' : 'fresh', lastSync: on ? STALE_SYNC : DEVICES.find((b) => b.id === d.id)?.lastSync ?? 'Just now' } : x)))
+    showToast(t(on ? 'markedStale' : 'markedFresh', { name: d.name }))
+  }
+  const staleNames = connected.filter((d) => d.freshness === 'stale').map((d) => d.name)
+
   const wornNights = WEAR_NIGHTS.filter((n) => n.h >= 4).length
   const gaps = WEAR_NIGHTS.filter((n) => n.h === 0)
   const short = WEAR_NIGHTS.filter((n) => n.h > 0 && n.h < 4)
@@ -152,6 +164,12 @@ export default function Devices() {
                 <Pill tone={d.freshness === 'fresh' ? 'positive' : 'caution'}>{d.freshness === 'fresh' ? t('fresh') : t('stale')}</Pill>
               </div>
               <p className="mt-4 flex items-center gap-1.5 text-[14px] text-ink-2"><Clock size={14} className="text-ink-3" /> {rich(t('lastSync'), { when: <span className="num text-ink">{syncing ? t('syncingLower') : dx(d.lastSync ?? '')}</span> })}</p>
+              {d.freshness === 'stale' && (
+                <p role="status" className="mt-3 rounded-card border border-dashed border-line-strong px-3 py-2 text-[14px] text-ink-2">
+                  {nums(t('staleCard', { name: d.name, when: dx(d.lastSync ?? '') }))}
+                  {d.id === 'oura' && (!d.purposes || d.purposes.includes('body')) && <>{' '}<Link to="/app/spaces/body" className="text-ink underline underline-offset-4 focus-ring">{t('staleSee', { space: tt.space('H') })}</Link></>}
+                </p>
+              )}
               <p className="mt-3 text-[15px] text-ink-2">{nums(dx(d.note))}</p>
               <div className="mt-4 flex flex-wrap gap-1.5">
                 {d.signals.map((s) => <Pill key={s}>{dx(s)}</Pill>)}
@@ -179,8 +197,10 @@ export default function Devices() {
                 </div>
               )}
 
-              <div className="mt-auto flex gap-2 pt-5">
+              <div className="mt-auto flex flex-wrap items-center gap-2 pt-5">
                 <Button size="sm" variant="ghost" onClick={() => setDisconnect(d)}>{t('disconnect')}</Button>
+                <Button size="sm" variant="ghost" disabled={syncing} onClick={() => markStale(d, d.freshness !== 'stale')}>{d.freshness === 'stale' ? t('markSyncing') : t('markStale')}</Button>
+                <SpecimenTag />
               </div>
             </Card>
           ))}
@@ -244,7 +264,7 @@ export default function Devices() {
               <QualityRow label={t('gaps')} value={t('nNights', { n: gaps.length })} note={t('gapsNote', { days: gaps.map((g) => g.d).join(lang === 'en' ? ' and ' : ', ') })} />
               <QualityRow label={t('shortNights')} value={t(short.length === 1 ? 'nNight' : 'nNights', { n: short.length })} note={t('shortNote', { day: short[0]?.d ?? '—' })} />
               <QualityRow ok={!hk.find((x) => x.id === 'sleep')?.on} label={t('overlap')} value={hk.find((x) => x.id === 'sleep')?.on ? t('twoSources') : t('fromOura')} note={hk.find((x) => x.id === 'sleep')?.on ? t('overlapOn') : t('overlapOff')} />
-              <QualityRow ok label={t('freshness')} value={t('under72')} note={t('freshNote')} />
+              <QualityRow ok={staleNames.length === 0} label={t('freshness')} value={staleNames.length > 0 ? t('notSyncing') : t('under72')} note={staleNames.length > 0 ? t('staleNote', { names: staleNames.join(', ') }) : t('freshNote')} />
             </ul>
           </Card>
         </div>

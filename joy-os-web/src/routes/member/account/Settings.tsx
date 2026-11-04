@@ -7,9 +7,9 @@ import { DaybreakButton } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill, Sheet } from '@/components/ui'
 import { MEMBER } from '@/data/member'
 import { LANGS, fill, useT, useDict } from '@/lib/i18n'
-import { useApp, type TextSize } from '@/lib/store'
+import { interceptsCrisis, useApp, type TextSize } from '@/lib/store'
 import { playSound } from '@/lib/sound'
-import { DEFAULT_NOTIF_PREFS, LEDGER_TIMES, NOTIF_TYPES, pushesPerDay, type Channel, type NotifPrefs } from './_data'
+import { DEFAULT_NOTIF_PREFS, LEDGER_TIMES, NOTIF_TYPES, pushesPerDay, quietOptions, type Channel, type NotifPrefs } from './_data'
 import { Field, LinkButton, Section, Segmented, Select, Toggle } from './_parts'
 import { applyReducedMotion, inputCls, nums, rich, usePersisted, useToast } from './_util'
 import { SET, useData } from './_i18n'
@@ -28,7 +28,6 @@ const CHANNELS: { id: Channel; label: string; icon: typeof Smartphone; desc: str
   { id: 'email', label: 'Email', icon: Mail, desc: 'Weekly digest, invoices' },
   { id: 'letter', label: 'The Letter', icon: BookOpen, desc: 'Monthly, by post' },
 ]
-const TIMES = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`).concat(['21:45']).sort()
 
 export default function Settings() {
   const t = useDict(SET)
@@ -175,8 +174,8 @@ export default function Settings() {
                 <p className="mt-0.5 text-[14px] text-ink-2">{t('quietDesc')}</p>
                 {n.quietFrom === n.quietTo && <p role="alert" className="mt-2 text-[14px] text-error">{t('quietSame')}</p>}
                 <div className="mt-3 grid max-w-sm grid-cols-2 gap-3">
-                  <Field label={t('from')}>{(id) => <Select id={id} value={n.quietFrom} onChange={(v) => setN({ ...n, quietFrom: v })} options={TIMES.map((x) => ({ value: x, label: x }))} className="num" />}</Field>
-                  <Field label={t('until')}>{(id) => <Select id={id} value={n.quietTo} onChange={(v) => setN({ ...n, quietTo: v })} options={TIMES.map((x) => ({ value: x, label: x }))} className="num" />}</Field>
+                  <Field label={t('from')}>{(id) => <Select id={id} value={n.quietFrom} onChange={(v) => setN({ ...n, quietFrom: v })} options={quietOptions(n.quietFrom, saved.quietFrom)} className="num" />}</Field>
+                  <Field label={t('until')}>{(id) => <Select id={id} value={n.quietTo} onChange={(v) => setN({ ...n, quietTo: v })} options={quietOptions(n.quietTo, saved.quietTo)} className="num" />}</Field>
                 </div>
               </div>
               <div className="border-t border-line px-5 py-5 md:px-6">
@@ -363,6 +362,7 @@ export default function Settings() {
 
 function PasskeyForm({ existing, onAdded, onCancel }: { existing: string[]; onAdded: (name: string) => void; onCancel: () => void }) {
   const t = useDict(SET)
+  const { setCrisisOpen } = useApp()
   const [name, setName] = useState('')
   const [step, setStep] = useState<'name' | 'device'>('name')
   const [tried, setTried] = useState(false)
@@ -381,7 +381,7 @@ function PasskeyForm({ existing, onAdded, onCancel }: { existing: string[]; onAd
     )
   }
   return (
-    <form noValidate className="space-y-4" onSubmit={(e) => { e.preventDefault(); setTried(true); if (!err) { setTried(false); setStep('device') } }}>
+    <form noValidate className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (interceptsCrisis(name)) { setCrisisOpen(true); return } setTried(true); if (!err) { setTried(false); setStep('device') } }}>
       <p className="text-[17px] text-ink-2">{t('pkIntro')}</p>
       <Field label={t('pkName')} error={tried ? err : null}>{(id, d) => <input id={id} aria-describedby={d} value={name} onChange={(e) => setName(e.target.value)} placeholder={t('pkPlaceholder')} autoComplete="off" className={inputCls} />}</Field>
       <div className="flex justify-end gap-2 pt-2">

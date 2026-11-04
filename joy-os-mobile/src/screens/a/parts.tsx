@@ -1,12 +1,14 @@
+import { router } from 'expo-router'
 import { useState, type ReactNode } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text as RNText, TextInput, View, type StyleProp, type TextInputProps, type TextStyle, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, Defs, Line, Path, Rect } from 'react-native-svg'
-import { Body, Eyebrow, HatchPattern, Icon, InkSurface, Meta, Mono, ScriptText, TermDot, useSvgId, type IconName } from '@/components'
+import { ArrowLink, Body, Card, DaybreakButton, EmptyIllustration, Eyebrow, HatchPattern, Icon, InkSurface, Meta, Mono, ScriptText, TermDot, useSvgId, type IconName } from '@/components'
 import type { TermKey } from '@/shared/types'
 import { splitNums } from '@/lib/monoNums'
 import { useTheme } from '@/theme/ThemeProvider'
 import { fonts, palettes } from '@/theme/tokens'
+import { useAccountId } from '@/screens/b/bStore'
 import { useA } from './i18n'
 
 // Lane A helpers: sparkline, chips, text field, provenance, Ink ground screen.
@@ -329,6 +331,35 @@ function ScrollPad({ children, bottom }: { children: ReactNode; bottom: number }
 
 /** Ink-ground palette (the dark palette's lines and grounds), for borders on InkScreen. */
 export const INK = palettes.dark
+
+/** True for Arjun, the specimen member: the seeded records, ninety days, household and circle on these screens are his alone. */
+export const useIsSpecimen = () => useAccountId() === 'arjun'
+
+/**
+ * The honest empty state for a member with no Index yet (U2): nothing of anyone else's, and a way to
+ * take it. `primary` makes that way the screen's one Daybreak; `h1` when the screen has no header.
+ */
+export function NoIndexYet({ body, primary = false, h1 = false }: { body: string; primary?: boolean; h1?: boolean }) {
+  const { space } = useTheme()
+  const { t } = useA()
+  const take = () => router.push('/index-take')
+  return (
+    <Card tone="raised" style={{ gap: space.s2 }}>
+      <EmptyIllustration width={128} />
+      <View style={{ gap: 6 }}>
+        <Eyebrow {...(h1 ? ({ accessibilityRole: 'header', 'aria-level': 1 } as const) : {})}>{t('No Index yet')}</Eyebrow>
+        <Body tone="ink2">{monoNums(body)}</Body>
+      </View>
+      {primary ? (
+        <DaybreakButton icon="arrow-right" onPress={take}>
+          {t('Take the Index')}
+        </DaybreakButton>
+      ) : (
+        <ArrowLink onPress={take}>{t('Take the Index')}</ArrowLink>
+      )}
+    </Card>
+  )
+}
 
 /**
  * The calm note shown where a score, band, delta or Wheel value would be for a member under 18

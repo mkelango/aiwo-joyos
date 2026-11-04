@@ -13,6 +13,7 @@ import { useDict } from '@/lib/i18n'
 import { CARE, useData } from './_i18n'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { ReadAloud, SpeakAnswer } from './_voice'
+import { whenOrder } from './_when'
 
 // CARE (Memo p.17, module 09 Care bridge): my people, the stepped-care ladder,
 // consults under the Telemedicine Practice Guidelines 2020, signed results, e-Rx
@@ -40,6 +41,8 @@ export default function Care() {
   const [role, setRole] = useState<'Psychologist' | 'Physician'>('Psychologist')
   // Same per-viewer thread store as Messages, so the badge follows what the member has read.
   const unreadMessages = usePersisted('threads', { list: THREADS })[0].list.reduce((a, th) => a + th.unread, 0)
+  /** A person's earliest consult on the list below: what their card shows as next, so the two never disagree. */
+  const soonestWith = (name: string) => consults.filter((c) => c.who.name === name).sort((a, b) => whenOrder(a.when, a.time) - whenOrder(b.when, b.time))[0]
   const findClinician = (r: 'Psychologist' | 'Physician') => { setRole(r); document.getElementById('match')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
 
   return (
@@ -68,6 +71,9 @@ export default function Care() {
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {TEAM.map((p) => {
             const d = PEOPLE_DETAIL[p.id]
+            const c = soonestWith(p.name)
+            const nextWhen = c ? dx(`${c.when.replace(/ \d{4}$/, '')} · ${c.time}`) : dx(d.next)
+            const nextKind = c ? `${dx('Video consult')} · ${t(c.status)}` : d.nextKind && dx(d.nextKind)
             return (
               <Card as="li" key={p.id} className="flex flex-col">
                 <div className="flex items-center gap-3">
@@ -79,7 +85,7 @@ export default function Care() {
                 </div>
                 <p className="mt-4 text-[15px] leading-relaxed text-ink-2">{nums(dx(d.line))}</p>
                 <dl className="mt-4 space-y-2 border-t border-line pt-4 text-[14px]">
-                  <div className="flex justify-between gap-3"><dt className="text-ink-3">{t('next')}</dt><dd className="text-right text-ink"><span className="num">{dx(d.next)}</span><span className="block text-[13px] text-ink-2">{dx(d.nextKind)}</span></dd></div>
+                  <div className="flex justify-between gap-3"><dt className="text-ink-3">{t('next')}</dt><dd className="text-right text-ink"><span>{nums(nextWhen)}</span>{nextKind && <span className="block text-[13px] text-ink-2">{nextKind}</span>}</dd></div>
                   <div className="flex justify-between gap-3"><dt className="text-ink-3">{t('speaks')}</dt><dd className="text-right text-ink-2">{dx(d.languages)}</dd></div>
                   <div className="flex justify-between gap-3"><dt className="text-ink-3">{t('since')}</dt><dd className="num text-right text-ink-2">{dx(d.since)}</dd></div>
                 </dl>

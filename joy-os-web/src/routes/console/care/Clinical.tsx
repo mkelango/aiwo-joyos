@@ -13,8 +13,9 @@ import {
   CLINICAL_RECORDS, CLOSE_OUTCOMES, EXTRA_FORMULARY, EXTRA_INTERACTIONS, FORMULARY, MD_CONFIG, MEERA, MEMBER_IDS, RETURN_REASONS, SCREEN_ROUTES, SCREEN_ROUTE_OWNER,
   type SafetyAlert,
 } from './_data'
-import { REDRAW, clinical, recordOf, redrawTestFor, stampOf, useClinicalState, type ClinicalAudit, type Draft, type MdActive, type MdHistory, type Order, type Screen, type RemeasureWork, type Sent, type SignItem, type SoapNote } from './_clinicalStore'
+import { REDRAW, clearEaseRoute, clinical, clockEndingToday, followedAlert, liveScreenOrders, markEaseRouted, orderStatus, recordOf, redrawTestFor, screenRouteLabel, stampOf, useClinicalState, type ClinicalAudit, type Draft, type EaseLive, type MdActive, type MdHistory, type Order, type Screen, type RemeasureWork, type Sent, type SignItem, type SoapNote } from './_clinicalStore'
 import { PreviewBanner, useConsoleAccess } from './_gate'
+import { mono } from '@/routes/member/spaces/_i18n'
 import { recordSessionRead } from './_memberShare'
 import { CLINICAL_PURPOSES, ReasonGate } from './_purpose'
 import { REMEASURE_OCCASION, remeasure, useRemeasure, type Remeasure } from './_remeasure'
@@ -439,24 +440,35 @@ function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canA
     const owner = SCREEN_ROUTE_OWNER[r] ?? MEERA.name
     const memberId = MEMBER_IDS[q.member] ?? ''
     const existing = alerts.find((a) => a.memberId === memberId && a.status !== 'closed')
+    // A member told to expect a call today gets a clock that ends today, not the config's 48 h.
+    const sameDay = q.live?.within === 'Call today'
+    const openedAt = new Date(now).toISOString()
+    const slaMinutes = sameDay ? clockEndingToday({ openedAt, slaMinutes: md.values.p1 * 60 }, now) : md.values.p1 * 60
+    // An alert already open keeps its place on the board, on a clock that keeps that same promise.
+    const reusedClock = existing && sameDay ? clockEndingToday(existing, now) : undefined
+    const tightened = !!existing && reusedClock !== undefined && reusedClock < existing.slaMinutes
     let alertId = existing?.id
     if (!existing) {
-      alertId = `s-${q.id}`
+      // A live row can be routed again after its alert closes, so its alert id carries the time.
+      alertId = q.live ? `s-${q.id}-${now}` : `s-${q.id}`
       setAlerts((xs) => [...xs, {
         id: alertId!, member: q.member, memberId, priority: 'P1', kind: `Screen threshold · ${q.instrument}`,
-        detail: `${q.instrument} = ${q.score} (threshold ≥ ${q.threshold}). Routed: ${r.toLowerCase()}.`,
-        openedAt: new Date(now).toISOString(), slaMinutes: md.values.p1 * 60, owner, status: 'open',
+        detail: `${q.instrument} = ${q.score} (threshold ≥ ${q.threshold}). Routed: ${r.toLowerCase()}.${q.live?.status === 'callRequested' ? ' The member asked for a call sooner.' : ''}`,
+        openedAt, slaMinutes, owner, status: 'open',
       }])
     }
-    setScreens((s) => s.map((x) => (x.id === q.id ? { ...x, route: `${r} · ${owner}`, routedAt: fmtClock(now), alertId: existing ? undefined : alertId } : x)))
-    log({ what: `Routed ${q.instrument} ${q.score}/${q.max} to ${r} · ${owner}${existing ? '' : ` · P1 raised on config ${md.version}`}`, purpose: 'Screen-threshold routing', member: q.member })
-    setNotice(`${q.member} routed to ${owner} · ${r}. ${existing ? 'An alert is already open on the safety board.' : `A P1 is now on the safety board with a ${md.values.p1} h clock (config ${md.version}).`}`)
+    if (tightened) setAlerts((xs) => xs.map((a) => (a.id === existing.id ? { ...a, slaMinutes: reusedClock, detail: `${a.detail} ${q.instrument} = ${q.score}: the member was told to expect a call today, so the clock now ends today.` } : a)))
+    setScreens((s) => s.map((x) => (x.id === q.id ? { ...x, route: `${r} · ${owner}`, routedAt: fmtClock(now), alert: alertId, alertId: existing ? undefined : alertId } : x)))
+    markEaseRouted(q, owner)
+    log({ what: `Routed ${q.instrument} ${q.score}/${q.max} to ${r} · ${owner}${existing ? (tightened ? ` · ${existing.priority} clock now ends today` : '') : ` · P1 raised on config ${md.version}`}`, purpose: 'Screen-threshold routing', member: q.member })
+    setNotice(`${q.member} routed to ${owner} · ${r}. ${existing ? `An alert is already open on the safety board.${tightened ? ` Its clock now ends today: ${q.member.split(' ')[0]} was told to expect a call today.` : ''}` : sameDay ? `A P1 is now on the safety board, on a clock that ends today: ${q.member.split(' ')[0]} was told to expect a call today.` : `A P1 is now on the safety board with a ${md.values.p1} h clock (config ${md.version}).`}`)
   }
   const undo = (q: Screen) => {
     if (!canActOn(MEMBER_IDS[q.member])) return
     log({ what: `Undid routing of ${q.instrument} ${q.score}/${q.max} (${q.route})${q.alertId ? ' · its P1 withdrawn' : ''}`, purpose: 'Screen-threshold routing', member: q.member })
-    setScreens((s) => s.map((x) => (x.id === q.id ? { ...x, route: 'Unassigned', routedAt: undefined, alertId: undefined } : x)))
+    setScreens((s) => s.map((x) => (x.id === q.id ? { ...x, route: 'Unassigned', routedAt: undefined, alertId: undefined, alert: undefined } : x)))
     if (q.alertId) setAlerts((xs) => xs.filter((a) => a.id !== q.alertId))
+    clearEaseRoute(q)
     setNotice(`Routing for ${q.member} undone.`)
   }
 
@@ -480,9 +492,15 @@ function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canA
             {screens.map((q) => {
               const routed = q.route !== 'Unassigned'
               const owner = choice[q.id] ? SCREEN_ROUTE_OWNER[choice[q.id]] : null
+              const link = followedAlert(q, alerts)
+              // Undo takes back a routing, never a contact made or an outcome signed.
+              const undoable = !!q.routedAt && (!link || (q.alertId ? link.status === 'open' : link.status !== 'closed'))
               return (
                 <tr key={q.id} className="border-b border-line last:border-0 align-middle">
-                  <td className="py-3.5 pr-4 text-[15px]"><MemberLink name={q.member} onOpen={onOpen} /></td>
+                  <td className="py-3.5 pr-4 text-[15px]">
+                    <MemberLink name={q.member} onOpen={onOpen} />
+                    {q.live && <span className="eyebrow mt-0.5 block text-ink-3">From the app</span>}
+                  </td>
                   <td className="py-3.5 pr-4"><span className="inline-flex items-center gap-2"><TermDot term="B" /> {q.instrument} <span className="sr-only">Preventable Suffering</span></span></td>
                   <td className="py-3.5 pr-4">
                     <div className="flex items-center gap-3">
@@ -499,9 +517,9 @@ function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canA
                   <td className="py-3.5">
                     {routed ? (
                       <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                        <span className="text-[14px] text-ink">{q.routedAt ? 'Routed · ' : ''}{q.route}</span>
+                        <span className="text-[14px] text-ink">{mono(screenRouteLabel(q, alerts))}</span>
                         {q.routedAt && <span className="num text-[12px] text-ink-3">{q.routedAt}</span>}
-                        {q.routedAt && canActOn(MEMBER_IDS[q.member]) && <button onClick={() => undo(q)} className="inline-flex items-center gap-1 text-[13px] text-ink underline underline-offset-4 focus-ring"><Undo2 size={12} aria-hidden /> Undo</button>}
+                        {undoable && canActOn(MEMBER_IDS[q.member]) && <button onClick={() => undo(q)} className="inline-flex items-center gap-1 text-[13px] text-ink underline underline-offset-4 focus-ring"><Undo2 size={12} aria-hidden /> Undo</button>}
                       </span>
                     ) : (
                       <div className="flex flex-wrap items-center gap-2">
@@ -514,6 +532,7 @@ function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canA
                         {owner && <span className="w-full text-[12px] text-ink-3">Goes to {owner}</span>}
                       </div>
                     )}
+                    {q.live && <LiveRowNote live={q.live} routed={routed} closed={link?.status === 'closed'} />}
                   </td>
                 </tr>
               )
@@ -522,7 +541,20 @@ function ScreenQueue({ screens, setScreens, alerts, setAlerts, now, onOpen, canA
         </table>
       </div>
       <p className="mt-4 text-[13px] text-ink-3">Members see their screen history in pre-approved copy written with psychologists. No AI text is ever written on a Suffering result. Non-English answers keep their language through review.</p>
+      {screens.some((q) => q.live) && <p className="mt-2 text-[13px] text-ink-3">Rows from the app are today’s results in a band Ease routes, PSS-4 and pain on their own bands. A route or a close is written back to the member’s record.</p>}
     </Card>
+  )
+}
+
+/** What the member was told, and anything they have done since, under a live row's route. */
+function LiveRowNote({ live, routed, closed }: { live: EaseLive; routed: boolean; closed: boolean }) {
+  return (
+    <span className="mt-1.5 block space-y-1 text-[12px] text-ink-3">
+      <span className="block">{mono(`Told in the app: ${live.told} · ${live.within.toLowerCase()}`)}</span>
+      {live.status === 'callRequested' && !closed && <span className="flex items-center gap-1.5 text-[13px] text-ink"><Phone size={12} aria-hidden /> Asked for a call sooner</span>}
+      {live.status === 'closed' && !closed && <span className="block text-ink-2">The member marked this talked through. A clinician still decides what happens next.</span>}
+      {live.superseded && <span className="block text-ink-2">Retaken today and now below the routing line.{routed && !closed ? ' The routing stands until it is closed.' : ''}</span>}
+    </span>
   )
 }
 
@@ -843,7 +875,8 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts, log, audit, on
   const [checked, setChecked] = useState(false)
   const [override, setOverride] = useState('')
   // Orders and prescriptions survive switching member, tab or console (_clinicalStore).
-  const work = recordOf(useClinicalState(), memberId)
+  const clinicalState = useClinicalState()
+  const work = recordOf(clinicalState, memberId)
   const { sent, adjusted, orders } = work
   const setSent = (f: (s: Sent[]) => Sent[]) => clinical.updateRecord(memberId, (w) => ({ ...w, sent: f(w.sent) }))
   const setAdjusted = (f: (a: Record<string, string>) => Record<string, string>) => clinical.updateRecord(memberId, (w) => ({ ...w, adjusted: f(w.adjusted) }))
@@ -1039,10 +1072,10 @@ function MemberRecord({ memberId, setMember, now, canAct, alerts, log, audit, on
           <Card tone="sunk">
             <CardHead eyebrow="Orders" title="Tests and referrals" aside={<FlaskConical size={16} className="text-ink-3" aria-hidden />} />
             <ul className="divide-y divide-[color:var(--line)]">
-              {[...orders, ...rec.orders].map((o, i) => (
+              {[...orders, ...liveScreenOrders(memberId, clinicalState), ...rec.orders.map((o) => ({ ...o, status: orderStatus(o, clinicalState) }))].map((o, i) => (
                 <li key={i} className="py-2.5">
                   <p className="text-[15px] text-ink">{o.test}</p>
-                  <p className="text-[13px] text-ink-3">{o.when} · {o.status}</p>
+                  <p className="text-[13px] text-ink-3">{mono(`${o.when} · ${o.status}`)}</p>
                 </li>
               ))}
             </ul>

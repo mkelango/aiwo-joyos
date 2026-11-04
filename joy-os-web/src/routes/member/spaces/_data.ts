@@ -107,14 +107,24 @@ export function todayActionFor(lowest: TermKey | null): Action {
   return actionsFor(lowest)[0] ?? TODAY_ACTION
 }
 
-/** A specimen VIVA draft per space — drafted by VIVA, a person signs. */
+/** A specimen VIVA draft per space — drafted by VIVA, a person signs. ledger_weekly_story is drafted at ask time from the live week. */
 export const VIVA_DRAFT: Record<TermKey, { tool: string; ask: string; draft: string; reviewer: string } | null> = {
   H: { tool: 'explain_biomarker', ask: 'What is ApoB, in plain words?', draft: 'ApoB counts the particles that carry cholesterol in your blood. Yours is 92 mg/dL; the lab range is under 90. It is one number among several, and Dr Meera will talk it through with you at your Day 45 review. VIVA does not diagnose.', reviewer: 'Reviewed by Dr Meera Iyer' },
   P: { tool: 'ikigai_coach', ask: 'Help me make my daily anchors smaller.', draft: 'Your three anchors are good ones. “Teach the interns every Friday” could become “answer one intern question a day”. Small enough that a busy day cannot take it away.', reviewer: 'Coach Priya sees this in your digest' },
   R: { tool: 'couples_prompt', ask: 'Give us a State of Us prompt for this week.', draft: 'Each of you, separately: name one moment this week when you felt your partner was on your side. Then say it out loud to them, without explaining it.', reviewer: 'Never reveals one partner to the other' },
   F: { tool: 'time_audit_summary', ask: 'Summarise my time audit.', draft: 'Over two weeks, a little over a quarter of your planned hours were yours. Nearly half were asked of you by others, mostly in Tuesday and Wednesday meetings. Weekends were largely your own.', reviewer: 'Calendar entries discarded · totals only · never financial advice' },
-  D: { tool: 'ledger_weekly_story', ask: 'Where did joy come from this week?', draft: 'This week joy came mostly from people and food, usually around lunch. Evenings were quieter than last week.', reviewer: 'Two sentences · from your Ledger only' },
+  D: { tool: 'ledger_weekly_story', ask: 'Where did joy come from this week?', draft: '', reviewer: 'Two sentences · from your Ledger only' },
   B: null,
+}
+
+/** How a week's tag counts (highest first) read: the top tag, the top two when the second stands alone, or an even spread. */
+export type WeekTop = { kind: 'none' } | { kind: 'even'; n: number } | { kind: 'two'; a: string; b: string } | { kind: 'one'; a: string }
+export function weekTop(week: { tag: string; count: number }[]): WeekTop {
+  const [first, second, third] = week
+  if (!first) return { kind: 'none' }
+  const tied = week.filter((l) => l.count === first.count).length
+  if (tied > 2) return { kind: 'even', n: tied }
+  return second && (!third || third.count < second.count) ? { kind: 'two', a: first.tag, b: second.tag } : { kind: 'one', a: first.tag }
 }
 
 /**

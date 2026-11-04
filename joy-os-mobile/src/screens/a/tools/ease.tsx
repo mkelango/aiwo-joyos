@@ -4,7 +4,7 @@ import { Linking, Pressable, View } from 'react-native'
 import { ArrowLink, Body, Button, Card, Divider, Eyebrow, Icon, Meta, Mono, Sheet, Toggle, fmtDate } from '@/components'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { shiftTime, useLocal } from '@/screens/a/local'
-import { BarRow, HumanWritten, IconButton, OptionRow, TextField, monoNums } from '@/screens/a/parts'
+import { BarRow, HumanWritten, IconButton, OptionRow, TextField, monoNums, useIsSpecimen } from '@/screens/a/parts'
 import { BURDEN_PARTS, JOURNAL_START, KEEP_MEANING_START, SCREEN_FORMS, SCREEN_HISTORY, SCREEN_META, SCREEN_ROUTE, SPACE_TODAY, WIND_DOWN, type EaseScreen } from '@/screens/a/spacesData'
 import { messagesStore, useAccountThreads, useStore } from '@/screens/b/bStore'
 import type { Msg } from '@/screens/b/accountData'
@@ -25,12 +25,15 @@ import { ToolCard, ToolsHeading, shortDate } from './common'
 
 export function EaseTools() {
   const { t } = useA()
+  // What Burden is made of is read from Arjun's Index. The journal, the list and the screens start
+  // empty for anyone else, and Tele-MANAS is in this room for everyone.
+  const specimen = useIsSpecimen()
   return (
     <>
       <ToolsHeading>{t('Ease tools')}</ToolsHeading>
       <SecondArrow />
       <KeepMeaning />
-      <Parts />
+      {specimen ? <Parts /> : null}
       <SleepPlan />
       <Screens />
       <TeleManas />
@@ -44,7 +47,7 @@ function SecondArrow() {
   const { setCrisisOpen } = useApp()
   const [problem, setProblem] = useState('')
   const [arrow, setArrow] = useState('')
-  const [entries, setEntries] = useLocal('journal', JOURNAL_START)
+  const [entries, setEntries] = useLocal('journal', useIsSpecimen() ? JOURNAL_START : [])
   const [held, setHeld] = useState(false)
   const [saved, setSaved] = useState(false)
   const save = () => {
@@ -243,6 +246,7 @@ function Screens() {
   const { c, space } = useTheme()
   const { t, tx, lang } = useA()
   const names = Object.keys(SCREEN_META) as EaseScreen[]
+  const specimen = useIsSpecimen()
   const taken = useTaken()
   const share = useShareToCare()
   // The screen whose sheet is shown; it stays mounted while the sheet fades out.
@@ -258,9 +262,10 @@ function Screens() {
           const meta = SCREEN_META[n]
           const form = SCREEN_FORMS[n]
           const mine = taken.of(n)
-          const hist: Taken[] = [...SCREEN_HISTORY[n], ...mine]
-          const last = hist[hist.length - 1]
-          const band = bandOf(n, last.score)
+          // Only Arjun has a recorded history; anyone else's starts with their first sitting.
+          const hist: Taken[] = [...(specimen ? SCREEN_HISTORY[n] : []), ...mine]
+          const last: Taken | undefined = hist[hist.length - 1]
+          const band = last ? bandOf(n, last.score) : null
           return (
             <View key={n} style={{ gap: 6, paddingVertical: space.s2, borderTopWidth: i > 0 ? 1 : 0, borderTopColor: c.line }}>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
@@ -270,22 +275,30 @@ function Screens() {
                     {monoNums(tx(meta.what))}
                   </Meta>
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }} accessible accessibilityLabel={t('{n} {score} of {max}', { n: tx(n), score: last.score, max: meta.max })}>
-                  <Mono tone="ink" size={22} weight="light">
-                    {String(last.score)}
-                  </Mono>
-                  <Mono tone="ink3" size={12}>{`/${meta.max}`}</Mono>
-                </View>
+                {last ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }} accessible accessibilityLabel={t('{n} {score} of {max}', { n: tx(n), score: last.score, max: meta.max })}>
+                    <Mono tone="ink" size={22} weight="light">
+                      {String(last.score)}
+                    </Mono>
+                    <Mono tone="ink3" size={12}>{`/${meta.max}`}</Mono>
+                  </View>
+                ) : null}
               </View>
-              <Eyebrow tone="ink2">{tx(band.label)}</Eyebrow>
-              <Body tone="ink2">{monoNums(tx(band.copy))}</Body>
-              <Meta size={13} tone="ink3">
-                <Rich
-                  text={t('*{date}* · {cadence} · earlier *{list}*', { date: fmtDate(last.date, lang), cadence: tx(meta.cadence), list: hist.slice(0, -1).map((h) => h.score).join(', ') })}
-                  wrap={(w) => <Mono size={12} tone="ink3">{w}</Mono>}
-                />
-              </Meta>
-              {routes(n, last.score) ? <CareRouted screen={n} today={band.copy.includes('today')} thread={last.thread} /> : null}
+              {last && band ? (
+                <>
+                  <Eyebrow tone="ink2">{tx(band.label)}</Eyebrow>
+                  <Body tone="ink2">{monoNums(tx(band.copy))}</Body>
+                  <Meta size={13} tone="ink3">
+                    <Rich
+                      text={hist.length > 1 ? t('*{date}* · {cadence} · earlier *{list}*', { date: fmtDate(last.date, lang), cadence: tx(meta.cadence), list: hist.slice(0, -1).map((h) => h.score).join(', ') }) : t('*{date}* · {cadence}', { date: fmtDate(last.date, lang), cadence: tx(meta.cadence) })}
+                      wrap={(w) => <Mono size={12} tone="ink3">{w}</Mono>}
+                    />
+                  </Meta>
+                  {routes(n, last.score) ? <CareRouted screen={n} today={band.copy.includes('today')} thread={last.thread} /> : null}
+                </>
+              ) : (
+                <Meta size={13} tone="ink3">{monoNums(tx(meta.cadence))}</Meta>
+              )}
               <Button
                 size="sm"
                 variant="secondary"
@@ -482,7 +495,7 @@ function KeepMeaning() {
   const { c, space } = useTheme()
   const { t } = useA()
   const { setCrisisOpen } = useApp()
-  const [items, setItems] = useLocal('keepMeaning', KEEP_MEANING_START)
+  const [items, setItems] = useLocal('keepMeaning', useIsSpecimen() ? KEEP_MEANING_START : [])
   const [draft, setDraft] = useState('')
   const open = items.filter((x) => !x.done).length
   const add = () => {

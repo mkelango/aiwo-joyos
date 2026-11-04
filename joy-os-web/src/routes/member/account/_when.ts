@@ -43,6 +43,14 @@ export function localWhen(s: string, lang: Lang): string {
   return s
 }
 
+/** A specimen date and time ("Thu 4 Feb 2027", "18:30") as a number that sorts by when it falls. */
+export function whenOrder(when: string, time = '00:00'): number {
+  const m = new RegExp(`(\\d{1,2}) (${M})(?: (\\d{4}))?`).exec(when)
+  if (!m) return Number.MAX_SAFE_INTEGER
+  const [h, min] = time.split(':').map(Number)
+  return new Date(m[3] ? Number(m[3]) : SPECIMEN_YEAR, MONTHS.indexOf(m[2]), Number(m[1]), h, min).getTime()
+}
+
 /**
  * A sentence with English dates in it, as a template and its dates: "Next: 5 Apr 2027" becomes
  * "Next: {d0}" plus a formatter. Dictionaries key such lines by the template, so the date is

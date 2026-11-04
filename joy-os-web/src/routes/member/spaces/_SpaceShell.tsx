@@ -11,13 +11,14 @@ import { interceptsCrisis, useApp } from '@/lib/store'
 import { CATIONS, PRACTICE_WEEKS } from '@/data/platform'
 import { termByKey, termColor } from '@/data/terms'
 import type { IndexScore, TermKey } from '@/domain/types'
-import { LE8, LE8_KEY, LE8_LOG_START, VIVA_DRAFT, VIVA_MATCH, VIVA_MORE, actionWhy, actionsFor, le8Latest, le8Score, roomVerdict, termHistory, todayActionFor, type Le8Key } from './_data'
+import { LE8, LE8_KEY, LE8_LOG_START, VIVA_DRAFT, VIVA_MATCH, VIVA_MORE, actionWhy, actionsFor, le8Latest, le8Score, roomVerdict, termHistory, todayActionFor, weekTop, type Le8Key } from './_data'
 import { mono, useSpaceText } from './_i18n'
 import { TermIcon } from '@/components/joy/icons'
 import { useIsMinor } from '@/lib/minor'
 import { readCalendarProvider, readSpaceState, readTrustConsent, useCalendarConnected, useSpaceState } from './_state'
 import { MEMBER } from '@/data/member'
 import { useIndexHistory } from '@/routes/member/core/_latest'
+import { liveLedger, specimenWeek, useLedgerRemoved, weekCounts } from '@/routes/member/core/_store'
 import { useNbaOverride } from '@/routes/console/care/_memberShare'
 
 // Shared shell for the six spaces (Memo p.19): the term, its score with method,
@@ -428,11 +429,19 @@ type VivaTurn = { ask: string; text: string; by: string; link?: VivaLink }
 /** Freedom's tools that read the time audit's totals. */
 const CALENDAR_TOOLS = ['time_audit_summary', 'no_list_coach']
 
+/** This week's live moments (removed ones gone, on the specimen clock): what the Ledger shows for the week. */
+export function thisWeek(ledger: Parameters<typeof liveLedger>[0], removed: string[]) {
+  const week = new Set(specimenWeek())
+  return liveLedger(ledger, removed).filter((e) => week.has(e.at.slice(0, 10)))
+}
+
 function VivaTool({ term }: { term: TermKey }) {
   const t = termByKey(term)
-  const { t: tx, d: dx } = useSpaceText()
+  const { t: tx, d: dx, lang } = useSpaceText()
   const guard = useCrisisGuard()
   const minor = useIsMinor()
+  const { ledger } = useApp()
+  const [removed] = useLedgerRemoved()
   // Every named tool that can be asked here: the space's first draft, then its second tool.
   const drafts = [VIVA_DRAFT[term], ...VIVA_MORE[term]].filter(Boolean) as VivaDraft[]
   const [state, setState] = useState<'idle' | 'drafting' | 'shown'>('idle')
@@ -442,8 +451,30 @@ function VivaTool({ term }: { term: TermKey }) {
   const timer = useRef<number | undefined>(undefined)
   useEffect(() => () => window.clearTimeout(timer.current), [])
 
+  /**
+   * ledger_weekly_story's two sentences, from the same week the Ledger insights card reads: where
+   * joy came from (weekCounts), then when the moments came (their prompts). Nothing else is said.
+   * A moment may hold only a word or a photo, so the week's moments decide whether it is empty,
+   * not its tags; a single moment has no "most often".
+   */
+  const ledgerStory = () => {
+    const live = thisWeek(ledger, removed)
+    if (!live.length) return tx('pl.viva.none')
+    const top = weekTop(weekCounts(ledger, removed))
+    const word = (tag: string) => (lang === 'en' ? tag.toLowerCase() : dx(tag))
+    const where = top.kind === 'none' ? tx('pl.viva.untagged')
+      : top.kind === 'even' ? tx('pl.viva.even', { n: top.n })
+      : top.kind === 'two' ? tx('pl.viva.two', { a: word(top.a), b: word(top.b) })
+      : tx('pl.viva.one', { a: word(top.a) })
+    if (live.length === 1) return where
+    const slots = ([1, 2, 3] as const).map((p) => live.filter((e) => e.prompt === p).length)
+    const most = Math.max(...slots)
+    const when = slots.filter((n) => n === most).length > 1 ? 'pl.viva.whenEven' : (['pl.viva.when1', 'pl.viva.when2', 'pl.viva.when3'] as const)[slots.indexOf(most)]
+    return `${where} ${tx(when)}`
+  }
   /** The draft's words. le8_coach reads the LE8 log Body saved, so it names the two lowest of the eight. */
   const draftText = (dr: VivaDraft) => {
+    if (dr.tool === 'ledger_weekly_story') return ledgerStory()
     if (dr.tool !== 'le8_coach') return dx(dr.draft)
     // Under 18 nothing is scored, so the draft names no scores and ranks none of the eight.
     if (minor) return tx('mn.vivaLe8')

@@ -49,6 +49,7 @@ export function Invitations({ now, canAct, onApi, onEvent }: { now: number; canA
   const [notice, setNotice] = useState<string | null>(null)
   const [revoking, setRevoking] = useState<string | null>(null)
   const [declining, setDeclining] = useState<{ id: string; reason: string } | null>(null)
+  const [refused, setRefused] = useState<{ id: string; text: string } | null>(null)
 
   const stamp = () => `28 Jan · ${fmtClock(now)}`
   const email = EMAIL.test(contact.trim()) ? contact.trim().toLowerCase() : null
@@ -57,6 +58,17 @@ export function Invitations({ now, canAct, onApi, onEvent }: { now: number; canA
   const by = (c: GuestInvitation['channel']) => (c === 'email' ? 'email' : 'WhatsApp')
 
   const patch = (id: string, f: (i: GuestInvitation) => GuestInvitation) => setList((xs) => xs.map((x) => (x.id === id ? f(x) : x)))
+  /** Another invitation already live for this contact and stay. One guest, one live invitation per stay. */
+  const liveTwin = (to: string, forStay: string, self?: string) => list.find((x) => x.id !== self && x.contact === to && x.stay === forStay && (x.status === 'sent' || x.status === 'accepted'))
+  /** Refuses a send that would make a second live invitation, on the row and in the API log. */
+  const refuseTwin = (i: GuestInvitation, line: string) => {
+    const twin = liveTwin(i.contact, i.stay, i.id)
+    if (!twin) return false
+    const way = twin.status === 'accepted' ? `${twin.id} is accepted, so any change to the stay goes through the concierge.` : `Revoke ${twin.id} first if this one should go instead.`
+    setRefused({ id: i.id, text: `${i.contact} already has a live invitation to this stay (${twin.id}). Nothing was sent. ${way}` })
+    onApi(line, 409)
+    return true
+  }
 
   const create = (send: boolean) => {
     if (!canAct) return
@@ -68,7 +80,7 @@ export function Invitations({ now, canAct, onApi, onEvent }: { now: number; canA
     else if (arrival < TODAY_ISO) e.arrival = 'The arrival date has passed. Choose today or later.'
     if (!agreed) e.agreed = 'Confirm the guest agreed to be contacted. Joy OS does not invite anyone cold.'
     const to = email ?? mobile
-    if (!e.contact && to && list.some((x) => x.contact === to && x.stay === stay && (x.status === 'sent' || x.status === 'accepted'))) e.form = `${to} already has a live invitation to this stay.`
+    if (!e.contact && to && liveTwin(to, stay)) e.form = `${to} already has a live invitation to this stay.`
     setErrors(e)
     if (Object.keys(e).length || !channel || !to) return
     const id = `INV-${seq}`
@@ -90,6 +102,8 @@ export function Invitations({ now, canAct, onApi, onEvent }: { now: number; canA
 
   const sendDraft = (i: GuestInvitation) => {
     if (!canAct || i.status !== 'draft') return
+    if (refuseTwin(i, `POST /partner/v1/invitations · ${i.id} · ${i.channel}`)) return
+    setRefused(null)
     const at = stamp()
     patch(i.id, (x) => ({ ...x, status: 'sent', sends: 1, sentAt: at, history: [...x.history, { at, what: `Sent by ${by(x.channel)}` }] }))
     onApi(`POST /partner/v1/invitations · ${i.id} · ${i.channel}`, 201)
@@ -97,6 +111,8 @@ export function Invitations({ now, canAct, onApi, onEvent }: { now: number; canA
   }
   const resend = (i: GuestInvitation) => {
     if (!canAct || i.sends >= MAX_SENDS || (i.status !== 'sent' && i.status !== 'declined')) return
+    if (refuseTwin(i, `POST /partner/v1/invitations/${i.id}/resend`)) return
+    setRefused(null)
     const at = stamp()
     const again = i.status === 'declined'
     patch(i.id, (x) => ({ ...x, status: 'sent', sends: x.sends + 1, sentAt: at, decidedAt: undefined, reason: undefined, history: [...x.history, { at, what: `${again ? 'Invited again' : 'Resent'} by ${by(x.channel)}` }] }))
@@ -275,6 +291,8 @@ export function Invitations({ now, canAct, onApi, onEvent }: { now: number; canA
                       {(i.status === 'sent' || i.status === 'declined') && i.sends >= MAX_SENDS && <span className="text-[12px] text-ink-3">Sent <span className="num">{MAX_SENDS}</span> times: no more resends.</span>}
                     </div>
                   )}
+
+                  {refused?.id === i.id && liveTwin(i.contact, i.stay, i.id) && <p role="alert" className="mt-2 text-[13px] text-error">{refused.text}</p>}
 
                   <details className="mt-2">
                     <summary className="cursor-pointer text-[13px] text-ink-3 hover:text-ink focus-ring">History</summary>

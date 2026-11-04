@@ -200,7 +200,12 @@ export const HOUSE = {
   chJoyErr: { en: 'Say what the shared joy is.', ta: 'பகிர்ந்த மகிழ்ச்சி என்ன என்று சொல்லுங்கள்.', hi: 'बताएँ कि साझा ख़ुशी क्या है।' },
   chDay: { en: 'Usual day', ta: 'வழக்கமான நாள்', hi: 'आम दिन' },
   chSave: { en: 'Save and ask the family', ta: 'சேமித்துக் குடும்பத்திடம் கேட்கவும்', hi: 'सहेजें और परिवार से पूछें' },
-  chSaved: { en: 'Charter saved. Kavya and Lakshmi are asked to agree.', ta: 'சாசனம் சேமிக்கப்பட்டது. Kavya, Lakshmi ஒப்புக்கொள்ளக் கேட்கப்படுகிறார்கள்.', hi: 'चार्टर सहेजा गया। Kavya और Lakshmi से मानने को कहा गया है।' },
+  chSaved: { en: 'Charter saved. Asked to agree: {names}.', ta: 'சாசனம் சேமிக்கப்பட்டது. ஒப்புக்கொள்ளக் கேட்கப்பட்டவர்கள்: {names}.', hi: 'चार्टर सहेजा गया। मानने को कहा गया: {names}।' },
+  // With no other adult in the household there is no one to ask.
+  chSavedSolo: { en: 'Charter saved.', ta: 'சாசனம் சேமிக்கப்பட்டது.', hi: 'चार्टर सहेजा गया।' },
+  chSaveSolo: { en: 'Save the charter', ta: 'சாசனத்தைச் சேமிக்கவும்', hi: 'चार्टर सहेजें' },
+  chEditorIntroSolo: { en: 'Write it in your own words. You are the only adult in this household here, so it is kept when you save it.', ta: 'உங்கள் சொந்த வார்த்தைகளில் எழுதுங்கள். இங்கே இந்தக் குடும்பத்தில் நீங்கள் மட்டுமே பெரியவர், அதனால் சேமித்ததும் அது வைக்கப்படும்.', hi: 'इसे अपने शब्दों में लिखें। यहाँ इस परिवार में आप ही अकेले वयस्क हैं, इसलिए सहेजते ही यह रख लिया जाएगा।' },
+  chKeptSolo: { en: 'Kept on {date}', ta: '{date} அன்று வைக்கப்பட்டது', hi: '{date} को रखा गया' },
   chAgreeToast: { en: '{name} agreed to the charter.', ta: '{name} சாசனத்துக்கு ஒப்புக்கொண்டார்.', hi: '{name} ने चार्टर माना।' },
   chAllToast: { en: 'Every adult agreed. The charter is kept.', ta: 'எல்லாப் பெரியவர்களும் ஒப்புக்கொண்டனர். சாசனம் வைக்கப்பட்டது.', hi: 'हर वयस्क ने माना। चार्टर रख लिया गया।' },
   chEditNote: { en: 'Saving a change asks everyone to agree again.', ta: 'மாற்றத்தைச் சேமித்தால் எல்லோரும் மீண்டும் ஒப்புக்கொள்ளக் கேட்கப்படுவார்கள்.', hi: 'बदलाव सहेजने पर सबसे फिर से मानने को कहा जाता है।' },
@@ -270,6 +275,9 @@ export const HOUSE = {
   lkTextNote: { en: 'Large type also sets this phone’s text to Larger.', ta: 'பெரிய எழுத்து இந்தத் தொலைபேசியின் எழுத்தையும் பெரியதாக்கும்.', hi: 'बड़े अक्षर इस फ़ोन का टेक्स्ट भी बड़ा कर देते हैं।' },
   // The account made in onboarding: a household of one until someone joins
   yourHousehold: { en: 'Your household', ta: 'உங்கள் குடும்பம்', hi: 'आपका परिवार' },
+  noIndexYet: { en: 'No Index on this account yet.', ta: 'இந்தக் கணக்கில் இன்னும் குறியீடு இல்லை.', hi: 'इस खाते पर अभी कोई इंडेक्स नहीं।' },
+  noIndexEach: { en: 'Everyone here keeps their own. Take yours when you are ready.', ta: 'இங்கே ஒவ்வொருவரும் தங்களுடையதை வைத்துக்கொள்கிறார்கள். தயாரானதும் உங்களுடையதை எடுங்கள்.', hi: 'यहाँ हर कोई अपना रखता है। जब तैयार हों, अपना लें।' },
+  takeIndex: { en: 'Take the Index', ta: 'குறியீட்டை எடுங்கள்', hi: 'इंडेक्स लें' },
   newAlone: { en: 'Just you here, for now.', ta: 'இப்போதைக்கு இங்கே நீங்கள் மட்டும்.', hi: 'अभी यहाँ सिर्फ़ आप हैं।' },
   newAloneBody: { en: 'Made for two, welcoming to one. Invite a partner and you are still scored separately; a shared page shows only what you both agree to share.', ta: 'இருவருக்காக உருவானது, ஒருவரையும் வரவேற்கிறது. துணையை அழைத்தாலும் நீங்கள் தனித்தனியாகவே மதிப்பிடப்படுவீர்கள்; நீங்கள் இருவரும் பகிர ஒப்புக்கொள்வதை மட்டுமே பகிர்ந்த பக்கம் காட்டும்.', hi: 'दो के लिए बना, एक का भी स्वागत। साथी को बुलाएँ, तब भी आप दोनों का स्कोर अलग रहता है; साझा पेज पर वही दिखता है जो आप दोनों साझा करना मानें।' },
 } satisfies Dict

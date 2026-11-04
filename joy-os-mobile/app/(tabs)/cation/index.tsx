@@ -40,9 +40,9 @@ import { MY_CATION, SIGNAL_READINGS } from '@/screens/b/journeyData'
 import { FilterChips, HereMarker, PrimaryChip, TimelineStep } from '@/screens/b/parts'
 import { useCationRequests, useLocal } from '@/screens/a/local'
 import { Rich, useA } from '@/screens/a/i18n'
-import { monoNums } from '@/screens/a/parts'
+import { monoNums, NoIndexYet, useIsSpecimen } from '@/screens/a/parts'
 import { useT } from '@/lib/i18n'
-import { useLatestIndex } from '@/lib/indexRecord'
+import { useHasIndex, useLatestIndex } from '@/lib/indexRecord'
 import { useIsMinor } from '@/lib/minor'
 import type { Cation } from '@/shared/types'
 
@@ -53,6 +53,9 @@ import type { Cation } from '@/shared/types'
 // The lowest term is the latest Index's (shared contract L1). Under 18 nothing is scored (minors
 // gate): no lowest-term score, no reading deltas, no Day-90 measure or method line; the ’cation
 // for Pleasure is offered as the gentlest place to begin, as Today does.
+// The Joycation, its readings and its ninety days are Arjun's own, so anyone else has this tab as a
+// member with no ’cation yet. With no Index yet (U2) there is no lowest term to invite for: the way
+// to take the Index is the one Daybreak, with the ten beneath it.
 
 type Filter = 'all' | 'ALL' | TermKey
 
@@ -74,6 +77,8 @@ export default function CationHome() {
   // A specimen switch shows the tab for a member with no ’cation yet: the empty state invites the
   // ’cation for the lowest term (Memo p.17). Kept on the phone until switched back.
   const [noCation, setNoCation] = useLocal('cationDemoEmpty', false)
+  const specimen = useIsSpecimen()
+  if (!specimen) return <NoCation />
   return noCation ? <NoCation demo={<DemoSwitch on={noCation} onChange={setNoCation} />} /> : <WithCation demo={<DemoSwitch on={noCation} onChange={setNoCation} />} />
 }
 
@@ -299,6 +304,7 @@ function Catalogue({ noCation = false }: { noCation?: boolean }) {
     return r ? `${r.interestOnly ? t('Interest registered') : t('Requested')} · ${r.ref}` : null
   }
   const latest = useLatestIndex()
+  const hasIndex = useHasIndex()
   const minor = useIsMinor()
   const groups: (TermKey | 'ALL')[] = ['ALL', 'H', 'P', 'R', 'F', 'D', 'B']
   const shown = groups.flatMap((g) => CATIONS.filter((x) => x.primary === g)).filter((x) => filter === 'all' || x.primary === filter)
@@ -339,7 +345,7 @@ function Catalogue({ noCation = false }: { noCation?: boolean }) {
               </View>
               <Meta>{monoNums(tx(x.promise))}</Meta>
               {!noCation && x.slug === MY_CATION.slug ? <Meta size={14} tone="daybreak">{monoNums(t('You took this · {venue}', { venue: MY_CATION.venue }))}</Meta> : null}
-              {!minor && x.primary === latest.lowestTerm ? <Meta size={14} tone="daybreak">{t('For your lowest term')}</Meta> : null}
+              {!minor && hasIndex && x.primary === latest.lowestTerm ? <Meta size={14} tone="daybreak">{t('For your lowest term')}</Meta> : null}
               {requestLine(x.slug) ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Icon name="check" size={14} color={c.ink} />
@@ -414,13 +420,15 @@ function OccasionsLink() {
 }
 
 /** The ’Cation tab for a member with no ’cation yet: the empty state invites the ’cation for the lowest term. */
-function NoCation({ demo }: { demo: ReactNode }) {
+function NoCation({ demo }: { demo?: ReactNode }) {
   const { c, space } = useTheme()
   const { t, tx, name } = useA()
   const tt = useT()
   const { requests } = useCationRequests()
   const minor = useIsMinor()
   const latest = useLatestIndex()
+  const hasIndex = useHasIndex()
+  const waiting = !minor && !hasIndex
   // Under 18 there is no lowest term: the invitation is for Pleasure, the gentlest place to begin.
   const lowest = minor ? TODAY_ACTION.term : latest.lowestTerm
   const score = latest.terms.find((x) => x.key === lowest)?.value ?? ''
@@ -431,10 +439,12 @@ function NoCation({ demo }: { demo: ReactNode }) {
   const req = invite ? requests[invite.slug] : undefined
   return (
     <Screen inTabs top={<AppBar />}>
-      <ScreenHeader eyebrow={`${tt('cation')} · ${t('none taken yet')}`} title={<Rich text={t('Go somewhere. Come back *different*.')} wrap={(w) => <Serif>{w}</Serif>} />} lead={minor ? t('You have not taken a ’cation yet. Each one is built around one part of a life; here is a gentle place to begin.') : t('You have not taken a ’cation yet. Your Index already says where one would help most.')} />
+      <ScreenHeader eyebrow={`${tt('cation')} · ${t('none taken yet')}`} title={<Rich text={t('Go somewhere. Come back *different*.')} wrap={(w) => <Serif>{w}</Serif>} />} lead={minor ? t('You have not taken a ’cation yet. Each one is built around one part of a life; here is a gentle place to begin.') : waiting ? t('You have not taken a ’cation yet. Your Index will show where one would help most.') : t('You have not taken a ’cation yet. Your Index already says where one would help most.')} />
       {demo}
-      <EmptyIllustration kind="cation" />
-      {invite ? (
+      {waiting ? null : <EmptyIllustration kind="cation" />}
+      {waiting ? (
+        <NoIndexYet primary body={t('Your lowest term points to the ’cation that would help you most. All ten are here to look at meanwhile.')} />
+      ) : invite ? (
         <Card tone="sunk" style={{ gap: space.s2 }}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.s1 }}>
             <TermChip term={lowest} withSpace />
@@ -479,7 +489,7 @@ function NoCation({ demo }: { demo: ReactNode }) {
             <Body style={{ flex: 1 }}>{monoNums(x)}</Body>
           </View>
         ))}
-        {minor ? null : <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />}
+        {minor || waiting ? null : <MethodLine method={latest.method} grade={latest.grade} takenOn={latest.takenOn} next={latest.nextMeasure} />}
       </Card>
       <OccasionsLink />
       <Catalogue noCation />

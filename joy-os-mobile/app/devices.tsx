@@ -9,7 +9,7 @@ import { useApp } from '@/lib/store'
 import { isSpecimenToday } from '@/screens/a/local'
 import { LEDGER_TAG } from '@/screens/b/i18n/common'
 import { DEVICES, HEALTHKIT_TYPES, WEAR_NIGHTS, type DeviceState } from '@/screens/b/accountData'
-import { devicesStore, signalsDownIn, useStore } from '@/screens/b/bStore'
+import { devicesStore, signalsDownIn, useAccountId, useStore } from '@/screens/b/bStore'
 import { CheckLine, memberOnly } from '@/screens/b/parts'
 import { MonoNums } from '@/lib/monoNums'
 import { useDict } from '@/lib/i18n'
@@ -75,6 +75,9 @@ function Devices() {
   const others = devices.filter((d) => d.state !== 'connected')
   // Data quality from the devices as they are now.
   const ring = connected.find((d) => d.id === 'oura')
+  // The nights charted below are Arjun's: a ring anyone else links has none on record yet.
+  const ownNights = useAccountId() === 'arjun'
+  const nights = !!ring && ownNights
   const staleOnes = connected.filter((d) => d.freshness === 'stale')
   const hkSleep = hk.find((x) => x.id === 'sleep')?.on ?? false
   // Who reads sleep: a device whose signals include sleep; Apple Health only with its sleep read on.
@@ -220,9 +223,9 @@ function Devices() {
             <EmptyIllustration kind="generic" />
             <Meta>{t('qNoDevice')}</Meta>
           </Card>
-        ) : !ring ? (
+        ) : !nights ? (
           <Card tone="sunk">
-            <Meta>{t('qNoRing')}</Meta>
+            <Meta>{ring ? t('qRingNew') : t('qNoRing')}</Meta>
           </Card>
         ) : (
         <Card tone="raised" style={{ gap: space.s2 }}>
@@ -276,7 +279,7 @@ function Devices() {
           {(
             [
               // Wear, gaps and short nights describe the ring's nights: shown only while it is read.
-              ...(ring
+              ...(nights
                 ? ([
                     [true, t('qWear'), t('qWearV', { n: wornNights }), t('qWearN')],
                     [false, t('qGaps'), t('qGapsV', { n: gaps.length }), t('qGapsN', { list: gaps.map((g) => g.d).join(t('and')) })],

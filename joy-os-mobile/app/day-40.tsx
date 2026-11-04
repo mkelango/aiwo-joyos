@@ -5,12 +5,15 @@ import { AiwoMark, ArrowLink, Avatar, Body, Divider, DaybreakButton, Eyebrow, Jo
 import { useApp } from '@/lib/store'
 import { useIsMinor } from '@/lib/minor'
 import { useDict, useTermText } from '@/lib/i18n'
+import { useDayZeroIndex } from '@/lib/indexRecord'
+import { NoIndexScreen } from '@/lib/noIndex'
 import { H2 } from '@/screens/a/local'
+import { todayActionFor } from '@/screens/a/spacesData'
 import { DAY40_COACH_NOTE, DAY40_DATES } from '@/screens/b/entryData'
 import { DAY40, DAY40_SIGNALS } from '@/screens/b/i18n/day40'
 import { useTx } from '@/screens/b/i18n/common'
 import { memberOnly, useAccount } from '@/screens/b/parts'
-import { INDEX_HISTORY, MEMBER, TEAM, TODAY_ACTION } from '@/shared/member'
+import { MEMBER, TEAM } from '@/shared/member'
 import type { TermKey } from '@/shared/types'
 import { txFor } from '@/screens/a/i18n'
 import { useLang } from '@/lib/i18n'
@@ -22,10 +25,22 @@ import { MonoNums } from '@/lib/monoNums'
 // Index until Day 90), what the signals say per term (signals are not a score), the one thing
 // to keep, the coach's note in her own words, and what comes next. No streaks, no counts of
 // days done. One Daybreak: save (phone) or print (web).
+// The page is the signed-in account's own: its Day-0 Wheel (useDayZeroIndex), its Ledger and the
+// action for its lowest term. The signal lines, the coach's note and the Day-45 review are written
+// for Arjun, so nobody else is shown them. With no Index there is no Wheel to print: No Index yet.
 
 const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 
-export default memberOnly(Day40)
+export default memberOnly(Day40Gate)
+
+/** No Day-0 Index, no page. Under 18 the page runs without one, and nobody is asked to take it. */
+function Day40Gate() {
+  const t = useDict(DAY40)
+  const minor = useIsMinor()
+  const dayZero = useDayZeroIndex()
+  if (!minor && !dayZero) return <NoIndexScreen eyebrow={t('eyebrow')} lead={t('noneLead')} />
+  return <Day40 />
+}
 
 function Day40() {
   const { c, space, radius } = useTheme()
@@ -37,12 +52,14 @@ function Day40() {
   // The page names whoever is signed in on this phone (Arjun, Lakshmi, or the account made in onboarding).
   const me = useAccount()
   const [done, setDone] = useState<null | 'saved' | 'printed'>(null)
-  const day0 = INDEX_HISTORY[0]
-  const low = day0.lowestTerm
+  const recorded = me.id === 'arjun'
+  const day0 = useDayZeroIndex()
+  const low = day0?.lowestTerm ?? null
   const priya = TEAM.find((p) => p.id === 'p_priya')!
   const web = Platform.OS === 'web'
   // Under 18: never scored, so the page carries no Wheel, no lowest term and no measure dates.
   const minor = useIsMinor()
+  const action = todayActionFor(minor ? null : low)
 
   return (
     <Screen>
@@ -59,7 +76,7 @@ function Day40() {
         lead={<Body tone="ink2"><MonoNums text={t('lead')} /></Body>}
       />
       <View style={{ borderWidth: 1, borderStyle: 'dashed', borderColor: c.lineStrong, borderRadius: radius.card, padding: 12 }}>
-        <Meta size={14}><MonoNums text={t('preview', { date: fmtDate(DAY40_DATES.day40), n: MEMBER.dayOfLoop })} /></Meta>
+        <Meta size={14}><MonoNums text={recorded ? t('preview', { date: fmtDate(DAY40_DATES.day40), n: MEMBER.dayOfLoop }) : t('previewOwn', { date: fmtDate(DAY40_DATES.day40) })} /></Meta>
       </View>
 
       {/* The page */}
@@ -82,7 +99,7 @@ function Day40() {
           </View>
         </View>
 
-        {minor ? (
+        {minor || !day0 ? (
           <View style={{ backgroundColor: c.paperSunk, borderRadius: radius.card, padding: space.s2 }}>
             <Meta tone="ink"><MonoNums text={t('minorNote')} /></Meta>
           </View>
@@ -95,26 +112,32 @@ function Day40() {
 
         <View style={{ gap: space.s1 }}>
           <Eyebrow {...H2}>{t('signalsTitle')}</Eyebrow>
-          <Meta size={14}><MonoNums text={t('signalsNote')} /></Meta>
-          {ORDER.map((k) => (
-            <View key={k} style={{ flexDirection: 'row', gap: 10, paddingVertical: 4 }}>
-              <View style={{ paddingTop: 7 }}>
-                <TermDot term={k} />
-              </View>
-              <View style={{ flex: 1, gap: 2 }}>
-                <Body weight="medium">{tt.space(k)}</Body>
-                <Meta tone="ink"><MonoNums text={tx(DAY40_SIGNALS[k], DAY40_SIGNALS[k].en)} /></Meta>
-              </View>
-            </View>
-          ))}
+          {recorded ? (
+            <>
+              <Meta size={14}><MonoNums text={t('signalsNote')} /></Meta>
+              {ORDER.map((k) => (
+                <View key={k} style={{ flexDirection: 'row', gap: 10, paddingVertical: 4 }}>
+                  <View style={{ paddingTop: 7 }}>
+                    <TermDot term={k} />
+                  </View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Body weight="medium">{tt.space(k)}</Body>
+                    <Meta tone="ink"><MonoNums text={tx(DAY40_SIGNALS[k], DAY40_SIGNALS[k].en)} /></Meta>
+                  </View>
+                </View>
+              ))}
+            </>
+          ) : (
+            <Meta size={14}><MonoNums text={t('signalsNone')} /></Meta>
+          )}
         </View>
 
         <Divider />
         <View style={{ gap: space.s1 }}>
           <Eyebrow {...H2} tone="daybreak">{t('focusTitle')}</Eyebrow>
-          <Body><MonoNums text={minor ? t('minorFocus') : t('focusBody', { space: tt.space(low) })} /></Body>
+          <Body><MonoNums text={minor || !low ? t('minorFocus') : t('focusBody', { space: tt.space(low) })} /></Body>
           <Body size={20}>
-            <Serif>{txFor(lang, TODAY_ACTION.title)}</Serif>
+            <Serif>{txFor(lang, action.title)}</Serif>
           </Body>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space.s1 }}>
             <Numeral size={34} weight="light">
@@ -124,27 +147,28 @@ function Day40() {
           </View>
         </View>
 
-        <View style={{ backgroundColor: c.paperSunk, borderRadius: radius.card, padding: space.s2, gap: space.s1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Avatar person={priya} size={36} />
-            <Eyebrow style={{ flex: 1 }}>{t('fromCoach')}</Eyebrow>
+        {recorded ? (
+          <View style={{ backgroundColor: c.paperSunk, borderRadius: radius.card, padding: space.s2, gap: space.s1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Avatar person={priya} size={36} />
+              <Eyebrow style={{ flex: 1 }}>{t('fromCoach')}</Eyebrow>
+            </View>
+            <Body><MonoNums text={`“${DAY40_COACH_NOTE}”`} /></Body>
           </View>
-          <Body><MonoNums text={`“${DAY40_COACH_NOTE}”`} /></Body>
-        </View>
+        ) : null}
 
         <View style={{ gap: space.s1 }}>
           <Eyebrow {...H2}>{t('nextTitle')}</Eyebrow>
           {(
-            (minor
-              ? [
-                  ['45', DAY40_DATES.day45, t('next45')],
-                  ['90', DAY40_DATES.day90, t('minorNext90')],
-                ]
-              : [
-                  ['45', DAY40_DATES.day45, t('next45')],
-                  ['76', DAY40_DATES.day76, t('next76')],
-                  ['90', DAY40_DATES.day90, t('next90')],
-                ]) as [string, string, string][]
+            [
+              ...(recorded ? [['45', DAY40_DATES.day45, t('next45')]] : []),
+              ...(minor
+                ? [['90', DAY40_DATES.day90, t('minorNext90')]]
+                : [
+                    ['76', DAY40_DATES.day76, t('next76')],
+                    ['90', DAY40_DATES.day90, t('next90')],
+                  ]),
+            ] as [string, string, string][]
           ).map(([d, date, label]) => (
             <View key={d} style={{ flexDirection: 'row', gap: 12, alignItems: 'baseline' }}>
               <Mono size={14} tone="ink" style={{ minWidth: 64 }}>

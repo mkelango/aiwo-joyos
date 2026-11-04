@@ -151,7 +151,7 @@ function Household() {
     ? [{ person: { id: 'h_me', name: account.name, initials: account.name.split(' ').map((w) => w[0] ?? '').join('').slice(0, 2).toUpperCase(), tone: arjun.tone }, role: t('roleYou'), detail: t('detailYou'), tags: [...(minor ? [t('notScored')] : []), ownPlan], index: minor || !me ? undefined : me.value }]
     : asLakshmi
     ? [
-        { person: lakshmi, role: t('lkYou'), detail: t('lkDetailYou'), tags: [] as string[], index: undefined as number | undefined },
+        { person: lakshmi, role: t('lkYou'), detail: t('lkDetailYou'), tags: [] as string[], index: me?.value },
         { person: arjun, role: elder.helper ? t('lkSonHelper') : t('lkSon'), detail: t('lkDetailOwn'), tags: [t('ownIndex'), t('ownConsents')] },
         { person: kavya, role: t('lkDaughterInLaw'), detail: t('lkDetailOwn'), tags: [t('ownIndex'), t('ownConsents')] },
         { person: HOUSEHOLD_MINOR, role: t('lkGranddaughter'), detail: t('lkDetailMinor'), tags: [t('notScored')] },
@@ -236,6 +236,13 @@ function Household() {
             {t('invite')}
           </Button>
         )}
+        {!me && !minor ? (
+          <Card tone="sunk" style={{ gap: space.s1 }}>
+            <Body>{t('noIndexYet')}</Body>
+            <Meta>{t('noIndexEach')}</Meta>
+            <ArrowLink onPress={() => router.push('/index-take')}>{t('takeIndex')}</ArrowLink>
+          </Card>
+        ) : null}
       </View>
 
       {kindRec.kind === 'fjo' && asNew ? (

@@ -10,9 +10,10 @@ export const SPECIMEN_NOW = '2027-01-28'
 
 // ─── Care ─────────────────────────────────────────────────────────────────
 
+/** `next` and `nextKind` are what a card shows with no consult booked; Care puts the person's earliest persisted consult first. */
 export const PEOPLE_DETAIL: Record<string, { languages: string; city: string; next: string; nextKind: string; since: string; line: string; clinical?: boolean; replies: string }> = {
   p_priya: { languages: 'English · Tamil', city: 'Chennai', next: 'Mon 1 Feb · 19:00', nextKind: 'Circle call', since: 'Jan 2027', line: 'Your coach for the ninety days. Reviews on Day 15 and 45, the Day 60 talk.', replies: 'Replies within 1 working day' },
-  p_meera: { languages: 'English · Tamil · Hindi', city: 'Chennai', next: 'Thu 4 Feb · 18:30', nextKind: 'Video consult', since: 'Oct 2026', line: 'Signed your Clinical-grade Index. Reviews panels and writes e-prescriptions.', clinical: true, replies: 'Clinical replies within 2 working days' },
+  p_meera: { languages: 'English · Tamil · Hindi', city: 'Chennai', next: 'Nothing booked', nextKind: '', since: 'Oct 2026', line: 'Signed your Clinical-grade Index. Reviews panels and writes e-prescriptions.', clinical: true, replies: 'Clinical replies within 2 working days' },
   p_sanjay: { languages: 'English · Malayalam', city: 'Video, anywhere in India', next: 'On referral', nextKind: 'Not booked', since: 'Jan 2027', line: 'Reviews Ease screens above threshold. On call for the P0 pathway.', clinical: true, replies: 'Within 48 h of a referral' },
   p_ravi: { languages: 'English · Tamil · Hindi', city: 'Mumbai', next: 'Fri 5 Feb · 11:00', nextKind: 'Session booking', since: 'Dec 2026', line: 'Bookings, ’cations, Sessions and anything that needs arranging.', replies: 'Replies the same day, 08:00–20:00' },
 }
@@ -269,6 +270,19 @@ export const DEFAULT_NOTIF_PREFS: NotifPrefs = {
   quietTo: '07:30',
 }
 export const LEDGER_TIMES: Record<1 | 2 | 3, string[]> = { 1: ['21:30'], 2: ['12:40', '21:30'], 3: ['12:40', '16:15', '21:30'] }
+/** True when a clock time falls inside quiet hours, which usually run past midnight. */
+export function inQuietHours(hhmm: string, p: Pick<NotifPrefs, 'quietFrom' | 'quietTo'>) {
+  return p.quietFrom <= p.quietTo ? hhmm >= p.quietFrom && hhmm < p.quietTo : hhmm >= p.quietFrom || hhmm < p.quietTo
+}
+/** The Ledger prompts that really go out: the member's slots, less any in quiet hours. None with the type off. */
+export function ledgerSlots(p: NotifPrefs) {
+  return p.types.ledger ? LEDGER_TIMES[p.ledgerCount].filter((t) => !inQuietHours(t, p)) : []
+}
+const QUIET_TIMES = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`).concat(['21:45'])
+/** Options for a quiet-hours select. Setup takes any minute, so the stored times passed in are always listed. */
+export function quietOptions(...stored: string[]) {
+  return [...new Set([...QUIET_TIMES, ...stored])].sort().map((x) => ({ value: x, label: x }))
+}
 /** Pushes on the busiest day — the budget is three, across every channel. */
 export function pushesPerDay(p: NotifPrefs) {
   return (p.types.ledger ? p.ledgerCount : 0) + (p.types.action ? 1 : 0)

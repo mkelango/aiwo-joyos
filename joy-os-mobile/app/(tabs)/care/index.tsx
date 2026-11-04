@@ -28,14 +28,14 @@ import {
   fmtDate,
 } from '@/components'
 import { useApp } from '@/lib/store'
-import { MEMBER, TEAM } from '@/shared/member'
+import { TEAM } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
-import { CARE_LADDER, CLINICIANS, ERX, PAST_CONSULTS, PEOPLE_DETAIL, RESULTS } from '@/screens/b/accountData'
-import { accountStore, messagesStore, refCode, useAccountThreads, useStore } from '@/screens/b/bStore'
-import { ChoiceCard, Done, Field, HereMarker, KeyValue, TimelineStep, useSheetCrisisGuard } from '@/screens/b/parts'
+import { CARE_LADDER, CLINICIANS, DEVICES as LINKABLE, ERX, PAST_CONSULTS, PEOPLE_DETAIL, RESULTS } from '@/screens/b/accountData'
+import { accountStore, devicesStore, messagesStore, refCode, useAccountThreads, useStore } from '@/screens/b/bStore'
+import { ChoiceCard, Done, Field, HereMarker, KeyValue, TimelineStep, useAccount, usePlanLabel, useSheetCrisisGuard } from '@/screens/b/parts'
 import { localDate, Rich, useA } from '@/screens/a/i18n'
 import { slotsFor, useCareConsults, type Clinician, type ConsultRow } from '@/screens/a/care'
-import { Chip, monoNums } from '@/screens/a/parts'
+import { Chip, monoNums, useIsSpecimen } from '@/screens/a/parts'
 
 // CARE (Memo p.24; Technical Architecture, Care bridge): a person behind every number.
 // My people with SLAs, the care ladder, consults, signed results and prescriptions,
@@ -69,6 +69,12 @@ const CITIES = ['Chennai', 'Mumbai', 'Bengaluru', 'Video'] as const
 
 const shortName = (name: string) => (name.startsWith('Dr') ? `Dr ${name.split(' ')[1]}` : name.split(' ')[0])
 
+/** The rungs whose wording is Arjun's: what anyone else reads there. */
+const OWN_RUNG: Record<string, string> = {
+  practice: 'The Joyspiration Practice. Eight weeks, five minutes a day.',
+  circle: 'Thirty minutes a week, the same eight people.',
+}
+
 export default function Care() {
   const { c, space } = useTheme()
   const { t, tx, lang } = useA()
@@ -78,6 +84,13 @@ export default function Care() {
   // The signed-in account's own threads (L2): Lakshmi never sees Arjun's conversations here.
   const threads = useAccountThreads()
   const [acct, setAcct] = useStore(accountStore)
+  // The results, prescriptions, past consults and ladder position below are Arjun's record:
+  // anyone else reads their own, which is empty until something is written for them.
+  const specimen = useIsSpecimen()
+  const account = useAccount()
+  const planLabel = usePlanLabel()
+  const [devices] = useStore(devicesStore)
+  const linked = LINKABLE.filter((d) => (devices.states[d.id]?.state ?? d.state) === 'connected').map((d) => d.name)
   const { rows: consults, joined, book, cancel } = useCareConsults()
   const [resched, setResched] = useState<ConsultRow | null>(null)
   const [slot, setSlot] = useState<string | null>(null)
@@ -102,7 +115,8 @@ export default function Care() {
   const person = (id: string) => TEAM.find((p) => p.id === id)!
   const isUnread = (id: string, n: number) => n > 0 && !msgs.read.includes(id)
   const unread = threads.filter((t) => isUnread(t.id, t.unread)).length
-  const hereIdx = CARE_LADDER.findIndex((r) => r.status === 'here')
+  const ladder = specimen ? CARE_LADDER : CARE_LADDER.map((r) => ({ ...r, status: r.key === 'practice' ? ('here' as const) : ('open' as const), what: OWN_RUNG[r.key] ?? r.what }))
+  const hereIdx = ladder.findIndex((r) => r.status === 'here')
 
   // Messages live on their own screen, so the crisis intercept is never under a sheet.
   const openThreadFor = (personId: string) => {
@@ -230,7 +244,7 @@ export default function Care() {
           <SectionTitle>{t('My people')}</SectionTitle>
           <SpecimenTag />
         </View>
-        <Body tone="ink2">{t('Four people know your name and your ninety days. If something drifts, it becomes a task for one of them, never an alert on your phone.')}</Body>
+        <Body tone="ink2">{specimen ? t('Four people know your name and your ninety days. If something drifts, it becomes a task for one of them, never an alert on your phone.') : t('Four people are here for you. If something drifts, it becomes a task for one of them, never an alert on your phone.')}</Body>
         {TEAM.map((p) => {
           const d = PEOPLE_DETAIL[p.id]
           return (
@@ -242,13 +256,15 @@ export default function Care() {
                   <Meta size={14}>{monoNums(`${tx(p.role)}${d.clinical ? t(' · clinical') : ''}`)}</Meta>
                 </View>
               </View>
-              <Body tone="ink2">{monoNums(tx(d.line))}</Body>
+              {specimen ? <Body tone="ink2">{monoNums(tx(d.line))}</Body> : null}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s3, rowGap: space.s1 }}>
-                <View style={{ gap: 2 }}>
-                  <Eyebrow>{t('Next')}</Eyebrow>
-                  <Mono tone="ink">{ld(tx(d.next))}</Mono>
-                  <Meta size={13}>{monoNums(tx(d.nextKind))}</Meta>
-                </View>
+                {specimen ? (
+                  <View style={{ gap: 2 }}>
+                    <Eyebrow>{t('Next')}</Eyebrow>
+                    <Mono tone="ink">{ld(tx(d.next))}</Mono>
+                    <Meta size={13}>{monoNums(tx(d.nextKind))}</Meta>
+                  </View>
+                ) : null}
                 <View style={{ gap: 2 }}>
                   <Eyebrow>{t('Speaks')}</Eyebrow>
                   <Meta tone="ink">{monoNums(tx(d.languages))}</Meta>
@@ -276,10 +292,10 @@ export default function Care() {
         <Body tone="ink2">{monoNums(t('Most of the time the Practice and your circle are enough. An Ease screen above threshold moves you up to a clinician, with a person, within 48 hours.'))}</Body>
         <Card tone="raised">
           <View accessibilityRole="list" accessibilityLabel={t('Care ladder, from self-care to a ’cation')}>
-            {CARE_LADDER.map((r, i) => {
+            {ladder.map((r, i) => {
               const st = r.status === 'used' ? 'done' : r.status === 'here' ? 'now' : 'next'
               return (
-                <TimelineStep key={r.key} index={i} state={st} last={i === CARE_LADDER.length - 1}>
+                <TimelineStep key={r.key} index={i} state={st} last={i === ladder.length - 1}>
                   <View style={{ gap: 4 }}>
                     <View accessible accessibilityLabel={t('Rung {n}, {name}{here}. {who}. {what}', { n: i + 1, name: tx(r.name), here: r.status === 'here' ? t(', you are here') : '', who: tx(r.who), what: tx(r.what) })} style={{ gap: 4 }}>
                       <Body weight="medium" tone={st === 'next' ? 'ink2' : 'ink'}>
@@ -307,8 +323,12 @@ export default function Care() {
               )
             })}
           </View>
-          <Divider style={{ marginVertical: space.s2 }} />
-          <Meta>{monoNums(t('You use rungs 1–{n} today. Dr Meera signed your Clinical-grade Index in October; Priya has asked Dr Sanjay for a first conversation about sleep.', { n: hereIdx + 1 }))}</Meta>
+          {specimen ? (
+            <>
+              <Divider style={{ marginVertical: space.s2 }} />
+              <Meta>{monoNums(t('You use rungs 1–{n} today. Dr Meera signed your Clinical-grade Index in October; Priya has asked Dr Sanjay for a first conversation about sleep.', { n: hereIdx + 1 }))}</Meta>
+            </>
+          ) : null}
         </Card>
       </View>
 
@@ -395,27 +415,35 @@ export default function Care() {
             {monoNums(t('Telemedicine Practice Guidelines 2020. Every consult begins with the clinician’s name and registration, your identity and your consent.'))}
           </Meta>
         </View>
-        <Card tone="sunk" style={{ gap: space.s1 }}>
-          <Eyebrow>{t('Past consults')}</Eyebrow>
-          {PAST_CONSULTS.map((pc) => (
-            <View key={pc.id} style={{ gap: 2, paddingVertical: 6 }}>
-              <Body>{monoNums(tx(pc.title))}</Body>
-              <Meta size={14}>
-                <Mono size={14} tone="ink2">{ld(pc.when)}</Mono> · {person(pc.with).name} · {tx(pc.note)}
-              </Meta>
-            </View>
-          ))}
-        </Card>
+        {specimen ? (
+          <Card tone="sunk" style={{ gap: space.s1 }}>
+            <Eyebrow>{t('Past consults')}</Eyebrow>
+            {PAST_CONSULTS.map((pc) => (
+              <View key={pc.id} style={{ gap: 2, paddingVertical: 6 }}>
+                <Body>{monoNums(tx(pc.title))}</Body>
+                <Meta size={14}>
+                  <Mono size={14} tone="ink2">{ld(pc.when)}</Mono> · {person(pc.with).name} · {tx(pc.note)}
+                </Meta>
+              </View>
+            ))}
+          </Card>
+        ) : null}
       </View>
 
       {/* Results */}
       <View style={{ gap: space.s2 }}>
         <View style={{ gap: 8 }}>
           <SectionTitle>{t('Results')}</SectionTitle>
-          <SpecimenTag />
+          {specimen ? <SpecimenTag /> : null}
         </View>
         <Body tone="ink2">{monoNums(t('Signed by a physician before you see them. Lab partner, then the result pipeline (FHIR R4), then sign-off, then you.'))}</Body>
-        {RESULTS.map((r) => {
+        {!specimen ? (
+          <Card tone="outline" style={{ gap: space.s2, alignItems: 'flex-start' }}>
+            <EmptyIllustration kind="generic" />
+            <Meta>{t('No results yet. Joy OS shows only what a physician has signed, and nothing has been signed for you.')}</Meta>
+          </Card>
+        ) : null}
+        {(specimen ? RESULTS : []).map((r) => {
           const open = openResult === r.id
           const watch = r.markers.filter((m) => m.flag === 'watch').length
           return (
@@ -479,7 +507,8 @@ export default function Care() {
       {/* Prescriptions */}
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{t('Prescriptions')}</SectionTitle>
-        {ERX.map((rx) => (
+        {!specimen ? <Meta>{t('No prescriptions. Nothing has been written for you.')}</Meta> : null}
+        {(specimen ? ERX : []).map((rx) => (
           <Card key={rx.id} tone={rx.status === 'active' ? 'raised' : 'sunk'} style={{ gap: 6 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.s1, alignItems: 'flex-start' }}>
               <Body weight="medium" style={{ flex: 1 }}>
@@ -509,7 +538,7 @@ export default function Care() {
         </Title>
         <Body tone="ink2">{t('Panels, imaging and longer clinical plans live in LifeOS. Same AIWO ID; nothing is entered twice, and Joy OS only shows what your physician has signed.')}</Body>
         <Meta>
-          <Rich text={t('AIWO ID · *{id}*', { id: MEMBER.aiwoId })} wrap={(w) => <Mono tone="ink">{w}</Mono>} />
+          <Rich text={t('AIWO ID · *{id}*', { id: account.aiwoId })} wrap={(w) => <Mono tone="ink">{w}</Mono>} />
         </Meta>
         <Button variant="secondary" size="sm" iconRight="arrow-up-right" onPress={() => setNote(t('On your phone this opens the LifeOS app at your clinical record. Specimen: the deep link is not live in this build.'))}>
           {t('Open in LifeOS')}
@@ -520,19 +549,19 @@ export default function Care() {
       <View style={{ gap: space.s1 }}>
         <SectionTitle>{t('You and your data')}</SectionTitle>
         <Card tone="raised" padding={8} style={{ paddingHorizontal: 16 }}>
-          <ListRow icon="user" title={t('Profile')} sub={t('{name} · AIWO ID, emergency contact', { name: `${MEMBER.firstName} ${MEMBER.lastName}` })} onPress={() => router.push('/profile')} />
+          <ListRow icon="user" title={t('Profile')} sub={t('{name} · AIWO ID, emergency contact', { name: account.name })} onPress={() => router.push('/profile')} />
           <Divider />
-          <ListRow icon="star" title={t('Membership')} sub={t('{plan} · invoices', { plan: `${MEMBER.plan} + ${MEMBER.membership}` })} onPress={() => router.push('/membership')} />
+          <ListRow icon="star" title={t('Membership')} sub={t('{plan} · invoices', { plan: planLabel })} onPress={() => router.push('/membership')} />
           <Divider />
           <ListRow icon="bell" title={t('Notifications')} sub={t('Recent, quiet hours, channels')} onPress={() => router.push('/notifications')} />
           <Divider />
           <ListRow icon="shield" title={t('Trust centre')} sub={t('Who has seen my data · consents · export · delete')} onPress={() => router.push('/trust')} />
           <Divider />
-          <ListRow icon="home" title={t('Household')} sub={t('The Rao household · what each of you shares')} onPress={() => router.push('/household')} />
+          <ListRow icon="home" title={t('Household')} sub={account.id === 'new' ? t('Your household · what each of you shares') : t('The Rao household · what each of you shares')} onPress={() => router.push('/household')} />
           <Divider />
-          <ListRow icon="watch" title={tx('Devices')} sub={t('Oura Ring · Apple Health')} onPress={() => router.push('/devices')} />
+          <ListRow icon="watch" title={tx('Devices')} sub={linked.join(' · ') || t('Nothing connected yet')} onPress={() => router.push('/devices')} />
           <Divider />
-          <ListRow icon="users" title={tx('Your circle')} sub={t('Circle of eight · Monday 7 pm')} onPress={() => router.push('/circles')} />
+          <ListRow icon="users" title={tx('Your circle')} sub={specimen ? t('Circle of eight · Monday 7 pm') : t('No circle yet')} onPress={() => router.push('/circles')} />
           <Divider />
           <ListRow icon="settings" title={t('Settings')} sub={t('Language, theme, quiet hours, text size')} onPress={() => router.push('/settings')} />
         </Card>

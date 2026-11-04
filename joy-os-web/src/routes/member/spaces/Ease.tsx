@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, Check, Moon, Phone, Plus, MessageCircle, ShieldCheck, Sparkles, Stethoscope, Trash2 } from 'lucide-react'
-import { useState, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
 import { Link } from 'react-router-dom'
 import { DaybreakButton, Eyebrow, fmtDate } from '@/components/joy/primitives'
 import { Button, Pill, Sheet, Tabs } from '@/components/ui'
@@ -9,7 +9,8 @@ import { TEAM } from '@/data/member'
 import { BURDEN_PARTS, JOURNAL_START, KEEP_MEANING_START, SCREEN_FORMS, SCREEN_HISTORY, SCREEN_META, SPACE_TODAY, WIND_DOWN, type Screen } from './_data'
 import { SpaceShell, ToolCard, useCrisisGuard } from './_SpaceShell'
 import { mono, useSpaceText, type SpKey } from './_i18n'
-import { useSpaceState } from './_state'
+import { readSpaceState, useSpaceState } from './_state'
+import { CARE_PERSON, careThreadHref, postCareMessage, specimenNow, type CareRecipient } from '@/routes/member/account/_careInbox'
 import { INSTRUMENT_NOTE } from '@/lib/i18n'
 import { useIsMinor } from '@/lib/minor'
 
@@ -31,6 +32,7 @@ export default function Ease() {
     const last = history[s][history[s].length - 1]
     return last.date === SPACE_TODAY && bandFor(s, last.score).route ? [{ id: `${s}:${last.date}:${last.score}`, screen: s, score: last.score, on: last.date }] : []
   })
+  const routing = useRouting(tasks)
   return (
     <SpaceShell
       term="B"
@@ -45,7 +47,7 @@ export default function Ease() {
       <Screens history={history} setHistory={setHistory} />
       <div className="grid gap-6 lg:grid-cols-12">
         <div className="flex lg:col-span-7"><SleepPlan isi={isi} /></div>
-        <div className="flex lg:col-span-5"><ClinicianRouting tasks={tasks} onTalk={() => setTalkOpen(true)} /></div>
+        <div className="flex lg:col-span-5"><ClinicianRouting tasks={tasks} routing={routing} onTalk={() => setTalkOpen(true)} /></div>
       </div>
       <TalkNowSheet open={talkOpen} onClose={() => setTalkOpen(false)} />
     </SpaceShell>
@@ -285,6 +287,8 @@ function Screens({ history, setHistory }: { history: History; setHistory: Dispat
   const latest = h[h.length - 1]
   const band = bandFor(screen, latest.score)
   const [replaced, setReplaced] = useState(false)
+  // Under 18 the screens can still be taken, but no score, bar or band comes back; only the routing does.
+  const minor = useIsMinor()
   const start = () => { setAnswers(form.items.map(() => null)); setPain(null); setErr(null); setJustTook(null); setReplaced(false); setTaking(true) }
   const cancel = () => { setTaking(false); setErr(null) }
   const submit = () => {
@@ -307,14 +311,15 @@ function Screens({ history, setHistory }: { history: History; setHistory: Dispat
   return (
     <ToolCard
       eyebrow={t('ease.sc.eyebrow')}
-      title={t('ease.sc.title')}
-      sub={t('ease.sc.sub')}
+      title={t(minor ? 'ease.sc.mnTitle' : 'ease.sc.title')}
+      sub={minor ? mono(t('ease.sc.mnSub')) : t('ease.sc.sub')}
       aside={<Pill tone="neutral"><ShieldCheck size={12} aria-hidden /> {mono(t('ease.sc.pill'))}</Pill>}
     >
       <Tabs value={screen} onChange={(v) => { setScreen(v); setTaking(false); setErr(null); setJustTook(null) }} className="max-w-full self-start overflow-x-auto" items={(Object.keys(SCREEN_META) as Screen[]).map((s) => ({ value: s, label: label(s) }))} />
       <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="min-w-0">
-          <p className="text-[15px] text-ink-2">{r('ease.sc.meta', { what: d(meta.what), max: <span className="num">{meta.max}</span> })}</p>
+          <p className="text-[15px] text-ink-2">{minor ? d(meta.what) : r('ease.sc.meta', { what: d(meta.what), max: <span className="num">{meta.max}</span> })}</p>
+          {!minor && <>
           <div className="mt-4 flex h-48 items-end gap-3 border-b border-line" role="img" aria-label={t('ease.sc.history', { screen: label(screen), list: h.map((x) => t('ease.sc.historyItem', { date: fmtDate(x.date), score: x.score, max: meta.max, label: d(bandFor(screen, x.score).label) })).join('; ') })}>
             {h.map((x, i) => (
               <div key={x.date + i} className="flex h-full flex-1 flex-col items-center justify-end gap-1.5">
@@ -329,20 +334,27 @@ function Screens({ history, setHistory }: { history: History; setHistory: Dispat
           <ul className="mt-5 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-ink-3" aria-label={t('ease.sc.bands')}>
             {meta.bands.map((b, i) => <li key={b.label}><span className="num">{i === 0 ? 0 : meta.bands[i - 1].upTo + 1}–{b.upTo}</span> {mono(d(b.label))}</li>)}
           </ul>
+          </>}
         </div>
 
         <div className="min-w-0">
           <AnimatePresence mode="wait" initial={false}>
             {!taking ? (
               <motion.div key="result" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex h-full flex-col">
-                {justTook === screen && <p role="status" className="mb-4 flex items-center gap-2 text-[14px] text-ink-2"><Check size={14} className="shrink-0" aria-hidden /> {t(replaced ? 'ease.sc.replaced' : 'ease.sc.saved')}</p>}
+                {justTook === screen && <p role="status" className="mb-4 flex items-center gap-2 text-[14px] text-ink-2"><Check size={14} className="shrink-0" aria-hidden /> {t(replaced ? 'ease.sc.replaced' : minor ? 'ease.sc.mnSaved' : 'ease.sc.saved')}</p>}
                 <Eyebrow>{mono(t('c.latest', { d: fmtDate(latest.date) }))}</Eyebrow>
-                <div className="mt-2 flex items-end gap-3">
-                  <span className="num text-[3.5rem] font-light leading-none text-ink">{latest.score}</span>
-                  <span className="mb-1 min-w-0 text-[15px] text-ink-3">{mono(t('ease.sc.ofMax', { max: meta.max, label: d(band.label) }))}</span>
-                </div>
-                <p className="mt-4 rounded-xl bg-paper-sunk p-4 text-[17px] text-ink">{mono(d(band.copy))}</p>
-                <p className="eyebrow mt-2 text-ink-3">{mono(t('ease.sc.copy', { screen: label(screen) }))}</p>
+                {minor ? (
+                  <p className="mt-2 text-[1.3rem] font-light text-ink">{mono(t('mn.room'))}</p>
+                ) : (
+                  <>
+                    <div className="mt-2 flex items-end gap-3">
+                      <span className="num text-[3.5rem] font-light leading-none text-ink">{latest.score}</span>
+                      <span className="mb-1 min-w-0 text-[15px] text-ink-3">{mono(t('ease.sc.ofMax', { max: meta.max, label: d(band.label) }))}</span>
+                    </div>
+                    <p className="mt-4 rounded-xl bg-paper-sunk p-4 text-[17px] text-ink">{mono(d(band.copy))}</p>
+                    <p className="eyebrow mt-2 text-ink-3">{mono(t('ease.sc.copy', { screen: label(screen) }))}</p>
+                  </>
+                )}
                 {band.route && (
                   <p className="mt-3 flex items-start gap-2 rounded-xl border border-line-strong p-3.5 text-[15px] text-ink"><Stethoscope size={16} className="mt-0.5 shrink-0" aria-hidden /> {t(routeFor(screen, latest.score).copy)}</p>
                 )}
@@ -392,7 +404,7 @@ function Screens({ history, setHistory }: { history: History; setHistory: Dispat
                 )}
                 {err && <p role="alert" className="mt-3 text-[13px] text-error">{t(err.k, err.v)}</p>}
                 <div className="mt-5 flex gap-2">
-                  <Button type="submit" variant="ink">{t('ease.sc.see')}</Button>
+                  <Button type="submit" variant="ink">{t(minor ? 'ease.sc.mnDone' : 'ease.sc.see')}</Button>
                   <Button variant="ghost" onClick={cancel}>{t('c.cancel')}</Button>
                 </div>
                 <p className="mt-3 text-[12px] text-ink-3">{dn(form.source)}</p>
@@ -413,8 +425,8 @@ const ROUTE_COPY: Record<Screen, SpKey> = {
 }
 
 /** Who a routed result goes to, how soon, and the pre-approved copy. Severe PHQ-4 (9–12) is a same-day call, as its band copy says. */
-function routeFor(screen: Screen, score: number): { who: string; within: string; copy: SpKey } {
-  if (screen === 'PHQ-4' && score >= 9) return { who: ROUTE_TO['PHQ-4'].who, within: 'Call today', copy: 'ease.route.PHQ-4.today' }
+function routeFor(screen: Screen, score: number): { who: string; within: string; to: CareRecipient; copy: SpKey } {
+  if (screen === 'PHQ-4' && score >= 9) return { ...ROUTE_TO['PHQ-4'], within: 'Call today', copy: 'ease.route.PHQ-4.today' }
   return { ...ROUTE_TO[screen], copy: ROUTE_COPY[screen] }
 }
 
@@ -431,6 +443,7 @@ function SleepPlan({ isi }: { isi: number }) {
   const [windDown, setWindDown] = useState(savedOk ? saved!.windDown : '22:00')
   const [done, setDone] = useState<number[]>([])
   const { t, d, r } = useSpaceText()
+  const minor = useIsMinor()
   // An emptied or half-typed time input gives '', which must not turn into NaN:NaN.
   const valid = HM.test(wake) && HM.test(windDown)
   const dirty = !savedOk || saved!.wake !== wake || saved!.windDown !== windDown
@@ -450,7 +463,7 @@ function SleepPlan({ isi }: { isi: number }) {
   const tooShort = valid && !(sleepWindow >= 5)
   const timeCls = 'num h-11 w-full rounded-xl border border-line-strong bg-paper px-3 text-[16px] text-ink focus-ring'
   return (
-    <ToolCard className="w-full" eyebrow={<span className="inline-flex items-center gap-1.5"><Moon size={13} aria-hidden /> {t('ease.sp.eyebrow')}</span>} title={t('ease.sp.title')} sub={isi >= 15
+    <ToolCard className="w-full" eyebrow={<span className="inline-flex items-center gap-1.5"><Moon size={13} aria-hidden /> {t('ease.sp.eyebrow')}</span>} title={t('ease.sp.title')} sub={minor ? t('ease.sp.subMinor') : isi >= 15
       ? <>{r('ease.sp.subHigh', { isi: <span className="num">{isi}</span> })}</>
       : <>{r('ease.sp.subLow', { isi: <span className="num">{isi}</span>, c: <span className="num">15</span> })}</>}>
       <div className="grid grid-cols-2 gap-3">
@@ -500,41 +513,108 @@ function SleepPlan({ isi }: { isi: number }) {
 
 // ─── Clinician routing ────────────────────────────────────────────────────
 
-const ROUTE_TO: Record<Screen, { who: string; within: string }> = {
-  'PHQ-4': { who: 'Dr Sanjay Menon', within: 'Review within 48 h' },
-  ISI: { who: 'Dr Meera Iyer', within: 'Review within 48 h' },
-  'PSS-4': { who: 'Coach Priya', within: 'In touch this week' },
-  Pain: { who: 'Dr Meera Iyer', within: 'Review within 48 h' },
+/** `to` is the care thread a request for a call goes to: the physician's, or the coach's for what the coach handles. */
+const ROUTE_TO: Record<Screen, { who: string; within: string; to: CareRecipient }> = {
+  'PHQ-4': { who: 'Dr Sanjay Menon', within: 'Review within 48 h', to: 'physician' },
+  ISI: { who: 'Dr Meera Iyer', within: 'Review within 48 h', to: 'physician' },
+  'PSS-4': { who: 'Coach Priya', within: 'In touch this week', to: 'coach' },
+  Pain: { who: 'Dr Meera Iyer', within: 'Review within 48 h', to: 'physician' },
 }
 
 /** Past routings for the specimen member: the audit trail the card promises. */
 const ROUTED_BEFORE = [
-  { on: '2026-07-06', what: 'PHQ-4 6', who: 'Dr Sanjay Menon', outcome: 'Reviewed in 19 h · two calls · closed' },
-  { on: '2026-07-06', what: 'ISI 15', who: 'Dr Meera Iyer', outcome: 'Reviewed in 31 h · sleep plan, no study · closed' },
+  { on: '2026-07-06', screen: 'PHQ-4', score: 6, who: 'Dr Sanjay Menon', outcome: 'Reviewed in 19 h · two calls · closed' },
+  { on: '2026-07-06', screen: 'ISI', score: 15, who: 'Dr Meera Iyer', outcome: 'Reviewed in 31 h · sleep plan, no study · closed' },
 ]
 
 type RoutingTask = { id: string; screen: Screen; score: number; on: string }
-type TaskState = { status: 'callRequested' | 'closed' }
+/**
+ * One routed result, keyed by its id (screen:date:score) in ease.routing.v1. This record is the
+ * hand-off: the clinical portal's screen-threshold queue reads it as a live row for the specimen
+ * member and writes `status` back, so the member's card and the queue always show the same state.
+ * `closedBy` is 'member' when the member closed it here; a close without it came from the portal.
+ */
+type RoutingRecord = { id: string; instrument: Screen; score: number; routedTo: string; status: 'open' | 'callRequested' | 'closed'; at: string; closedBy?: 'member' }
+type SavedRouting = Record<string, Partial<RoutingRecord>>
+const ROUTING_KEY = 'ease.routing.v1'
+const dayOf = (id: string) => id.split(':')[1]
 
-function ClinicianRouting({ tasks, onTalk }: { tasks: RoutingTask[]; onTalk: () => void }) {
+/** A saved entry as a whole record. Entries from before the portal read this held only a status (closed by the member). */
+function toRecord(id: string, saved: Partial<RoutingRecord>): RoutingRecord | null {
+  const [screen, on, score] = id.split(':')
+  if (!(screen in SCREEN_META) || !saved.status) return null
+  const instrument = screen as Screen
+  const n = Number(score)
+  return { id, instrument, score: n, routedTo: routeFor(instrument, n).who, at: on, ...(saved.at ? {} : { closedBy: 'member' as const }), ...saved, status: saved.status }
+}
+
+/**
+ * Every routed result has its record. A retake that corrects today's result takes its open record
+ * off the queue, handing who has it to the corrected result; a call already asked for moves with it,
+ * or stands on its own if the corrected result no longer routes. Closed records stay as the trail,
+ * unless a moved call lands on one: the call is still waiting, so that record opens again with it.
+ */
+function reconcileRouting(saved: SavedRouting, tasks: RoutingTask[]): SavedRouting {
+  const next: SavedRouting = {}
+  const moved = new Map<Screen, RoutingRecord>()
+  for (const [id, entry] of Object.entries(saved)) {
+    const rec = toRecord(id, entry)
+    if (!rec) continue
+    if (rec.status !== 'closed' && dayOf(id) === SPACE_TODAY && !tasks.some((task) => task.id === id)) {
+      const corrected = tasks.some((task) => task.screen === rec.instrument)
+      if (corrected) moved.set(rec.instrument, rec)
+      if (corrected || rec.status === 'open') continue
+    }
+    next[id] = rec
+  }
+  for (const task of tasks) {
+    const from = moved.get(task.screen)
+    const here = next[task.id]
+    if (!here || (from?.status === 'callRequested' && here.status !== 'callRequested')) next[task.id] = { id: task.id, instrument: task.screen, score: task.score, routedTo: from?.routedTo ?? routeFor(task.screen, task.score).who, status: from?.status ?? 'open', at: specimenNow() }
+  }
+  return JSON.stringify(next) === JSON.stringify(saved) ? saved : next
+}
+
+function useRouting(tasks: RoutingTask[]) {
+  const [saved, setSaved] = useSpaceState<SavedRouting>(ROUTING_KEY, {})
+  const taskIds = tasks.map((task) => task.id).join('|')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => setSaved((cur) => reconcileRouting(cur, tasks)), [taskIds])
+  // The portal writes status back to the same record, sometimes from another tab. With nothing
+  // to read (storage blocked) the records held in memory stand.
+  useEffect(() => {
+    const sync = () => setSaved((cur) => readSpaceState<SavedRouting | null>(ROUTING_KEY, null) ?? cur)
+    window.addEventListener('storage', sync)
+    window.addEventListener('focus', sync)
+    return () => {
+      window.removeEventListener('storage', sync)
+      window.removeEventListener('focus', sync)
+    }
+  }, [setSaved])
+  const records = useMemo(() => Object.entries(saved).flatMap(([id, entry]) => toRecord(id, entry) ?? []), [saved])
+  const update = (rec: RoutingRecord, patch: Partial<RoutingRecord>) => setSaved((cur) => ({ ...cur, [rec.id]: { ...rec, ...patch } }))
+  return { records, update }
+}
+
+function ClinicianRouting({ tasks, routing, onTalk }: { tasks: RoutingTask[]; routing: ReturnType<typeof useRouting>; onTalk: () => void }) {
   const sanjay = TEAM.find((p) => p.role === 'Psychologist')!
   const meera = TEAM.find((p) => p.role === 'Physician')!
   const { t, d, r, dm } = useSpaceText()
+  // Under 18 the card still says who has it and how soon, but names no score.
+  const minor = useIsMinor()
   const label = (x: Screen) => (x === 'Pain' ? t('ease.pain') : x)
-  // What the member did with each routed task (keyed by screen, date and score), kept with the record.
-  const [states, setStates] = useSpaceState<Record<string, TaskState>>('ease.routing.v1', {})
-  const open = tasks.filter((task) => states[task.id]?.status !== 'closed')
+  const { records, update } = routing
+  const open = records.filter((rec) => rec.status !== 'closed')
   // Closed tasks stay in the audit trail even after today's result is corrected.
-  const closed = Object.entries(states).flatMap(([id, st]) => {
-    const [screen, on, score] = id.split(':')
-    return st.status === 'closed' && screen in SCREEN_META ? [{ id, screen: screen as Screen, on, score: Number(score) }] : []
-  })
-  const setTask = (id: string, st: TaskState | null) => setStates((x) => {
-    const next = { ...x }
-    if (st) next[id] = st
-    else delete next[id]
-    return next
-  })
+  const closed = records.filter((rec) => rec.status === 'closed')
+  /** Who the message about a call reaches: their thread is where the member can follow it. */
+  const threadPerson = (to: CareRecipient) => TEAM.find((p) => p.id === CARE_PERSON[to])?.name ?? ''
+  const askSooner = (rec: RoutingRecord) => {
+    const rt = routeFor(rec.instrument, rec.score)
+    const screen = label(rec.instrument)
+    postCareMessage({ to: rt.to, from: 'member', subject: t('ease.cr.askSubject', { screen }), body: t('ease.cr.askBody', { who: d(rec.routedTo), screen, day: dm(dayOf(rec.id)) }), ref: `ease.routing.${rec.id}` })
+    update(rec, { status: 'callRequested' })
+  }
   const rules = [
     { when: t('ease.cr.r0w'), then: t('ease.cr.r0t', { name: sanjay.name }) },
     { when: t('ease.cr.r1w'), then: t('ease.cr.r1t', { name: sanjay.name }) },
@@ -566,17 +646,18 @@ function ClinicianRouting({ tasks, onTalk }: { tasks: RoutingTask[]; onTalk: () 
       <div className="mt-6 border-t border-line pt-4">
         {open.length > 0 && <Eyebrow>{t('ease.cr.open')}</Eyebrow>}
         <ul className={clsx('space-y-2', open.length > 0 && 'mt-2.5')} aria-live="polite">
-          {open.map((task) => {
-            const rt = routeFor(task.screen, task.score)
-            const st = states[task.id]?.status
+          {open.map((rec) => {
+            const rt = routeFor(rec.instrument, rec.score)
+            const asked = rec.status === 'callRequested'
             return (
-              <li key={task.id} className="rounded-xl border border-line-strong bg-paper-raised p-3 text-[14px]">
-                <span className="flex items-center justify-between gap-2 text-ink"><span>{label(task.screen)} <span className="num">{task.score}</span> · {mono(d(rt.who))}</span><span className="num shrink-0 text-[12px] text-ink-3">{dm(task.on)}</span></span>
+              <li key={rec.id} className="rounded-xl border border-line-strong bg-paper-raised p-3 text-[14px]">
+                <span className="flex items-center justify-between gap-2 text-ink"><span>{label(rec.instrument)}{!minor && <> <span className="num">{rec.score}</span></>} · {mono(d(rec.routedTo))}</span><span className="num shrink-0 text-[12px] text-ink-3">{dm(dayOf(rec.id))}</span></span>
                 <span className="mt-0.5 block text-[13px] text-ink-2">{mono(t('ease.cr.task', { within: d(rt.within) }))}</span>
-                <span className="mt-1 block text-[13px] text-ink-3" role="status">{st === 'callRequested' ? t('ease.cr.soonerDone', { who: d(rt.who) }) : t('ease.cr.waiting')}</span>
+                <span className="mt-1 block text-[13px] text-ink-3" role="status">{asked ? t('ease.cr.soonerDone', { person: threadPerson(rt.to) }) : t('ease.cr.waiting')}</span>
+                {asked && <Link to={careThreadHref(rt.to)} className="mt-1 inline-flex items-center gap-1 rounded text-[13px] text-ink underline-offset-4 hover:underline focus-ring">{t('c.openThread')} <ArrowRight size={13} aria-hidden /></Link>}
                 <span className="mt-2.5 flex flex-wrap gap-2">
-                  {st !== 'callRequested' && <Button size="sm" variant="ghost" onClick={() => setTask(task.id, { status: 'callRequested' })}><Phone size={13} /> {t('ease.cr.sooner')}</Button>}
-                  <Button size="sm" variant="ghost" onClick={() => setTask(task.id, { status: 'closed' })}><Check size={13} /> {t('ease.cr.close')}</Button>
+                  {!asked && <Button size="sm" variant="ghost" onClick={() => askSooner(rec)}><Phone size={13} /> {t('ease.cr.sooner')}</Button>}
+                  <Button size="sm" variant="ghost" onClick={() => update(rec, { status: 'closed', closedBy: 'member' })}><Check size={13} /> {t('ease.cr.close')}</Button>
                 </span>
               </li>
             )
@@ -584,21 +665,21 @@ function ClinicianRouting({ tasks, onTalk }: { tasks: RoutingTask[]; onTalk: () 
         </ul>
         <Eyebrow className={open.length ? 'mt-4' : undefined}>{t('ease.cr.before')}</Eyebrow>
         <ul className="mt-2.5 space-y-2">
-          {closed.map((task) => {
-            const rt = routeFor(task.screen, task.score)
+          {closed.map((rec) => {
             return (
-              <li key={task.id} className="rounded-xl bg-paper-raised p-3 text-[14px]">
-                <span className="flex items-center justify-between gap-2 text-ink"><span><span className="num">{task.screen === 'Pain' ? label(task.screen) : task.screen} {task.score}</span> · {mono(d(rt.who))}</span><span className="num shrink-0 text-[12px] text-ink-3">{fmtDate(task.on)}</span></span>
+              <li key={rec.id} className="rounded-xl bg-paper-raised p-3 text-[14px]">
+                <span className="flex items-center justify-between gap-2 text-ink"><span><span className="num">{rec.instrument === 'Pain' ? label(rec.instrument) : rec.instrument}{!minor && ` ${rec.score}`}</span> · {mono(d(rec.routedTo))}</span><span className="num shrink-0 text-[12px] text-ink-3">{fmtDate(dayOf(rec.id))}</span></span>
                 <span className="mt-0.5 flex flex-wrap items-center justify-between gap-2 text-[13px] text-ink-2">
-                  {mono(t('ease.cr.closedBy', { who: d(rt.who) }))}
-                  <button type="button" onClick={() => setTask(task.id, null)} className="rounded text-ink underline-offset-4 hover:underline focus-ring">{t('ease.cr.reopen')}</button>
+                  {mono(t(rec.closedBy === 'member' ? 'ease.cr.closedBy' : 'ease.cr.closedTeam', { who: d(rec.routedTo) }))}
+                  {/* A result corrected since has nothing left to reopen. */}
+                  {tasks.some((task) => task.id === rec.id) && <button type="button" onClick={() => update(rec, { status: 'open', closedBy: undefined })} className="rounded text-ink underline-offset-4 hover:underline focus-ring">{t('ease.cr.reopen')}</button>}
                 </span>
               </li>
             )
           })}
           {ROUTED_BEFORE.map((rb) => (
-            <li key={rb.on + rb.what} className="rounded-xl bg-paper-raised p-3 text-[14px]">
-              <span className="flex items-center justify-between gap-2 text-ink"><span><span className="num">{rb.what}</span> · {rb.who}</span><span className="num shrink-0 text-[12px] text-ink-3">{fmtDate(rb.on)}</span></span>
+            <li key={rb.on + rb.screen} className="rounded-xl bg-paper-raised p-3 text-[14px]">
+              <span className="flex items-center justify-between gap-2 text-ink"><span><span className="num">{rb.screen}{!minor && ` ${rb.score}`}</span> · {rb.who}</span><span className="num shrink-0 text-[12px] text-ink-3">{fmtDate(rb.on)}</span></span>
               <span className="mt-0.5 block text-[13px] text-ink-2">{mono(d(rb.outcome))}</span>
             </li>
           ))}

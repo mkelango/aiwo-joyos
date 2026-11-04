@@ -5,7 +5,7 @@ import Svg, { Circle, G, Text as SvgText } from 'react-native-svg'
 import { ArrowLink, Body, Button, Divider, EmptyIllustration, Eyebrow, Icon, Meta, Mono, Pill, Progress, Segmented, Sheet, SpecimenTag } from '@/components'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { useLocal } from '@/screens/a/local'
-import { IconButton, monoNums, TextField } from '@/screens/a/parts'
+import { IconButton, monoNums, TextField, useIsSpecimen } from '@/screens/a/parts'
 import { CIRCLE_START, CONNECTIONS, COUPLES_CHECK, STATE_OF_US, TWO_AM_START, type CirclePerson } from '@/screens/a/spacesData'
 import { CIRCLE } from '@/shared/platform'
 import { useTheme } from '@/theme/ThemeProvider'
@@ -19,13 +19,19 @@ import { ToolCard, ToolsHeading } from './common'
 
 export function PeopleTools() {
   const { t } = useA()
+  // The orbit, circle, 2 am list and State of Us are Arjun's people.
+  const specimen = useIsSpecimen()
   return (
     <>
       <ToolsHeading>{t('People tools')}</ToolsHeading>
-      <Orbit />
-      <CircleOfEight />
-      <TwoAm />
-      <StateOfUs />
+      {specimen ? (
+        <>
+          <Orbit />
+          <CircleOfEight />
+          <TwoAm />
+          <StateOfUs />
+        </>
+      ) : null}
       <Connections />
     </>
   )

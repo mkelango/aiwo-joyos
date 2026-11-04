@@ -1,8 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useCallback, useSyncExternalStore } from 'react'
+import { localStorageKey, refreshLocal, setLocalAccount } from '@/screens/a/local'
 import { CONSENTS, MEMBER } from '@/shared/member'
 import type { MeasuredIndex } from '@/shared/indexScoring'
 import type { TermKey } from '@/shared/types'
+import { NOTICES, type Notice } from './_data'
 import { DEVICES, GRANTS, SPECIMEN_NOW, specimenThreads, type DeviceState, type Grant, type Msg, type Thread } from './accountData'
 
 // Lane B persisted state: small module-level stores kept on the device with AsyncStorage
@@ -91,6 +93,8 @@ export interface Session {
   elderTypeFor?: string
   /** Elder mode raised the phone's text size from Default; set back when another account signs in. */
   elderTypeRaised?: boolean
+  /** Where Lane A keeps the records of the account made in onboarding, once a second has been made here. */
+  newScope?: string
 }
 /**
  * Keys only a signed-in member can have written: each belongs to a member-only screen (Trust,
@@ -114,6 +118,17 @@ export const sessionStore = createStore<Session>(
   { signedIn: false, onboarded: false, account: 'arjun' },
   { whenMissing: () => keysAtLaunch.then((keys) => (keys.some((k) => SESSION_PROOF.includes(k)) ? { signedIn: true, onboarded: true, account: 'arjun' } : null)) },
 )
+
+/** Where Lane A keeps an account's records (local.ts): under its own id, or the latest new account's scope. */
+const scopeOf = (a: AccountId) => (a === 'new' ? sessionStore.get().newScope ?? 'new' : a)
+/** Signed out, nobody's records are open: the next person on the phone reads and writes only their own. */
+const SIGNED_OUT = 'signed-out'
+// Lane A's records follow the session: this runs when it hydrates, on every sign-in (applyDemoAccount
+// then the caller's signedIn), on sign-out in Settings and Profile, and when onboarding makes an account.
+sessionStore.subscribe(() => {
+  const s = sessionStore.get()
+  setLocalAccount(s.signedIn ? scopeOf(s.account ?? 'arjun') : SIGNED_OUT)
+})
 
 // ─── Notification preferences (onboarding, Settings and Notifications share these) ───
 
@@ -508,10 +523,11 @@ export function useSignalsDown() {
 
 // ─── Accounts (M1): the specimen member, Lakshmi in elder mode, or the one made in onboarding ───
 // Each account keeps its own profile, membership, bookings and passes, wallet, schedule, circle
-// requests, Declaration, invitations, consents (with their history), the rest of the Trust centre
-// (research use, insurer decision, scheduled erasure, exports), DPDP nominee, ABHA link, messages,
-// notification read state, circle concerns and device links. Switching puts the current
-// account's away and brings the next one's back (or its starting point).
+// settings and requests, Declaration, invitations, consents (with their history), the rest of the
+// Trust centre (research use, insurer decision, scheduled erasure, exports), DPDP nominee, ABHA
+// link, messages, notification read state, circle concerns, Occasion requests, Practice, and device
+// links with what they may read and write. Switching puts the current account's away and brings
+// the next one's back (or its starting point). Lane A's records move with the session (scopeOf).
 // Lakshmi's elder mode and the share grants belong to the household, so every account sees them.
 
 /** What each account keeps for itself: everything on the account but the household's own. */
@@ -534,11 +550,23 @@ interface AccountSnapshot {
   notifPrefs?: NotifPrefs
   /** The account's own passkeys (the lock itself belongs to the phone). */
   passkeys?: LockState['passkeys']
+  /** Occasion requests, Practice and what the devices may read and write. Older snapshots lack them: the account's start is used. */
+  occasions?: OccasionRequest[]
+  practice?: PracticeState
+  deviceReads?: Omit<DevicesState, 'states'>
 }
-type SideStart = Required<Pick<AccountSnapshot, 'trust' | 'nominee' | 'abha' | 'messages' | 'notifRead' | 'circleReports' | 'notifPrefs' | 'passkeys'>>
+type SideStart = Required<Pick<AccountSnapshot, 'trust' | 'nominee' | 'abha' | 'messages' | 'notifRead' | 'circleReports' | 'notifPrefs' | 'passkeys' | 'occasions' | 'practice' | 'deviceReads'>>
 /** The per-account stores beyond the account record, at each account's starting point. */
 function sideStart(id: AccountId): SideStart {
-  const empty = { messages: { sent: {}, started: [], read: [] }, notifRead: { read: [], cleared: [] }, circleReports: [], notifPrefs: NOTIF_PREFS_START }
+  const empty = {
+    messages: { sent: {}, started: [], read: [] },
+    notifRead: { read: [], cleared: [] },
+    circleReports: [],
+    notifPrefs: NOTIF_PREFS_START,
+    occasions: [],
+    practice: { weeks: [], unmarked: [], days: [], reflections: {} },
+    deviceReads: { hk: {}, writeBack: true, complication: true },
+  }
   if (id === 'arjun') {
     return { ...empty, trust: { research: true, eraseScheduled: false, insurer: 'not-granted' }, nominee: { name: 'Kavya Rao', relation: 'Spouse', email: 'kavya.rao@example.in' }, abha: { linked: true, address: 'arjun.rao@abdm', since: '2026-10-04' }, passkeys: ARJUN_PASSKEYS }
   }
@@ -580,11 +608,13 @@ function ownStart(id: AccountId, profile: AccountState['profile']): OwnAccount {
 
 const takeSnapshot = (): AccountSnapshot => {
   const { consents, ...trust } = trustStore.get()
+  const { states, ...deviceReads } = devicesStore.get()
   return {
     own: ownOf(accountStore.get()),
     consents,
     events: consentHistoryStore.get().events,
-    devices: devicesStore.get().states,
+    devices: states,
+    deviceReads,
     trust,
     nominee: nomineeStore.get(),
     abha: abhaStore.get(),
@@ -593,8 +623,12 @@ const takeSnapshot = (): AccountSnapshot => {
     circleReports: circleReportsStore.get().reports,
     notifPrefs: notifPrefsStore.get(),
     passkeys: lockStore.get().passkeys,
+    occasions: occasionsStore.get().requests,
+    practice: practiceStore.get(),
   }
 }
+/** Arjun's ring and Apple Health are his: an account with no device record of its own has nothing linked. */
+const nothingLinked = (): DevicesState['states'] => Object.fromEntries(DEVICES.filter((d) => d.state === 'connected').map((d) => [d.id, { state: 'available' as const }]))
 function putSnapshot(id: AccountId, s: AccountSnapshot, profile: AccountState['profile']) {
   // The household's elder mode and grants stay as they are; the rest is the account's own.
   const own: OwnAccount = s.own ?? ownStart(id, s.profile ?? profile)
@@ -602,7 +636,7 @@ function putSnapshot(id: AccountId, s: AccountSnapshot, profile: AccountState['p
   accountStore.set((a) => ({ ...own, elder: a.elder, grants: a.grants }))
   trustStore.set({ ...(s.trust ?? start.trust), consents: s.consents })
   consentHistoryStore.set({ events: s.events })
-  devicesStore.set((d) => ({ ...d, states: s.devices }))
+  devicesStore.set({ ...(s.deviceReads ?? start.deviceReads), states: id !== 'arjun' && !Object.keys(s.devices).length ? nothingLinked() : s.devices })
   nomineeStore.set(s.nominee ?? start.nominee)
   abhaStore.set(s.abha ?? start.abha)
   messagesStore.set(s.messages ?? start.messages)
@@ -610,6 +644,8 @@ function putSnapshot(id: AccountId, s: AccountSnapshot, profile: AccountState['p
   circleReportsStore.set({ reports: s.circleReports ?? start.circleReports })
   notifPrefsStore.set(s.notifPrefs ?? start.notifPrefs)
   lockStore.set((l) => ({ ...l, passkeys: s.passkeys ?? start.passkeys }))
+  occasionsStore.set({ requests: s.occasions ?? start.occasions })
+  practiceStore.set(s.practice ?? start.practice)
 }
 /** The specimen accounts start from the specimen record. */
 const specimenStart = (id: 'arjun' | 'lakshmi'): AccountSnapshot => ({ own: ownStart(id, ACCOUNT_PROFILES[id].profile), consents: {}, events: CONSENT_SEED, devices: {}, ...sideStart(id) })
@@ -697,22 +733,35 @@ export function seedFromOnboarding({ consents, device }: { consents: { care: boo
   const own: OwnAccount = { ...ownStart('new', newAccountProfile()), invites: current.invites.filter((iv) => invited.has(iv.id)) }
   // The quiet hours, reminders and channels chosen in onboarding's own step are the new member's.
   const snap: AccountSnapshot = { own, consents: choice, events, devices: states, ...sideStart('new'), notifPrefs: notifPrefsStore.get() }
+  // Onboarding makes a new person. If an account made here before is on the phone, its Lane A
+  // records and measured Index are not this one's: it starts blank under a scope of its own.
+  if ((sessionStore.get().account ?? 'arjun') === 'new' || accountSnapshotsStore.get().new) {
+    sessionStore.set((s) => ({ ...s, newScope: `new-${Date.now().toString(36)}` }))
+    whenHydrated(phoneOwnersStore, () => phoneOwnersStore.set((o) => ({ ...o, measured: { ...o.measured, new: undefined } })))
+    // Nor is its household: the earlier member's kind and Charter, with their name in agreed, go
+    // whether they are kept in householdsStore or are the live ones because they are still signed in.
+    const { new: _earlier, ...kept } = householdsStore.get()
+    householdsStore.set(kept)
+    if ((sessionStore.get().account ?? 'arjun') === 'new') {
+      const fresh = householdStart('new')
+      householdKindStore.set(fresh.kind)
+      charterStore.set(fresh.charter)
+    }
+  }
   if ((sessionStore.get().account ?? 'arjun') === 'new') putSnapshot('new', snap, own.profile)
   else accountStore.set((a) => ({ ...a, invites: a.invites.filter((iv) => !invited.has(iv.id)) }))
   // Kept as the new account's starting point; applyDemoAccount('new') brings it in.
   accountSnapshotsStore.set((s) => ({ ...s, new: snap }))
 }
 
-// ─── Records Lane A keeps for the whole phone, claimed per account ─────────────
+// ─── Records Lane A keeps on the phone, claimed per account ────────────────────
 // The Index measured on this phone ('measuredIndex') and ’Cation requests ('cationRequests') are
-// kept by Lane A under one phone-wide key. Each is claimed by the account signed in when it was
-// made: a record already on the phone at a switch belongs to the account signing out, and one
-// that appears while an account is signed in is that account's. Each account keeps a copy of its
-// own measured Index, so another account re-taking it on this phone never replaces it. A record
-// already on the phone before ownership was first checked (an earlier build) was made by someone
-// we cannot know: it is set aside as nobody's, so it is never shown to the wrong person as theirs.
+// kept by Lane A per account (local.ts: Arjun's under the plain key). Each is claimed by the
+// account signed in when it was made, and each account keeps a copy of its own measured Index.
+// Earlier builds kept one phone-wide key: a record already there before ownership was first
+// checked was made by someone we cannot know, so it is set aside as nobody's and never shown to
+// the wrong person as theirs, and what the accounts had claimed moves under each account's own key.
 
-const LANE_A = 'joyos:a:'
 export interface PhoneRecordOwners {
   /** Each account's own Index measured on this phone. */
   measured: Partial<Record<AccountId, NonNullable<MeasuredIndex>>>
@@ -722,6 +771,8 @@ export interface PhoneRecordOwners {
   unowned?: NonNullable<MeasuredIndex>
   /** True once the phone's records from before ownership was kept have been set aside. */
   checked?: boolean
+  /** True once the phone-wide records have been moved under each account's own key. */
+  split?: boolean
   /** Set while a switch reads the phone's records for the account signing out. */
   pending?: AccountId | null
 }
@@ -756,17 +807,18 @@ const parseRaw = (raw: string | null) => {
     return null
   }
 }
-/** The phone-wide measured Index and ’Cation request refs Lane A keeps. */
-function readPhoneRecords() {
-  return AsyncStorage.multiGet([`${LANE_A}measuredIndex`, `${LANE_A}cationRequests`]).then((rows) => {
+/** The measured Index and ’Cation requests Lane A keeps for an account (the plain keys are Arjun's). */
+function readPhoneRecords(account: AccountId = 'arjun') {
+  const scope = scopeOf(account)
+  return AsyncStorage.multiGet([localStorageKey('measuredIndex', scope), localStorageKey('cationRequests', scope)]).then((rows) => {
     const measured = parseRaw(rows[0]?.[1] ?? null) as MeasuredIndex
     const requests = (parseRaw(rows[1]?.[1] ?? null) ?? {}) as Record<string, { ref: string }>
-    return { measured: measured ?? undefined, refs: Object.values(requests).map((r) => r.ref) }
+    return { measured: measured ?? undefined, requests, refs: Object.values(requests).map((r) => r.ref) }
   })
 }
 function claimNow(account: AccountId) {
   phoneOwnersStore.set((o) => ({ ...o, pending: account }))
-  readPhoneRecords()
+  readPhoneRecords(account)
     .then(({ measured, refs }) => phoneOwnersStore.set((o) => claimFor(o, account, measured, refs)))
     .catch(() => {})
     .finally(() => phoneOwnersStore.set((o) => ({ ...o, pending: null })))
@@ -775,21 +827,51 @@ function claimNow(account: AccountId) {
 // made under an earlier build, by an account we cannot know, so it is nobody's (not the account
 // that happens to be signed in now). Claims wait for `checked`, so none is given away first.
 whenHydrated(phoneOwnersStore, () => {
-  if (phoneOwnersStore.get().checked) return
-  readPhoneRecords()
-    .then(({ measured, refs }) =>
-      phoneOwnersStore.set((o) => {
-        const fresh = refs.filter((r) => !(r in o.cation))
-        return {
-          ...o,
-          unowned: measured && !measuredClaimed(o, measured) ? measured : o.unowned,
-          cation: { ...o.cation, ...Object.fromEntries(fresh.map((r) => [r, 'unowned' as const])) },
-          checked: true,
-        }
-      }),
-    )
-    .catch(() => phoneOwnersStore.set((o) => ({ ...o, checked: true })))
+  const checked = phoneOwnersStore.get().checked
+    ? Promise.resolve()
+    : readPhoneRecords()
+        .then(({ measured, refs }) =>
+          phoneOwnersStore.set((o) => {
+            const fresh = refs.filter((r) => !(r in o.cation))
+            return {
+              ...o,
+              unowned: measured && !measuredClaimed(o, measured) ? measured : o.unowned,
+              cation: { ...o.cation, ...Object.fromEntries(fresh.map((r) => [r, 'unowned' as const])) },
+              checked: true,
+            }
+          }),
+        )
+        .catch(() => phoneOwnersStore.set((o) => ({ ...o, checked: true })))
+  checked.then(() => {
+    if (!phoneOwnersStore.get().split) splitPhoneRecords()
+  })
 })
+/** Once per phone: the plain keys become Arjun's alone, and what others claimed goes under their own. */
+function splitPhoneRecords() {
+  const o = phoneOwnersStore.get()
+  const others = ['lakshmi', 'new'] as const
+  return readPhoneRecords()
+    .then(async ({ measured, requests }) => {
+      const writes: [string, string][] = []
+      for (const id of others) {
+        const own = Object.entries(requests).filter(([, r]) => o.cation[r.ref] === id)
+        if (own.length) writes.push([localStorageKey('cationRequests', id), JSON.stringify(Object.fromEntries(own))])
+        if (o.measured[id]) writes.push([localStorageKey('measuredIndex', id), JSON.stringify(o.measured[id])])
+      }
+      const kept = Object.entries(requests).filter(([, r]) => !others.some((id) => o.cation[r.ref] === id))
+      if (kept.length < Object.keys(requests).length) writes.push([localStorageKey('cationRequests', 'arjun'), JSON.stringify(Object.fromEntries(kept))])
+      // The plain measured Index stays only if it is Arjun's, or nobody has claimed it yet.
+      if (measured && !sameRecord(measured, o.measured.arjun) && measuredClaimed(o, measured)) {
+        if (o.measured.arjun) writes.push([localStorageKey('measuredIndex', 'arjun'), JSON.stringify(o.measured.arjun)])
+        else await AsyncStorage.removeItem(localStorageKey('measuredIndex', 'arjun'))
+      }
+      if (writes.length) await AsyncStorage.multiSet(writes)
+      // A screen that read these before the split would otherwise keep the old value until the next start.
+      await refreshLocal(['measuredIndex', 'cationRequests'])
+    })
+    .catch(() => {})
+    .finally(() => phoneOwnersStore.set((x) => ({ ...x, split: true })))
+}
 
 // ─── Account-scoped reads (L2): what the signed-in person sees as their own ───
 
@@ -802,4 +884,21 @@ export function useAccountThreads(): Thread[] {
 export function useAccountId(): AccountId {
   const [session] = useStore(sessionStore)
   return session.account ?? 'arjun'
+}
+/** The notices sent to the signed-in account: its own, and a reply notice only when it has that thread. */
+export function useAccountNotices(): Notice[] {
+  const id = useAccountId()
+  const threads = useAccountThreads()
+  const [msgs] = useStore(messagesStore)
+  const hasThread = (href: string) => {
+    const t = /[?&]t=([^&]+)/.exec(href)?.[1]
+    return !t || [...threads, ...msgs.started].some((th) => th.id === t)
+  }
+  return NOTICES.filter((n) => (!n.for || n.for.includes(id)) && hasThread(n.href))
+}
+/** How many of the account's notices are not yet opened: the bell's dot and the Notifications screen read this one count. */
+export function useUnreadNotices(): number {
+  const mine = useAccountNotices()
+  const [rd] = useStore(notifReadStore)
+  return mine.filter((n) => !rd.cleared.includes(n.id) && !rd.read.includes(n.id)).length
 }

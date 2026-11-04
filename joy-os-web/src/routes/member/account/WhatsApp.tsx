@@ -7,6 +7,7 @@ import { Button, Card, PageHeader, Pill, Sheet, Tabs } from '@/components/ui'
 import { CONSENTS, INDEX_HISTORY, LEDGER_WEEK } from '@/data/member'
 import { termByKey } from '@/data/terms'
 import { interceptsCrisis, useApp } from '@/lib/store'
+import { LEDGER_TIMES, ledgerSlots } from './_data'
 import { Checkbox, LinkButton, Section } from './_parts'
 import { nums, readNotifPrefs, rich, syncWhatsAppChannel, useMemberProfile, usePersisted, useToast } from './_util'
 import { INSTRUMENT_NOTE, fill, useDict, useLang, useTermText } from '@/lib/i18n'
@@ -21,6 +22,8 @@ import { recordConsentEvent } from './_consent'
 // runs the emergency intercept first. One Daybreak: "Turn on WhatsApp prompts".
 // With consent given, a moment kept here is a real Joy Ledger entry (useApp().addLedger, as the
 // Ledger screen and the watch add one). Before consent the chat is a preview and says so.
+// The Ledger chat keeps the member's schedule: it opens at their first prompt of the day, and
+// {next}, {quiet} and {until} are filled from the notification prefs when a line is read.
 
 type Scenario = 'ledger' | 'check' | 'reminders'
 interface Reply { label: string; next: string; tag?: string }
@@ -36,18 +39,32 @@ const MINOR_LINES: Record<string, string> = {
 }
 const LIKERT = ['Rarely', 'Sometimes', 'Often', 'Almost always']
 
-const SCRIPTS: Record<Scenario, { start: string; time: string; nodes: Record<string, Node> }> = {
+/** With no Ledger prompt going out (type off, or every slot in quiet hours) these stand in for the lines that name the next one. */
+const NO_PROMPT_LINES: Record<string, string> = {
+  'Next prompt {next}. Quiet hours begin at {quiet}.': 'No Ledger prompt is set right now. You can change that in Settings.',
+  'Next prompt {next}.': 'No Ledger prompt is set right now. You can change that in Settings.',
+  'That’s fine — nothing is counted against you. I’ll ask again {next}.': 'That’s fine — nothing is counted against you.',
+  'Prompts are back on for today. The next Ledger prompt comes {next}.': 'Prompts are back on for today, but no Ledger prompt is set. You can change that in Settings.',
+  'Prompts are back on for today.': 'Prompts are back on for today, but no Ledger prompt is set. You can change that in Settings.',
+  'Paused until tomorrow, {until}. Reply RESUME any time, or STOP to end WhatsApp prompts.': 'There is nothing to pause: no Ledger prompt is set right now. You can change that in Settings.',
+}
+/** One prompt a day comes at 21:30, so the chat cannot say afternoon. */
+const EVENING_LINES: Record<string, string> = {
+  'Good afternoon, {name}. Anything good in the last few hours?': 'Good evening, {name}. Anything good today?',
+  'Have a good afternoon.': 'Have a good evening.',
+}
+
+const SCRIPTS: Record<Scenario, { start: string; time?: string; nodes: Record<string, Node> }> = {
   ledger: {
     start: 'l0',
-    time: '12:40',
     nodes: {
       l0: { bot: ['Good afternoon, {name}. Anything good in the last few hours?'], replies: [{ label: 'Yes, something', next: 'l1' }, { label: 'Not really', next: 'lno' }, { label: 'Pause for today', next: 'lpause' }] },
       l1: { bot: ['Lovely. Which of these was it closest to?'], replies: ['People', 'Food', 'Nature', 'Rest'].map((t) => ({ label: t, next: 'l2', tag: t })) },
       l2: { bot: ['Noted under {tag}. Add one word to remember it by? Tap one, or skip.'], replies: [{ label: 'Lunch with Kavya', next: 'l3' }, { label: 'Skip', next: 'l3' }] },
-      l3: { bot: ['Saved to your Joy Ledger. Ten seconds, well spent.', 'Next prompt around 16:15. Quiet hours begin at 21:45.'], replies: [{ label: 'This week so far', next: 'l4' }, { label: 'Thanks', next: 'lend' }] },
+      l3: { bot: ['Saved to your Joy Ledger. Ten seconds, well spent.', 'Next prompt {next}. Quiet hours begin at {quiet}.'], replies: [{ label: 'This week so far', next: 'l4' }, { label: 'Thanks', next: 'lend' }] },
       l4: { bot: ['This week, joy came most from {w1} and {w2}. The full picture is in the app, under Joy Ledger.'], replies: [{ label: 'Thanks', next: 'lend' }] },
-      lno: { bot: ['That’s fine — nothing is counted against you. I’ll ask again around 16:15.'], replies: [{ label: 'OK', next: 'lend' }] },
-      lpause: { bot: ['Paused until tomorrow, 07:30. Reply RESUME any time, or STOP to end WhatsApp prompts.'], replies: [{ label: 'RESUME', next: 'l0' }] },
+      lno: { bot: ['That’s fine — nothing is counted against you. I’ll ask again {next}.'], replies: [{ label: 'OK', next: 'lend' }] },
+      lpause: { bot: ['Paused until tomorrow, {until}. Reply RESUME any time, or STOP to end WhatsApp prompts.'], replies: [{ label: 'RESUME', next: 'l0' }] },
       lend: { bot: ['Have a good afternoon.'] },
     },
   },
@@ -114,14 +131,18 @@ export default function WhatsApp() {
   const [typing, setTyping] = useState(false)
   const [text, setText] = useState('')
   const [tag, setTag] = useState('People')
-  const clock = useRef(SCRIPTS.ledger.time)
+  const [prefs] = useState(readNotifPrefs)
+  const slots = ledgerSlots(prefs)
+  /** The Ledger chat opens at the member's first prompt of the day. */
+  const opening = slots[0] ?? LEDGER_TIMES[prefs.ledgerCount][0]
+  const clock = useRef(opening)
   const seq = useRef(0)
   const timers = useRef<number[]>([])
   const scroller = useRef<HTMLDivElement>(null)
   const [wa, setWa] = usePersisted('wa', { consented: CONSENTS.find((c) => c.id === 'c_wa')!.granted, requested: false })
   const consented = wa.consented
   const setConsented = (v: boolean, via: 'whatsapp' | 'reply' = 'whatsapp') => { setWa({ consented: v, requested: false }); syncWhatsAppChannel(v); recordConsentEvent('c_wa', v ? 'granted' : 'withdrawn', via) }
-  const [quiet] = useState(() => { const p = readNotifPrefs(); return `${p.quietFrom} – ${p.quietTo}` })
+  const quiet = `${prefs.quietFrom} – ${prefs.quietTo}`
   const [consentOpen, setConsentOpen] = useState(false)
 
   const clear = () => { timers.current.forEach((t) => window.clearTimeout(t)); timers.current = [] }
@@ -143,11 +164,12 @@ export default function WhatsApp() {
   const start = (s: Scenario) => {
     clear()
     const sc = SCRIPTS[s]
-    clock.current = sc.time
+    const time = sc.time ?? opening
+    clock.current = time
     seq.current = 0
     const node = sc.nodes[sc.start]
     setTyping(false)
-    setMsgs([{ id: ++seq.current, from: 'bot', text: node.bot[0], time: sc.time, replies: node.replies }])
+    setMsgs([{ id: ++seq.current, from: 'bot', text: node.bot[0], time, replies: node.replies }])
   }
 
   useEffect(() => { start(scenario); return clear }, [scenario]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -171,7 +193,8 @@ export default function WhatsApp() {
       botSay([PREVIEW_NOT_SAVED, ...node.bot.slice(1)], node.replies, newTag)
       return
     }
-    botSay(node.bot, node.replies, newTag)
+    // With no prompt set there is nothing paused, so nothing to resume.
+    botSay(node.bot, r.next === 'lpause' && slots.length === 0 ? undefined : node.replies, newTag)
   }
 
   const sendFree = () => {
@@ -205,7 +228,7 @@ export default function WhatsApp() {
     if (/^resume$/i.test(t)) {
       const n = SCRIPTS.ledger.nodes.l0
       if (scenario === 'ledger') botSay(['Prompts are back on for today.', ...n.bot], n.replies)
-      else botSay(['Prompts are back on for today. The next Ledger prompt comes around 16:15.'])
+      else botSay(['Prompts are back on for today. The next Ledger prompt comes {next}.'])
       return
     }
     if (/^check$/i.test(t)) {
@@ -219,7 +242,7 @@ export default function WhatsApp() {
         botSay([PREVIEW_NOT_SAVED], [{ label: 'Thanks', next: 'lend' }])
         return
       }
-      botSay(['Saved to your Joy Ledger: “{text}”. Ten seconds, well spent.', 'Next prompt around 16:15.'], [{ label: 'This week so far', next: 'l4' }, { label: 'Thanks', next: 'lend' }], tag, { text: t })
+      botSay(['Saved to your Joy Ledger: “{text}”. Ten seconds, well spent.', 'Next prompt {next}.'], [{ label: 'This week so far', next: 'l4' }, { label: 'Thanks', next: 'lend' }], tag, { text: t })
       return
     }
     botSay(['I can only help with your Joy Ledger, the Check and reminders here. For anything else, open the app or message Priya.'], [{ label: 'Anything good today?', next: SCRIPTS.ledger.start }].filter(() => scenario === 'ledger'))
@@ -228,11 +251,14 @@ export default function WhatsApp() {
   /** Chat lines are kept in English and read in the member's language; the Check statements stay English. */
   const profile = useMemberProfile()
   const word = (w: string) => (lang === 'en' ? w.toLowerCase() : lk(w))
+  /** The next prompt after a chat clock time, from the member's own slots. */
+  const nextPrompt = (time: string) => { const later = slots.find((s) => s > time); return later ? tw('nextAt', { t: later }) : tw('nextTomorrow', { t: slots[0] ?? '' }) }
   const lineText = (m: ChatMsg) => {
     if (m.from === 'me') return m.vars?.reply ? lk(m.text) : m.text
     if (hidden && MINOR_LINES[m.text]) return lk(MINOR_LINES[m.text])
     const bands = lang === 'en' ? bandsLine : latest.terms.map((x) => `${tt.space(x.key)} ${bandText(x.band)}`).join(' · ')
-    return fill(lk(m.text), { name: profile.firstName, bands, w1: word(LEDGER_WEEK[0].tag), w2: word(LEDGER_WEEK[1].tag), ...m.vars, tag: word(m.vars?.tag ?? tag) })
+    const line = (slots.length === 0 && NO_PROMPT_LINES[m.text]) || (m.time >= '17:00' && EVENING_LINES[m.text]) || m.text
+    return fill(lk(line), { name: profile.firstName, bands, w1: word(LEDGER_WEEK[0].tag), w2: word(LEDGER_WEEK[1].tag), next: nextPrompt(m.time), quiet: prefs.quietFrom, until: prefs.quietTo, ...m.vars, tag: word(m.vars?.tag ?? tag) })
   }
 
   return (
@@ -248,6 +274,7 @@ export default function WhatsApp() {
         <div className="flex flex-col items-center">
           <Tabs className="mb-5" value={scenario} onChange={setScenario} items={[{ value: 'ledger', label: tw('tabLedger') }, { value: 'check', label: tw('tabCheck') }, { value: 'reminders', label: tw('tabReminders') }]} />
           {scenario === 'check' && lang !== 'en' && <p className="mb-4 max-w-[360px] text-center text-[13px] leading-snug text-ink-3">{INSTRUMENT_NOTE[lang]}</p>}
+          {scenario === 'ledger' && slots.length === 0 && <p className="mb-4 max-w-[360px] text-center text-[13px] leading-snug text-ink-3">{tw('noPromptNote')}</p>}
           <div className="relative w-full max-w-[360px] rounded-[2.6rem] border-[10px] border-ink-ground bg-ink-ground shadow-lift ring-1 ring-line-strong" role="region" aria-label={tw('simAria')}>
             <div className="flex h-[640px] flex-col overflow-hidden rounded-[2rem] bg-paper-sunk">
               {/* Status + header */}
@@ -393,7 +420,7 @@ export default function WhatsApp() {
       <Sheet open={consentOpen} onClose={() => setConsentOpen(false)} title={tw('consentTitle')} side="center">
         <ConsentForm
           onCancel={() => setConsentOpen(false)}
-          onAgree={() => { setConsented(true); setConsentOpen(false); showToast(tw('onToast')) }}
+          onAgree={() => { setConsented(true); setConsentOpen(false); showToast(slots[0] ? tw('onToast', { t: slots[0] }) : tw('onToastNone')) }}
         />
       </Sheet>
       {toast}

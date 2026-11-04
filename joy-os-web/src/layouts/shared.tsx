@@ -38,7 +38,7 @@ function readEmergencyContact(): EmergencyContact | null {
 }
 
 /** P0 crisis pathway — a person and Tele-MANAS before any model runs (Memo p.24, p.27). */
-export function CrisisSheet() {
+export function CrisisSheet({ guest = false }: { guest?: boolean }) {
   const { crisisOpen, setCrisisOpen, crisisEventId } = useApp()
   const t = useDict(SHARED)
   const sanjay = TEAM.find((p) => p.role === 'Psychologist')!
@@ -87,7 +87,8 @@ export function CrisisSheet() {
             <MessageCircle size={18} className="shrink-0" aria-hidden />
           </Link>
         </div>
-        <div className="rounded-card border border-line px-5 py-4">
+        {/* Someone still setting up has no emergency contact: the one on this browser is the specimen member's. */}
+        {!guest && <div className="rounded-card border border-line px-5 py-4">
           <p className="eyebrow text-ink-3">{t('ecEyebrow')}</p>
           {contact ? (
             <>
@@ -124,7 +125,7 @@ export function CrisisSheet() {
               <Link to="/app/profile#emergency" onClick={() => setCrisisOpen(false)} className="text-ink underline underline-offset-4 focus-ring">{t('ecAdd')}</Link>
             </p>
           )}
-        </div>
+        </div>}
         <a href="tel:112" className="flex items-center justify-between gap-3 rounded-card border border-line px-5 py-4 text-ink">
           <span className="text-[16px]">{t('emergency')}</span>
           <Phone size={18} className="shrink-0" />

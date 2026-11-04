@@ -38,10 +38,11 @@ import { H2, useLocal, usePlanned } from '@/screens/a/local'
 import { actionsFor } from '@/screens/a/spacesData'
 import { joyspanIndex } from '@/shared/indexEngine'
 import { measuredScore, type MeasuredIndex } from '@/shared/indexScoring'
-import { useSignOffTimer, useSubmittedIndex } from '@/lib/indexRecord'
+import { useClinicalRemeasure, useLatestIndex, useSignOffTimer, useSubmittedIndex } from '@/lib/indexRecord'
 import { useIsMinor } from '@/lib/minor'
 import { MonoNums } from '@/lib/monoNums'
-import { useSignalsDown } from '@/screens/b/bStore'
+import { NoIndexScreen } from '@/lib/noIndex'
+import { useAccountId, useSignalsDown } from '@/screens/b/bStore'
 import { INK } from '@/screens/a/parts'
 import { INSTR_TEXT } from '@/screens/b/i18n/method'
 import { TAKE } from '@/screens/b/i18n/indexTake'
@@ -69,16 +70,25 @@ import { txFor } from '@/screens/a/i18n'
 // "Years Worth Living.", the equation and the footer.
 // Signals down (Arch p30): a measure scored without device signals is flagged survey-only here,
 // in its source split and in the history; while signals are down, the next sitting is too.
+// Everything here is the signed-in account's own. Arjun alone has recorded measures and the written
+// story of each term; anyone else sees only what they measured here, set beside nothing of his,
+// and an account with no measure sees No Index yet.
 
 export default memberOnly(IndexResultGate)
 
-/** Minors gate: a member under 18 is never scored, so there is no Index to show. */
+/** Minors gate: a member under 18 is never scored, so there is no Index to show. Then: no Index yet. */
 function IndexResultGate() {
   const minor = useIsMinor()
   const t = useDict(TAKE)
+  const tr = useDict(RESULT)
   const tc = useCommon()
   const { space } = useTheme()
-  if (!minor) return <IndexResult />
+  const { hasIndex } = useLatestIndex()
+  const [rm] = useClinicalRemeasure()
+  if (!minor) {
+    if (hasIndex || (rm.stage === 'signed' && rm.result)) return <IndexResult />
+    return <NoIndexScreen eyebrow={tr('eyebrow')} lead={tr('noneLead')} />
+  }
   return (
     <Screen>
       <ScreenHeader
@@ -105,15 +115,19 @@ function IndexResult() {
   const [confirmClear, setConfirmClear] = useState(false)
   const [submitted, , , clearSubmitted] = useSubmittedIndex()
   const rm = useSignOffTimer()
+  // Only Arjun has recorded measures. Anyone else's are compared with their own, or with nothing.
+  const recorded = useAccountId() === 'arjun'
+  const phoneRow = measured ? measuredScore(measured, recorded ? undefined : null) : null
   // The signed Day-90 re-measure, as a Clinical-grade row (released only once signed).
   const day90: IndexScore | null =
     rm.stage === 'signed' && rm.result
-      ? { ...measuredScore(rm.result), id: 'ix_day90', grade: 'clinical', signedBy: rm.signedBy, nextMeasure: '2027-07-04' }
+      ? { ...measuredScore(rm.result, recorded ? undefined : phoneRow), id: 'ix_day90', grade: 'clinical', signedBy: rm.signedBy, nextMeasure: '2027-07-04' }
       : null
   // Newest first: the signed Day-90 measure, the measure taken on this phone, then the recorded ones.
-  const rows = [...(day90 ? [day90] : []), ...(measured ? [measuredScore(measured)] : []), ...INDEX_HISTORY]
+  const rows = [...(day90 ? [day90] : []), ...(phoneRow ? [phoneRow] : []), ...(recorded ? INDEX_HISTORY : [])]
   const latest = rows[0]
-  const previous = rows[1]
+  const previous: IndexScore | undefined = rows[1]
+  const dayZero = recorded ? INDEX_HISTORY[0] : rows[rows.length - 1]
   const [selRaw, setSel] = useState<TermKey | null>(null)
   const sel = selRaw ?? latest.lowestTerm
   const { planned, plan } = usePlanned()
@@ -139,8 +153,8 @@ function IndexResult() {
   const bandWord = (b: Band) => (b === 'not-yet-measured' ? kit(lang, 'bandNone') : tk(BAND[b], b))
   const instr = (i: string) => (lang === 'en' ? i : INSTR_TEXT[i]?.[lang] ?? i)
   const signalsDown = useSignalsDown()
-  // A survey-only measure: every term from the answers, none from signals.
-  const so = !!latest.surveyOnly
+  // A survey-only measure: every term from the answers, none from signals. Only Arjun has readings.
+  const so = !!latest.surveyOnly || !recorded
   const survey = so ? 100 : detail.survey
   const signalPct = so ? 0 : detail.signals
 
@@ -167,7 +181,7 @@ function IndexResult() {
           </ArrowLink>
           {confirmClear ? (
             <View style={{ gap: 4 }} accessibilityLiveRegion="polite">
-              <Meta tone="ink"><MonoNums text={t('clearQ')} /></Meta>
+              <Meta tone="ink"><MonoNums text={t(recorded ? 'clearQ' : 'clearQOwn')} /></Meta>
               <View style={{ flexDirection: 'row', gap: space.s1, flexWrap: 'wrap' }}>
                 <Button
                   variant="ghost"
@@ -215,7 +229,7 @@ function IndexResult() {
             <CountUp value={latest.value} size={96} />
           </View>
           <View style={{ paddingBottom: 14, gap: 4 }}>
-            <Delta value={latest.value - previous.value} size={17} />
+            {previous ? <Delta value={latest.value - previous.value} size={17} /> : null}
             <BandLabel band={latest.band} />
             {so ? <Pill>{t('surveyOnly')}</Pill> : null}
           </View>
@@ -230,7 +244,7 @@ function IndexResult() {
           </View>
         ) : null}
         <Body tone="ink2">
-          <MonoNums text={t(latest.value > previous.value ? 'upFrom' : latest.value < previous.value ? 'downFrom' : 'sameAs', { prev: previous.value, month: new Date(previous.takenOn).toLocaleDateString(locale, { month: 'long' }), name: tt.name(latest.lowestTerm) })} />
+          <MonoNums text={previous ? t(latest.value > previous.value ? 'upFrom' : latest.value < previous.value ? 'downFrom' : 'sameAs', { prev: previous.value, month: new Date(previous.takenOn).toLocaleDateString(locale, { month: 'long' }), name: tt.name(latest.lowestTerm) }) : t('onlyMeasure', { name: tt.name(latest.lowestTerm) })} />
         </Body>
         <Divider />
         <View style={{ gap: 8 }} accessible accessibilityLabel={t('howA11y', { gm: calc.gm, burden: calc.burden, v: latest.value })}>
@@ -253,9 +267,9 @@ function IndexResult() {
       <Card tone="raised" style={{ gap: space.s2 }}>
         <Eyebrow {...H2}>{t('tapPetal')}</Eyebrow>
         <View style={{ alignItems: 'center' }}>
-          <JoyspanWheel terms={latest.terms} size={232} highlight={sel} onSelect={setSel} value={latest.value} baseline={latest.id === INDEX_HISTORY[0].id ? null : INDEX_HISTORY[0].terms} />
+          <JoyspanWheel terms={latest.terms} size={232} highlight={sel} onSelect={setSel} value={latest.value} baseline={latest.id === dayZero.id ? null : dayZero.terms} />
         </View>
-        {latest.id !== INDEX_HISTORY[0].id ? (
+        {latest.id !== dayZero.id ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'center' }}>
             <View style={{ width: 18, height: 0, borderTopWidth: 1.5, borderColor: c.wheelGhost }} />
             <Meta size={13}><MonoNums text={kit(lang, 'wheelGhost')} /></Meta>
@@ -295,7 +309,7 @@ function IndexResult() {
               <BandLabel band={s.band} />
             </View>
           </View>
-          <Body><MonoNums text={ax(detail.sentence)} /></Body>
+          {recorded ? <Body><MonoNums text={ax(detail.sentence)} /></Body> : null}
 
           <View style={{ gap: 8 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
@@ -333,19 +347,21 @@ function IndexResult() {
             )}
           </View>
 
-          <View style={{ gap: 8 }}>
-            <Eyebrow>{t('moved')}</Eyebrow>
-            {detail.moved.map((m) => (
-              <View key={m} style={{ flexDirection: 'row', gap: 10 }}>
-                <View style={{ marginTop: 9 }}>
-                  <TermDot term={sel} size={6} />
+          {recorded ? (
+            <View style={{ gap: 8 }}>
+              <Eyebrow>{t('moved')}</Eyebrow>
+              {detail.moved.map((m) => (
+                <View key={m} style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={{ marginTop: 9 }}>
+                    <TermDot term={sel} size={6} />
+                  </View>
+                  <Body tone="ink2" style={{ flex: 1 }}>
+                    <MonoNums text={ax(m)} />
+                  </Body>
                 </View>
-                <Body tone="ink2" style={{ flex: 1 }}>
-                  <MonoNums text={ax(m)} />
-                </Body>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          ) : null}
           <Meta size={14} tone="ink3">
             {term.instruments.map(instr).join(' · ')}
           </Meta>
@@ -404,7 +420,7 @@ function IndexResult() {
             </View>
             <Body weight="medium"><MonoNums text={ax(nextStep.title)} /></Body>
             <Meta tone="ink"><MonoNums text={ax(nextStep.detail)} /></Meta>
-            <Meta size={14}><MonoNums text={ax(nextStep.why)} /></Meta>
+            {recorded ? <Meta size={14}><MonoNums text={ax(nextStep.why)} /></Meta> : null}
           </Card>
           {isPlanned ? (
             <View style={{ gap: 4 }} accessibilityLiveRegion="polite">
@@ -431,40 +447,48 @@ function IndexResult() {
 
       {/* History */}
       <Card tone="raised" style={{ gap: space.s2 }}>
-        <Eyebrow {...H2}>{rows.length === 3 ? t('threeMeasures') : t('nMeasures', { n: rows.length })}</Eyebrow>
-        <Meta>
-          {t('historyA')}<Mono tone="ink">{String(history[0].value)}</Mono>{t('historyB')}<Mono tone="ink">{String(latest.value)}</Mono>{t('historyC')}
-        </Meta>
-        <IndexHistoryChart
-          points={history.map((h) => ({ date: h.takenOn, value: h.value, grade: h.grade }))}
-          markers={[
-            { date: METHOD_V10_PUBLISHED, label: 'v1.0' },
-            { date: latest.nextMeasure, label: t('nextShort'), solid: true },
-          ]}
-          min={Math.min(50, Math.floor((Math.min(...history.map((h) => h.value)) - 4) / 5) * 5)}
-          max={Math.max(70, Math.ceil((Math.max(...history.map((h) => h.value)) + 4) / 5) * 5)}
-          height={130}
-          edgeLabels={[fmtDate(history[0].takenOn), fmtDate(latest.nextMeasure)]}
-          label={t('historyA11y', { list: history.map((h) => t('historyItemA11y', { date: fmtDate(h.takenOn), v: h.value, m: methodOf(h) })).join(', ') })}
-        />
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s2, rowGap: 6 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <HistoryGlyph kind="index" />
-            <Meta size={13}><MonoNums text={t('indexGrade')} /></Meta>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <HistoryGlyph kind="clinical" />
-            <Meta size={13}><MonoNums text={t('legClinical')} /></Meta>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <HistoryGlyph kind="method" />
-            <Meta size={13}><MonoNums text={t('legMethod', { date: fmtDate(METHOD_V10_PUBLISHED) })} /></Meta>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <HistoryGlyph kind="next" />
-            <Meta size={13}><MonoNums text={t('legNext')} /></Meta>
-          </View>
-        </View>
+        <Eyebrow {...H2}>{rows.length === 1 ? t('oneMeasure') : rows.length === 3 ? t('threeMeasures') : t('nMeasures', { n: rows.length })}</Eyebrow>
+        {recorded ? (
+          <Meta>
+            {t('historyA')}<Mono tone="ink">{String(history[0].value)}</Mono>{t('historyB')}<Mono tone="ink">{String(latest.value)}</Mono>{t('historyC')}
+          </Meta>
+        ) : (
+          <Meta><MonoNums text={t('historyOwn')} /></Meta>
+        )}
+        {rows.length > 1 ? (
+          <>
+            <IndexHistoryChart
+              points={history.map((h) => ({ date: h.takenOn, value: h.value, grade: h.grade }))}
+              markers={[
+                { date: METHOD_V10_PUBLISHED, label: 'v1.0' },
+                { date: latest.nextMeasure, label: t('nextShort'), solid: true },
+              ]}
+              min={Math.min(50, Math.floor((Math.min(...history.map((h) => h.value)) - 4) / 5) * 5)}
+              max={Math.max(70, Math.ceil((Math.max(...history.map((h) => h.value)) + 4) / 5) * 5)}
+              height={130}
+              edgeLabels={[fmtDate(history[0].takenOn), fmtDate(latest.nextMeasure)]}
+              label={t('historyA11y', { list: history.map((h) => t('historyItemA11y', { date: fmtDate(h.takenOn), v: h.value, m: methodOf(h) })).join(', ') })}
+            />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space.s2, rowGap: 6 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <HistoryGlyph kind="index" />
+                <Meta size={13}><MonoNums text={t('indexGrade')} /></Meta>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <HistoryGlyph kind="clinical" />
+                <Meta size={13}><MonoNums text={t('legClinical')} /></Meta>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <HistoryGlyph kind="method" />
+                <Meta size={13}><MonoNums text={t('legMethod', { date: fmtDate(METHOD_V10_PUBLISHED) })} /></Meta>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <HistoryGlyph kind="next" />
+                <Meta size={13}><MonoNums text={t('legNext')} /></Meta>
+              </View>
+            </View>
+          </>
+        ) : null}
         <View>
           {rows.map((h, i) => {
             const isOpen = openMeasure === h.id
@@ -521,7 +545,7 @@ function IndexResult() {
       <Card tone="outline" style={{ gap: space.s2 }}>
         <Eyebrow {...H2}>{t('nextMeasure')}</Eyebrow>
         <Body>
-          <MonoNums text={t('nextA', { d: MEMBER.dayOfLoop })} /><Mono tone="ink">{fmtDate(latest.nextMeasure)}</Mono><MonoNums text={t('nextB')} />
+          <MonoNums text={recorded ? t('nextA', { d: MEMBER.dayOfLoop }) : t('nextOwnA')} /><Mono tone="ink">{fmtDate(latest.nextMeasure)}</Mono><MonoNums text={t('nextB')} />
         </Body>
         <View style={{ gap: space.s1 }}>
           <Button variant="secondary" icon="refresh-cw" block onPress={() => router.push('/index-take')} accessibilityHint={t('reHint')}>

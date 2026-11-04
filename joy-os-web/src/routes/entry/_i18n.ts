@@ -253,7 +253,7 @@ export const CK = {
   door2H: { en: 'Get your number, and your ninety days.', ta: 'உங்கள் எண்ணையும், உங்கள் தொண்ணூறு நாட்களையும் பெறுங்கள்.', hi: 'अपनी संख्या पाएँ, और अपने नब्बे दिन।' },
   door2B: { en: 'The full Joyspan Index: about sixty validated items in two sittings, a 0–100 Index with six term scores, your lowest term and one action a day. Re-measured on Day 90, so you can see what moved.', ta: 'முழு ஜாய்ஸ்பான் குறியீடு: இரண்டு அமர்வுகளில் சுமார் அறுபது சரிபார்க்கப்பட்ட கேள்விகள், ஆறு அம்ச மதிப்பெண்களுடன் 0–100 குறியீடு, உங்கள் மிகக் குறைந்த அம்சம், தினம் ஒரு செயல். நாள் 90 அன்று மீண்டும் அளக்கப்படும், எது மாறியது என்று பார்க்கலாம்.', hi: 'पूरा जॉयस्पैन इंडेक्स: दो बैठकों में लगभग साठ प्रमाणित सवाल, छह पहलुओं के स्कोर के साथ 0–100 का इंडेक्स, आपका सबसे कमज़ोर पहलू और हर दिन एक काम। दिन 90 पर दोबारा मापा जाता है, ताकि आप देख सकें क्या बदला।' },
   door2L1: { en: 'Free with an AIWO ID', ta: 'AIWO ID உடன் இலவசம்', hi: 'AIWO ID के साथ मुफ़्त' },
-  door2L2: { en: 'Your Check answers carry over', ta: 'உங்கள் செக் பதில்கள் தொடர்ந்து வரும்', hi: 'आपके चेक के जवाब आगे जुड़ जाते हैं' },
+  door2L2: { en: 'Your lowest Space carries into setup', ta: 'உங்கள் மிகக் குறைந்த இடம் அமைப்பில் தொடர்ந்து வரும்', hi: 'आपका सबसे कमज़ोर स्पेस सेटअप में आगे जुड़ जाता है' },
   door2L3: { en: 'Method v1.0, pinned on every score', ta: 'முறை v1.0, ஒவ்வொரு மதிப்பெண்ணிலும் குறிக்கப்படும்', hi: 'पद्धति v1.0, हर स्कोर पर दर्ज' },
   door2Btn: { en: 'Take a baseline Index', ta: 'தொடக்க குறியீட்டை எடுங்கள்', hi: 'शुरुआती इंडेक्स लें' },
   door3Eyebrow: { en: 'Door 3 · the app', ta: 'வழி 3 · ஆப்', hi: 'रास्ता 3 · ऐप' },

@@ -406,9 +406,9 @@ export function useAccount() {
 /**
  * The signed-in account's own Index (L2), or null when it has none on record. Arjun: the Index he
  * took on this phone, else his recorded history (INDEX_HISTORY). Lakshmi and the account made in
- * onboarding: only an Index they took on this phone themselves. The phone keeps one measured
- * record for everyone (Lane A); each account keeps a copy of its own (bStore phoneOwnersStore), so
- * another account's re-take never shows as yours. Screens still hide it for under-18s.
+ * onboarding: only an Index they took on this phone themselves. Lane A keeps each account's measure
+ * under its own key, and each account a copy of its own (bStore phoneOwnersStore), so another
+ * account's re-take never shows as yours. Screens still hide it for under-18s.
  */
 export function useAccountIndex(): LatestIndex | null {
   const [session] = useStore(sessionStore)
@@ -428,7 +428,8 @@ export function useAccountIndex(): LatestIndex | null {
     if (own) {
       // The phone's current record is this account's: read it as Today does.
       if (measured && JSON.stringify(own) === JSON.stringify(measured)) return phoneLatest
-      return { ...measuredScore(own), surveyOnly: !!own.surveyOnly, onPhone: true, previous: INDEX_HISTORY[0] }
+      const score = measuredScore(own, id === 'arjun' ? undefined : null)
+      return { ...score, surveyOnly: !!own.surveyOnly, onPhone: true, previous: id === 'arjun' ? INDEX_HISTORY[0] : score }
     }
     if (id !== 'arjun') return null
     const latest = INDEX_HISTORY[0]
@@ -436,7 +437,7 @@ export function useAccountIndex(): LatestIndex | null {
   }, [unclaimed, measured, owners.measured, id, phoneLatest])
 }
 
-/** The ’Cation requests the signed-in account made on this phone (the phone keeps one list for all). */
+/** The ’Cation requests the signed-in account made on this phone (the ones an earlier build kept as nobody's stay out). */
 export function useAccountCationRequests() {
   const { requests, ready } = useCationRequests()
   const [session] = useStore(sessionStore)

@@ -54,6 +54,7 @@ export const DAY90 = {
   inviteSteps: { en: 'What happens', ta: 'என்ன நடக்கும்', hi: 'क्या होगा' },
   step1: { en: 'Two sittings, about twenty minutes in all. Pause any time.', ta: 'இரண்டு அமர்வுகள், மொத்தம் சுமார் இருபது நிமிடங்கள். எப்போது வேண்டுமானாலும் இடைநிறுத்தலாம்.', hi: 'दो बैठकें, कुल लगभग बीस मिनट। कभी भी रोक सकते हैं।' },
   step2: { en: 'Your lab results from the home draw join Body.', ta: 'வீட்டில் எடுத்த மாதிரியின் ஆய்வக முடிவுகள் உடலுடன் சேரும்.', hi: 'घर पर लिए नमूने के लैब नतीजे शरीर में जुड़ते हैं।' },
+  step2Own: { en: 'No lab results are on your record, so Body comes from your answers.', ta: 'உங்கள் பதிவில் ஆய்வக முடிவுகள் இல்லை, அதனால் உடல் உங்கள் பதில்களிலிருந்து வரும்.', hi: 'आपके रिकॉर्ड में कोई लैब नतीजे नहीं हैं, इसलिए शरीर आपके जवाबों से गिना जाता है।' },
   step3: { en: 'Dr Meera reads it and signs. Until then, no number.', ta: 'Dr Meera அதைப் படித்துக் கையொப்பமிடுவார். அதுவரை எண் இல்லை.', hi: 'Dr Meera इसे पढ़कर हस्ताक्षर करेंगी। तब तक कोई नंबर नहीं।' },
   step4: { en: 'Your Day-90 card: the number, what moved, and a call to plan the next ninety days.', ta: 'உங்கள் நாள்-90 அட்டை: எண், என்ன மாறியது, அடுத்த தொண்ணூறு நாட்களைத் திட்டமிட ஒரு அழைப்பு.', hi: 'आपका दिन-90 कार्ड: नंबर, क्या बदला, और अगले नब्बे दिन की योजना के लिए एक कॉल।' },
   begin: { en: 'Begin the re-measure', ta: 'மறு அளவீட்டைத் தொடங்கு', hi: 'दोबारा माप शुरू करें' },
@@ -70,6 +71,7 @@ export const DAY90 = {
   awaitSigning: { en: 'Specimen: signing now…', ta: 'மாதிரி: இப்போது கையொப்பமிடுகிறார்…', hi: 'नमूना: अभी हस्ताक्षर हो रहे हैं…' },
   awaitLabs: { en: 'Labs included: {list}', ta: 'சேர்க்கப்பட்ட ஆய்வக முடிவுகள்: {list}', hi: 'शामिल लैब नतीजे: {list}' },
   awaitNoLabs: { en: 'Sent without labs: Body from your answers and signals only.', ta: 'ஆய்வக முடிவுகள் இல்லாமல் அனுப்பப்பட்டது: உடல் உங்கள் பதில்கள், சமிக்ஞைகளிலிருந்து மட்டும்.', hi: 'बिना लैब के भेजा: शरीर सिर्फ़ आपके जवाबों और संकेतों से।' },
+  awaitNoLabsSurvey: { en: 'Sent without labs: Body from your answers only.', ta: 'ஆய்வக முடிவுகள் இல்லாமல் அனுப்பப்பட்டது: உடல் உங்கள் பதில்களிலிருந்து மட்டும்.', hi: 'बिना लैब के भेजा: शरीर सिर्फ़ आपके जवाबों से।' },
   awaitWhile: { en: 'Whatever the number turns out to be, nothing here counts against you. If it has gone down, Dr Meera tells you herself.', ta: 'எண் எதுவாக இருந்தாலும், இங்கே எதுவும் உங்களுக்கு எதிராகக் கணக்கிடப்படாது. அது குறைந்திருந்தால், Dr Meera தானே உங்களிடம் சொல்வார்.', hi: 'नंबर जो भी निकले, यहाँ कुछ भी आपके ख़िलाफ़ नहीं गिना जाता। अगर यह नीचे गया है, तो Dr Meera ख़ुद बताएँगी।' },
   titleUpA: { en: 'The number went ', ta: 'எண் ', hi: 'नंबर ' },
   titleUpSerif: { en: 'up', ta: 'உயர்ந்தது', hi: 'ऊपर गया' },
@@ -81,8 +83,14 @@ export const DAY90 = {
   ownSentence: { en: 'Your Index moved from {from} to {to}. {space} moved most.', ta: 'உங்கள் குறியீடு {from}-இலிருந்து {to}-க்கு மாறியது. {space} அதிகம் மாறியது.', hi: 'आपका इंडेक्स {from} से {to} पर आया। सबसे ज़्यादा {space} बदला।' },
   ownHeld: { en: 'Your Index held at {to}. {space} moved most.', ta: 'உங்கள் குறியீடு {to}-இல் மாறாமல் இருந்தது. {space} அதிகம் மாறியது.', hi: 'आपका इंडेक्स {to} पर स्थिर रहा। सबसे ज़्यादा {space} बदला।' },
   ownWhy: { en: 'From your answers, signals and labs. Dr Meera will go through it with you on the call.', ta: 'உங்கள் பதில்கள், சமிக்ஞைகள், ஆய்வக முடிவுகளிலிருந்து. அழைப்பில் Dr Meera உங்களுடன் இதைப் பார்ப்பார்.', hi: 'आपके जवाबों, संकेतों और लैब नतीजों से। कॉल पर Dr Meera आपके साथ इसे देखेंगी।' },
+  ownWhyNoLabs: { en: 'From your answers and signals. Dr Meera will go through it with you on the call.', ta: 'உங்கள் பதில்கள், சமிக்ஞைகளிலிருந்து. அழைப்பில் Dr Meera உங்களுடன் இதைப் பார்ப்பார்.', hi: 'आपके जवाबों और संकेतों से। कॉल पर Dr Meera आपके साथ इसे देखेंगी।' },
+  ownWhySurvey: { en: 'From your answers and labs. Dr Meera will go through it with you on the call.', ta: 'உங்கள் பதில்கள், ஆய்வக முடிவுகளிலிருந்து. அழைப்பில் Dr Meera உங்களுடன் இதைப் பார்ப்பார்.', hi: 'आपके जवाबों और लैब नतीजों से। कॉल पर Dr Meera आपके साथ इसे देखेंगी।' },
+  ownWhyAnswers: { en: 'From your answers alone. Dr Meera will go through it with you on the call.', ta: 'உங்கள் பதில்களிலிருந்து மட்டும். அழைப்பில் Dr Meera உங்களுடன் இதைப் பார்ப்பார்.', hi: 'सिर्फ़ आपके जवाबों से। कॉल पर Dr Meera आपके साथ इसे देखेंगी।' },
   wheelTitle: { en: 'Day 0 and Day 90', ta: 'நாள் 0 மற்றும் நாள் 90', hi: 'दिन 0 और दिन 90' },
   walkAgain: { en: 'Walk through the re-measure again (specimen)', ta: 'மறு அளவீட்டை மீண்டும் செய்து பாருங்கள் (மாதிரி)', hi: 'दोबारा माप फिर से करके देखें (नमूना)' },
+  // An account other than the specimen member: no Day 0 yet, and no plan written for them.
+  noneLead: { en: 'Day 90 is measured against your Day 0, and you have not taken your first Index yet. Take it first; the re-measure follows from there.', ta: 'நாள் 90 உங்கள் நாள் 0 உடன் ஒப்பிட்டு அளவிடப்படுகிறது, நீங்கள் இன்னும் முதல் குறியீட்டை எடுக்கவில்லை. முதலில் அதை எடுங்கள்; மறு அளவீடு அதன் பிறகு வரும்.', hi: 'दिन 90 आपके दिन 0 के मुक़ाबले मापा जाता है, और आपने अभी अपना पहला इंडेक्स नहीं लिया है। पहले वह लें; दोबारा माप उसके बाद आता है।' },
+  planOnCall: { en: 'No plan has been written for you yet. You and Dr Meera draft it together on the call.', ta: 'உங்களுக்காக இன்னும் திட்டம் எழுதப்படவில்லை. அழைப்பில் நீங்களும் Dr Meera-வும் சேர்ந்து அதை வரைவு செய்வீர்கள்.', hi: 'आपके लिए अभी कोई योजना नहीं लिखी गई है। कॉल पर आप और Dr Meera मिलकर इसका मसौदा बनाएँगे।' },
 } satisfies Dict
 
 export const SLOT_TEXT: Record<'thu' | 'fri' | 'sat', { label: L3; long: L3; day: L3 }> = {

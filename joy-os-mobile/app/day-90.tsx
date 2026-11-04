@@ -3,8 +3,10 @@ import { useEffect, useState } from 'react'
 import { Pressable, View } from 'react-native'
 import { ArrowLink, Avatar, Body, Button, CountUp, DaybreakButton, Eyebrow, Icon, InkSurface, JoyspanWheel, Meta, MethodLine, Mono, Numeral, Screen, ScreenHeader, Segmented, Serif, Sheet, TermDot, Title, fmtDate } from '@/components'
 import { kit } from '@/components/_i18n'
-import { REMEASURE_DATES, REMEASURE_INITIAL, useClinicalRemeasure, useSignOffTimer } from '@/lib/indexRecord'
+import { REMEASURE_DATES, REMEASURE_INITIAL, useClinicalRemeasure, useDayZeroIndex, useSignOffTimer } from '@/lib/indexRecord'
+import { NoIndexScreen } from '@/lib/noIndex'
 import { bandFor } from '@/shared/indexEngine'
+import { measuredScore } from '@/shared/indexScoring'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { H2, useLocal } from '@/screens/a/local'
 import { DAY90_DATES, DAY90_TERMS, DAY90_WHY, NEXT_90 } from '@/screens/a/coreData'
@@ -13,6 +15,7 @@ import { DAY90_SPECIMEN, INDEX_HISTORY, TEAM } from '@/shared/member'
 import { termByKey } from '@/shared/terms'
 import type { TermKey, TermScore } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
+import { useAccountId } from '@/screens/b/bStore'
 import { memberOnly } from '@/screens/b/parts'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
 import { DAY90, SLOT_TEXT } from '@/screens/b/i18n/day90'
@@ -30,7 +33,11 @@ import { MonoNums } from '@/lib/monoNums'
 // assessment (/index-take?grade=clinical: two sittings, then the labs) → awaiting physician
 // sign-off (no number until she signs; a specimen timer stands in for the clinical portal) →
 // this card with the member's own signed numbers. The specimen card (64 → 61) stays one tap
-// away from the invite as a labelled preview.
+// away from the invite as a labelled preview, for Arjun: it is his story.
+//
+// Everything here is the signed-in account's own: Day 0 is useDayZeroIndex, and the chain and the
+// booked call are account-scoped keys. An account with no Index has no Day 0, so it sees No Index
+// yet until it has taken one. The written plan for the next ninety days is Arjun's alone.
 
 const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
 const SLOTS = [
@@ -47,12 +54,19 @@ const DAY90_INITIAL: Day90Saved = { confirmed: false, slot: 'thu', planState: 'o
 
 export default memberOnly(Day90Gate)
 
-/** Minors gate: a member under 18 is never scored, so there is no Day-90 number to show. */
+/** Minors gate: a member under 18 is never scored, so there is no Day-90 number to show. Then: no Day 0 yet. */
 function Day90Gate() {
   const minor = useIsMinor()
   const t = useDict(TAKE)
+  const td = useDict(DAY90)
   const tc = useCommon()
-  if (!minor) return <Day90 />
+  const dayZero = useDayZeroIndex()
+  const [rm] = useClinicalRemeasure()
+  if (!minor) {
+    // A re-measure already sent stays in view even if the Day-0 measure was removed since.
+    if (dayZero || rm.stage !== 'invite') return <Day90 />
+    return <NoIndexScreen eyebrow={td('eyebrow')} lead={td('noneLead')} />
+  }
   return (
     <Screen>
       <ScreenHeader
@@ -104,7 +118,8 @@ function Day90() {
     setPlanState('noted')
   }
   const [open, setOpen] = useState<TermKey | null>('F')
-  const before = INDEX_HISTORY[0]
+  const recorded = useAccountId() === 'arjun'
+  const dayZero = useDayZeroIndex()
   // The re-measure chain (kept on the phone) and the simulated sign-off timer.
   const rm = useSignOffTimer()
   const [, setRm] = useClinicalRemeasure()
@@ -119,6 +134,8 @@ function Day90() {
   }, [rm.stage])
   // The member's own signed result, or the specimen.
   const own = !preview && rm.stage === 'signed' ? rm.result ?? null : null
+  // Day 0 is the account's own for its own result; the specimen preview keeps the specimen's.
+  const before = own ? dayZero ?? measuredScore(own, null) : INDEX_HISTORY[0]
   const fromV = own ? before.value : DAY90_SPECIMEN.from
   const toV = own ? own.ji : DAY90_SPECIMEN.to
   const termsNow: TermScore[] = own
@@ -132,6 +149,10 @@ function Day90() {
   const fell = fromV - toV
   const mover = ORDER.reduce((a, k) => (Math.abs(termsNow.find((x) => x.key === k)?.delta ?? 0) > Math.abs(termsNow.find((x) => x.key === a)?.delta ?? 0) ? k : a), 'H' as TermKey)
   const signer = own ? rm.signedBy ?? meera.name : meera.name
+  // What the sitting was actually made from: only Arjun has labs on record, and a survey-only one had no signals.
+  const labsUsed = recorded ? rm.labs ?? [] : []
+  const noSignals = !!rm.result?.surveyOnly
+  const whyKey = labsUsed.length ? (noSignals ? 'ownWhySurvey' : 'ownWhy') : noSignals ? 'ownWhyAnswers' : 'ownWhyNoLabs'
 
   const back = (
     <View style={{ paddingHorizontal: space.gutter, width: '100%', maxWidth: 640, alignSelf: 'center' }}>
@@ -150,7 +171,7 @@ function Day90() {
 
   // ── Day 76: the invite ──
   if (!preview && rm.stage === 'invite') {
-    const steps = ['step1', 'step2', 'step3', 'step4'] as const
+    const steps = ['step1', recorded ? 'step2' : 'step2Own', 'step3', 'step4'] as const
     return (
       <InkScreen top={back}>
         <View style={{ gap: space.s1 }}>
@@ -180,9 +201,11 @@ function Day90() {
         <View style={{ borderWidth: 1, borderStyle: 'dashed', borderColor: INK.lineStrong, borderRadius: radius.card, padding: 12 }}>
           <Meta size={14}><MonoNums text={t('inviteSpecimen')} /></Meta>
         </View>
-        <Button variant="ghost" icon="eye" onPress={() => setPreview(true)} style={{ alignSelf: 'flex-start' }}>
-          {t('previewSpecimen')}
-        </Button>
+        {recorded ? (
+          <Button variant="ghost" icon="eye" onPress={() => setPreview(true)} style={{ alignSelf: 'flex-start' }}>
+            {t('previewSpecimen')}
+          </Button>
+        ) : null}
       </InkScreen>
     )
   }
@@ -213,7 +236,7 @@ function Day90() {
             <Icon name="clock" size={18} color={INK.ink2} />
           </View>
           <Meta accessibilityLiveRegion="polite">{left > 0 ? t('awaitTimer', { s: left }) : t('awaitSigning')}</Meta>
-          <Meta>{rm.labs && rm.labs.length ? t('awaitLabs', { list: rm.labs.map((n) => (lang === 'en' ? n : LAB_TEXT[n]?.[lang] ?? n)).join(', ') }) : t('awaitNoLabs')}</Meta>
+          <Meta>{labsUsed.length ? t('awaitLabs', { list: labsUsed.map((n) => (lang === 'en' ? n : LAB_TEXT[n]?.[lang] ?? n)).join(', ') }) : t(noSignals ? 'awaitNoLabsSurvey' : 'awaitNoLabs')}</Meta>
           <MethodLine method="v1.0" grade="clinical" />
         </View>
         <Meta><MonoNums text={t('awaitWhile')} /></Meta>
@@ -380,7 +403,7 @@ function Day90() {
                 </View>
                 {isOpen ? (
                   <Meta tone="ink2" style={{ paddingLeft: 20 }}>
-                    {own ? t('ownWhy') : ax(DAY90_WHY[k])}
+                    {own ? t(whyKey) : ax(DAY90_WHY[k])}
                   </Meta>
                 ) : null}
               </Pressable>
@@ -393,58 +416,64 @@ function Day90() {
       {/* The next ninety days */}
       <View style={{ gap: space.s2 }}>
         <Eyebrow {...H2}>{t('next90')}</Eyebrow>
-        <Meta><MonoNums text={t('draftedFor')} /></Meta>
-        {NEXT_90.map((n) => (
-          <View key={n.day + n.title} style={{ flexDirection: 'row', gap: 14 }}>
-            <Mono size={13} tone="ink3" style={lang === 'en' ? { width: 56, paddingTop: 3 } : { width: 84, paddingTop: 3 }}>
-              {ax(n.day)}
-            </Mono>
-            <View style={{ flex: 1, gap: 2 }}>
-              <Body weight="medium"><MonoNums text={ax(n.title)} /></Body>
-              <Meta><MonoNums text={ax(n.detail)} /></Meta>
-              {n.day === 'Day 60' ? (
-                <ArrowLink icon="compass" onPress={() => router.push('/cation/wealthcation')}>
-                  {t('seeWealth')}
-                </ArrowLink>
-              ) : null}
+        {recorded ? (
+          <>
+            <Meta><MonoNums text={t('draftedFor')} /></Meta>
+            {NEXT_90.map((n) => (
+              <View key={n.day + n.title} style={{ flexDirection: 'row', gap: 14 }}>
+                <Mono size={13} tone="ink3" style={lang === 'en' ? { width: 56, paddingTop: 3 } : { width: 84, paddingTop: 3 }}>
+                  {ax(n.day)}
+                </Mono>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Body weight="medium"><MonoNums text={ax(n.title)} /></Body>
+                  <Meta><MonoNums text={ax(n.detail)} /></Meta>
+                  {n.day === 'Day 60' ? (
+                    <ArrowLink icon="compass" onPress={() => router.push('/cation/wealthcation')}>
+                      {t('seeWealth')}
+                    </ArrowLink>
+                  ) : null}
+                </View>
+              </View>
+            ))}
+            <View style={{ borderTopWidth: 1, borderTopColor: INK.line, paddingTop: space.s2, gap: space.s1 }} accessibilityLiveRegion="polite">
+              {planState === 'open' ? (
+                <>
+                  <Meta><MonoNums text={t('feelRight', { day: tx(SLOT_TEXT[slot].day, when.long.split(' · ')[0]) })} /></Meta>
+                  <View style={{ flexDirection: 'row', gap: space.s1, flexWrap: 'wrap' }}>
+                    <Button variant="secondary" icon="check" onPress={() => setPlanState('agreed')}>
+                      {t('looksRight')}
+                    </Button>
+                    <Button variant="ghost" icon="edit-3" onPress={() => setPlanState('note')}>
+                      {t('change')}
+                    </Button>
+                  </View>
+                </>
+              ) : planState === 'note' ? (
+                <>
+                  <TextField label={t('whatChange')} value={note} onChangeText={setNote} placeholder={t('changePh')} multiline />
+                  <View style={{ flexDirection: 'row', gap: space.s1, flexWrap: 'wrap' }}>
+                    <Button variant="secondary" icon="send" onPress={saveNote} disabled={!note.trim()}>
+                      {t('addToCall')}
+                    </Button>
+                    <Button variant="ghost" onPress={() => setPlanState('open')}>
+                      {tc('cancel')}
+                    </Button>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Body weight="medium">{planState === 'agreed' ? t('notedAgreed') : t('notedNote')}</Body>
+                  {planState === 'noted' ? <Meta>“{note.trim()}”</Meta> : null}
+                  <Button variant="link" onPress={() => setPlanState('open')}>
+                    {t('undo')}
+                  </Button>
+                </>
+              )}
             </View>
-          </View>
-        ))}
-        <View style={{ borderTopWidth: 1, borderTopColor: INK.line, paddingTop: space.s2, gap: space.s1 }} accessibilityLiveRegion="polite">
-          {planState === 'open' ? (
-            <>
-              <Meta><MonoNums text={t('feelRight', { day: tx(SLOT_TEXT[slot].day, when.long.split(' · ')[0]) })} /></Meta>
-              <View style={{ flexDirection: 'row', gap: space.s1, flexWrap: 'wrap' }}>
-                <Button variant="secondary" icon="check" onPress={() => setPlanState('agreed')}>
-                  {t('looksRight')}
-                </Button>
-                <Button variant="ghost" icon="edit-3" onPress={() => setPlanState('note')}>
-                  {t('change')}
-                </Button>
-              </View>
-            </>
-          ) : planState === 'note' ? (
-            <>
-              <TextField label={t('whatChange')} value={note} onChangeText={setNote} placeholder={t('changePh')} multiline />
-              <View style={{ flexDirection: 'row', gap: space.s1, flexWrap: 'wrap' }}>
-                <Button variant="secondary" icon="send" onPress={saveNote} disabled={!note.trim()}>
-                  {t('addToCall')}
-                </Button>
-                <Button variant="ghost" onPress={() => setPlanState('open')}>
-                  {tc('cancel')}
-                </Button>
-              </View>
-            </>
-          ) : (
-            <>
-              <Body weight="medium">{planState === 'agreed' ? t('notedAgreed') : t('notedNote')}</Body>
-              {planState === 'noted' ? <Meta>“{note.trim()}”</Meta> : null}
-              <Button variant="link" onPress={() => setPlanState('open')}>
-                {t('undo')}
-              </Button>
-            </>
-          )}
-        </View>
+          </>
+        ) : (
+          <Meta><MonoNums text={t('planOnCall')} /></Meta>
+        )}
       </View>
 
       <View style={{ gap: space.s1, borderTopWidth: 1, borderTopColor: INK.line, paddingTop: space.s2 }}>

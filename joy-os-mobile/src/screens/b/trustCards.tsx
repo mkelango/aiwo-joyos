@@ -8,7 +8,7 @@ import type { MethodVersion } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { useDict } from '@/lib/i18n'
 import { abhaStore, nomineeStore, useStore, type NomineeState } from './bStore'
-import { ChoiceCard, Field, FilterChips } from './parts'
+import { ChoiceCard, Field, FilterChips, useSheetCrisisGuard } from './parts'
 import { NOMINEE_REL, TRUST } from './i18n/trust'
 import { METHOD_LABEL } from './i18n/method'
 import { useCommon, useTx } from './i18n/common'
@@ -46,7 +46,7 @@ export function MethodCard() {
         <View style={{ paddingVertical: 12, gap: 4 }}>
           <Mono tone="ink">{`JI = GM(H, P, R, F, D) − ${METHODS['v1.0'].lambda} · B`}</Mono>
           {/* The method and engine build are identifiers with numbers in them: Mono, inside the sentence. */}
-          <Meta size={14}>{monoSlots(t('yourIndexOn', { method: SLOT_A, build: SLOT_B }), [latest.method, latest.engineBuild])}</Meta>
+          {latest.hasIndex ? <Meta size={14}>{monoSlots(t('yourIndexOn', { method: SLOT_A, build: SLOT_B }), [latest.method, latest.engineBuild])}</Meta> : null}
         </View>
         {(Object.keys(METHODS) as MethodVersion[]).map((v) => (
           <View key={v}>
@@ -86,12 +86,15 @@ export function NomineeCard({ onToast }: { onToast: (msg: string) => void }) {
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState(nominee)
   const [tried, setTried] = useState(false)
+  const guard = useSheetCrisisGuard()
   const errs = {
     name: form.name.trim().length < 2 ? t('errFullName') : null,
     email: EMAIL.test(form.email.trim()) ? null : t('errEmail'),
   }
   const rel = (r: string) => tx(NOMINEE_REL[r], r)
   const save = () => {
+    // Emergency intercept first: nothing is saved until support has been offered.
+    if (!guard(form.name, () => setOpen(false)) || !guard(form.email, () => setOpen(false))) return
     setTried(true)
     if (errs.name || errs.email) return
     const next = { ...form, name: form.name.trim(), email: form.email.trim(), savedAt: new Date().toISOString() }

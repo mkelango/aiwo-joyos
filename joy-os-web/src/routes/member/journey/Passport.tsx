@@ -11,7 +11,7 @@ import { MEMBER } from '@/data/member'
 import { useIndexHistory } from '@/routes/member/core/_latest'
 import { useMemberName } from '@/lib/memberName'
 import { useScoresHidden } from '@/lib/minor'
-import { FLAGSHIP_NEXT, PASSES, PASSPORT, SESSIONS_ALLOWANCE } from './_data'
+import { FLAGSHIP_NEXT, PASSES, PASSPORT, SESSIONS_ALLOWANCE, cationForTerm } from './_data'
 import { QRCode, SheetFocus, reducedFade } from './_parts'
 import { DUR, EASE_BRAND, useReduceMotion } from '@/lib/motion'
 import { setWallet, useJourney } from './_store'
@@ -59,7 +59,9 @@ export default function Passport() {
   const sessionsBooked = SESSIONS_ALLOWANCE.bookedBefore + booked.filter((b) => b.kind === 'Session').length
   const flagshipReq = journey.flagshipRequest
   const stampCount = PASSPORT.stamps.length + requested.length + booked.length + (flagshipReq ? 1 : 0)
-  const savourRequested = requested.some((r) => r.slug === 'savourcation')
+  // The next stamp is the ’cation for the latest lowest term, until it has been requested.
+  const nextCation = cationForTerm(latest.lowestTerm)
+  const nextRequested = requested.some((r) => r.slug === nextCation.slug)
   const upcoming = [...PASSES.filter((p) => p.status === 'Valid').map((p) => ({ id: p.id, code: p.code, label: 'Joyspan Session · Chennai' })), ...booked.map((b) => ({ id: b.id, code: b.code, label: b.name }))]
 
   return monoDigits(
@@ -254,12 +256,12 @@ export default function Passport() {
               </div>
             </motion.li>
           )}
-          {!savourRequested && (
+          {!nextRequested && (
             <li>
-              <Link to="/app/cation/savourcation" className="flex h-full min-h-[11rem] flex-col items-center justify-center rounded-card border border-dashed border-line p-5 text-center text-ink-2 hover:border-line-strong hover:text-ink focus-ring">
+              <Link to={`/app/cation/${nextCation.slug}`} className="flex h-full min-h-[11rem] flex-col items-center justify-center rounded-card border border-dashed border-line p-5 text-center text-ink-2 hover:border-line-strong hover:text-ink focus-ring">
                 <MapPin size={20} aria-hidden />
                 <span className="mt-3 text-[15px]">{t('nextStamp')}</span>
-                <span className="mt-1 text-[13px] text-ink-3">{t('nextStampBody')}</span>
+                <span className="mt-1 text-[13px] text-ink-3">{t('nextStampBody', { name: nextCation.name })}</span>
               </Link>
             </li>
           )}

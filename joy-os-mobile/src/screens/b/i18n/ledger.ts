@@ -7,6 +7,7 @@ export const LEDGER = {
   where: { en: 'Where was it? Up to three', ta: 'எங்கே இருந்தது? மூன்று வரை', hi: 'कहाँ था? तीन तक' },
   word: { en: 'A word or a few · optional', ta: 'ஒரு சொல் அல்லது சில · விருப்பத்தேர்வு', hi: 'एक-दो शब्द · वैकल्पिक' },
   wordPh: { en: 'Lunch with Kavya', ta: 'Kavya-வுடன் மதிய உணவு', hi: 'Kavya के साथ लंच' },
+  wordPhOwn: { en: 'Lunch with a friend', ta: 'நண்பருடன் மதிய உணவு', hi: 'दोस्त के साथ लंच' },
   photo: { en: 'Photo attached', ta: 'புகைப்படம் இணைக்கப்பட்டது', hi: 'फ़ोटो जुड़ी है' },
   photoKept: { en: 'Kept on this phone with the moment.', ta: 'அந்தத் தருணத்துடன் இந்தத் தொலைபேசியில் வைக்கப்பட்டது.', hi: 'उस पल के साथ इसी फ़ोन पर रखी गई।' },
   removePhoto: { en: 'Remove the photo', ta: 'புகைப்படத்தை நீக்கு', hi: 'फ़ोटो हटाएँ' },
@@ -25,6 +26,10 @@ export const LEDGER = {
   actually: { en: 'Actually, there was something', ta: 'உண்மையில், ஒன்று இருந்தது', hi: 'असल में, कुछ था' },
   thisWeek: { en: 'This week · where joy came from', ta: 'இந்த வாரம் · மகிழ்ச்சி எங்கிருந்து வந்தது', hi: 'इस हफ़्ते · ख़ुशी कहाँ से आई' },
   byTagA: { en: 'Moments by tag, Monday to today. ', ta: 'குறிச்சொல் வாரியாகத் தருணங்கள், திங்கள் முதல் இன்று வரை. இதுவரை ', hi: 'टैग के हिसाब से पल, सोमवार से आज तक। अब तक ' },
+  // An account with no seeded week: one tag so far, or none.
+  byTagOne: { en: ' so far; all from {a}.', ta: '; அனைத்தும் {a} இலிருந்து.', hi: '; सब {a} से।' },
+  weekNone: { en: 'Nothing kept this week yet, and that is fine. The moments you keep here show by tag.', ta: 'இந்த வாரம் இன்னும் எதுவும் வைக்கப்படவில்லை, அது பரவாயில்லை. நீங்கள் வைக்கும் தருணங்கள் இங்கே குறிச்சொல் வாரியாகக் காட்டப்படும்.', hi: 'इस हफ़्ते अभी कुछ नहीं रखा गया, और यह ठीक है। आप जो पल रखेंगे, वे यहाँ टैग के हिसाब से दिखेंगे।' },
+  recentNone: { en: 'No moments yet. The first one you keep shows here.', ta: 'இன்னும் தருணங்கள் இல்லை. நீங்கள் வைக்கும் முதல் தருணம் இங்கே தெரியும்.', hi: 'अभी कोई पल नहीं। आपका रखा पहला पल यहाँ दिखेगा।' },
   byTagB: { en: ' so far; most from {a} and {b}.', ta: '; பெரும்பாலும் {a}, {b} இலிருந்து.', hi: '; सबसे ज़्यादा {a} और {b} से।' },
   fourWeeks: { en: 'Four weeks', ta: 'நான்கு வாரங்கள்', hi: 'चार हफ़्ते' },
   dotsBody: { en: 'Each dot is a day, Monday to Sunday; larger means more moments. Empty days are part of it.', ta: 'ஒவ்வொரு புள்ளியும் ஒரு நாள், திங்கள் முதல் ஞாயிறு வரை; பெரியது என்றால் அதிகத் தருணங்கள். காலியான நாட்களும் இதன் பகுதியே.', hi: 'हर बिंदु एक दिन है, सोमवार से रविवार; बड़ा मतलब ज़्यादा पल। ख़ाली दिन भी इसका हिस्सा हैं।' },

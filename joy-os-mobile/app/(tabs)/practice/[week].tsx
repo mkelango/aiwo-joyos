@@ -14,13 +14,15 @@ import { useLocal } from '@/screens/a/local'
 import type { MeasuredIndex } from '@/shared/indexScoring'
 import { INDEX_HISTORY } from '@/shared/member'
 import { SPACE_TODAY, SPACE_TODAY_INDEX, localDay } from '@/screens/a/spacesData'
-import { Verse, monoNums } from '@/screens/a/parts'
+import { NoIndexYet, Verse, monoNums, useIsSpecimen } from '@/screens/a/parts'
+import { useHasIndex } from '@/lib/indexRecord'
 import { useIsMinor } from '@/lib/minor'
 
 // PRACTICE WEEK (Memo p.21): one week in full — audio, the practice, the science note,
 // a private reflection (crisis-intercepted) and "Mark practised", the one Daybreak. The Practice
 // register's verse (the Thirukkural, Tamil with the English beneath) closes the week. Under 18 the
-// Week-8 re-take is not offered: nothing is scored (minors gate).
+// Week-8 re-take is not offered: nothing is scored (minors gate). Arjun is in Week 4 with his circle;
+// anyone else starts at Week 1 with neither, and a member with no Index yet is offered their first.
 
 const MAX = 600
 
@@ -37,14 +39,19 @@ function WeekView({ n }: { n: string }) {
   const content = PRACTICE_CONTENT.find((p) => p.week === num)
   const guard = useCrisisGuard()
   const minor = useIsMinor()
-  const [measured] = useLocal<MeasuredIndex>('measuredIndex', null)
+  const hasIndex = useHasIndex()
+  const specimen = useIsSpecimen()
+  const current = specimen ? CIRCLE.week : 1
+  const [saved] = useLocal<MeasuredIndex>('measuredIndex', null)
+  // "Before and after" compares a re-take with the recorded measure, which only Arjun has.
+  const measured = specimen ? saved : null
   const [prac, setPrac] = useStore(practiceStore)
   const stored = prac.reflections[String(num)]
   const [reflection, setReflection] = useState(stored?.text ?? '')
   const [savedAt, setSavedAt] = useState<string | null>(stored?.at ?? null)
   const [error, setError] = useState('')
   // Earlier weeks count as practised unless the member un-marked them; later ones once marked.
-  const practised = prac.weeks.includes(num) || (num > 0 && num < CIRCLE.week && !prac.unmarked.includes(num))
+  const practised = prac.weeks.includes(num) || (num > 0 && num < current && !prac.unmarked.includes(num))
   const setPractised = (v: boolean) =>
     setPrac((p) => ({
       ...p,
@@ -72,14 +79,14 @@ function WeekView({ n }: { n: string }) {
     )
   }
 
-  const status = num < CIRCLE.week ? 'done' : num === CIRCLE.week ? 'now' : 'next'
+  const status = num < current ? 'done' : num === current ? 'now' : 'next'
   const prev = PRACTICE_WEEKS.find((w) => w.week === num - 1)
   const next = PRACTICE_WEEKS.find((w) => w.week === num + 1)
   const termName = week.term === 'ALL' ? null : name(week.term)
   // Each week opens on the circle's Monday. Counted from the specimen today's Monday (25 Jan, the
   // start of CIRCLE.week), so Week 1 opens Mon 4 Jan and Week 5 opens Mon 1 Feb.
   const today = localDay(SPACE_TODAY)
-  const opens = new Date(today.getFullYear(), today.getMonth(), today.getDate() - SPACE_TODAY_INDEX + (num - CIRCLE.week) * 7).toISOString()
+  const opens = new Date(today.getFullYear(), today.getMonth(), today.getDate() - SPACE_TODAY_INDEX + (num - current) * 7).toISOString()
 
   const save = () => {
     if (!guard(reflection)) return
@@ -100,7 +107,7 @@ function WeekView({ n }: { n: string }) {
         <PrimaryChip primary={week.term} />
         {status === 'now' ? <Pill tone="daybreak">{t('This week')}</Pill> : status === 'next' ? <Pill>{t('Opens {date}', { date: fmtDate(opens, lang) })}</Pill> : practised ? <Pill tone="ink">{t('Practised')}</Pill> : <Pill>{t('Earlier week · not marked')}</Pill>}
       </View>
-      {status === 'next' ? (
+      {status === 'next' && specimen ? (
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Icon name="lock" size={16} color={c.ink3} />
           <Meta style={{ flex: 1 }}>{monoNums(t('You can read ahead. The circle takes this week together on {date}.', { date: fmtDate(opens, lang) }))}</Meta>
@@ -134,6 +141,8 @@ function WeekView({ n }: { n: string }) {
             <Body weight="medium">{monoNums(t('Not scored while under 18'))}</Body>
             <Meta>{t('At the end of the eight weeks, choose one thing for the next ninety days with Priya.')}</Meta>
           </Card>
+        ) : num === 8 && !hasIndex ? (
+          <NoIndexYet body={t('This week is measured against your own Index. Take it first, and the re-take has something to compare.')} />
         ) : num === 8 ? (
           <Card tone="raised" padding={16} style={{ gap: space.s1 }}>
             <Body weight="medium">{t('This week, you take the Index again.')}</Body>
@@ -219,6 +228,7 @@ function WeekView({ n }: { n: string }) {
       </View>
 
       {/* Circle prompt */}
+      {specimen ? (
       <Card tone="raised" style={{ gap: space.s1 + 4 }}>
         <Eyebrow>{t('The circle’s prompt')}</Eyebrow>
         <Title size={22}>
@@ -229,6 +239,7 @@ function WeekView({ n }: { n: string }) {
           {t('Your circle')}
         </ArrowLink>
       </Card>
+      ) : null}
 
       {/* The verse of the Practice register (Playbook p63) */}
       <Card tone="soft">

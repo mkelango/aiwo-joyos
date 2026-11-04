@@ -8,6 +8,7 @@ import { useTheme } from '@/theme/ThemeProvider'
 import { ENTITLEMENTS, GSTIN_AIWO, GST_RATE, INVOICES, INVOICES_LAKSHMI, SPECIMEN_NOW, UPI_ON_FILE } from '@/screens/b/accountData'
 import { PLANS, inr } from '@/screens/b/_data'
 import { accountStore, refCode, useStore, type Billing } from '@/screens/b/bStore'
+import { renewalOf } from '@/screens/b/grace'
 import { FigureListRow, CheckLine, ChoiceCard, Done, KeyValue, hasCircle, memberOnly, shareOrCopy, useAccount, useFigures } from '@/screens/b/parts'
 import { MonoNums } from '@/lib/monoNums'
 import { useDict } from '@/lib/i18n'
@@ -32,23 +33,11 @@ const STORE_NAME: Record<StoreBilling, string> = { 'app-store': 'App Store', 'go
 const STORE_ACCOUNT: Record<StoreBilling, string> = { 'app-store': 'Apple ID', 'google-play': 'Google account' }
 
 type PlanKey = (typeof PLANS)[number]['key']
-const RENEWS = '2027-02-01'
 const CIRCLE_RENEWS = '2027-12-15'
-const addYear = (iso: string) => `${Number(iso.slice(0, 4)) + 1}${iso.slice(4, 10)}`
 const addMonths = (iso: string, n: number) => {
   const y = Number(iso.slice(0, 4))
   const m = Number(iso.slice(5, 7)) - 1 + n
   return `${y + Math.floor(m / 12)}-${String((m % 12) + 1).padStart(2, '0')}${iso.slice(7, 10)}`
-}
-// Payments grace (§4B): the February renewal fails, fourteen days of unchanged access follow.
-const FEB_INVOICE = 'INV-2027-000531'
-const FEB_DUE = '2027-02-01'
-const GRACE_UNTIL = '2027-02-15'
-const GRACE_DAYS = 14
-const addDays = (iso: string, n: number) => {
-  const d = new Date(`${iso}T00:00:00Z`)
-  d.setUTCDate(d.getUTCDate() + n)
-  return d.toISOString().slice(0, 10)
 }
 type Invoice = (typeof INVOICES)[number]
 type Entitlement = { name: string; from: string; use: string }
@@ -84,27 +73,10 @@ function Membership() {
   const paused = acct.pause ?? null
   const current = PLANS.find((p) => p.key === acct.plan)!
   const pending = acct.planChange
-  // Monthly plans renew on the 1st; a yearly plan renews a year after it took effect.
-  const yearly = current.cadence === '/ year'
-  const renews = yearly && acct.planSince ? addYear(acct.planSince) : RENEWS
-  // Payments grace (§4B) bills the plan's own renewal: Plus in February by UPI autopay (it failed),
-  // Patron's yearly renewal by a Razorpay link (it is unpaid: no card is on file, and the sum is
-  // beyond a UPI mandate). Joy OS (free) bills nothing, and nothing can fail without a method.
-  const renewYear = Number(renews.slice(0, 4))
-  const overdue: Invoice | null = acct.plan === 'Free'
-    ? null
-    : yearly
-      ? { id: `INV-${renewYear}-000017`, date: renews, item: `Patron · ${renewYear}–${renewYear + 1}`, total: current.price, method: 'Razorpay link', status: 'Unpaid' }
-      : { id: FEB_INVOICE, date: FEB_DUE, item: 'Joy OS Plus · February', total: current.price, method: 'UPI', status: 'Retrying' }
-  const graceUntil = yearly ? addDays(renews, GRACE_DAYS) : GRACE_UNTIL
+  // Payments grace (§4B): the plan's own renewal, read the way the app-wide banner reads it.
+  const { yearly, renews, renewYear, overdue, graceUntil, storeBilled, hasMethod, canGrace, overduePaid } = renewalOf(acct, account.id)
   /** An invoice still to pay: the failed UPI renewal, or the unpaid Patron link. */
   const isDue = (inv: Invoice | null) => !!inv && (inv.status === 'Retrying' || inv.status === 'Unpaid')
-  const billing: Billing = acct.billing ?? 'razorpay'
-  const storeBilled = billing !== 'razorpay' && acct.plan === 'Plus' ? billing : null
-  const hasMethod = !!storeBilled || !!upi
-  const canGrace = !!overdue && hasMethod
-  // Once the renewal is paid the grace state is over; the demo switch can no longer bring it back.
-  const overduePaid = !!overdue && paidHere.some((i) => i.id === overdue.id)
   const inGrace = paymentsGrace && canGrace && !overduePaid
   const invoiceRows: Invoice[] = [...(inGrace && overdue ? [overdue] : []), ...paidHere.map(({ ref: _ref, ...i }) => i), ...ownInvoices]
   // What the plan includes: its own points (Plus also for Patron), then Circle where the account
@@ -223,6 +195,8 @@ function Membership() {
     const upgrade = isUpgrade
     const effective = upgrade ? SPECIMEN_NOW : renews
     setAcct((a) => ({ ...a, planChange: { to: pick, effective, ref: refCode('PLN') }, plan: upgrade ? pick : a.plan, planSince: upgrade ? effective : a.planSince, billing: upgrade ? by ?? 'razorpay' : a.billing }))
+    // The new plan starts today: the old plan's missed renewal is over and nothing of the new one is due.
+    if (upgrade) setPaymentsGrace(false)
     setStoreStep('idle')
     setConfirm(true)
   }
@@ -260,7 +234,7 @@ function Membership() {
           onChange={setPaymentsGrace}
           disabled={overduePaid || !canGrace}
           label={t('demoGrace')}
-          description={!overdue ? t('demoGraceFree') : !hasMethod ? t('demoGraceNoMethod') : overduePaid ? (yearly ? t('demoGracePaidPatron') : t('demoGracePaid')) : t('demoGraceD')}
+          description={acct.plan === 'Free' ? t('demoGraceFree') : !overdue ? t('demoGraceNotDue', { date: fmtDate(renews) }) : !hasMethod ? t('demoGraceNoMethod') : overduePaid ? (yearly ? t('demoGracePaidPatron') : t('demoGracePaid')) : t('demoGraceD')}
         />
       </View>
 
@@ -272,7 +246,7 @@ function Membership() {
             <Mono size={20} tone="ink">{fmtDate(graceUntil)}</Mono>
             {lang === 'hi' ? '।' : '.'}
           </Title>
-          <Body tone="ink2">{yearly ? t('graceBodyPatron') : t('graceBody')}</Body>
+          <Body tone="ink2">{yearly ? t('graceBodyPatron') : circle ? t('graceBody') : t('graceBodyNoCircle')}</Body>
           <DaybreakButton icon={yearly ? 'external-link' : 'smartphone'} onPress={openPay}>
             {payLabel}
           </DaybreakButton>

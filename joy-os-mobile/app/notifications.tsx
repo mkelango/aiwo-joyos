@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react'
 import { Pressable, View } from 'react-native'
 import { Body, Button, Card, DaybreakButton, Divider, EmptyIllustration, Eyebrow, Icon, Meta, Mono, Screen, ScreenHeader, SectionTitle, Serif, Toggle, type IconName } from '@/components'
 import { useTheme } from '@/theme/ThemeProvider'
-import { NOTICES, type Notice } from '@/screens/b/_data'
-import { messagesStore, notifPrefsStore, notifReadStore, useAccountThreads, useStore, validatePrefs, type NotifPrefs } from '@/screens/b/bStore'
-import { Done, NumberSegmented, TimeStepper, memberOnly, useAccount } from '@/screens/b/parts'
+import type { Notice } from '@/screens/b/_data'
+import { notifPrefsStore, notifReadStore, useAccountNotices, useStore, useUnreadNotices, validatePrefs, type NotifPrefs } from '@/screens/b/bStore'
+import { Done, NumberSegmented, TimeStepper, memberOnly } from '@/screens/b/parts'
 import { MonoNums } from '@/lib/monoNums'
 import { useDict, useLang } from '@/lib/i18n'
 import { parseIsoDate } from '@/components/MethodLine'
@@ -53,16 +53,10 @@ function Notifications() {
     if (!dirty) setDraft(prefs)
   }, [prefs, dirty])
 
-  const account = useAccount()
-  const specimenThreads = useAccountThreads()
-  const [msgs] = useStore(messagesStore)
-  const hasThread = (href: string) => {
-    const id = /[?&]t=([^&]+)/.exec(href)?.[1]
-    return !id || [...specimenThreads, ...msgs.started].some((th) => th.id === id)
-  }
-  const mine = NOTICES.filter((n) => (!n.for || n.for.includes(account.id)) && hasThread(n.href))
+  // The same list and count as the bell in the app bar, so "Mark all read" clears its dot.
+  const mine = useAccountNotices()
   const shown = mine.filter((n) => !rd.cleared.includes(n.id))
-  const unread = shown.filter((n) => !rd.read.includes(n.id)).length
+  const unread = useUnreadNotices()
   const edit = (fn: (d: NotifPrefs) => NotifPrefs) => {
     setDraft(fn)
     setDirty(true)

@@ -1,9 +1,10 @@
 import { useEffect, useMemo } from 'react'
 import { useLocal } from '@/screens/a/local'
 import { DAY90_DATES } from '@/screens/a/coreData'
-import { measuredScore, type MeasuredIndex } from '@/shared/indexScoring'
-import { INDEX_HISTORY } from '@/shared/member'
+import { ORDER, measuredScore, type MeasuredIndex } from '@/shared/indexScoring'
+import { INDEX_HISTORY, TODAY_ACTION } from '@/shared/member'
 import type { IndexScore } from '@/shared/types'
+import { useAccountId } from '@/screens/b/bStore'
 import { playSound } from './sound'
 
 // What the Index screens keep on this phone beyond the score itself (all specimen, nothing
@@ -18,6 +19,9 @@ import { playSound } from './sound'
 //    assessment (two sittings plus the lab results) → "awaiting physician sign-off" → the Day-90
 //    card. Clinical results are released only after a physician signs (AP-08); the sign-off is
 //    simulated here by a short timer, as the clinical portal would do it.
+//
+// All of it is the signed-in account's own: the keys below are account-scoped in useLocal
+// (local.ts), so Arjun's measures, corrections and re-measure are never read as anyone else's.
 
 export interface Amendment {
   id: string
@@ -65,19 +69,70 @@ export type LatestIndex = IndexScore & {
   previous: IndexScore
 }
 
+/** Whether the signed-in account has an Index at all, and whether it has anything to compare it with. */
+export interface IndexPresence {
+  /** False for an account other than Arjun with no Index measured on the phone: show no number. */
+  hasIndex: boolean
+  /** The account's only measure: `previous` is the measure itself, so nothing reads as a change. */
+  firstMeasure: boolean
+}
+
+// What an account with no Index reads: nothing measured, never imputed and never Arjun's. It keeps
+// the shape screens expect; hasIndex says not to show it. Its lowest term is the one Today's
+// gentlest start comes from.
+const NOT_MEASURED: IndexScore = {
+  id: 'ix_none',
+  memberId: '',
+  grade: 'index',
+  method: INDEX_HISTORY[0].method,
+  engineBuild: INDEX_HISTORY[0].engineBuild,
+  takenOn: '',
+  nextMeasure: INDEX_HISTORY[0].nextMeasure,
+  terms: ORDER.map((key) => ({ key, value: null, band: 'not-yet-measured' })),
+  gm: 0,
+  lambda: INDEX_HISTORY[0].lambda,
+  value: 0,
+  band: 'not-yet-measured',
+  lowestTerm: TODAY_ACTION.term,
+}
+
 /**
- * The latest Index: the one taken on this phone when there is one, else the newest recorded
- * measure (INDEX_HISTORY[0]). Same shape the screens use (terms, band, lowestTerm), so the
- * Spaces hub, each room and Today's one action follow the current lowest term after a re-take.
+ * The signed-in account's latest Index: the one taken on this phone when there is one, else, for
+ * Arjun, the newest recorded measure (INDEX_HISTORY[0]). Nobody else has recorded measures, so
+ * they read hasIndex false until they take their own, and their first measure is compared with
+ * nothing. Same shape the screens use (terms, band, lowestTerm), so the Spaces hub, each room and
+ * Today's one action follow the current lowest term after a re-take.
  * The Index result keeps its own read, since it also writes the measured record.
  */
-export function useLatestIndex(): LatestIndex {
+export function useLatestIndex(): LatestIndex & IndexPresence {
+  const account = useAccountId()
   const [measured] = useLocal<MeasuredIndex>(MEASURED_KEY, null)
   return useMemo(() => {
-    if (measured) return { ...measuredScore(measured), surveyOnly: !!measured.surveyOnly, onPhone: true, previous: INDEX_HISTORY[0] }
+    const recorded = account === 'arjun'
+    if (measured) {
+      const score = measuredScore(measured, recorded ? undefined : null)
+      return { ...score, surveyOnly: !!measured.surveyOnly, onPhone: true, previous: recorded ? INDEX_HISTORY[0] : score, hasIndex: true, firstMeasure: !recorded }
+    }
+    if (!recorded) return { ...NOT_MEASURED, surveyOnly: false, onPhone: false, previous: NOT_MEASURED, hasIndex: false, firstMeasure: false }
     const latest = INDEX_HISTORY[0]
-    return { ...latest, surveyOnly: !!latest.surveyOnly, onPhone: false, previous: INDEX_HISTORY[1] }
-  }, [measured])
+    return { ...latest, surveyOnly: !!latest.surveyOnly, onPhone: false, previous: INDEX_HISTORY[1], hasIndex: true, firstMeasure: false }
+  }, [account, measured])
+}
+
+/** False while the signed-in account has no Index of its own (shared contract U2). */
+export function useHasIndex(): boolean {
+  return useLatestIndex().hasIndex
+}
+
+/**
+ * The measure the ninety days start from: Arjun's recorded Day 0, or the one measure another
+ * account has kept on this phone. Null when they have none. Day 90 and the Day-40 page read this.
+ */
+export function useDayZeroIndex(): IndexScore | null {
+  const account = useAccountId()
+  const latest = useLatestIndex()
+  if (account === 'arjun') return INDEX_HISTORY[0]
+  return latest.hasIndex ? latest : null
 }
 
 // ─── The Day-90 re-measure chain ──────────────────────────────────────────
@@ -130,7 +185,8 @@ export function useSignOffTimer() {
     scheduledTimer = setTimeout(() => {
       scheduledTimer = null
       scheduledFor = 0
-      setRm((p) => (p.stage === 'awaiting' ? { ...p, stage: 'signed', signedAt: new Date().toISOString(), signedBy: SIGNING_PHYSICIAN } : p))
+      // Only the re-measure this timer was set for: another account may have signed in since.
+      setRm((p) => (p.stage === 'awaiting' && p.signDueAt === due ? { ...p, stage: 'signed', signedAt: new Date().toISOString(), signedBy: SIGNING_PHYSICIAN } : p))
       playSound('complete')
     }, Math.max(0, due - Date.now()))
   }, [ready, due, setRm])

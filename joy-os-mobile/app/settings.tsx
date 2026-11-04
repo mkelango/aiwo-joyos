@@ -27,8 +27,12 @@ import { ScriptText } from '@/components/Text'
 // For Lakshmi it is her elder mode's voice, the same switch Household shows.
 // Passkeys: name the device, then the device step (Face ID, Touch ID or PIN; simulated).
 
-/** What answering by voice "hears" in the simulation. People's own words stay in English. */
-const HEARD_SAMPLE = 'Tea on the verandah with Kavya'
+/** What answering by voice "hears" in the simulation: nobody's household, so true for any account. */
+const HEARD_SAMPLE = {
+  en: 'Tea on the verandah with a friend',
+  ta: 'நண்பருடன் திண்ணையில் தேநீர்',
+  hi: 'दोस्त के साथ बरामदे में चाय',
+}
 
 const SAMPLE = {
   en: 'Anything good in the last few hours?',
@@ -274,7 +278,7 @@ function Settings() {
                 <Button size="sm" variant="secondary" icon={reading ? 'square' : 'volume-2'} onPress={() => (reading ? stopReading() : readAloud(SAMPLE[lang]))}>
                   {reading ? ts('vtStop') : ts('vtRead')}
                 </Button>
-                <Button size="sm" variant="secondary" icon="mic" onPress={() => setHeard(HEARD_SAMPLE)}>
+                <Button size="sm" variant="secondary" icon="mic" onPress={() => setHeard(HEARD_SAMPLE[lang])}>
                   {ts('vtSpeak')}
                 </Button>
               </View>

@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom'
 import { DaybreakButton, SpecimenTag } from '@/components/joy/primitives'
 import { Avatar, Button, Card, EmptyState, PageHeader, Pill, Tabs } from '@/components/ui'
 import { TEAM } from '@/data/member'
-import { DEFAULT_NOTIF_PREFS, LEDGER_TIMES, NOTIFICATIONS, NOTIF_TYPES, pushesPerDay, type Notif, type NotifKind, type NotifPrefs } from './_data'
+import { DEFAULT_NOTIF_PREFS, LEDGER_TIMES, NOTIFICATIONS, NOTIF_TYPES, pushesPerDay, quietOptions, type Notif, type NotifKind, type NotifPrefs } from './_data'
 import { Field, LinkButton, Section, Select, Toggle } from './_parts'
 import { nums, rich, usePersisted, useToast } from './_util'
 import { useDict } from '@/lib/i18n'
@@ -25,7 +25,6 @@ const GROUPS: { key: Notif['day']; label: string }[] = [
   { key: 'week', label: 'Earlier this week' },
   { key: 'upcoming', label: 'Coming up' },
 ]
-const TIMES = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`).concat(['21:45']).sort()
 /** Which kinds count toward the three-a-day push budget. */
 const BUDGETED: NotifKind[] = ['ledger', 'action']
 
@@ -35,6 +34,8 @@ export default function Notifications() {
   const [toast, showToast] = useToast()
   const [readIds, setReadIds] = usePersisted<{ ids: string[] }>('notifRead', { ids: NOTIFICATIONS.filter((n) => n.read).map((n) => n.id) })
   const [prefs, setPrefs] = usePersisted<NotifPrefs>('notifs', DEFAULT_NOTIF_PREFS)
+  // The times found on arrival stay listed, so a setup time such as 22:15 can be chosen again after a change.
+  const [arrived] = useState({ from: prefs.quietFrom, to: prefs.quietTo })
   const [tab, setTab] = useState<'all' | 'unread'>('all')
   // Keep a just-read item visible under "Unread" until the filter changes.
   const [sticky, setSticky] = useState<Set<string>>(() => new Set())
@@ -197,8 +198,8 @@ export default function Notifications() {
                 <p className="text-[14px] text-ink-2">{t('quietBody')}</p>
               </div>
               <div className="mt-4 grid grid-cols-2 gap-3">
-                <Field label={t('from')}>{(id) => <Select id={id} value={prefs.quietFrom} onChange={(v) => setQuiet('quietFrom', v)} options={TIMES.map((x) => ({ value: x, label: x }))} className="num" />}</Field>
-                <Field label={t('until')}>{(id) => <Select id={id} value={prefs.quietTo} onChange={(v) => setQuiet('quietTo', v)} options={TIMES.map((x) => ({ value: x, label: x }))} className="num" />}</Field>
+                <Field label={t('from')}>{(id) => <Select id={id} value={prefs.quietFrom} onChange={(v) => setQuiet('quietFrom', v)} options={quietOptions(prefs.quietFrom, arrived.from)} className="num" />}</Field>
+                <Field label={t('until')}>{(id) => <Select id={id} value={prefs.quietTo} onChange={(v) => setQuiet('quietTo', v)} options={quietOptions(prefs.quietTo, arrived.to)} className="num" />}</Field>
               </div>
               <LinkButton to="/app/settings#notifications" variant="ghost" size="sm" className="mt-4 -ml-3"><Settings2 size={15} /> {t('channelsMore')}</LinkButton>
             </Card>

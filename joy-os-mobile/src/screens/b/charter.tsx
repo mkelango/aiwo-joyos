@@ -195,7 +195,8 @@ export function FjoOffice({ adults, minor, onToast }: { adults: { name: string; 
 
 /**
  * The Family Joy Charter: shown as written, or as an invitation to write it. `writer` is the adult
- * signed in: saving records them as agreed and asks every other adult again.
+ * signed in: saving records them as agreed and asks every other adult again. With no other adult
+ * in the household there is no one to ask, so nobody is named and it is kept on saving.
  */
 export function CharterCard({ isPatron, adults, writer, minor, onToast }: { isPatron: boolean; adults: string[]; writer: string; minor: string | null; onToast: (m: string) => void }) {
   const { c, space } = useTheme()
@@ -286,7 +287,7 @@ export function CharterCard({ isPatron, adults, writer, minor, onToast }: { isPa
             {waiting.length === 0 && ch.agreedOn ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Icon name="check" size={14} color={c.ink} />
-                <Meta tone="ink" style={{ flexShrink: 1 }}><MonoNums text={t('chAgreedAll', { date: fmtDate(ch.agreedOn) })} /></Meta>
+                <Meta tone="ink" style={{ flexShrink: 1 }}><MonoNums text={t(others.length ? 'chAgreedAll' : 'chKeptSolo', { date: fmtDate(ch.agreedOn) })} /></Meta>
               </View>
             ) : (
               <>
@@ -308,12 +309,13 @@ export function CharterCard({ isPatron, adults, writer, minor, onToast }: { isPa
       {editing ? (
         <CharterEditor
           charter={ch}
+          solo={!others.length}
           onClose={() => setEditing(false)}
           onSave={(next) => {
             // Saving asks every other adult to agree again; the writer has agreed by writing it.
             setCh({ ...next, written: true, agreed: [me], agreedOn: others.length ? undefined : SPECIMEN_NOW, week: ch.week })
             setEditing(false)
-            onToast(t('chSaved'))
+            onToast(others.length ? t('chSaved', { names: others.join(', ') }) : t('chSavedSolo'))
           }}
         />
       ) : null}
@@ -322,7 +324,7 @@ export function CharterCard({ isPatron, adults, writer, minor, onToast }: { isPa
 }
 
 /** Writing or changing the charter. Mounted only while open, so each opening starts from what is kept. */
-function CharterEditor({ charter, onClose, onSave }: { charter: Charter; onClose: () => void; onSave: (c: Charter) => void }) {
+function CharterEditor({ charter, solo, onClose, onSave }: { charter: Charter; solo: boolean; onClose: () => void; onSave: (c: Charter) => void }) {
   const { c, space } = useTheme()
   const t = useDict(HOUSE)
   const tc = useCommon()
@@ -368,7 +370,7 @@ function CharterEditor({ charter, onClose, onSave }: { charter: Charter; onClose
       footer={
         <View style={{ gap: 8 }}>
           <Button variant="ink" block onPress={save}>
-            {t('chSave')}
+            {solo ? t('chSaveSolo') : t('chSave')}
           </Button>
           <Button variant="ghost" block onPress={onClose}>
             {tc('cancel')}
@@ -376,7 +378,7 @@ function CharterEditor({ charter, onClose, onSave }: { charter: Charter; onClose
         </View>
       }
     >
-      <Meta>{t('chEditorIntro')}</Meta>
+      <Meta>{solo ? t('chEditorIntroSolo') : t('chEditorIntro')}</Meta>
 
       <Eyebrow>{t('chValues')}</Eyebrow>
       {values.length ? (
@@ -452,7 +454,7 @@ function CharterEditor({ charter, onClose, onSave }: { charter: Charter; onClose
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <Icon name="lock" size={13} color={c.ink3} />
         <Meta size={13} tone="ink3" style={{ flex: 1 }}>
-          {charter.written ? t('chEditNote') : t('chPrivate')}
+          {charter.written && !solo ? t('chEditNote') : t('chPrivate')}
         </Meta>
       </View>
       <View style={{ height: space.s1 }} />

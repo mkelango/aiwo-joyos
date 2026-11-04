@@ -165,7 +165,7 @@ function DeviceLink({ dev }: { dev: BodyDevices }) {
                   <p className="mt-1.5 flex items-center gap-1.5 text-[13px] text-ink-3">
                     <span className={clsx('h-2 w-2 shrink-0 rounded-full', on ? 'bg-ink' : 'border border-line-strong')} aria-hidden />
                     {on
-                      ? (sharing ? tn('body.dev.lastSync', { when: dx(dv.lastSync ?? 'Just now') }) : t('body.dev.paused'))
+                      ? (sharing ? tn(dv.freshness === 'stale' ? 'body.dev.notSyncing' : 'body.dev.lastSync', { when: dx(dv.lastSync ?? 'Just now') }) : t('body.dev.paused'))
                       : busy ? t('body.dev.linking') : dv.state === 'android' ? <span className="inline-flex items-center gap-1"><Smartphone size={13} aria-hidden /> {t('body.dev.notLinked')}</span> : t('body.dev.notLinked')}
                   </p>
                   {on && (given || dv.purposes) && (
@@ -1057,10 +1057,10 @@ function SignalTrends({ dev }: { dev: BodyDevices }) {
       {body ?? (source && (
         <>
           <Tabs value={k} onChange={setK} className="self-start" items={[{ value: 'hrv', label: 'HRV' }, { value: 'rhr', label: t('body.sig.restingHr') }, { value: 'regularity', label: t('body.sig.regularity') }]} />
-          {stale && <p role="status" className="mt-4 rounded-2xl border border-line px-4 py-3 text-[14px] text-ink-2">{mono(t('body.sig.stale', { name: source.name, when: dx(source.lastSync ?? '') }))}</p>}
+          {stale && <p role="status" className="mt-4 rounded-2xl border border-line px-4 py-3 text-[14px] text-ink-2">{mono(t('body.sig.stale', { name: source.name, when: dx(source.lastSync ?? '') }))} <Link to="/app/devices" className="rounded text-ink underline underline-offset-4 focus-ring">{t('body.sig.devices')}</Link></p>}
           <div className="mt-5 grid gap-6 md:grid-cols-[minmax(0,1fr)_14rem]">
             <div className="min-w-0">
-              <p className="text-[15px] text-ink-2">{mono(m.sentence)} {tn('body.sig.dashed')}</p>
+              <p className="text-[15px] text-ink-2">{mono(m.sentence)} {stale ? tn('body.sig.dashedN', { n: data.length }) : tn('body.sig.dashed')}</p>
               <div className="mt-3 h-[220px]" aria-hidden>
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
@@ -1074,10 +1074,10 @@ function SignalTrends({ dev }: { dev: BodyDevices }) {
                   </LineChart>
                 </ResponsiveContainer>
               </div>
-              <p className="sr-only">{tn('body.sig.sr', { name: m.name, list: data.map((s) => `${dm(s.on)} ${s[k]}`).join(', ') })}</p>
+              <p className="sr-only">{tn(stale ? 'body.sig.srN' : 'body.sig.sr', { name: m.name, n: data.length, list: data.map((s) => `${dm(s.on)} ${s[k]}`).join(', ') })}</p>
             </div>
             <dl className="grid grid-cols-3 gap-3 md:grid-cols-1">
-              <div className="rounded-xl bg-paper-sunk p-3"><dt className="eyebrow text-ink-3">{tn('body.sig.mean')}</dt><dd className="num mt-1 text-[1.6rem] font-light text-ink">{mean}<span className="text-[13px] text-ink-3">{m.unit}</span></dd></div>
+              <div className="rounded-xl bg-paper-sunk p-3"><dt className="eyebrow text-ink-3">{stale ? tn('body.sig.meanN', { n: data.length }) : tn('body.sig.mean')}</dt><dd className="num mt-1 text-[1.6rem] font-light text-ink">{mean}<span className="text-[13px] text-ink-3">{m.unit}</span></dd></div>
               <div className="rounded-xl bg-paper-sunk p-3"><dt className="eyebrow text-ink-3">{t('body.sig.lastNight')}</dt>{stale
                 ? <dd className="mt-1 text-[15px] text-ink-3">{t('body.sig.noReading')}</dd>
                 : <dd className="num mt-1 text-[1.6rem] font-light text-ink">{SIGNALS[SIGNALS.length - 1][k]}<span className="text-[13px] text-ink-3">{m.unit}</span></dd>}</div>
