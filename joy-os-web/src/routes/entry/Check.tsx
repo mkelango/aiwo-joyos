@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, Check as CheckIcon, Clock, Lock, Mail, MessageCircle, Phone, RotateCcw, Smartphone } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -8,6 +8,7 @@ import { DaybreakButton, Eyebrow, TermDot } from '@/components/joy/primitives'
 import { Button, Card, Progress, Sheet } from '@/components/ui'
 import { termByKey } from '@/data/terms'
 import { INSTRUMENT_NOTE, useDict, useLang, useTermText } from '@/lib/i18n'
+import { brandTransition, useReduceMotion, useRiseFade } from '@/lib/motion'
 import type { Band, TermKey, TermScore } from '@/domain/types'
 import { BAND_PETAL, BAND_PETAL_BURDEN, CHECK_STATEMENTS, COUNTRIES, EMAIL_RE, SCALE, SCALE_BURDEN, checkBand, checkStanding, countryName, phoneError, type CountryCode } from './_data'
 import { CK, E } from './_i18n'
@@ -198,12 +199,13 @@ function Intro({ progress, last, asksPhone, onBegin, onResume, onStartOver, onSe
   const band = useBand()
   const tt = useTermText()
   const shortDate = useShortDate()
+  const rise = useRiseFade()
   const bandWord = (b: 'steady' | 'uneven' | 'thin') => <span className="eyebrow text-ink">{band.label(b)}</span>
   return (
     <div className="mx-auto w-full max-w-page px-4 pb-32 pt-10 md:px-10 md:pb-16 md:pt-16">
       <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_1fr] lg:gap-16">
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24 }} className="min-w-0">
-          <p className="eyebrow mb-4 text-daybreak-ink">{t('introEyebrow')}</p>
+        <motion.div {...rise} className="min-w-0">
+          <p className="eyebrow mb-4 text-ink-3">{t('introEyebrow')}</p>
           <h1 className="text-[2.4rem] font-light leading-[1.08] tracking-tight text-ink md:text-[3.4rem]">
             {rich(t('introH'), { em: <em>{t('introHem')}</em> })}
           </h1>
@@ -295,7 +297,7 @@ function Intro({ progress, last, asksPhone, onBegin, onResume, onStartOver, onSe
 // ─── One statement per screen ──────────────────────────────────────────────
 
 function Question({ i, dir, answers, onAnswer, onBack, onNext }: { i: number; dir: 1 | -1; answers: Record<string, number>; onAnswer: (v: number) => void; onBack: () => void; onNext: () => void }) {
-  const reduce = useReducedMotion()
+  const reduce = useReduceMotion()
   const s = CHECK_STATEMENTS[i]
   const term = termByKey(s.term)
   const t = useDict(CK)
@@ -330,7 +332,7 @@ function Question({ i, dir, answers, onAnswer, onBack, onNext }: { i: number; di
           <Clock size={14} aria-hidden /> {rich(t('qLeft'), { m: <span className="num">{minutesLeft}</span> })}
         </p>
       </div>
-      <Progress value={i + (chosen ? 1 : 0)} max={TOTAL} className="mt-3" label={t('qProgress', { a: answered, total: TOTAL })} />
+      <Progress value={i + (chosen ? 1 : 0)} max={TOTAL} className="mt-3" color="var(--ink)" label={t('qProgress', { a: answered, total: TOTAL })} />
       <ol className="mt-3 flex gap-1" aria-hidden>
         {CHECK_STATEMENTS.map((q, n) => (
           <li key={q.id} className={clsx('h-1 flex-1 rounded-full', n === i ? 'bg-ink' : answers[q.id] ? 'bg-line-strong' : 'bg-paper-sunk')} />
@@ -343,7 +345,7 @@ function Question({ i, dir, answers, onAnswer, onBack, onNext }: { i: number; di
           initial={{ opacity: 0, x: offset }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -offset }}
-          transition={{ duration: 0.22, ease: [0.2, 0, 0, 1] }}
+          transition={brandTransition(reduce, 220)}
           className="mt-10 md:mt-14"
         >
           <div className="flex flex-wrap items-center gap-3">
@@ -425,7 +427,7 @@ function PhoneStep({ onBack, onDone }: { onBack: () => void; onDone: (c: Contact
 
   return (
     <form onSubmit={submit} noValidate className="mx-auto flex w-full max-w-3xl flex-col px-4 pb-28 pt-8 md:px-6 md:pb-16 md:pt-14">
-      <p className="eyebrow mb-3 text-daybreak-ink">{t('pEyebrow')}</p>
+      <p className="eyebrow mb-3 text-ink-3">{t('pEyebrow')}</p>
       <h1 ref={headingRef} tabIndex={-1} className="break-words text-[2rem] font-light leading-tight tracking-tight text-ink outline-none md:text-[2.6rem]">
         {rich(t('pH'), { em: <em>{t('pHem')}</em> })}
       </h1>
@@ -539,7 +541,7 @@ function Result({ answers, savedAt, contact, onRemoveContact, onRestart, onSaved
     <div className="mx-auto w-full max-w-page px-4 pb-32 pt-10 md:px-10 md:pb-16 md:pt-14">
       <GetTheApp open={appOpen} onClose={() => setAppOpen(false)} />
       <header className="max-w-3xl">
-        <p className="eyebrow mb-3 text-daybreak-ink">{t('rEyebrow')}</p>
+        <p className="eyebrow mb-3 text-ink-3">{t('rEyebrow')}</p>
         <h1 className="break-words text-[2.1rem] font-light leading-tight tracking-tight text-ink md:text-[2.9rem]">
           {allSteady ? (
             <>{rich(t('rAllSteady'), { em: <em>{band.inline('steady')}</em> })}</>
@@ -717,6 +719,7 @@ function Result({ answers, savedAt, contact, onRemoveContact, onRestart, onSaved
 
 function LetterDoor({ lowestName }: { lowestName: string }) {
   const appLang = useLang()
+  const reduce = useReduceMotion()
   const t = useDict(CK)
   const te = useDict(E)
   const [email, setEmail] = useState('')
@@ -738,7 +741,7 @@ function LetterDoor({ lowestName }: { lowestName: string }) {
       <p className="mt-3 text-[1.35rem] font-light leading-snug text-ink">{t('lH')}</p>
       <AnimatePresence mode="wait" initial={false}>
         {!sent ? (
-          <motion.form key="form" onSubmit={submit} noValidate initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-1 flex-col">
+          <motion.form key="form" onSubmit={submit} noValidate initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={brandTransition(reduce)} className="flex flex-1 flex-col">
             <p className="mt-2 text-[15px] leading-relaxed text-ink-2">
               {t('lB', { name: lowestName })}
             </p>
@@ -775,7 +778,7 @@ function LetterDoor({ lowestName }: { lowestName: string }) {
             </div>
           </motion.form>
         ) : (
-          <motion.div key="sent" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex flex-1 flex-col">
+          <motion.div key="sent" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={brandTransition(reduce)} className="flex flex-1 flex-col">
             <p className="mt-4 text-[17px] leading-relaxed text-ink">
               {rich(t('lThanks'), { email: <span className="break-all text-ink">{email.trim()}</span> })}
             </p>

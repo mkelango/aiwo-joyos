@@ -1,11 +1,12 @@
 import clsx from 'clsx'
-import { motion, useReducedMotion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { ArrowRight, Check, Eye, FileLock2, KeyRound, Lock, Minus, ScrollText, ShieldCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { DaybreakButton, Eyebrow, SpecimenTag } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill } from '@/components/ui'
 import { CONSOLES } from '@/layouts/ConsoleLayout'
+import { DUR, brandTransition, useReduceMotion } from '@/lib/motion'
 import { AccessRequestSheet } from './_access'
 import { DECLINE_REASONS, STRUCTURE_ONLY, AGGREGATES_ONLY, ASSIGNED_MEMBERS, NAMED_MEMBER, OPS_JIT_READ, OPS_JIT_WRITE, access, assignedIds, isLive, scopeLabel, standingRequest, lastSettled, statusLabel, useAccessAudit, useAccessRequests, type AccessRequest } from './_accessStore'
 import { useMemberAccessLog } from '@/routes/member/account/_access'
@@ -51,7 +52,7 @@ const LEVEL: Record<Level, { label: string; cls: string }> = {
 export default function ConsoleHome() {
   const { role, setRole, chosen, roleLabel, person } = useConsoleRole()
   const navigate = useNavigate()
-  const reduce = useReducedMotion()
+  const reduce = useReduceMotion()
   // No console role chosen (the member default): every console is view only until a role is
   // picked. Opening one from a card signs the visitor in as its specimen person, so it can act.
   const activeRole = chosen ? role : null
@@ -150,9 +151,9 @@ export default function ConsoleHome() {
             return (
               <motion.li
                 key={c.to}
-                initial={reduce ? false : { opacity: 0, y: 8 }}
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.24, delay: reduce ? 0 : i * 0.03 }}
+                transition={brandTransition(reduce, DUR.settle, i * 30)}
                 className={clsx('group flex flex-col rounded-card border p-5 md:p-6', open || specimen ? 'border-line bg-paper-raised shadow-card' : 'border-dashed border-line-strong bg-paper')}
               >
                 <div className="flex items-start justify-between gap-3">

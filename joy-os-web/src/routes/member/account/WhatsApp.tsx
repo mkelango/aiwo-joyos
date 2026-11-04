@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, BadgeCheck, Ban, Check, CheckCheck, Clock, MessageCircle, MoreVertical, RotateCcw, Send, ShieldCheck } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { DaybreakButton, useBandText } from '@/components/joy/primitives'
@@ -11,6 +11,7 @@ import { LEDGER_TIMES, ledgerSlots } from './_data'
 import { Checkbox, LinkButton, Section } from './_parts'
 import { nums, readNotifPrefs, rich, syncWhatsAppChannel, useMemberProfile, usePersisted, useToast } from './_util'
 import { INSTRUMENT_NOTE, fill, useDict, useLang, useTermText } from '@/lib/i18n'
+import { brandTransition, useReduceMotion } from '@/lib/motion'
 import { WA, useLookup } from './_i18n'
 import { WatchComplication } from './_watch'
 import { useScoresHidden } from '@/lib/minor'
@@ -124,7 +125,7 @@ export default function WhatsApp() {
   const tt = useTermText()
   const bandText = useBandText()
   const hidden = useScoresHidden()
-  const reduce = useReducedMotion()
+  const reduce = useReduceMotion()
   const [toast, showToast] = useToast()
   const [scenario, setScenario] = useState<Scenario>('ledger')
   const [msgs, setMsgs] = useState<ChatMsg[]>([])
@@ -300,7 +301,7 @@ export default function WhatsApp() {
                 )}
                 <AnimatePresence initial={false}>
                   {msgs.map((m) => (
-                    <motion.div key={`${scenario}-${m.id}`} initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }} className={clsx('flex flex-col', m.from === 'me' ? 'items-end' : 'items-start')}>
+                    <motion.div key={`${scenario}-${m.id}`} initial={reduce ? { opacity: 0 } : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={brandTransition(reduce, 180)} className={clsx('flex flex-col', m.from === 'me' ? 'items-end' : 'items-start')}>
                       <div className={clsx('max-w-[82%] rounded-xl px-3 py-2 text-[14.5px] leading-snug shadow-card', m.from === 'me' ? 'rounded-tr-sm bg-ink text-paper' : 'rounded-tl-sm bg-paper-raised text-ink')}>
                         {nums(lineText(m))}
                         <span className={clsx('num ml-2 inline-flex translate-y-0.5 items-center gap-0.5 whitespace-nowrap text-[10px]', m.from === 'me' ? 'opacity-70' : 'text-ink-3')}>

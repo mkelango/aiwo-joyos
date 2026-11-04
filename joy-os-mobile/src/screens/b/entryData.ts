@@ -1,4 +1,4 @@
-import type { Band, Role, TermKey } from '@/shared/types'
+import type { Band, MethodVersion, Role, TermKey } from '@/shared/types'
 
 // ─── The Joyspan Check ─────────────────────────────────────────────────────
 // 18 statements, three per term, each on a five-point scale (Memo p.10).
@@ -193,6 +193,16 @@ export const DEVICES = [
 ] as const
 
 export type DeviceId = (typeof DEVICES)[number]['id']
+
+// ─── Method signers (Architecture p11: method.definition signedBy) ─────────
+// The two signatures on a published version: the same people and dates as the Science console.
+// A version not yet published has none. SPECIMEN names.
+export const METHOD_SIGNERS: Partial<Record<MethodVersion, { name: string; role: 'head' | 'medical'; on: string }[]>> = {
+  'v1.0': [
+    { name: 'Dr Lakshmi Raghavan', role: 'head', on: '2026-10-20' },
+    { name: 'Dr Arvind Natesan', role: 'medical', on: '2026-10-21' },
+  ],
+}
 
 // ─── The Joyspan Letter (Memo p17; Playbook p63) ───────────────────────────
 // Monthly, in the Mentor's voice, with real numbers: his own Index, published when it falls

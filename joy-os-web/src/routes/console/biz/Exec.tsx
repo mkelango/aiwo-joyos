@@ -6,6 +6,7 @@ import { Bar, BarChart, CartesianGrid, LabelList, Line, LineChart, ReferenceLine
 import { DaybreakButton, Delta, Eyebrow, SpecimenTag } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill, Sheet } from '@/components/ui'
 import { RELEASES, SCOREBOARD } from '@/data/platform'
+import { brandTransition, useReduceMotion } from '@/lib/motion'
 import { PreviewBanner, useConsoleAccess } from '../care/_gate'
 import { COST_CURVE, DECISIONS, FLYWHEEL, MOATS, NORTH_STAR, NS_TREND, REVENUE, RISKS, SCOREBOARD_STATUS, THREE_NUMBERS } from './_data'
 import { CardHead, ChartLead, Legend, StatusTag, Swatch, downloadHtml, esc, tick, tipLabel, tipStyle } from './_parts'
@@ -248,6 +249,7 @@ function Scoreboard() {
 // ─── Roadmap ─────────────────────────────────────────────────────────────
 
 function Roadmap() {
+  const reduce = useReduceMotion()
   const [sel, setSel] = useState(CURRENT)
   const r = RELEASES.find((x) => x.id === sel)!
   const idx = RELEASES.findIndex((x) => x.id === CURRENT)
@@ -292,7 +294,7 @@ function Roadmap() {
       </ol>
 
       <AnimatePresence mode="wait">
-        <motion.div key={r.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }} className="mt-5 grid gap-5 rounded-card border border-line p-5 md:grid-cols-[1fr_1fr]">
+        <motion.div key={r.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={brandTransition(reduce, 160)} className="mt-5 grid gap-5 rounded-card border border-line p-5 md:grid-cols-[1fr_1fr]">
           <div>
             <p className="flex items-center gap-2 text-ink-3"><Icon size={16} aria-hidden /><span className="eyebrow">{r.layer} · {r.when}</span></p>
             <p className="mt-2 text-[1.35rem] font-light text-ink">{r.id} · {r.name}</p>

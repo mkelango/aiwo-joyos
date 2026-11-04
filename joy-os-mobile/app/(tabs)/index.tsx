@@ -44,6 +44,7 @@ import type { Action, TermKey } from '@/shared/types'
 import { Rich, useA } from '@/screens/a/i18n'
 import { NoIndexYet, NotScored, monoNums, useIsSpecimen } from '@/screens/a/parts'
 import { useIsMinor } from '@/lib/minor'
+import { ReadAloud } from '@/screens/b/parts'
 
 // TODAY (Memo p.14, p.17, p.18; Playbook p62): the Index and Wheel, the lowest term, one
 // action, the circle's next call, Day N of 90 and the next measure date. One Daybreak button.
@@ -215,7 +216,7 @@ export default function Today() {
             </View>
           ) : null}
           <Body tone="ink2">
-            {previous && change !== null ? ta(change > 0 ? 'Up from {n}. Lowest term:' : change < 0 ? 'Down from {n}. Lowest term:' : 'Level with {n}. Lowest term:', { n: previous.value }) : ta('Your latest measure. Lowest term:')} <Body>{name(lowest.key)}</Body>{lang === 'hi' ? '।' : '.'}
+            {previous && change !== null ? monoNums(ta(change > 0 ? 'Up from {n}. Lowest term:' : change < 0 ? 'Down from {n}. Lowest term:' : 'Level with {n}. Lowest term:', { n: previous.value })) : ta('Your latest measure. Lowest term:')} <Body>{name(lowest.key)}</Body>{lang === 'hi' ? '।' : '.'}
           </Body>
 
           <Divider />
@@ -254,7 +255,7 @@ export default function Today() {
       {minor || hasIndex ? (
       <Card tone="sunk" style={{ gap: space.s2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s1, flexWrap: 'wrap' }}>
-          <Eyebrow tone="daybreak" style={{ flexShrink: 1 }}>{`${t('today')} · ${name(action.term)}`}</Eyebrow>
+          <Eyebrow color={c.vizBronze} style={{ flexShrink: 1 }}>{`${t('today')} · ${name(action.term)}`}</Eyebrow>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Icon name="clock" size={14} color={c.ink3} />
             <Meta tone="ink3" size={14}>
@@ -285,6 +286,8 @@ export default function Today() {
               <Icon name="info" size={16} color={c.ink2} />
               <Meta style={{ textDecorationLine: 'underline', flexShrink: 1 }}>{ta('Why this, today?')}</Meta>
             </Pressable>
+            {/* Voice-first (Settings · Accessibility): the one action, read aloud. Hidden while it is off. */}
+            <ReadAloud text={specimenAction ? tx(`${action.title.replace('.', '')}. *Notice* three things.`).replace(/\*/g, '') : `${tx(action.title)} ${tx(action.detail)}`} />
             <View style={{ gap: space.s1, marginTop: space.s1 }}>
               <DaybreakButton onPress={() => setActionState('done')} accessibilityHint={ta('Marks today’s action as done. You can undo it.')}>
                 {t('doneForToday')}

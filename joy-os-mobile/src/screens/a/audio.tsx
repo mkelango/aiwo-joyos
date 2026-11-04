@@ -18,6 +18,7 @@ import { monoNums } from './parts'
 // plays with no signal, a week not saved says it needs a connection, and a download pauses while
 // offline and carries on when the connection is back. The Practice tab's eight-week strip reads the
 // same record to mark the saved weeks and the storage they use.
+// The Letter plays its issues through this player too, streamed only: offlineToggle={false} drops the download.
 
 /** Megabytes a week's audio takes on the phone (the Mentor's audio at about 123 kbps). */
 export const audioMB = (seconds: number) => Math.round(seconds * 0.0154 * 10) / 10
@@ -36,7 +37,7 @@ export function useOfflineAudio() {
   return { weeks, set, step, ready }
 }
 
-export function AudioPlayer({ week, title, seconds, transcript, startAt = 0 }: { week: number; title: string; seconds: number; transcript: string[]; startAt?: number }) {
+export function AudioPlayer({ week, title, seconds, transcript, startAt = 0, offlineToggle = true }: { week: number; title: string; seconds: number; transcript: string[]; startAt?: number; offlineToggle?: boolean }) {
   const { c, space, radius } = useTheme()
   const t = useDict(PARTS)
   const { t: ta, lang } = useA()
@@ -110,7 +111,7 @@ export function AudioPlayer({ week, title, seconds, transcript, startAt = 0 }: {
           filled
           size={56}
           disabled={!canPlay}
-          hint={!canPlay ? ta('This week is not saved on this phone, so it needs a connection to play.') : undefined}
+          hint={!canPlay ? (offlineToggle ? ta('This week is not saved on this phone, so it needs a connection to play.') : t('issueNeedsSignal')) : undefined}
           onPress={() => {
             if (pos >= seconds) setPos(0)
             setPlaying((p) => !p)
@@ -134,7 +135,11 @@ export function AudioPlayer({ week, title, seconds, transcript, startAt = 0 }: {
         <View accessibilityLiveRegion="polite" style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
           <Icon name={saved ? 'check-circle' : 'wifi-off'} size={16} color={c.ink2} />
           <Meta tone="ink" style={{ flex: 1 }}>
-            {saved ? ta('You are offline. This week is saved on this phone, so it plays.') : ta('You are offline. This week is not saved on this phone, so it needs a connection to play.')}
+            {!offlineToggle
+              ? t('issueNeedsSignal')
+              : saved
+              ? ta('You are offline. This week is saved on this phone, so it plays.')
+              : ta('You are offline. This week is not saved on this phone, so it needs a connection to play.')}
           </Meta>
         </View>
       ) : null}
@@ -143,12 +148,14 @@ export function AudioPlayer({ week, title, seconds, transcript, startAt = 0 }: {
         <SmallPill label={`${rate}×`} a11y={t('speed', { rate })} onPress={() => setRate((r) => (r === 1 ? 1.25 : r === 1.25 ? 0.8 : 1))} mono />
         <SmallPill icon={showText ? 'chevron-up' : 'chevron-down'} label={t('transcript')} a11y={showText ? t('hideTranscript') : t('showTranscript')} onPress={() => setShowText((s) => !s)} />
       </View>
-      <View style={{ borderTopWidth: 1, borderTopColor: c.line, paddingTop: space.s2 }}>
-        {/* The status sits under the switch as its own line, so its numbers can be Mono and a
-            screen reader still hears it (a switch's hint takes plain text only). */}
-        <Toggle checked={kept} onChange={(v) => offline.set(week, v)} label={t('offline')} />
-        <Meta accessibilityLiveRegion="polite">{monoNums(status)}</Meta>
-      </View>
+      {offlineToggle ? (
+        <View style={{ borderTopWidth: 1, borderTopColor: c.line, paddingTop: space.s2 }}>
+          {/* The status sits under the switch as its own line, so its numbers can be Mono and a
+              screen reader still hears it (a switch's hint takes plain text only). */}
+          <Toggle checked={kept} onChange={(v) => offline.set(week, v)} label={t('offline')} />
+          <Meta accessibilityLiveRegion="polite">{monoNums(status)}</Meta>
+        </View>
+      ) : null}
       {showText ? (
         <View style={{ backgroundColor: c.paperSunk, borderRadius: radius.card, padding: space.s2, gap: space.s1 }}>
           <Eyebrow>{t('transcriptFollows')}</Eyebrow>

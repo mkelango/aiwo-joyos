@@ -10,6 +10,7 @@ import { INDEX_HISTORY } from '@/data/member'
 import { TERMS, termByKey } from '@/data/terms'
 import { FIVE, METHODS, geometricMean } from '@/domain/indexEngine'
 import type { MethodVersion, TermKey } from '@/domain/types'
+import { brandTransition, useReduceMotion } from '@/lib/motion'
 import { CLAIMS_LOG, COUNCIL_REVIEW, DATA_REQUESTS, INSTRUMENT_LICENCE, GOLDEN_CASES, JOY_REPORT, METHOD_SIGNER_ROLES, METHOD_V10_META, MIN_ITEMS, NEEDS_CITATION, REFUSED, RESEARCH, SIGNERS, TERM_VARS, WEIGHTS_V10, WEIGHTS_V11_PROPOSAL, type WeightSet } from './_data'
 import { PreviewBanner, useConsoleAccess } from '../care/_gate'
 import { AccessNote, CanActProvider, CardHead, ChartLead, Field, Kpi, ScrollTabs, StatusTag, areaCls, fieldCls, pct, tabPanelProps, tick, tipLabel, tipStyle, useCanAct, useTabParam } from './_parts'
@@ -68,6 +69,7 @@ function useDraft() {
 type Draft = ReturnType<typeof useDraft>
 
 export default function Science() {
+  const reduce = useReduceMotion()
   const [tab, setTab] = useTabParam(TABS, 'methods')
   const [focusDraft, setFocusDraft] = useState(0)
   // Set by the header action; Methods scrolls to the draft once it has mounted, then clears it.
@@ -130,7 +132,7 @@ export default function Science() {
 
       <CanActProvider value={canAct}>
       <AnimatePresence mode="wait">
-        <motion.div key={tab} {...tabPanelProps('sci', tab)} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+        <motion.div key={tab} {...tabPanelProps('sci', tab)} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={brandTransition(reduce, 180)}>
           {tab === 'methods' && <Methods focusKey={focusDraft} scrollRequest={scrollToDraft} d={draft} />}
           {tab === 'instruments' && <Instruments rows={instRows} onConfirm={(code, ref) => setInst((x) => ({ ...x, [code]: { status: 'live', licence: 'Confirmed in writing · 28 Jan 2027', ref } }))} />}
           {tab === 'cohorts' && <Cohorts redesign={redesign} setRedesign={setRedesign} />}
@@ -245,6 +247,7 @@ function MethodJson({ v, d }: { v: 'v1.0' | 'v1.1'; d: Draft }) {
 }
 
 function Methods({ focusKey, scrollRequest, d }: { focusKey: number; scrollRequest: MutableRefObject<boolean>; d: Draft }) {
+  const reduce = useReduceMotion()
   const { weights, setWeights, lambda, setLambda, tests, runTests, touch, signed, setSigned, published, setPublished } = d
   const [term, setTerm] = useState<TermKey>('H')
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -521,7 +524,7 @@ function Methods({ focusKey, scrollRequest, d }: { focusKey: number; scrollReque
                     <td className="num py-3 pr-4 text-right text-ink">{show ? exp ?? 'null' : tests === 'running' ? '…' : '·'}</td>
                     <td className="num py-3 pr-4 text-right text-ink">{show ? draft ?? 'null' : tests === 'running' ? '…' : '·'}</td>
                     <td className="py-3 pr-4">
-                      {show ? <StatusTag tone="ok">Pass</StatusTag> : tests === 'running' ? <motion.span className="eyebrow text-ink-3" animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1, repeat: Infinity, delay: idx * 0.05 }}>running</motion.span> : <span className="eyebrow text-ink-3">not run</span>}
+                      {show ? <StatusTag tone="ok">Pass</StatusTag> : tests === 'running' ? <motion.span className="eyebrow text-ink-3" initial={{ opacity: reduce ? 0 : 0.4 }} animate={{ opacity: reduce ? 1 : [0.4, 1, 0.4] }} transition={reduce ? brandTransition(true) : { duration: 1, repeat: Infinity, delay: idx * 0.05 }}>running</motion.span> : <span className="eyebrow text-ink-3">not run</span>}
                     </td>
                   </tr>
                 )

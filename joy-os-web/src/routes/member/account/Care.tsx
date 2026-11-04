@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, ArrowUpRight, CalendarClock, Check, ChevronDown, FileSignature, FlaskConical, Info, MapPin, MessageCircle, Mic, MicOff, PhoneOff, Pill as PillIcon, ShieldCheck, Stethoscope, Video, VideoOff } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -10,6 +10,7 @@ import { CARE_LADDER, CLINICIANS, CONSULTS, ERX, PAST_CONSULTS, PEOPLE_DETAIL, R
 import { Checkbox, Field, LinkButton, Section, Segmented, Select, TeleManasStrip } from './_parts'
 import { inputCls, nums, rich, useMemberProfile, usePersisted, useToast } from './_util'
 import { useDict } from '@/lib/i18n'
+import { brandTransition, useReduceMotion } from '@/lib/motion'
 import { CARE, useData } from './_i18n'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { ReadAloud, SpeakAnswer } from './_voice'
@@ -27,6 +28,7 @@ const ALT_SLOTS = ['Fri 5 Feb · 17:30', 'Mon 8 Feb · 18:00', 'Thu 11 Feb · 09
 
 export default function Care() {
   const t = useDict(CARE)
+  const reduce = useReduceMotion()
   const dx = useData()
   const [toast, showToast] = useToast()
   const [bookFor, setBookFor] = useState<(typeof CLINICIANS)[number] | null>(null)
@@ -112,7 +114,7 @@ export default function Care() {
           <ul className="space-y-4">
             <AnimatePresence initial={false}>
             {consults.map((c) => (
-                <motion.li key={c.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+                <motion.li key={c.id} layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={brandTransition(reduce, 200)}>
                 <Card>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
@@ -255,7 +257,7 @@ const RUNG_NEXT: Record<string, { label: string; to?: string; find?: 'Psychologi
 function CareLadder({ onFind }: { onFind: (r: 'Psychologist' | 'Physician') => void }) {
   const t = useDict(CARE)
   const dx = useData()
-  const reduce = useReducedMotion()
+  const reduce = useReduceMotion()
   const nav = useNavigate()
   const hereIdx = CARE_LADDER.findIndex((r) => r.status === 'here')
   const [sel, setSel] = useState<string>(CARE_LADDER[hereIdx].key)
@@ -281,10 +283,10 @@ function CareLadder({ onFind }: { onFind: (r: 'Psychologist' | 'Physician') => v
             return (
               <motion.li
                 key={r.key}
-                initial={reduce ? false : { opacity: 0, y: 12 }}
+                initial={reduce ? { opacity: 0 } : { opacity: 0, y: 12 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.24, delay: reduce ? 0 : i * 0.05 }}
+                transition={brandTransition(reduce, 240, i * 50)}
                 className="flex flex-1 flex-col"
                 aria-current={here ? 'step' : undefined}
               >
@@ -308,7 +310,7 @@ function CareLadder({ onFind }: { onFind: (r: 'Psychologist' | 'Physician') => v
         </ol>
         <div className="hidden border-t border-line md:block" />
         <AnimatePresence mode="wait">
-          <motion.div key={rung.key} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }} className="hidden items-center justify-between gap-6 pt-5 md:flex" aria-live="polite">
+          <motion.div key={rung.key} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={brandTransition(reduce, 160)} className="hidden items-center justify-between gap-6 pt-5 md:flex" aria-live="polite">
             <div>
               <p className="eyebrow text-ink-3">{statusText(rung.status)} · {dx(rung.name)}</p>
               <p className="mt-1 text-[16px] text-ink">{nums(dx(rung.what))}</p>

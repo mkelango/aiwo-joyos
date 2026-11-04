@@ -13,6 +13,7 @@ import { FIVE, METHODS, bandFor, joyspanIndex } from '@/domain/indexEngine'
 import type { MethodVersion, TermKey, TermScore } from '@/domain/types'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
 import { COHORT_TERMS } from './_data'
+import { SIGNERS } from '@/routes/console/biz/_data'
 import { formulaText } from '@/routes/member/core/_extra'
 import { E, MT, regTx } from './_i18n'
 import { JoyspanCredit, LMethodLine, LSpecimenTag, LTermChip, Section, SpecimenScores, nums, rich, useBand, useFmtDate } from './_parts'
@@ -25,6 +26,9 @@ import { JoyspanCredit, LMethodLine, LSpecimenTag, LTermChip, Section, SpecimenS
 
 const WORKED = INDEX_HISTORY[0]
 const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
+
+/** Each Science Office signer's role, in the member's language. */
+const SIGNER_ROLE = { s1: 'sigHead', s2: 'sigMedical' } as const
 
 const NAV = ['formula', 'grades', 'terms', 'instruments', 'versions', 'commitments', 'signals', 'ai', 'results'] as const
 
@@ -421,7 +425,7 @@ function VersionsSection() {
   const fmt = useFmt()
   return (
     <Section id="versions" eyebrow={t('vEyebrow')} title={<>{rich(t('vTitle'), { em: <em>{t('vTitleEm')}</em> })}</>} lead={t('vLead')}>
-      <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
+      <div className="grid gap-6 2xl:grid-cols-[1.3fr_1fr]">
         <Card className="min-w-0">
           <DataTable
             caption={t('vCaption')}
@@ -433,6 +437,12 @@ function VersionsSection() {
               { key: 'lambda', header: 'λ', align: 'right', render: ([, m]) => <span className="num">{m.lambda.toFixed(2)}</span> },
               { key: 'pub', header: t('colPublished'), render: ([, m]) => <span className="num whitespace-nowrap text-ink-2">{fmt(m.published)}</span> },
               { key: 'status', header: t('colStatus'), render: ([v, m]) => <Pill tone={m.status === 'In use' ? 'positive' : 'neutral'}>{nums(lang === 'en' ? m.status : t(`ms_${v}`))}</Pill> },
+              // Two people sign a method before it is published; a planned version has no signers yet.
+              { key: 'signed', header: t('colSigned'), className: 'min-w-[176px]', render: ([, m]) => m.status === 'In use' ? (
+                <ul className="space-y-1">
+                  {SIGNERS.map((s) => <li key={s.id}><span className="block text-ink">{s.name}</span><span className="block text-[13px] text-ink-3">{t(SIGNER_ROLE[s.id as keyof typeof SIGNER_ROLE])}</span></li>)}
+                </ul>
+              ) : <span className="text-ink-3">{t('sigNone')}</span> },
             ]}
           />
         </Card>

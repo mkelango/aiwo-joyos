@@ -8,6 +8,7 @@ export const NOTIF = {
   titleB: { en: '.', ta: '.', hi: '।' },
   lead: { en: 'At most three a day, never in your quiet hours. A fall in your Index is never sent here; a person tells you.', ta: 'நாளுக்கு அதிகபட்சம் மூன்று, உங்கள் அமைதி நேரத்தில் ஒருபோதும் இல்லை. குறியீடு குறைந்தால் அது இங்கே ஒருபோதும் அனுப்பப்படாது; ஒரு மனிதர் உங்களிடம் சொல்வார்.', hi: 'दिन में ज़्यादा से ज़्यादा तीन, शांत समय में कभी नहीं। इंडेक्स गिरने की ख़बर यहाँ कभी नहीं आती; कोई इंसान आपको बताता है।' },
   notOpened: { en: '{n} not yet opened', ta: '{n} இன்னும் திறக்கப்படவில்லை', hi: '{n} अभी नहीं खोले' },
+  readUnread: { en: 'Read the unread aloud', ta: 'படிக்காதவற்றை உரக்க வாசிக்கவும்', hi: 'न पढ़ी गई सूचनाएँ पढ़कर सुनाएँ' },
   allRead: { en: 'All read', ta: 'அனைத்தும் படிக்கப்பட்டன', hi: 'सब पढ़ लिए' },
   markAll: { en: 'Mark all read', ta: 'அனைத்தையும் படித்ததாகக் குறி', hi: 'सबको पढ़ा हुआ करें' },
   clear: { en: 'Clear', ta: 'அழி', hi: 'हटाएँ' },

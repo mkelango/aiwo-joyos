@@ -63,8 +63,9 @@ function Passport() {
   const account = useAccount()
   const pp = passportFor(account.id, account.aiwoId)
   const isArjun = account.id === 'arjun'
-  // Circle membership is the specimen member's; Plus features come with Plus or Patron.
-  const opens = PASSPORT.entitlements.filter((e) => (e.needs === 'circle' ? isArjun : acct.plan !== 'Free'))
+  // Circle membership is the specimen member's, or the plan where the account bought it; Plus
+  // features come with any paid plan.
+  const opens = PASSPORT.entitlements.filter((e) => (e.needs === 'circle' ? isArjun || acct.plan === 'Circle' : acct.plan !== 'Free'))
   const tc = useCommon()
   const tx = useTx()
   const tg = useT()
@@ -267,12 +268,13 @@ function Passport() {
             {opens.map((e, i) => {
               const et = ENTITLEMENT_TEXT[e.label]
               // Arjun's circle meets on Mondays with Priya; another account's starts with its Index
-              // and asking to join in Circles.
-              const detail = !isArjun && e.label === 'Circle of eight' ? (minor ? t('circleMinor') : !latest ? t('circleToForm') : acct.circleRequests?.next ? t('circleAsked', { c: CONCIERGE }) : t('circleAskNow')) : tx(et?.detail, e.detail)
+              // and asking to join in Circles. His Day 76 re-measure and his counts are his alone.
+              const detail = !isArjun && e.label === 'Circle of eight' ? (minor ? t('circleMinor') : !latest ? t('circleToForm') : acct.circleRequests?.next ? t('circleAsked', { c: CONCIERGE }) : t('circleAskNow')) : !isArjun && e.label === 'Quarterly Index' ? (minor ? t('quarterlyMinor') : t('quarterlyOwn')) : tx(et?.detail, e.detail)
+              const used = e.label === 'Joyspan Sessions' ? t('booked', { n: Math.min(4, (isArjun ? 1 : 0) + acct.bookings.length) }) : isArjun && e.used ? tx(et?.used, e.used) : null
               return (
               <KeyValue key={e.label} k={tx(et?.label, e.label)} last={i === opens.length - 1}>
                 <Meta tone="ink">
-                  <MonoNums text={e.used ? `${detail} · ${e.label === 'Joyspan Sessions' ? t('booked', { n: Math.min(4, 1 + acct.bookings.length) }) : tx(et?.used, e.used)}` : detail} />
+                  <MonoNums text={used ? `${detail} · ${used}` : detail} />
                 </Meta>
               </KeyValue>
               )

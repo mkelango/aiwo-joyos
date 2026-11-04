@@ -1,13 +1,14 @@
 import { router } from 'expo-router'
 import { useState } from 'react'
 import { View } from 'react-native'
-import { BandLabel, Body, Card, CountUp, DaybreakButton, Divider, Eyebrow, Icon, JoyspanEquation, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Serif, SpecimenTag, TermDot, Title } from '@/components'
+import { BandLabel, Body, Card, CountUp, DaybreakButton, Divider, Eyebrow, Icon, JoyspanEquation, Meta, Mono, Pill, Screen, ScreenHeader, SectionTitle, Serif, SpecimenTag, TermDot, Title, fmtDate } from '@/components'
 import { METHODS, bandFor, joyspanIndex, lowestTerm } from '@/shared/indexEngine'
 import { INSTRUMENTS } from '@/shared/platform'
 import { TERMS, termByKey } from '@/shared/terms'
 import type { MethodVersion, TermKey, TermScore } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { AI_LIMITS, DISPLAY_RULES, GRADES, NEVER_IMPORTED } from '@/screens/b/_data'
+import { METHOD_SIGNERS } from '@/screens/b/entryData'
 import { CheckLine, IconButton, ORDER } from '@/screens/b/parts'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
 import { METHOD, GRADE_TEXT, RULES_TEXT, NEVER_TEXT, AI_TEXT, LICENCE_TEXT, METHOD_LABEL, INSTR_TEXT, PART_TEXT } from '@/screens/b/i18n/method'
@@ -16,7 +17,7 @@ import { MonoNums } from '@/lib/monoNums'
 
 // THE METHOD (Memo p.10): the formula, a live worked example run through the same engine as
 // your Index, the three grades, the instrument registry with licences, method versions,
-// display rules, what is never imported, and the AI's limits. One Daybreak: try it yourself.
+// who signed each version, display rules, what is never imported, and the AI's limits. One Daybreak: try it yourself.
 // The six terms show their framework, within-term weights (the published formula) and
 // instruments, matching the web Method page.
 
@@ -234,6 +235,21 @@ export default function Method() {
                   </Meta>
                 </View>
                 <Pill tone={v === 'v1.0' ? 'ink' : 'neutral'}>{v === 'v1.0' ? t('current') : v === 'v1.1' ? t('calibrating') : t('planned')}</Pill>
+              </View>
+              <View style={{ gap: 2, paddingBottom: 12 }}>
+                {METHOD_SIGNERS[v] ? (
+                  <>
+                    <Eyebrow size={11}>{t('signedBy')}</Eyebrow>
+                    {METHOD_SIGNERS[v].map((s) => (
+                      <Meta key={s.name} size={14}>
+                        {`${s.name}, ${s.role === 'medical' ? t('roleMedical') : t('roleHead')} · `}
+                        <Mono size={14} tone="ink2">{fmtDate(s.on, lang)}</Mono>
+                      </Meta>
+                    ))}
+                  </>
+                ) : (
+                  <Meta size={14} tone="ink3">{t('notSigned')}</Meta>
+                )}
               </View>
             </View>
           ))}

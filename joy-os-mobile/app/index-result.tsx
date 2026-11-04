@@ -173,7 +173,7 @@ function IndexResult() {
 
       {measured ? (
         <Card tone="soft" style={{ gap: space.s1 }}>
-          <Eyebrow tone="daybreak">{t('phoneMeasured', { date: fmtDate(measured.at) })}</Eyebrow>
+          <Eyebrow>{t('phoneMeasured', { date: fmtDate(measured.at) })}</Eyebrow>
           <Meta><MonoNums text={t('phoneBody')} /></Meta>
           {submitted && submitted.amendments.length ? <Meta tone="ink"><MonoNums text={t('corrected', { n: submitted.amendments.length })} /></Meta> : null}
           <ArrowLink icon="edit-3" onPress={() => router.push('/index-take?amend=1')}>
@@ -210,7 +210,7 @@ function IndexResult() {
 
       {rm.stage === 'awaiting' ? (
         <Card tone="sunk" style={{ gap: space.s1 }}>
-          <Eyebrow tone="daybreak">{t('awaitEyebrow')}</Eyebrow>
+          <Eyebrow>{t('awaitEyebrow')}</Eyebrow>
           <Meta tone="ink"><MonoNums text={t('awaitBody')} /></Meta>
           <ArrowLink icon="clock" onPress={() => router.push('/day-90')}>
             {t('awaitLink')}
@@ -338,7 +338,7 @@ function IndexResult() {
               </Meta>
             ) : detail.signalSources.length ? (
               <Meta size={14} tone="ink3">
-                {detail.signalSources.map(ax).join(' · ')}
+                <MonoNums text={detail.signalSources.map(ax).join(' · ')} />
               </Meta>
             ) : (
               <Meta size={14} tone="ink3">
@@ -411,7 +411,7 @@ function IndexResult() {
       {/* The lowest term, and one concrete next step */}
       {nextStep ? (
         <Card tone="sunk" style={{ gap: space.s2 }}>
-          <Eyebrow tone="daybreak" {...H2}>{t('nextEyebrow', { space: tt.space(low) })}</Eyebrow>
+          <Eyebrow color={c.vizBronze} {...H2}>{t('nextEyebrow', { space: tt.space(low) })}</Eyebrow>
           <Body size={20}><MonoNums text={t('lowestIs', { name: tt.name(low), v: `${low === 'B' ? '−' : ''}${lowScore.value}` })} /></Body>
           <Card tone="raised" style={{ gap: space.s1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
@@ -505,7 +505,7 @@ function IndexResult() {
                   <View style={{ flex: 1, gap: 2 }}>
                     <Body><MonoNums text={fmtDate(h.takenOn)} /></Body>
                     <Meta size={14} tone="ink3">
-                      {h.id === 'ix_phone' ? t('onPhone') : h.grade === 'clinical' ? t('clinicalSigned', { by: h.signedBy ?? '' }) : t('indexGrade')} · {methodOf(h)} · <Mono size={14} tone="ink3">{h.engineBuild.replace('engine ', '')}</Mono>
+                      {h.id === 'ix_phone' ? t('onPhone') : h.grade === 'clinical' ? t('clinicalSigned', { by: h.signedBy ?? '' }) : t('indexGrade')} · <MonoNums text={methodOf(h)} /> · <Mono size={14} tone="ink3">{h.engineBuild.replace('engine ', '')}</Mono>
                       {h.surveyOnly ? ` · ${t('historySurvey')}` : ''}
                     </Meta>
                   </View>
@@ -567,7 +567,7 @@ function IndexResult() {
         <ArrowLink icon="file-text" onPress={() => router.push('/day-40')}>
           {t('day40Link')}
         </ArrowLink>
-        <ArrowLink icon="mail" onPress={() => router.push('/letter')}>
+        <ArrowLink joyIcon="letter" onPress={() => router.push('/letter')}>
           {t('letterLink')}
         </ArrowLink>
       </Card>

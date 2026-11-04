@@ -9,6 +9,7 @@ import { Button, Card, EmptyState, PageHeader, Pill, Sheet } from '@/components/
 import { DEVICES, HEALTHKIT_TYPES, WEAR_NIGHTS, type DeviceState } from './_data'
 import { Checkbox, Section, Toggle } from './_parts'
 import { fmtShortDate, nums, rich, usePersisted, useToast } from './_util'
+import { brandTransition, useReduceMotion } from '@/lib/motion'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
 import { DEV, useData } from './_i18n'
 import { finishedOnboarding } from './_onboarding'
@@ -345,6 +346,7 @@ function QualityRow({ label, value, note, ok }: { label: string; value: string; 
 
 function ConnectSheet({ device, onClose, onConnected }: { device: Device | null; onClose: () => void; onConnected: (d: Device, purposes: DevicePurpose[]) => void }) {
   const t = useDict(DEV)
+  const reduce = useReduceMotion()
   const tt = useTermText()
   const [purposes, setPurposes] = useState({ body: true, ease: true })
   const [step, setStep] = useState<'consent' | 'redirect'>('consent')
@@ -372,7 +374,7 @@ function ConnectSheet({ device, onClose, onConnected }: { device: Device | null;
         </div>
       )}
       {device && step === 'redirect' && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-4 py-6 text-center">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={brandTransition(reduce)} className="flex flex-col items-center gap-4 py-6 text-center">
           <DeviceIcon id={device.id} />
           <p className="text-[17px] text-ink">{device.id === 'apple' ? t('iosAsk') : t('vendorSignIn', { name: device.name })}</p>
           <p className="text-[14px] text-ink-2">{t('vendorSpecimen')}</p>

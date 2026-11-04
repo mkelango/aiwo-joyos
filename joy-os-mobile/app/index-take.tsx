@@ -515,7 +515,7 @@ function TakeIndex() {
         ) : null}
         {resuming ? (
           <Card tone="soft" style={{ gap: space.s1 }} >
-            <Eyebrow tone="daybreak">{t('kept')}</Eyebrow>
+            <Eyebrow>{t('kept')}</Eyebrow>
             <Progress value={answered} max={items.length} color={c.ink} label={t('answeredOf', { n: answered, total: items.length })} />
             <Meta>
               <Mono size={15} tone="ink">{t('nOfTotal', { n: answered, total: items.length })}</Mono>{t('nothingSent')}

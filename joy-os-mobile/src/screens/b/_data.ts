@@ -1,6 +1,8 @@
 // Lane B specimen data for sign-in, notifications, membership and the method page.
 // SPECIMEN — not a real member, not real credentials.
 
+import { MEMBERSHIPS } from '@/shared/platform'
+
 /** The specimen one-time code. Any other six digits is "wrong" so the error path can be seen. */
 export const SPECIMEN_OTP = '246810'
 export const SPECIMEN_AIWO_ID = 'AIWO-7F3K-22Q9'
@@ -36,9 +38,17 @@ export const NOTICES: Notice[] = [
   { id: 'n6', group: 'Earlier', kind: 'letter', title: 'The Joyspan Letter · Winter', body: 'Published results, up and down, and what we changed.', at: '15 Jan', date: '2027-01-15', href: '/method', cta: 'Read the method' },
 ]
 
+/** A yearly tier of the shared ladder (MEMBERSHIPS), its price in rupees: ₹1.5 L is 1,50,000. */
+const tier = <K extends 'Circle' | 'Clinical'>(key: K) => {
+  const m = MEMBERSHIPS.find((x) => x.name === key)!
+  return { key, name: m.name, price: Number(m.price.replace(/[^\d.]/g, '')) * 100000, cadence: m.cadence, points: m.points }
+}
+
 export const PLANS = [
   { key: 'Free' as const, name: 'Joy OS', price: 0, cadence: 'free', points: ['Self-assessed Index', 'Joy Ledger', 'One practice', 'Trust centre'] },
   { key: 'Plus' as const, name: 'Joy OS Plus', price: 499, cadence: '/ month', points: ['All six spaces in full', 'Devices and signals', 'The Joyspiration Practice', 'Circle of eight'] },
+  tier('Circle'),
+  tier('Clinical'),
   { key: 'Patron' as const, name: 'Patron', price: 1200000, cadence: '/ year', points: ['Household of up to six', 'Annual ’cation', 'Family Joy Charter', 'Priority Houses and Residences'] },
 ]
 

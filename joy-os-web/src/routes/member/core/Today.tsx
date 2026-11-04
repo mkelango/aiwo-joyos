@@ -169,7 +169,7 @@ export default function Today() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1.25fr_1fr] lg:gap-8">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[1.25fr_1fr] lg:gap-8">
       <h1 className="sr-only">{t('today')}</h1>
       {/* The Index — the largest element on the screen */}
       <Card className="relative overflow-hidden lg:row-span-2" tone="raised">

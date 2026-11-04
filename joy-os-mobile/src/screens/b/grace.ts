@@ -35,11 +35,12 @@ export function renewalOf(acct: Pick<AccountState, 'plan' | 'planSince' | 'billi
     plan.key === 'Free' || !reached
       ? null
       : yearly
-        ? { id: `INV-${renewYear}-000017`, date: renews, item: `Patron · ${renewYear}–${renewYear + 1}`, total: plan.price, method: 'Razorpay link', status: 'Unpaid' }
+        ? { id: `INV-${renewYear}-000017`, date: renews, item: `${plan.name} · ${renewYear}–${renewYear + 1}`, total: plan.price, method: 'Razorpay link', status: 'Unpaid' }
         : { id: FEB_INVOICE, date: FEB_DUE, item: 'Joy OS Plus · February', total: plan.price, method: 'UPI', status: 'Retrying' }
   const billing: Billing = acct.billing ?? 'razorpay'
-  const storeBilled = billing !== 'razorpay' && acct.plan === 'Plus' ? billing : null
-  const hasMethod = !!storeBilled || !!UPI_ON_FILE[id]
+  const storeBilled = (billing === 'app-store' || billing === 'google-play') && acct.plan === 'Plus' ? billing : null
+  const stripeBilled = billing === 'stripe' && acct.plan !== 'Free'
+  const hasMethod = !!storeBilled || stripeBilled || !!UPI_ON_FILE[id]
   return {
     plan,
     yearly,
@@ -48,6 +49,7 @@ export function renewalOf(acct: Pick<AccountState, 'plan' | 'planSince' | 'billi
     overdue,
     graceUntil: yearly ? addDays(renews, GRACE_DAYS) : GRACE_UNTIL,
     storeBilled,
+    stripeBilled,
     hasMethod,
     canGrace: !!overdue && hasMethod,
     // Once the renewal is paid the grace state is over; the demo switch can no longer bring it back.

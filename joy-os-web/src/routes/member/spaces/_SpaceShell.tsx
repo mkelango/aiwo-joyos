@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, BookOpen, Check, Clock, Copy, MapPin, ShieldCheck, Sparkles } from 'lucide-react'
 import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
@@ -7,6 +7,7 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'rec
 import { BandLabel, Delta, Eyebrow, MethodLine, SpecimenTag } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill } from '@/components/ui'
 import { INDEX_HISTORY } from '@/data/member'
+import { expandFade, useReduceMotion, useRiseFade } from '@/lib/motion'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { CATIONS, PRACTICE_WEEKS } from '@/data/platform'
 import { termByKey, termColor } from '@/data/terms'
@@ -104,11 +105,11 @@ export function rovingRadio<V>(options: readonly V[], value: V, onChange: (v: V)
   })
 }
 
-/** Fade-in wrapper; ≤240ms, respects reduced motion. */
+/** Rise-in wrapper, 240 ms. Under reduced motion (the OS setting or the app's own) a 120 ms fade. */
 export function Reveal({ children, className, delay = 0 }: { children: ReactNode; className?: string; delay?: number }) {
-  const reduce = useReducedMotion()
+  const fade = useRiseFade(delay * 1000)
   return (
-    <motion.div className={className} initial={reduce ? false : { y: 8 }} animate={{ y: 0 }} transition={{ duration: 0.24, delay }}>
+    <motion.div className={className} {...fade}>
       {children}
     </motion.div>
   )
@@ -328,6 +329,7 @@ function ThreeActions({ term }: { term: TermKey }) {
   const { t: tx, tt, dn } = useSpaceText()
   const [added, setAdded] = useSpaceState<Record<string, boolean>>(`actions.${term}.added.v1`, {})
   const [open, setOpen] = useState<string | null>(null)
+  const reduce = useReduceMotion()
   const todayId = useTodayActionId()
   // Calendar-derived reasons wait for a connected calendar (see _data WHY_NO_CAL).
   const calendar = useCalendarConnected()
@@ -352,7 +354,7 @@ function ThreeActions({ term }: { term: TermKey }) {
                 </p>
                 <AnimatePresence initial={false}>
                   {open === a.id && (
-                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
+                    <motion.div {...expandFade(reduce, 200)} className="overflow-hidden">
                       <p className="mt-3 rounded-xl bg-paper-sunk p-3 text-[14px] text-ink-2"><b className="font-medium text-ink">{dn(actionWhy(a, calendar))}</b> {dn(a.evidence)}</p>
                     </motion.div>
                   )}
@@ -555,7 +557,7 @@ function VivaTool({ term }: { term: TermKey }) {
                 <p className="eyebrow text-ink-3">{tx('sh.drafting')}</p>
               ) : (
                 <>
-                  <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24 }} className="rounded-2xl rounded-bl-md bg-paper-raised p-4">
+                  <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl rounded-bl-md bg-paper-raised p-4">
                     <p className="text-[15px] leading-relaxed text-ink">{mono(turn.text)}</p>
                     <p className="eyebrow mt-3 break-words text-ink-3">{mono(turn.by)}</p>
                     {turn.link && (turn.link.to
@@ -653,6 +655,12 @@ export function SpaceShell({ term, title, headerActions, children }: { term: Ter
           <div className="flex lg:col-span-4"><PracticeLink term={term} /></div>
         </div>
       </section>
+      {/* Privacy is one tap from every room, at any width (Playbook p62). */}
+      <footer className="mt-10 border-t border-line pt-3">
+        <Link to="/app/trust" className="inline-flex min-h-11 items-center gap-2 rounded text-[14px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring">
+          <ShieldCheck size={15} className="shrink-0" aria-hidden /> {tx('sh.privacy')} <ArrowRight size={14} className="shrink-0" aria-hidden />
+        </Link>
+      </footer>
     </div>
   )
 }

@@ -7,6 +7,7 @@ import { DaybreakButton, Delta, Eyebrow, SpecimenTag, TermDot } from '@/componen
 import { Button, Card, PageHeader, Pill } from '@/components/ui'
 import { termByKey, termColor } from '@/data/terms'
 import type { TermKey } from '@/domain/types'
+import { brandTransition, useReduceMotion } from '@/lib/motion'
 import { ARRIVALS, BLOCK_LIBRARY, GUEST_INVITATIONS, ITINERARY_TEMPLATES, PACKAGES, PASSES, RECEIVABLES, SIGNAL_POINTS, VENUE, VENUE_COHORTS, WEBHOOKS, WEBHOOK_EVENTS, ZONES, type GuestInvitation } from './_data'
 import { PreviewBanner, useConsoleAccess } from './_gate'
 import { Invitations, type ApiLog } from './_invitations'
@@ -164,6 +165,7 @@ function Floor({ arrivals, setArrivals, devices, setDevices, now, canAct, onEven
   canAct: boolean
   onEvent: Deliver
 }) {
+  const reduce = useReduceMotion()
   // Passes scanned in earlier start in the zone they are in (part of the specimen zone counts);
   // any other scanned pass is checked in but not in a zone right now.
   const [passes, setPasses] = usePartnerField<Pass[]>('passes', () => PASSES.map((p) => ({ ...p, inZone: p.checkedIn ? (SEED_ZONE[p.code] ?? null) : null })))
@@ -317,7 +319,7 @@ function Floor({ arrivals, setArrivals, devices, setDevices, now, canAct, onEven
           </form>
           <AnimatePresence>
             {result && (
-              <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} role="status" className={clsx('mt-3 flex items-start gap-2 rounded-lg px-3 py-2.5 text-[14px]', result.ok ? 'bg-ink text-paper' : 'border border-line-strong bg-paper-raised text-ink')}>
+              <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={brandTransition(reduce)} role="status" className={clsx('mt-3 flex items-start gap-2 rounded-lg px-3 py-2.5 text-[14px]', result.ok ? 'bg-ink text-paper' : 'border border-line-strong bg-paper-raised text-ink')}>
                 {result.ok && <Check size={15} className="mt-0.5 shrink-0" aria-hidden />}{result.msg}
               </motion.p>
             )}
@@ -376,6 +378,7 @@ const planFor = (cation: string, gid: string, eta: string): Plan => ({
 })
 
 function Itinerary({ now, canAct, onPublish }: { now: number; canAct: boolean; onPublish: (guest: string, v: number) => boolean }) {
+  const reduce = useReduceMotion()
   const guests = ARRIVALS
   const [guestId, setGuestId] = useState(guests[0].id)
   const guest = guests.find((g) => g.id === guestId)!
@@ -528,7 +531,7 @@ function Itinerary({ now, canAct, onPublish }: { now: number; canAct: boolean; o
           </DaybreakButton>
           <AnimatePresence>
             {justPublished && plan.published && (
-              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mt-3 flex items-start gap-2 text-[14px] text-ink" role="status">
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={brandTransition(reduce)} className="mt-3 flex items-start gap-2 text-[14px] text-ink" role="status">
                 <Check size={15} className="mt-0.5 shrink-0" aria-hidden />
                 <span>
                   Published v<span className="num">{plan.published.v}</span> for room <span className="num">{guest.room}</span> at <span className="num">{plan.published.at}</span>.{' '}

@@ -1,7 +1,7 @@
 import { router } from 'expo-router'
 import * as Device from 'expo-device'
 import { Platform, View } from 'react-native'
-import { ArrowLink, Body, Button, Card, DaybreakButton, Divider, Eyebrow, Icon, Meta, Screen, ScreenHeader, Serif, Toggle } from '@/components'
+import { ArrowLink, Body, Button, Card, DaybreakButton, Divider, Eyebrow, Icon, JoyIcon, Meta, Screen, ScreenHeader, Serif, Toggle } from '@/components'
 import { useDict } from '@/lib/i18n'
 import { useApp } from '@/lib/store'
 import { H2 } from '@/screens/a/local'
@@ -42,6 +42,13 @@ export default function DeviceSecurity() {
           </>
         }
         lead={<Body tone="ink2"><MonoNums text={t('lead')} /></Body>}
+        right={
+          // The Joy OS icon, the phone it lives on, with its label (Playbook p51).
+          <View style={{ alignItems: 'center', gap: 2 }}>
+            <JoyIcon name="joyos" size={28} />
+            <Eyebrow size={11}>Joy OS</Eyebrow>
+          </View>
+        }
       />
 
       <Card tone="raised" style={{ gap: space.s1 }}>

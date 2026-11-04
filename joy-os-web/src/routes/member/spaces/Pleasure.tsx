@@ -7,6 +7,7 @@ import { DaybreakButton, Eyebrow, SpecimenTag } from '@/components/joy/primitive
 import { Button, Sheet } from '@/components/ui'
 import { SPECIMEN_TODAY, addDays, liveLedger, useLedgerRemoved, weekCounts, weekEntryCount } from '@/routes/member/core/_store'
 import { useA11yPrefs } from '@/routes/member/account/_prefs'
+import { expandFade, growFade, useReduceMotion } from '@/lib/motion'
 import { useApp } from '@/lib/store'
 import { FILMS, PLANNED_START, SAVOURING_PROMPTS, weekTop } from './_data'
 import { CopyDetails, SpaceShell, ToolCard, rovingRadio, thisWeek, useCrisisGuard, Toggle } from './_SpaceShell'
@@ -42,6 +43,7 @@ export default function Pleasure() {
 // ─── Ledger insights ──────────────────────────────────────────────────────
 
 function LedgerInsights() {
+  const reduce = useReduceMotion()
   const { ledger } = useApp()
   const { t, d, r, lang, dm, clock, tn } = useSpaceText()
   const [removed] = useLedgerRemoved()
@@ -84,7 +86,7 @@ function LedgerInsights() {
           <li key={l.tag} className={clsx('grid items-center gap-3', lang === 'en' ? 'grid-cols-[5.5rem_1fr_2rem]' : 'grid-cols-[6.5rem_1fr_2rem]')}>
             <span className="min-w-0 break-words text-[14px] text-ink">{mono(d(l.tag))}</span>
             <span className="h-3 overflow-hidden rounded-full bg-paper-sunk" aria-hidden>
-              <motion.span className="block h-full rounded-full bg-term-d" initial={{ width: 0 }} animate={{ width: `${(l.count / max) * 100}%` }} transition={{ duration: 0.24 }} />
+              <motion.span className="block h-full rounded-full bg-term-d" {...growFade(reduce, 'width', `${(l.count / max) * 100}%`)} />
             </span>
             <span className="num text-right text-[14px] text-ink">{l.count}</span>
           </li>
@@ -269,7 +271,7 @@ function Savouring() {
     <ToolCard className="w-full" eyebrow={t('pl.sv.eyebrow')} title={t('pl.sv.title')} sub={t('pl.sv.sub')}>
       <div className="relative flex min-h-[200px] flex-col justify-between overflow-hidden rounded-2xl bg-[color:var(--term-d-soft)] p-5">
         <AnimatePresence mode="wait" initial={false}>
-          <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.22 }} aria-live="polite">
+          <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} aria-live="polite">
             <p className="eyebrow text-[color:var(--term-d-ink)]">{mono(d(p.kind))} · <span className="num">{i + 1}</span>/<span className="num">{SAVOURING_PROMPTS.length}</span></p>
             <p className="mt-3 text-[1.3rem] font-light leading-snug text-ink">{mono(d(p.text))}</p>
           </motion.div>
@@ -306,6 +308,7 @@ function Savouring() {
 // ─── Moments of Joy films + #MyMomentOfJoy ────────────────────────────────
 
 function Films() {
+  const reduce = useReduceMotion()
   const [open, setOpen] = useState<(typeof FILMS)[number] | null>(null)
   const [playing, setPlaying] = useState(false)
   const [pos, setPos] = useState(0)
@@ -363,7 +366,7 @@ function Films() {
               </span>
               <span className="block p-2.5 sm:p-3">
                 <span className="block break-words text-[14px] leading-snug text-ink sm:text-[15px]">{mono(d(f.title))}</span>
-                <span className="mt-0.5 block text-[12px] text-ink-3 sm:text-[13px]">{f.who}</span>
+                <span className="mt-0.5 block text-[12px] text-ink-3 sm:text-[13px]">{mono(f.who)}</span>
               </span>
             </button>
           </li>
@@ -374,7 +377,7 @@ function Films() {
         {takenBack && <p role="status" className="mt-3 flex items-start gap-2 text-[14px] text-ink-2"><Check size={14} className="mt-0.5 shrink-0" aria-hidden /> {t(takenBack.why === 'off' ? (takenBack.n === 1 ? 'pl.fm.takenBackOff1' : 'pl.fm.takenBackOff') : takenBack.n === 1 ? 'pl.fm.takenBackPub1' : 'pl.fm.takenBackPub', { n: takenBack.n })}</p>}
         <AnimatePresence initial={false}>
           {optIn && (
-            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+            <motion.div {...expandFade(reduce)} className="overflow-hidden">
               {pub.on ? (
                 <p className="pt-3 text-[14px] text-ink-2">{t('pl.fm.consent')}</p>
               ) : (

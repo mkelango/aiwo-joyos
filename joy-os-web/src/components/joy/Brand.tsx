@@ -27,6 +27,6 @@ export function JoyOsLockup({ to = '/', className, sub = 'Joy OS' }: { to?: stri
   )
 }
 
-export const TAGLINE = 'Joy, measured. Years worth living.'
+export const TAGLINE = 'Joy, measured. Years Worth Living.'
 /** The brand line that arrives last in the animated mark (Playbook p15, p53). Stays English. */
 export const BRAND_LINE = 'Years Worth Living.'

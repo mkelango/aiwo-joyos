@@ -12,6 +12,7 @@ import { AUTO_REPLY, PEOPLE_DETAIL, THREADS, type Msg, type Thread } from './_da
 import { CARE_INBOX_CHANGED, isClinicalPerson, specimenNow } from './_careInbox'
 import { TeleManasStrip } from './_parts'
 import { fmtDay, fmtShortDate, fmtTime, nums, readPersisted, rich, usePersisted } from './_util'
+import { brandTransition, useReduceMotion } from '@/lib/motion'
 import { useDict } from '@/lib/i18n'
 import { MSG, useData } from './_i18n'
 
@@ -25,6 +26,7 @@ const shortName = (name: string) => (name.startsWith('Dr') ? name.split(' ').sli
 
 export default function Messages() {
   const tr = useDict(MSG)
+  const reduce = useReduceMotion()
   const dx = useData()
   const { setCrisisOpen } = useApp()
   const [params, setParams] = useSearchParams()
@@ -184,7 +186,7 @@ export default function Messages() {
         </div>
 
         {/* Conversation */}
-        <div className={clsx('h-[calc(100dvh-210px)] min-h-[520px] min-w-0 flex-col lg:flex lg:h-auto lg:min-h-0', activeId ? 'flex' : 'hidden')}>
+        <div className={clsx('h-[calc(100dvh-210px)] min-h-[500px] min-w-0 flex-col lg:flex lg:h-auto lg:min-h-0', activeId ? 'flex' : 'hidden')}>
           <div className="flex items-center gap-3 border-b border-line px-4 py-3 md:px-6">
             <button onClick={() => { setActiveId(null); setParams({}, { replace: true }) }} className="rounded-full p-2 text-ink-2 hover:bg-paper-sunk focus-ring lg:hidden" aria-label={tr('backToList')}>
               <ArrowLeft size={18} />
@@ -221,7 +223,7 @@ export default function Messages() {
             })}
             <AnimatePresence>
               {held && (
-                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mx-auto max-w-md rounded-card border border-line bg-paper-raised p-4 text-center">
+                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={brandTransition(reduce)} className="mx-auto max-w-md rounded-card border border-line bg-paper-raised p-4 text-center">
                   <ShieldAlert size={18} className="mx-auto text-ink-2" />
                   <p className="mt-2 text-[15px] text-ink">{tr('heldTitle')}</p>
                   <p className="mt-1 text-[14px] text-ink-2">{rich(tr('heldBody'), { tel: <a className="num underline" href="tel:14416">14416</a> })}</p>

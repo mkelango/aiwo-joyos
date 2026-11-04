@@ -63,7 +63,7 @@ export function LockScreen() {
           <Icon name="lock" size={28} color={c.ink} />
         </View>
         <View style={{ gap: space.s1 }}>
-          <Eyebrow tone="daybreak">{t('lockEyebrow')}</Eyebrow>
+          <Eyebrow>{t('lockEyebrow')}</Eyebrow>
           <Title size={32} accessibilityRole="header">
             {t('lockTitleA')}
             <Serif>{t('lockTitleSerif')}</Serif>

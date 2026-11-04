@@ -8,7 +8,7 @@ import type { Lang } from '@/lib/store'
 // scales (forward–back translation pending; INSTRUMENT_NOTE is shown above them),
 // instrument names and licence attributions, people's own words (Ledger words, what the
 // member typed), names, brand and product names (AIWO, Joy OS, VIVA, Tele-MANAS, State of
-// Us, Couples Check, ’Cation names), tool ids and prompt versions, formulas, units and
+// Us, ’Cation names), tool ids and prompt versions, formulas, units and
 // scientific abbreviations. Numbers stay Latin digits.
 
 export type L = Record<Lang, string>
@@ -21,10 +21,11 @@ export function fmtLocal(d: Date, lang: Lang, opts: Intl.DateTimeFormatOptions) 
 }
 
 /**
- * A figure in running text ("1.9", "−3", "22:00", "Day-90"). A digit that is part of an
- * instrument's name (PHQ-4, LE8, UCLA-3, v1.0) is not a figure and stays in the sentence's face.
+ * A figure in running text ("1.9", "−3", "22:00", "Day-90") or a method version ("v1.0", set
+ * whole; Playbook p40). A digit that is part of an instrument's name (PHQ-4, LE8, UCLA-3) is not
+ * a figure and stays in the sentence's face.
  */
-const NUMBER_RUN = /((?<![A-Za-z]\d*[.,:]?)(?<![A-Z][-‑])[−+]?\d+(?:[.,:]\d+)*)/
+const NUMBER_RUN = /(\bv\d+(?:\.\d+)*|(?<![A-Za-z]\d*[.,:]?)(?<![A-Z][-‑])[−+]?\d+(?:[.,:]\d+)*)/
 
 /** Set every figure in a plain string in the mono style (the brand rule); text without digits is returned as is. */
 export function monoFigures(text: string, key: string | number = 'n'): ReactNode {
@@ -873,13 +874,13 @@ export const CORE = {
   },
   rtCouples: {
     en: 'This week’s State of Us: each of you names one moment in the last seven days when you felt on the same side. Share them at Friday dinner, phones in the basket. Kavya’s answers in the Couples Check stay hers; I will never tell you what she said.',
-    ta: 'இந்த வாரத்தின் State of Us: கடந்த ஏழு நாட்களில் நீங்கள் இருவரும் ஒரே பக்கம் இருப்பதாக உணர்ந்த ஒரு தருணத்தை ஒவ்வொருவரும் சொல்லுங்கள். வெள்ளிக்கிழமை இரவு உணவின்போது, ஃபோன்களைக் கூடையில் வைத்துவிட்டு, பகிர்ந்துகொள்ளுங்கள். Couples Check இல் Kavya-வின் பதில்கள் அவருடையவை மட்டுமே; அவர் என்ன சொன்னார் என்று நான் உங்களிடம் ஒருபோதும் சொல்ல மாட்டேன்.',
-    hi: 'इस हफ़्ते का State of Us: पिछले सात दिनों का एक ऐसा पल आप दोनों बताएँ, जब आपको लगा कि आप एक ही तरफ़ हैं। शुक्रवार के डिनर पर, फ़ोन टोकरी में रखकर, इन्हें साझा करें। Couples Check में Kavya के जवाब सिर्फ़ उनके हैं; उन्होंने क्या कहा, यह आपको कभी नहीं बताया जाएगा।',
+    ta: 'இந்த வாரத்தின் State of Us: கடந்த ஏழு நாட்களில் நீங்கள் இருவரும் ஒரே பக்கம் இருப்பதாக உணர்ந்த ஒரு தருணத்தை ஒவ்வொருவரும் சொல்லுங்கள். வெள்ளிக்கிழமை இரவு உணவின்போது, ஃபோன்களைக் கூடையில் வைத்துவிட்டு, பகிர்ந்துகொள்ளுங்கள். தம்பதியர் சரிபார்ப்பில் Kavya-வின் பதில்கள் அவருடையவை மட்டுமே; அவர் என்ன சொன்னார் என்று நான் உங்களிடம் ஒருபோதும் சொல்ல மாட்டேன்.',
+    hi: 'इस हफ़्ते का State of Us: पिछले सात दिनों का एक ऐसा पल आप दोनों बताएँ, जब आपको लगा कि आप एक ही तरफ़ हैं। शुक्रवार के डिनर पर, फ़ोन टोकरी में रखकर, इन्हें साझा करें। कपल्स चेक में Kavya के जवाब सिर्फ़ उनके हैं; उन्होंने क्या कहा, यह आपको कभी नहीं बताया जाएगा।',
   },
   rtCouplesPlain: {
     en: 'This week’s State of Us: each of you names one moment in the last seven days when you felt on the same side. Share them when you next sit down together, without screens. Kavya’s answers in the Couples Check stay hers; I will never tell you what she said.',
-    ta: 'இந்த வாரத்தின் State of Us: கடந்த ஏழு நாட்களில் நீங்கள் இருவரும் ஒரே பக்கம் இருப்பதாக உணர்ந்த ஒரு தருணத்தை ஒவ்வொருவரும் சொல்லுங்கள். அடுத்த முறை நீங்கள் இருவரும் சேர்ந்து அமரும்போது, திரைகள் இல்லாமல், பகிர்ந்துகொள்ளுங்கள். Couples Check இல் Kavya-வின் பதில்கள் அவருடையவை மட்டுமே; அவர் என்ன சொன்னார் என்று நான் உங்களிடம் ஒருபோதும் சொல்ல மாட்டேன்.',
-    hi: 'इस हफ़्ते का State of Us: पिछले सात दिनों का एक ऐसा पल आप दोनों बताएँ, जब आपको लगा कि आप एक ही तरफ़ हैं। अगली बार जब आप साथ बैठें, बिना स्क्रीन के, तब इन्हें साझा करें। Couples Check में Kavya के जवाब सिर्फ़ उनके हैं; उन्होंने क्या कहा, यह आपको कभी नहीं बताया जाएगा।',
+    ta: 'இந்த வாரத்தின் State of Us: கடந்த ஏழு நாட்களில் நீங்கள் இருவரும் ஒரே பக்கம் இருப்பதாக உணர்ந்த ஒரு தருணத்தை ஒவ்வொருவரும் சொல்லுங்கள். அடுத்த முறை நீங்கள் இருவரும் சேர்ந்து அமரும்போது, திரைகள் இல்லாமல், பகிர்ந்துகொள்ளுங்கள். தம்பதியர் சரிபார்ப்பில் Kavya-வின் பதில்கள் அவருடையவை மட்டுமே; அவர் என்ன சொன்னார் என்று நான் உங்களிடம் ஒருபோதும் சொல்ல மாட்டேன்.',
+    hi: 'इस हफ़्ते का State of Us: पिछले सात दिनों का एक ऐसा पल आप दोनों बताएँ, जब आपको लगा कि आप एक ही तरफ़ हैं। अगली बार जब आप साथ बैठें, बिना स्क्रीन के, तब इन्हें साझा करें। कपल्स चेक में Kavya के जवाब सिर्फ़ उनके हैं; उन्होंने क्या कहा, यह आपको कभी नहीं बताया जाएगा।',
   },
   rtSavour: {
     en: 'When the tea is poured, wait before the first sip. Name three things: one you can see, one you can hear, and one you are glad of right now. Stay ten seconds longer than feels natural, then tell Kavya one of them.',

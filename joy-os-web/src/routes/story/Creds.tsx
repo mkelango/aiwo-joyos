@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, ArrowUpRight, Expand, LayoutGrid, NotebookText, Printer, RotateCw, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent, type RefObject } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
@@ -9,6 +9,7 @@ import { ThemeToggle } from '@/layouts/shared'
 import { useApp } from '@/lib/store'
 import { ROLE_ACCOUNTS } from '@/routes/entry/_data'
 import { DeckCtx, H, SLIDES, SlideFrame, W } from './_deck'
+import { brandTransition, useReduceMotion } from '@/lib/motion'
 
 // CREDS (Plan §4E): the Joy OS credentials deck — 16:9 slides scaled to the viewport,
 // a plain-text reading view on phones, demo sign-in by role (overview and last slide),
@@ -57,7 +58,7 @@ function readHash(hash: string) {
 export default function Creds() {
   const { hash } = useLocation()
   const nav = useNavigate()
-  const reduce = useReducedMotion()
+  const reduce = useReduceMotion()
   const [i, setI] = useState(() => readHash(hash))
   const [dir, setDir] = useState(1)
   const [overview, setOverview] = useState(false)
@@ -219,7 +220,7 @@ export default function Creds() {
                     initial={reduce ? { opacity: 0 } : { opacity: 0, x: dir * 24 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={reduce ? { opacity: 0 } : { opacity: 0, x: dir * -24 }}
-                    transition={{ duration: 0.24, ease: [0.2, 0, 0, 1] }}
+                    transition={brandTransition(reduce, 240)}
                     className="absolute inset-0"
                   >
                     <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: W, height: H }}>
@@ -246,7 +247,7 @@ export default function Creds() {
                     initial={reduce ? { opacity: 0 } : { opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.18 }}
+                    transition={brandTransition(reduce, 180)}
                     className="rounded-card border border-line bg-paper-raised p-5"
                   >
                     <p className="eyebrow text-ink-3"><span className="num">{String(i + 1).padStart(2, '0')}</span> · {slide.section}</p>
@@ -356,6 +357,7 @@ function IconBtn({ label, onClick, children, pressed, className, btnRef }: { lab
 
 // ─── Overview: thumbnails, plus demo sign-in by role ─────────────────────────
 function Overview({ current, onPick, onClose }: { current: number; onPick: (k: number) => void; onClose: () => void }) {
+  const reduce = useReduceMotion()
   const ref = useRef<HTMLDivElement>(null)
   const nav = useNavigate()
   const { role, setRole } = useApp()
@@ -396,7 +398,7 @@ function Overview({ current, onPick, onClose }: { current: number; onPick: (k: n
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
+      transition={brandTransition(reduce, 200)}
       className="fixed inset-0 z-50 overflow-y-auto bg-paper"
     >
       <div className="mx-auto max-w-[1440px] px-4 pb-16 pt-6 md:px-8">

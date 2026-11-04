@@ -16,6 +16,9 @@ export const LETTER = {
   issueNo: { en: 'Letter No. {n}', ta: 'கடிதம் எண் {n}', hi: 'लेटर नं. {n}' },
   latest: { en: 'Latest', ta: 'சமீபத்தியது', hi: 'नवीनतम' },
   numbers: { en: 'His numbers', ta: 'அவரது எண்கள்', hi: 'उनके नंबर' },
+  // The issue in the Mentor's recorded voice (Playbook p54). The player is simulated, and says so.
+  listen: { en: 'Listen · in the Mentor’s voice', ta: 'கேளுங்கள் · வழிகாட்டியின் குரலில்', hi: 'सुनें · मार्गदर्शक की आवाज़ में' },
+  listenNote: { en: 'Recorded by the Mentor, with his written consent, in English. Specimen: playback is simulated and no sound plays.', ta: 'வழிகாட்டி தனது எழுத்துபூர்வ ஒப்புதலுடன், ஆங்கிலத்தில் பதிவு செய்தது. மாதிரி: இயக்கம் உருவகப்படுத்தப்பட்டது, ஒலி இல்லை.', hi: 'मार्गदर्शक ने अपनी लिखित सहमति से, अंग्रेज़ी में रिकॉर्ड किया। नमूना: प्लेबैक सिम्युलेटेड है, कोई आवाज़ नहीं आती।' },
   writeBack: { en: 'Write back', ta: 'பதில் எழுதுங்கள்', hi: 'जवाब लिखें' },
   writeBackLead: { en: 'Tell him yours: what moved, what did not, one thing you are changing.', ta: 'உங்களுடையதைச் சொல்லுங்கள்: என்ன மாறியது, எது மாறவில்லை, நீங்கள் மாற்றும் ஒன்று.', hi: 'अपना बताइए: क्या बदला, क्या नहीं, एक चीज़ जो आप बदल रहे हैं।' },
   replyLabel: { en: 'Your reply', ta: 'உங்கள் பதில்', hi: 'आपका जवाब' },

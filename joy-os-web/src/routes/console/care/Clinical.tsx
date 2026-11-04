@@ -9,6 +9,7 @@ import { Avatar, Button, Card, PageHeader, Pill, Sheet } from '@/components/ui'
 import { termByKey } from '@/data/terms'
 import { joyspanIndex } from '@/domain/indexEngine'
 import type { TermKey } from '@/domain/types'
+import { brandTransition, useReduceMotion } from '@/lib/motion'
 import {
   CLINICAL_RECORDS, CLOSE_OUTCOMES, EXTRA_FORMULARY, EXTRA_INTERACTIONS, FORMULARY, MD_CONFIG, MEERA, MEMBER_IDS, RETURN_REASONS, SCREEN_ROUTES, SCREEN_ROUTE_OWNER,
   type SafetyAlert,
@@ -115,6 +116,7 @@ function MemberLink({ name, onOpen }: { name: string; onOpen: (id: string) => vo
 }
 
 export default function Clinical() {
+  const reduce = useReduceMotion()
   const now = useConsoleNow()
   const acc = useConsoleAccess('/console/clinical')
   // canAct is the portal as a whole (the Medical Director config, a reset); canActOn answers for
@@ -214,7 +216,7 @@ export default function Clinical() {
       {/* P0 strip — always on top */}
       <AnimatePresence mode="wait">
         {openP0 ? (
-          <motion.section key={openP0.id} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} aria-label="Open P0 alert" className="mb-8 rounded-card border-2 border-ink bg-paper-raised p-5 shadow-card md:p-6">
+          <motion.section key={openP0.id} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={brandTransition(reduce, 200)} aria-label="Open P0 alert" className="mb-8 rounded-card border-2 border-ink bg-paper-raised p-5 shadow-card md:p-6">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex items-start gap-4">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ink text-paper"><AlertTriangle size={20} aria-hidden /></span>
@@ -235,7 +237,7 @@ export default function Clinical() {
             </div>
           </motion.section>
         ) : (
-          <motion.p key="calm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-8 flex items-center gap-2 rounded-card bg-paper-sunk px-5 py-3.5 text-[15px] text-ink" role="status">
+          <motion.p key="calm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={brandTransition(reduce)} className="mb-8 flex items-center gap-2 rounded-card bg-paper-sunk px-5 py-3.5 text-[15px] text-ink" role="status">
             <ShieldCheck size={17} aria-hidden /> Every P0 has been reached by a person. Close each with its outcome on the safety board.
           </motion.p>
         )}

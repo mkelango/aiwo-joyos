@@ -15,6 +15,7 @@ import { COUPLES_CHECK, GRANTS, HOUSEHOLD_MINOR, KAVYA_SHARED, SPECIMEN_NOW, typ
 import { Checkbox, Field, Section, Segmented, Toggle } from './_parts'
 import { inputCls, nums, rich, usePersisted, useToast } from './_util'
 import { useDict, useTermText } from '@/lib/i18n'
+import { brandTransition, useReduceMotion } from '@/lib/motion'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { HH, useData } from './_i18n'
 import { ReadAloud, SpeakAnswer } from './_voice'
@@ -34,6 +35,7 @@ const ELDER_DEFAULT: Elder = { large: true, voice: true, helper: true, helperSin
 // Household kind (couple | family | Family Joy Office) and an authored Family Joy Charter: see _charter.
 export default function Household() {
   const tr = useDict(HH)
+  const reduce = useReduceMotion()
   const dx = useData()
   const tt = useTermText()
   const [toast, showToast] = useToast()
@@ -120,7 +122,7 @@ export default function Household() {
           />
           <AnimatePresence initial={false}>
             {invites.map((iv) => (
-              <motion.li key={iv.id} layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="rounded-card border border-dashed border-line-strong p-5 md:p-6">
+              <motion.li key={iv.id} layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={brandTransition(reduce, 200)} className="rounded-card border border-dashed border-line-strong p-5 md:p-6">
                 <div className="flex items-start gap-4">
                   <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-dashed border-line-strong text-ink-3"><Clock size={18} /></span>
                   <div className="min-w-0 flex-1">
@@ -213,7 +215,7 @@ export default function Household() {
           <ul className="divide-y divide-line">
             <AnimatePresence initial={false}>
               {grants.map((g) => (
-                <motion.li key={g.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between md:px-6">
+                <motion.li key={g.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={brandTransition(reduce)} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between md:px-6">
                   <div className="flex flex-wrap items-center gap-3">
                     <span className="flex items-center gap-1.5 text-[15px] text-ink">
                       {who(g.from)} <ArrowRight size={14} className="text-ink-3" /> {who(g.to)}

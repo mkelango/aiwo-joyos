@@ -9,7 +9,8 @@ import { INDEX_HISTORY } from '@/data/member'
 import { DRIFT_RULES } from '@/data/platform'
 import { bandFor, joyspanIndex, lowestTerm } from '@/domain/indexEngine'
 import type { Band, DriftTask, Grade, MethodVersion, TermKey } from '@/domain/types'
-import { CIRCLES_LED, CIRCLE_ROSTER, COACH_CASELOAD, DAY_N, MEERA, PRIYA, RAVI } from './_data'
+import { brandTransition, useReduceMotion } from '@/lib/motion'
+import { CIRCLES_LED, CIRCLE_ROSTER, COACH_CASELOAD, CONCIERGE_ARRIVALS, DAY_N, MEERA, PRIYA, RAVI, digestFor } from './_data'
 import { ConciergeDesk } from './_concierge'
 import { useClinicalState } from './_clinicalStore'
 import { RaiseConcernSheet, type ConcernTarget } from './_concern'
@@ -20,7 +21,7 @@ import { coach, isClinicalTask, isMyTask, taskLabel, useCoachState, type CoachTa
 import { AccessNote, AuditList, CardHead, ConsoleTermChip, Kpi, PriorityTag, ScrollTabs, SlaChip, areaCls, fieldCls, fmtClock, fmtOpened, labelCls, parseIst, useConsoleNow } from './_parts'
 
 // COACH & CONCIERGE CONSOLE (Memo p.15, p.18; Architecture p6): caseload by loop day,
-// drift tasks with SLA timers, circles, Day-N. Coaches see term scores and bands only.
+// drift tasks with SLA timers, circles, Day-N, ’Cation cohorts. Coaches see term scores and bands only.
 
 const PRIORITY_ORDER = { P0: 0, P1: 1, P2: 2 } as const
 const isClinical = isClinicalTask
@@ -85,6 +86,7 @@ export default function CoachConsole() {
 
 function Coach({ deskSwitch }: { deskSwitch: ReactNode }) {
   const navigate = useNavigate()
+  const reduce = useReduceMotion()
   const now = useConsoleNow()
   const { tasks, circles, deskLog } = useCoachState()
   const log = useDeskLog()
@@ -231,7 +233,7 @@ function Coach({ deskSwitch }: { deskSwitch: ReactNode }) {
 
           <AnimatePresence>
             {notice && (
-              <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mt-4 flex items-center justify-between gap-3 rounded-lg bg-paper-sunk px-4 py-2.5 text-[14px] text-ink" role="status">
+              <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={brandTransition(reduce)} className="mt-4 flex items-center justify-between gap-3 rounded-lg bg-paper-sunk px-4 py-2.5 text-[14px] text-ink" role="status">
                 <span className="flex items-start gap-2"><Check size={15} className="mt-0.5 shrink-0" aria-hidden />{notice.text}</span>
                 <span className="flex shrink-0 items-center gap-3">
                   {notice.to && <Link to={notice.to} className="text-[13px] text-ink underline underline-offset-4 focus-ring">{notice.cta}</Link>}
@@ -349,6 +351,8 @@ function Coach({ deskSwitch }: { deskSwitch: ReactNode }) {
           </div>
         </Card>
       </div>
+
+      <CationCohorts />
 
       <ScoresFeed />
 
@@ -639,6 +643,112 @@ const specimenIssued = (): Issued[] => {
     { id: 'si-0262-d0', memberId: 'm_0262', member: 'Sameer Joshi', grade: 'index', value: 52, prev: null, band: bandFor(52), lowest: 'R', method: 'v1.0', ms: istMs('2027-01-22 10:15'), what: 'Day 0 · first measure' },
     { id: 'si-0001-d0', memberId: 'm_0001', member: 'Arjun Rao', grade: 'clinical', value: arjun.value, prev: 61, band: arjun.band, lowest: arjun.lowestTerm, method: arjun.method, ms: istMs('2027-01-02 17:30'), what: 'Day 0 · Joycation, on site', signedBy: arjun.signedBy },
   ]
+}
+
+/** First review is Day 15, so a checkout this recent has not had one yet. */
+const NEW_CHECKOUT_DAYS = 15
+
+/**
+ * ’Cation cohorts across this caseload (Architecture p.9 cation module): enrolment.created and checkout.completed.
+ * A member's checkout is their Day 0, the date on their digest. A stay ahead is a concierge arrival for someone on this
+ * caseload; other guests have no coach here yet. Everyone on a caseload has checked out once, so each one is a return stay,
+ * and enrolments count stays, not people (one enrolment row per stay). dayN.due is the Day-N board above.
+ */
+function CationCohorts() {
+  const inCaseload = new Set(COACH_CASELOAD.map((m) => m.id))
+  const checkedOut = COACH_CASELOAD.map((m) => ({ ...m, checkout: digestFor(m.id)?.consentGranted ?? '—' })).sort((a, b) => a.day - b.day)
+  const ahead = CONCIERGE_ARRIVALS.filter((a) => a.memberId && inCaseload.has(a.memberId)).map((a) => ({ ...a, cation: a.cation.split(' · ')[0] }))
+  const newly = checkedOut.filter((m) => m.day <= NEW_CHECKOUT_DAYS)
+  // checkedOut runs newest first, so each cohort's first member is its latest checkout, and the rows keep that order.
+  const cohorts = [...new Set([...checkedOut, ...ahead].map((m) => m.cation))].map((name) => ({
+    name,
+    out: checkedOut.filter((m) => m.cation === name),
+    up: ahead.filter((a) => a.cation === name),
+  }))
+  return (
+    <Card className="mt-8">
+      <CardHead
+        eyebrow="’Cation cohorts"
+        title="Who came from which ’Cation"
+        aside={<span className="flex flex-wrap gap-1.5">{['enrolment.created', 'checkout.completed'].map((e) => <code key={e} className="rounded-full bg-paper-sunk px-2 py-0.5 font-mono text-[12px] text-ink-2">{e}</code>)}</span>}
+      />
+      <p className="-mt-2 mb-5 max-w-2xl text-[15px] text-ink-2">Every enrolment on your caseload, by ’Cation: guests who have checked out and started their ninety days, and return stays still ahead. Each stay is one enrolment, so a guest booked to come back counts once for each stay.</p>
+      <div className="grid gap-8 xl:grid-cols-[1.75fr_1fr] [&>*]:min-w-0">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[620px] border-collapse text-left text-[14px]">
+            <caption className="sr-only">’Cation cohorts on this caseload: enrolments by stay, return stays ahead, checkouts, the latest checkout and the loop days they span.</caption>
+            <thead>
+              <tr className="border-b border-line">
+                {['’Cation', 'Enrolments', 'Return stays', 'Checked out', 'Latest checkout', 'Loop days'].map((h, i) => (
+                  <th key={h} scope="col" className={clsx('eyebrow whitespace-nowrap py-3 pr-4 font-normal text-ink-3', i > 0 && i < 4 && 'text-right')}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {cohorts.map((c) => {
+                const first = c.out[0]?.day
+                const last = c.out[c.out.length - 1]?.day
+                return (
+                  <tr key={c.name} className="border-b border-line/70 last:border-0">
+                    <th scope="row" className="py-3 pr-4 text-[15px] font-normal text-ink">{c.name}</th>
+                    <td className="num py-3 pr-4 text-right text-ink">{c.out.length + c.up.length}</td>
+                    <td className="num py-3 pr-4 text-right text-ink-2">{c.up.length}</td>
+                    <td className="num py-3 pr-4 text-right text-ink-2">{c.out.length}</td>
+                    <td className="num whitespace-nowrap py-3 pr-4 text-ink-2">{c.out[0]?.checkout ?? '—'}</td>
+                    <td className="num whitespace-nowrap py-3 pr-4 text-ink-2">{first === undefined ? '—' : first === last ? `Day ${first}` : `Day ${first} to ${last}`}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="space-y-5">
+          <section aria-label="Newly checked out">
+            <div className="flex items-baseline justify-between gap-3 border-b border-line pb-2">
+              <p className="text-[15px] text-ink">Newly checked out</p>
+              <span className="num text-[13px] text-ink-3">{newly.length}</span>
+            </div>
+            <p className="mt-1.5 text-[13px] text-ink-3">Within {NEW_CHECKOUT_DAYS} days, before or at their first review.</p>
+            {newly.length === 0 ? (
+              <p className="mt-2 text-[14px] text-ink-2">Nobody in the last {NEW_CHECKOUT_DAYS} days.</p>
+            ) : (
+              <ul className="mt-2 space-y-1">
+                {newly.map((m) => <CohortLink key={m.id} to={m.id} name={m.name} what={<>{m.cation} · <span className="num">{m.checkout}</span></>} />)}
+              </ul>
+            )}
+          </section>
+          <section aria-label="Return stays ahead">
+            <div className="flex items-baseline justify-between gap-3 border-b border-line pb-2">
+              <p className="text-[15px] text-ink">Return stays ahead</p>
+              <span className="num text-[13px] text-ink-3">{ahead.length}</span>
+            </div>
+            <p className="mt-1.5 text-[13px] text-ink-3">Checked out once and booked to come back, so also counted under Checked out. The concierge holds the arrival.</p>
+            {ahead.length === 0 ? (
+              <p className="mt-2 text-[14px] text-ink-2">No return stay booked.</p>
+            ) : (
+              <ul className="mt-2 space-y-1">
+                {ahead.map((a) => <CohortLink key={a.id} to={a.memberId ?? ''} name={a.guest} what={<>{a.cation} · {a.where} · <span className="num">{a.when}</span></>} />)}
+              </ul>
+            )}
+          </section>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+function CohortLink({ to, name, what }: { to: string; name: string; what: ReactNode }) {
+  return (
+    <li>
+      <Link to={`/console/coach/member/${to}`} className="group flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 hover:bg-paper-sunk focus-ring">
+        <span className="min-w-0">
+          <span className="block text-[15px] text-ink">{name}</span>
+          <span className="block text-[13px] text-ink-2">{what}</span>
+        </span>
+        <ChevronRight size={14} className="shrink-0 text-ink-3 group-hover:text-ink" aria-hidden />
+      </Link>
+    </li>
+  )
 }
 
 function ScoresFeed() {

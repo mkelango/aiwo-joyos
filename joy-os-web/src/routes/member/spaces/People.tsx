@@ -179,7 +179,7 @@ function CirclesOrbit() {
 
           <AnimatePresence mode="wait" initial={false}>
             {selected && (
-              <motion.div key={selected.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }} className="rounded-2xl border border-line p-4">
+              <motion.div key={selected.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="rounded-2xl border border-line p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-[1.2rem] font-light text-ink">{selected.name}</p>
@@ -322,7 +322,7 @@ function StateOfUs() {
         ))}
       </ol>
       <AnimatePresence mode="wait" initial={false}>
-        <motion.div key={step} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="flex flex-1 flex-col" aria-live="polite">
+        <motion.div key={step} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex flex-1 flex-col" aria-live="polite">
           {step === -1 && (
             <>
               <p className="text-[17px] text-ink">{t('ppl.s.intro')}</p>

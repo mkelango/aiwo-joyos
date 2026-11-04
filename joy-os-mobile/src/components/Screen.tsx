@@ -83,7 +83,8 @@ export function ScreenHeader({ eyebrow, title, lead, back, right }: HeaderProps)
       ) : null}
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space.s2 }}>
         <View style={{ flex: 1, gap: space.s1 }}>
-          {eyebrow ? <Eyebrow tone="daybreak">{eyebrow}</Eyebrow> : null}
+          {/* Neutral, like the screen labels on Playbook p62: Daybreak is the screen's one action. */}
+          {eyebrow ? <Eyebrow>{eyebrow}</Eyebrow> : null}
           <Title accessibilityRole="header" size={32}>
             {title}
           </Title>

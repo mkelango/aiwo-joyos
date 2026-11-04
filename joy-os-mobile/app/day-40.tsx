@@ -134,7 +134,7 @@ function Day40() {
 
         <Divider />
         <View style={{ gap: space.s1 }}>
-          <Eyebrow {...H2} tone="daybreak">{t('focusTitle')}</Eyebrow>
+          <Eyebrow {...H2} color={c.vizBronze}>{t('focusTitle')}</Eyebrow>
           <Body><MonoNums text={minor || !low ? t('minorFocus') : t('focusBody', { space: tt.space(low) })} /></Body>
           <Body size={20}>
             <Serif>{txFor(lang, action.title)}</Serif>
@@ -204,7 +204,7 @@ function Day40() {
           {web ? t('print') : t('save')}
         </DaybreakButton>
         {minor ? null : (
-          <ArrowLink icon="bar-chart-2" onPress={() => router.push('/index-result')}>
+          <ArrowLink joyIcon="index" onPress={() => router.push('/index-result')}>
             {t('seeIndex')}
           </ArrowLink>
         )}

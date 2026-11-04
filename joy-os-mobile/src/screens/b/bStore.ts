@@ -251,10 +251,10 @@ export const notifReadStore = createStore<NotifRead>('notifRead', { read: [], cl
 // ─── Account: membership, profile, events, care, circles, household ───────
 
 export interface AccountState {
-  plan: 'Free' | 'Plus' | 'Patron'
+  plan: 'Free' | 'Plus' | 'Circle' | 'Clinical' | 'Patron'
   /** ISO date the current plan took effect (set on an upgrade; a yearly plan renews a year on). */
   planSince?: string
-  planChange?: { to: 'Free' | 'Plus' | 'Patron'; effective: string; ref: string }
+  planChange?: { to: AccountState['plan']; effective: string; ref: string }
   profile: { name: string; phone: string; email: string; language: string }
   emergency: { name: string; relation: string; phone: string }
   bookings: { id: string; ref: string; at: string }[]
@@ -286,14 +286,14 @@ export interface AccountState {
   schedule?: Record<number, boolean> | null
   /** The Joyspan 2027 Declaration card, signed by typing a name (Playbook p61). */
   declaration?: { name: string; signedAt: string } | null
-  /** Who bills the plan: Razorpay (web, Patron, or set up before) or the phone's store for Joy OS Plus. */
+  /** Who bills the plan: Razorpay (web, yearly plans, or set up before), Stripe (an international tenant), or the phone's store for Joy OS Plus. */
   billing?: Billing
   /** The Joy Passport card added to the phone's wallet (specimen). */
   passportWallet?: 'apple' | 'google' | null
   /** The member chose to keep the Index off the Passport screen (shown again with one tap). */
   passportHideIndex?: boolean
 }
-export type Billing = 'razorpay' | 'app-store' | 'google-play'
+export type Billing = 'razorpay' | 'stripe' | 'app-store' | 'google-play'
 
 /** What the next edition's delegate badge carries (Playbook p61: consent as a word, and diet). */
 export type BadgeDiet = 'Vegetarian' | 'Non-vegetarian' | 'Vegan' | 'Jain'

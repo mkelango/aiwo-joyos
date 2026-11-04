@@ -11,12 +11,13 @@ import { ENTITLEMENTS, GSTIN_AIWO, GST_RATE, INVOICES, SUPPLIER_STATE, placeOfSu
 import { Section, Segmented, Toggle } from './_parts'
 import { inr, nums, rich, useMemberProfile, usePersisted, useToast } from './_util'
 import { useDict, useLang } from '@/lib/i18n'
+import { brandTransition, useReduceMotion } from '@/lib/motion'
 import { useApp } from '@/lib/store'
 import { MEM, useData } from './_i18n'
 
 // MEMBERSHIP (module 12 Commerce): Joy OS Plus + Circle, entitlements, the
-// ladder of plans, GST invoices, Razorpay / UPI methods (mock, no entry here),
-// the Joy Passport, and the payments-grace state. No urgency, no scarcity —
+// ladder of plans, GST invoices, Razorpay / UPI methods and Stripe for international
+// tenants (mock, no entry here), the Joy Passport, and the payments-grace state. No urgency, no scarcity —
 // a missed payment never locks a member out of their own data. One Daybreak:
 // "Change plan", or "Pay ₹499 by UPI" while the grace banner is showing.
 type Invoice = (typeof INVOICES)[number]
@@ -43,11 +44,13 @@ export default function Membership() {
   const dx = useData()
   const lang = useLang()
   const [toast, showToast] = useToast()
+  const reduce = useReduceMotion()
   // Payments grace is app-wide state (store key 'paymentsGrace'), so other screens can show it too.
   const { paymentsGrace: grace, setPaymentsGrace: setGrace } = useApp()
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [plan, setPlan] = useState<string | null>(null)
   const [addMethod, setAddMethod] = useState(false)
+  const [payVia, setPayVia] = useState<'razorpay' | 'stripe'>('razorpay')
   // Plan changes, a pause and new invoices are kept per viewer, so they survive leaving the page.
   const [mem, setMem] = usePersisted<{ pending: Pending | null; paused: { from: string; until: string } | null; extra: Invoice[] }>('membership', { pending: null, paused: null, extra: [] })
   const pending = mem.pending
@@ -97,11 +100,11 @@ export default function Membership() {
 
       <AnimatePresence>
         {inGrace && (
-          <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }} className="mb-8">
+          <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={brandTransition(reduce, 200)} className="mb-8">
             <Card tone="soft" role="status">
               <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
                 <div className="max-w-2xl">
-                  <p className="eyebrow text-daybreak-ink">{t('graceEyebrow')}</p>
+                  <p className="eyebrow text-ink-3">{t('graceEyebrow')}</p>
                   <p className="mt-2 text-[1.3rem] font-light leading-snug text-ink">{rich(t('graceTitle'), { date: <span className="num">{fmtDate(PAYMENTS_GRACE.until)}</span> })}</p>
                   <p className="mt-2 text-[15px] text-ink-2">{t('graceBody')}</p>
                 </div>
@@ -150,7 +153,7 @@ export default function Membership() {
           })()}
           <AnimatePresence>
             {pending && (
-              <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.2 }} className="mt-5 flex flex-col gap-3 rounded-card border border-line-strong p-4 sm:flex-row sm:items-center sm:justify-between" role="status">
+              <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={brandTransition(reduce, 200)} className="mt-5 flex flex-col gap-3 rounded-card border border-line-strong p-4 sm:flex-row sm:items-center sm:justify-between" role="status">
                 <div className="flex items-start gap-3">
                   <CalendarClock size={18} className="mt-0.5 shrink-0 text-ink-3" />
                   <div>
@@ -289,6 +292,7 @@ export default function Membership() {
               </div>
             </Card>
             <p className="mt-3 text-[13px] text-ink-3">{t('razorpay')}</p>
+            <p className="mt-1 text-[13px] text-ink-3">{t('stripeNote')}</p>
           </Section>
 
           <Link to="/app/passport" className="group block rounded-card focus-ring">
@@ -366,9 +370,10 @@ export default function Membership() {
 
       {/* Add method — no entry in this front end */}
       <Sheet open={addMethod} onClose={() => setAddMethod(false)} title={t('addPayment')} side="center">
-        <p className="text-[17px] text-ink-2">{t('addPaymentBody')}</p>
-        <AddMethodPrefs />
-        <p className="eyebrow mt-5 text-ink-3">{t('razorpaySpecimen')}</p>
+        <Segmented label={t('payVia')} value={payVia} onChange={setPayVia} items={[{ value: 'razorpay', label: t('viaIndia') }, { value: 'stripe', label: t('viaStripe') }]} />
+        <p className="mt-4 text-[17px] text-ink-2">{t(payVia === 'stripe' ? 'addPaymentStripe' : 'addPaymentBody')}</p>
+        {payVia === 'razorpay' && <AddMethodPrefs />}
+        <p className="eyebrow mt-5 text-ink-3">{t(payVia === 'stripe' ? 'stripeSpecimen' : 'razorpaySpecimen')}</p>
         <div className="mt-5 flex justify-end"><Button variant="secondary" onClick={() => setAddMethod(false)}>{t('close')}</Button></div>
       </Sheet>
       {toast}

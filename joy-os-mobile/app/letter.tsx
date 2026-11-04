@@ -3,6 +3,7 @@ import { Platform, View } from 'react-native'
 import { AiwoMark, Body, Button, Card, DaybreakButton, EmptyIllustration, Eyebrow, Icon, Meta, Mono, Screen, ScreenHeader, Segmented, Serif, SpecimenTag, Title, Toggle, fmtDate } from '@/components'
 import { playSound } from '@/lib/sound'
 import { useDict, useLang } from '@/lib/i18n'
+import { AudioPlayer } from '@/screens/a/audio'
 import { H2, useLocal } from '@/screens/a/local'
 import { TextField } from '@/screens/a/parts'
 import { LETTER_AUTHOR, LETTER_ISSUES } from '@/screens/b/entryData'
@@ -16,9 +17,16 @@ import { MonoNums } from '@/lib/monoNums'
 // Daybreak only as the ribbon (and the illustration's one fill, as on the web issue). The letter is the Mentor's own words and stays as written; the
 // chrome around it is translated. Write back: free text through the crisis intercept, kept on
 // the phone (specimen), never quoted without the member's yes. One Daybreak: send the reply.
+// Listen: the issue in the Mentor's recorded voice (Playbook p54), on the Practice audio player,
+// so playback is simulated as it is there; the note under it says so.
 // Open to anyone (the Check's Letter door leads here), members and not.
 
 type Reply = { id: string; issue: number; text: string; quote: boolean; at: string }
+
+/** The player keeps saved audio by number: a letter's sits above the Practice weeks, never on one. */
+const AUDIO_KEY = 1000
+/** The Mentor's reading pace, in words a second. */
+const WORDS_PER_SECOND = 2.5
 
 export default function LetterScreen() {
   const { c, space, radius } = useTheme()
@@ -33,6 +41,8 @@ export default function LetterScreen() {
   const [err, setErr] = useState<string | null>(null)
   const [sent, setSent] = useState(false)
   const mine = replies.filter((r) => r.issue === issue.n)
+  const spoken = [...issue.body, issue.change]
+  const seconds = Math.round(spoken.join(' ').split(/\s+/).length / WORDS_PER_SECOND)
 
   const send = () => {
     const v = text.trim()
@@ -97,12 +107,12 @@ export default function LetterScreen() {
           ) : null}
           {issue.body.map((p) => (
             <Body key={p} size={18} style={{ lineHeight: 28 }}>
-              {p}
+              <MonoNums text={p} />
             </Body>
           ))}
           <View style={{ borderLeftWidth: 2, borderLeftColor: c.lineStrong, paddingLeft: space.s2 }}>
             <Body size={18} style={{ lineHeight: 28 }}>
-              <Serif>{issue.change}</Serif>
+              <Serif><MonoNums text={issue.change} /></Serif>
             </Body>
           </View>
           <View style={{ gap: 4 }} accessible accessibilityLabel={`${t('numbers')}: ${issue.stats.map(([k, v]) => `${k} ${v}`).join(', ')}`}>
@@ -123,6 +133,11 @@ export default function LetterScreen() {
       <Meta size={13} tone="ink3">
         <MonoNums text={t('specimen')} />
       </Meta>
+      <Card tone="raised" style={{ gap: space.s2 }}>
+        <Eyebrow {...H2}>{t('listen')}</Eyebrow>
+        <AudioPlayer offlineToggle={false} week={AUDIO_KEY + issue.n} title={issue.title} seconds={seconds} transcript={spoken} />
+        <Meta size={13} tone="ink3"><MonoNums text={t('listenNote')} /></Meta>
+      </Card>
       {Platform.OS === 'web' ? (
         <Button
           variant="secondary"
@@ -172,7 +187,7 @@ export default function LetterScreen() {
             {mine.map((r) => (
               <View key={r.id} style={{ gap: 2, borderTopWidth: 1, borderTopColor: c.line, paddingTop: space.s1 }}>
                 <Meta size={13} tone="ink3">
-                  {`${fmtDate(new Date(r.at).toLocaleDateString('en-CA'))} · ${r.quote ? t('mayQuote') : t('notQuoted')}`}
+                  <MonoNums text={`${fmtDate(new Date(r.at).toLocaleDateString('en-CA'))} · ${r.quote ? t('mayQuote') : t('notQuoted')}`} />
                 </Meta>
                 <Body>{r.text}</Body>
               </View>

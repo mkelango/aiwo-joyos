@@ -281,6 +281,7 @@ export const TENANTS = [
   { id: 'tnt_fairmont', name: 'Fairmont Mumbai', kind: 'Venue partner', cell: 'India · Mumbai', tenancy: 'Pooled · no PHI', keys: 'Region key', members: 0, budget: 0 },
   { id: 'tnt_house_chn', name: 'Joyspan House Chennai', kind: 'House', cell: 'India · Mumbai', tenancy: 'Pooled · RLS', keys: 'Region key', members: 140, budget: 75 },
   { id: 'tnt_star', name: 'Star Health', kind: 'Insurer', cell: 'India · Mumbai', tenancy: 'Bridge schema at J4', keys: 'Own key at J4', members: 0, budget: 0 },
+  { id: 'tnt_harbourline', name: 'Harbourline Hospital · Joyspan Inside', kind: 'Hospital unit', cell: 'India · Mumbai', tenancy: 'Pooled · RLS from J4', keys: 'Region key from J4', members: 0, budget: 0 },
 ]
 
 export const AUDIT = [
@@ -436,7 +437,7 @@ export const COUNCIL_REVIEW = {
   dissent: 'Dr Farah Siddiqui: the Delhi NCR Burden figure rests on 121 people; print its interval beside the mean, not in the appendix.',
 }
 
-export type TenantKind = 'employer' | 'insurer'
+export type TenantKind = 'employer' | 'insurer' | 'hospital'
 export type AdminRole = 'Tenant admin' | 'Read-only analyst' | 'Routing volume only'
 
 export const TENANT_KIND = {
@@ -489,6 +490,32 @@ export const TENANT_KIND = {
       { name: 'eligible_from', note: 'ISO date.' },
     ],
   },
+  // A planned J4 tenant: nobody holds these seats yet and nothing has been sent, so there is no "me" and no wave.
+  hospital: {
+    short: 'Harbourline',
+    group: 10,
+    domain: 'harbourlinehospital.in',
+    issuer: 'https://login.harbourlinehospital.in/oauth2/default',
+    clientId: 'harbourline-joyos-j4',
+    metadata: 'https://login.harbourlinehospital.in/app/joyos/sso/saml/metadata',
+    tenantId: 'tnt_harbourline',
+    me: '',
+    admins: [
+      { name: 'Unit director, to be named', email: 'unit.director@harbourlinehospital.in', role: 'Tenant admin' as AdminRole, since: 'J4' },
+      { name: 'Unit outcomes desk, to be named', email: 'outcomes@harbourlinehospital.in', role: 'Read-only analyst' as AdminRole, since: 'J4' },
+    ],
+    waves: [] as typeof INVITE_WAVES,
+    audiences: [{ value: 'not-enrolled', label: 'Patients of the unit, not yet enrolled', n: 0 }, { value: 'referred', label: 'Referred by a unit physician, opted in', n: 0 }],
+    fileName: 'harbourline-unit-eligibility-sample.csv',
+    file: { rows: '436', matched: '420', dupes: '11', invalid: '5', held: 16, from: 'J4', eligible: '420' },
+    columns: [
+      { name: 'patient_ref', note: 'Your hashed patient reference. Not a name or a medical record number.' },
+      { name: 'email', note: 'Used once, for the invitation.' },
+      { name: 'pathway', note: 'How they came to the unit, referral or health check, for aggregates of ten or more. Never a diagnosis.' },
+      { name: 'city', note: 'City; never an address.' },
+      { name: 'eligible_from', note: 'ISO date.' },
+    ],
+  },
 }
 
 export const INSURER_PROFILE = {
@@ -507,6 +534,28 @@ export const INSURER_FLAGS = [
   { key: 'circles', label: 'Circles for policyholders', state: 'From J3', on: false, note: 'Not yet offered; the main reason re-measure trails direct members.' },
   { key: 'underwriting_use', label: 'Use in underwriting, pricing or claims', state: 'Never', on: false, note: 'Forbidden by contract. Not a setting.' },
   { key: 'individual_export', label: 'Individual-level export', state: 'Never', on: false, note: 'Insurers receive aggregates of ten or more only.' },
+  { key: 'ease_detail', label: 'Ease screens, journals or any term below aggregate', state: 'Never', on: false, note: 'Architecture p.24: tenants never receive these.' },
+]
+
+// Hospital units (“Joyspan Inside”, Memo p.32; Architecture p.24): a unit runs the Clinical grade and the 90 days
+// under its own line of type, reports against the Index and routes complex care back. They arrive at J4 (FY29 – FY31),
+// so no unit is live and no patient has enrolled. Harbourline Hospital is a made-up name for the shape of that tenant.
+export const HOSPITAL = { name: 'Harbourline Hospital · Joyspan Inside', stage: 'Planned tenant · J4, FY29 – FY31' }
+
+export const HOSPITAL_PROFILE = {
+  id: 'tnt_harbourline',
+  legal: 'Harbourline Hospital (specimen name)',
+  edition: 'Joyspan Inside · hospital unit',
+  stage: 'Planned · J4, FY29 – FY31',
+  region: 'India · Mumbai cell (pooled)',
+  recovery: 'Hyderabad',
+  keys: 'Pooled region key from J4',
+}
+
+export const HOSPITAL_FLAGS = [
+  { key: 'clinical_grade_unit', label: 'Clinical grade and the 90 days, run by the unit', state: 'From J4', on: false, note: 'The unit runs both under its own line of type, with a physician in the loop.' },
+  { key: 'complex_care_routing', label: 'Route complex care back', state: 'From J4', on: false, note: 'This console shows the monthly count only: who, why and what was said never reach it.' },
+  { key: 'individual_export', label: 'Individual-level export', state: 'Never', on: false, note: 'This console and the partner API give aggregates of ten or more only.' },
   { key: 'ease_detail', label: 'Ease screens, journals or any term below aggregate', state: 'Never', on: false, note: 'Architecture p.24: tenants never receive these.' },
 ]
 
@@ -738,6 +787,7 @@ export const CLINICAL_FEATURES = [
 export const CLINICAL_PARTNER = {
   employer: { partner: null as string | null, note: 'Northwind’s contract is wellbeing only. Ease flags route to the Northwind EAP; no licensed clinical partner is named for this tenant.' },
   insurer: { partner: null as string | null, note: 'A licensed clinical partner is part of the J3 pilot terms still in conversation (Decision 7). Until it is signed, clinical features stay off for policyholders.' },
+  hospital: { partner: 'Harbourline Hospital, the unit itself' as string | null, when: 'J4', note: 'A hospital unit runs the Clinical grade, so the hospital is its own licensed clinical partner. Nothing is switched on until a unit goes live at J4.' },
 }
 
 export const API_SCOPES = [
@@ -769,6 +819,7 @@ export const TENANT_API: Record<TenantKind, { keys: ApiKey[]; hooks: Webhook[] }
     keys: [{ id: 'cli_sh_sbx_a61e', name: 'Pilot integration · sandbox', env: 'sandbox', scopes: ['eligibility:write', 'aggregates:read'], created: '18 Nov 2026', lastUsed: '26 Jan 2027 15:30' }],
     hooks: [],
   },
+  hospital: { keys: [], hooks: [] },
 }
 
 // ─── Control plane · on-call rota (specimen) ─────────────────────────────
@@ -917,7 +968,7 @@ export const ACCESS_REVIEW = {
 
 // ─── Tenant admin · which tenant the role belongs to ─────────────────────
 // The tenant admin role is one tenant's role: Rhea Kapoor and the Northwind Capital People team (ACCESS_REVIEW g10).
-// Any other tenant shown in this console (the Star Health insurer view) is a read-only specimen preview: a tenant
+// Any other tenant shown in this console (the Star Health insurer and Harbourline hospital views) is a read-only specimen preview: a tenant
 // admin's sign-in reaches its own tenant's writes only, and in production would not open another tenant at all.
 export const TENANT_HOME: TenantKind = 'employer'
 
@@ -979,6 +1030,51 @@ export const INSURER_ROUTING: { month: string; clinician: number; eap: number; p
   { month: 'Feb', clinician: 34, eap: 24, projected: true },
   { month: 'Mar', clinician: 32 + DAY90_MAR, eap: 22, projected: true },
   { month: 'Apr', clinician: 30 + (INSURER.routed - DAY90_MAR), eap: 21, projected: true },
+]
+
+// ─── Hospital unit view · aggregate filters (specimen, J4 illustration) ──
+// Same partner endpoint and the same threshold of ten as the insurer. Every figure here is an illustration of the report
+// a unit would receive, never a result or a forecast: the pathway cohorts sum to the unit totals (enrolled 420, measured
+// 372), and a pathway is how someone came to the unit, never a diagnosis.
+
+export type HospitalCohortKey = 'all' | 'referred' | 'check' | 'late'
+export type HospitalCohort = {
+  value: HospitalCohortKey
+  label: string
+  note: string
+  enrolled: number
+  measured: number
+  remeasureRate: number
+  termMeans: AggTerm[]
+}
+export const HOSPITAL_COHORTS: HospitalCohort[] = [
+  {
+    value: 'all', label: 'Unit cohort · every patient enrolled', note: 'One ninety-day cycle of the unit.', enrolled: 420, measured: 372, remeasureRate: 0.72,
+    termMeans: tm([52, 56], [58, 61], [57, 60], [48, 51], [50, 54], [46, 39]),
+  },
+  {
+    value: 'referred', label: 'Referred by a unit physician', note: 'Came to the unit on a referral.', enrolled: 240, measured: 216, remeasureRate: 0.74,
+    termMeans: tm([49, 53], [57, 60], [56, 59], [47, 50], [48, 52], [49, 42]),
+  },
+  {
+    value: 'check', label: 'Joined from a unit health check', note: 'Came to the unit for a health check.', enrolled: 180, measured: 156, remeasureRate: 0.69,
+    termMeans: tm([56, 60], [59, 62], [58, 61], [49, 52], [53, 57], [42, 35]),
+  },
+  {
+    value: 'late', label: 'Joined after the unit cohort closed', note: 'Not in the unit totals. Under ten, so nothing is reported.', enrolled: 6, measured: 0, remeasureRate: 0,
+    termMeans: [],
+  },
+]
+export const HOSPITAL_PERIODS: { value: AggPeriod; label: string }[] = [
+  { value: 'change', label: 'Day 0 → Day 90 · illustration' },
+  { value: 'd0', label: 'Day 0 · illustration' },
+  { value: 'd90', label: 'Day 90 · illustration' },
+]
+/** Complex care routed back in one illustrated cycle: counts only, whole unit, and no total, so a cell under ten stays hidden. */
+export const HOSPITAL_ROUTING = [
+  { month: 'Month 1', routed: 14 },
+  { month: 'Month 2', routed: 11 },
+  { month: 'Month 3', routed: 7 },
 ]
 
 // ─── Science Office · method definition, stored as data (Architecture p.11) ───

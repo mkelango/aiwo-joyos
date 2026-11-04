@@ -12,6 +12,7 @@ import { ROOM_PLAIN, actionsFor, roomVerdict } from './_data'
 import { Reveal, TermRule, softColor } from './_SpaceShell'
 import { mono, useSpaceText } from './_i18n'
 import { useIsMinor } from '@/lib/minor'
+import { riseFade, useReduceMotion } from '@/lib/motion'
 import { useIndexHistory } from '@/routes/member/core/_latest'
 import { SABBATH_DAYS, SABBATH_KEY, nextSabbathOn, readSpaceState, useCalendarConnected, type SabbathPlan } from './_state'
 
@@ -21,6 +22,7 @@ import { SABBATH_DAYS, SABBATH_KEY, nextSabbathOn, readSpaceState, useCalendarCo
 // Under 18 nothing is scored (the minors gate): no Index, Wheel values, scores, bands or
 // deltas; the Wheel stays empty, each room says so, and no room is ranked as the lowest.
 export default function SpacesHub() {
+  const reduce = useReduceMotion()
   // The latest Index: a signed Day-90 re-measure moves the petals and the lowest term (core/_latest).
   const { latest } = useIndexHistory()
   const minor = useIsMinor()
@@ -72,7 +74,7 @@ export default function SpacesHub() {
               <SpecimenTag className="hidden sm:inline-flex" />
             </div>
             <AnimatePresence mode="wait" initial={false}>
-              <motion.div key={selected} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+              <motion.div key={selected} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                 <div className="mt-5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
                   <TermDot term={selected} size={12} />
                   <span className="text-[1.6rem] font-light text-ink">{tt.space(selected)}</span>
@@ -116,7 +118,7 @@ export default function SpacesHub() {
             const isLow = t.key === lowest && !minor
             const isB = t.key === 'B'
             return (
-              <motion.li key={t.key} className="flex" initial={{ y: 8 }} animate={{ y: 0 }} transition={{ duration: 0.24, delay: i * 0.03 }}>
+              <motion.li key={t.key} className="flex" {...riseFade(reduce, i * 30)}>
                   <Link
                     to={`/app/spaces/${t.slug}`}
                     onMouseEnter={() => setSelected(t.key)}

@@ -11,7 +11,7 @@ import type { TermKey } from '@/domain/types'
 // What stays English by design: the Mentor's spoken transcript (a verbatim record
 // of English audio), people's own words (coach notes, circle captions, the named
 // outcome), names, brand and product names (AIWO, Joy OS, the ’cation names,
-// Couples Check, Circle as a tier), citations and scientific abbreviations.
+// Circle as a tier), citations and scientific abbreviations.
 
 export const JOURNEY = {
   // shared
@@ -351,13 +351,13 @@ export const JOURNEY = {
   sessionsTitle: { en: 'Joyspan Sessions', ta: 'ஜாய்ஸ்பான் அமர்வுகள்', hi: 'जॉयस्पैन सेशन' },
   bookedSession: { en: 'Booked: Joyspan Session · {city}. *See you there.*', ta: 'முன்பதிவானது: ஜாய்ஸ்பான் அமர்வு · {city}. *அங்கே சந்திப்போம்.*', hi: 'बुक हो गया: जॉयस्पैन सेशन · {city}। *वहाँ मिलते हैं।*' },
   bookedMeta: { en: '{when} · {who} · pass {code} is now in your Upcoming passes and on your Joy Passport.', ta: '{when} · {who} · பாஸ் {code} இப்போது உங்கள் வரவிருக்கும் பாஸ்களிலும் ஜாய் பாஸ்போர்ட்டிலும் உள்ளது.', hi: '{when} · {who} · पास {code} अब आपके आने वाले पासों में और जॉय पासपोर्ट पर है।' },
-  forTwoCheck: { en: 'for two; the Check at the door is offered to {p}', ta: 'இருவருக்கு; வாசலில் Check {p} க்கு வழங்கப்படும்', hi: 'दो के लिए; दरवाज़े पर Check {p} को दिया जाएगा' },
+  forTwoCheck: { en: 'for two; the Check at the door is offered to {p}', ta: 'இருவருக்கு; வாசலில் செக் {p} க்கு வழங்கப்படும்', hi: 'दो के लिए; दरवाज़े पर चेक {p} को दिया जाएगा' },
   forTwoLower: { en: 'for two', ta: 'இருவருக்கு', hi: 'दो के लिए' },
   forOneLower: { en: 'for one', ta: 'ஒருவருக்கு', hi: 'एक के लिए' },
   showThePass: { en: 'Show the pass', ta: 'பாஸைக் காட்டு', hi: 'पास दिखाएँ' },
   bookAnother: { en: 'Book another', ta: 'இன்னொன்றை முன்பதிவு செய்', hi: 'एक और बुक करें' },
   sessionLegend: { en: 'A half-day in your city: the Mentor, the Zones, your circle, ten minutes with your coach.', ta: 'உங்கள் நகரில் ஒரு அரை நாள்: வழிகாட்டி, மண்டலங்கள், உங்கள் வட்டம், உங்கள் கோச்சுடன் பத்து நிமிடங்கள்.', hi: 'आपके शहर में आधा दिन: मेंटर, ज़ोन, आपका सर्कल, और आपके कोच के साथ दस मिनट।' },
-  offerCheck: { en: 'Offer the Check at the door to {p}. Bands only, never a number, and private to {p}.', ta: 'வாசலில் Check ஐ {p} க்கு வழங்குங்கள். நிலைகள் மட்டும், எண் ஒருபோதும் இல்லை; {p} க்கு மட்டுமே தெரியும்.', hi: 'दरवाज़े पर Check {p} को दें। सिर्फ़ स्तर, कभी कोई अंक नहीं, और सिर्फ़ {p} के लिए निजी।' },
+  offerCheck: { en: 'Offer the Check at the door to {p}. Bands only, never a number, and private to {p}.', ta: 'வாசலில் செக்-ஐ {p} க்கு வழங்குங்கள். நிலைகள் மட்டும், எண் ஒருபோதும் இல்லை; {p} க்கு மட்டுமே தெரியும்.', hi: 'दरवाज़े पर चेक {p} को दें। सिर्फ़ स्तर, कभी कोई अंक नहीं, और सिर्फ़ {p} के लिए निजी।' },
   morningProg: { en: 'Morning programme, about five hours. {l} of {n} included left this year.', ta: 'காலை நிகழ்ச்சி, சுமார் ஐந்து மணிநேரம். இந்த ஆண்டு {n} இல் {l} மீதம் உள்ளன.', hi: 'सुबह का कार्यक्रम, लगभग पाँच घंटे। इस साल {n} में से {l} बचे हैं।' },
   bookThisSession: { en: 'Book this Session', ta: 'இந்த அமர்வை முன்பதிவு செய்யுங்கள்', hi: 'यह सेशन बुक करें' },
 
@@ -522,12 +522,12 @@ export const JOURNEY = {
   occP_anniversary: { en: 'The years you have had, and a measure of the next ones, together.', ta: 'நீங்கள் கடந்த ஆண்டுகளும், வரும் ஆண்டுகளுக்கான ஒரு அளவீடும், இணைந்து.', hi: 'जो साल आपने साथ बिताए, और आगे के सालों का एक माप, साथ में।' },
   occP_homecoming: { en: 'Someone comes home from abroad; the family gathers and starts the next ninety days as one.', ta: 'வெளிநாட்டிலிருந்து ஒருவர் வீடு திரும்புகிறார்; குடும்பம் கூடி, அடுத்த தொண்ணூறு நாட்களை ஒன்றாகத் தொடங்குகிறது.', hi: 'कोई विदेश से घर लौटता है; परिवार इकट्ठा होता है और अगले नब्बे दिन एक साथ शुरू करता है।' },
   occM_birthday60: { en: 'Full Joyspan Index re-score for every guest measured', ta: 'அளக்கப்பட்ட ஒவ்வொரு விருந்தினருக்கும் முழு ஜாய்ஸ்பான் குறியீட்டு மறு மதிப்பீடு', hi: 'मापे गए हर मेहमान का पूरा जॉयस्पैन इंडेक्स दोबारा स्कोर' },
-  occM_anniversary: { en: 'CSI-4 for each partner; Couples Check agreement; Index for every guest measured', ta: 'ஒவ்வொரு துணைக்கும் CSI-4; Couples Check ஒத்திசைவு; அளக்கப்பட்ட ஒவ்வொரு விருந்தினருக்கும் குறியீடு', hi: 'हर साथी के लिए CSI-4; Couples Check में सहमति; मापे गए हर मेहमान का इंडेक्स' },
+  occM_anniversary: { en: 'CSI-4 for each partner; Couples Check agreement; Index for every guest measured', ta: 'ஒவ்வொரு துணைக்கும் CSI-4; தம்பதியர் சரிபார்ப்பில் ஒத்துப்போதல்; அளக்கப்பட்ட ஒவ்வொரு விருந்தினருக்கும் குறியீடு', hi: 'हर साथी के लिए CSI-4; कपल्स चेक में सहमति; मापे गए हर मेहमान का इंडेक्स' },
   occM_homecoming: { en: 'Index for every guest measured; Relationships re-measured for the household', ta: 'அளக்கப்பட்ட ஒவ்வொரு விருந்தினருக்கும் குறியீடு; குடும்பத்துக்கு உறவுகள் மறு அளவீடு', hi: 'मापे गए हर मेहमान का इंडेक्स; घर के लिए रिश्तों का दोबारा माप' },
   occI_table: { en: 'The day itself: the family table, hosted', ta: 'அந்த நாளே: குடும்ப மேசை, முழு ஏற்பாட்டுடன்', hi: 'खुद वह दिन: परिवार की मेज़, पूरी मेज़बानी के साथ' },
   occI_index: { en: 'A Day-0 Index for every guest who agrees, three generations measured together', ta: 'ஒப்புக்கொள்ளும் ஒவ்வொரு விருந்தினருக்கும் நாள்-0 குறியீடு; மூன்று தலைமுறைகளும் ஒன்றாக அளக்கப்படுகின்றன', hi: 'हर सहमत मेहमान का दिन-0 इंडेक्स, तीन पीढ़ियाँ एक साथ मापी जाती हैं' },
   occI_clinician: { en: 'A named clinician present, not on call', ta: 'அழைப்பில் அல்ல, நேரில் இருக்கும் பெயரிட்ட மருத்துவர்', hi: 'एक नामित चिकित्सक जो मौजूद रहते हैं, सिर्फ़ फ़ोन पर नहीं' },
-  occI_couples: { en: 'Couples Check for the two of you: where you agree and differ, never who said what', ta: 'உங்கள் இருவருக்கும் Couples Check: எங்கே ஒத்துப்போகிறீர்கள், எங்கே வேறுபடுகிறீர்கள்; யார் என்ன சொன்னார்கள் என்பது ஒருபோதும் இல்லை', hi: 'आप दोनों के लिए Couples Check: कहाँ सहमत हैं और कहाँ अलग, यह कभी नहीं कि किसने क्या कहा' },
+  occI_couples: { en: 'Couples Check for the two of you: where you agree and differ, never who said what', ta: 'உங்கள் இருவருக்கும் தம்பதியர் சரிபார்ப்பு: எங்கே ஒத்துப்போகிறீர்கள், எங்கே வேறுபடுகிறீர்கள்; யார் என்ன சொன்னார்கள் என்பது ஒருபோதும் இல்லை', hi: 'आप दोनों के लिए कपल्स चेक: कहाँ सहमत हैं और कहाँ अलग, यह कभी नहीं कि किसने क्या कहा' },
   occI_arrival: { en: 'An arrival day planned around the journey home, and a slow first morning', ta: 'வீடு திரும்பும் பயணத்தைச் சுற்றித் திட்டமிட்ட வருகை நாள், மெதுவான முதல் காலை', hi: 'घर लौटने के सफ़र के हिसाब से तय आगमन का दिन, और एक धीमी पहली सुबह' },
   occI_circle: { en: 'A family circle with Coach {c} for the ninety days after', ta: 'பிறகு தொண்ணூறு நாட்களுக்கு கோச் {c} உடன் ஒரு குடும்ப வட்டம்', hi: 'उसके बाद नब्बे दिनों के लिए कोच {c} के साथ एक पारिवारिक सर्कल' },
   occFrom: { en: 'From {p} for the household', ta: 'குடும்பத்துக்கு {p} முதல்', hi: 'पूरे घर के लिए {p} से' },
@@ -784,7 +784,7 @@ const DATA: Record<string, [string, string]> = {
   'Present for the week; reviews your CGM trace each morning.': ['வாரம் முழுவதும் உடனிருப்பார்; ஒவ்வொரு காலையும் உங்கள் CGM பதிவைப் பார்வையிடுவார்.', 'पूरे हफ़्ते मौजूद; हर सुबह आपका CGM ग्राफ़ देखते हैं।'],
   'Clears every session against your capacity battery.': ['உங்கள் திறன் சோதனை முடிவுகளைப் பார்த்து ஒவ்வொரு அமர்வுக்கும் அனுமதி தருவார்.', 'आपकी क्षमता जाँच के आधार पर हर सत्र की मंज़ूरी देती हैं।'],
   'Holds the PSS-4 secondary measure and any screen that needs a person.': ['PSS-4 துணை அளவீட்டையும், ஒரு மனிதர் பார்க்க வேண்டிய எந்தப் பரிசோதனையையும் இவரே கவனிப்பார்.', 'PSS-4 सहायक माप और हर वह जाँच संभालते हैं जिसे किसी इंसान को देखना ज़रूरी हो।'],
-  'Leads the Couples Check debrief. Shows where you agree and differ, never who said what.': ['Couples Check கலந்துரையாடலை நடத்துவார். நீங்கள் எங்கே ஒத்துப்போகிறீர்கள், எங்கே வேறுபடுகிறீர்கள் என்று காட்டுவார்; யார் என்ன சொன்னார்கள் என்பதை ஒருபோதும் அல்ல.', 'Couples Check पर बातचीत का नेतृत्व करती हैं। दिखाती हैं कि आप कहाँ सहमत हैं और कहाँ अलग, यह कभी नहीं कि किसने क्या कहा।'],
+  'Leads the Couples Check debrief. Shows where you agree and differ, never who said what.': ['தம்பதியர் சரிபார்ப்பு கலந்துரையாடலை நடத்துவார். நீங்கள் எங்கே ஒத்துப்போகிறீர்கள், எங்கே வேறுபடுகிறீர்கள் என்று காட்டுவார்; யார் என்ன சொன்னார்கள் என்பதை ஒருபோதும் அல்ல.', 'कपल्स चेक पर बातचीत का नेतृत्व करती हैं। दिखाती हैं कि आप कहाँ सहमत हैं और कहाँ अलग, यह कभी नहीं कि किसने क्या कहा।'],
   'Present for the stress and autonomy sessions. This ’cation never gives financial or investment advice.': ['மன அழுத்தம் மற்றும் சுயாட்சி அமர்வுகளில் உடனிருப்பார். இந்த ’கேஷன் ஒருபோதும் நிதி அல்லது முதலீட்டு ஆலோசனை வழங்காது.', 'तनाव और स्वायत्तता वाले सत्रों में मौजूद। यह ’केशन कभी भी वित्तीय या निवेश सलाह नहीं देता।'],
   'Reads your skin imaging on arrival and re-reads it at Day 90.': ['நீங்கள் வந்தவுடன் உங்கள் தோல் படங்களைப் படிப்பார்; நாள் 90 அன்று மீண்டும் படிப்பார்.', 'आपके आते ही त्वचा की इमेजिंग पढ़ती हैं, और दिन 90 पर फिर से।'],
   'Present for all three days; holds any Ease screen that needs a person.': ['மூன்று நாட்களும் உடனிருப்பார்; ஒரு மனிதர் பார்க்க வேண்டிய எந்த நிம்மதி பரிசோதனையையும் இவரே கவனிப்பார்.', 'तीनों दिन मौजूद; सहजता की हर वह जाँच संभालते हैं जिसे किसी इंसान को देखना ज़रूरी हो।'],
@@ -849,7 +849,7 @@ const DATA: Record<string, [string, string]> = {
   'River room': ['நதி அறை', 'रिवर रूम'],
   'Ghat': ['படித்துறை', 'घाट'],
   'Garden': ['தோட்டம்', 'बगीचा'],
-  'Couples Check debrief: agree and differ': ['Couples Check கலந்துரையாடல்: ஒத்ததும் வேறுபட்டதும்', 'Couples Check पर बातचीत: सहमति और फ़र्क'],
+  'Couples Check debrief: agree and differ': ['தம்பதியர் சரிபார்ப்பு கலந்துரையாடல்: ஒத்ததும் வேறுபட்டதும்', 'कपल्स चेक पर बातचीत: सहमति और फ़र्क'],
   'Love maps, an evening for two': ['அன்பு வரைபடங்கள், இருவருக்கான ஒரு மாலை', 'प्यार के नक्शे, दो लोगों की एक शाम'],
   'The signature date: a boat at sunset': ['சிறப்புச் சந்திப்பு: சூரிய அஸ்தமனத்தில் படகு', 'ख़ास डेट: सूर्यास्त पर नाव'],
   'The repair conversation, practised': ['சரிசெய்யும் உரையாடல், பயிற்சியாக', 'रिश्ता सुधारने वाली बातचीत, अभ्यास में'],
@@ -894,7 +894,7 @@ const DATA: Record<string, [string, string]> = {
   'HbA1c or HOMA-IR drawn at home; visceral fat baseline booked.': ['வீட்டிலேயே HbA1c அல்லது HOMA-IR பரிசோதனை; உள்ளுறுப்புக் கொழுப்பு அடிப்படை அளவுக்கு முன்பதிவு.', 'घर पर HbA1c या HOMA-IR जाँच; विसरल फ़ैट के आधार-माप की बुकिंग।'],
   'Capacity battery self-test at home; physician clearance where needed.': ['வீட்டிலேயே திறன் சுயசோதனை; தேவைப்பட்டால் மருத்துவர் அனுமதி.', 'घर पर क्षमता की खुद जाँच; ज़रूरत हो तो चिकित्सक की मंज़ूरी।'],
   'Ikigai-9 and MLQ-Presence at home; the Joyspiration book posted.': ['வீட்டிலேயே Ikigai-9 மற்றும் MLQ-Presence; Joyspiration புத்தகம் அனுப்பப்படும்.', 'घर पर Ikigai-9 और MLQ-Presence; Joyspiration किताब भेजी जाएगी।'],
-  'The Couples Check, each partner privately; CSI-4 for each of you.': ['Couples Check, ஒவ்வொரு துணையும் தனியாக; உங்கள் ஒவ்வொருவருக்கும் CSI-4.', 'Couples Check, हर साथी अलग से; आप दोनों के लिए CSI-4।'],
+  'The Couples Check, each partner privately; CSI-4 for each of you.': ['தம்பதியர் சரிபார்ப்பு, ஒவ்வொரு துணையும் தனியாக; உங்கள் ஒவ்வொருவருக்கும் CSI-4.', 'कपल्स चेक, हर साथी अलग से; आप दोनों के लिए CSI-4।'],
   'Autonomy, time affluence and CFPB Financial Well-Being at home; calendar summary, if you allow it.': ['வீட்டிலேயே சுயாட்சி, நேர வளம், CFPB Financial Well-Being; நீங்கள் அனுமதித்தால் நாட்காட்டிச் சுருக்கம்.', 'घर पर स्वायत्तता, समय की भरपूरता और CFPB Financial Well-Being; आप अनुमति दें तो कैलेंडर का सारांश।'],
   'Skin imaging booked; SPANE at home; your Joy Ledger opened a week early.': ['தோல் படமெடுப்புக்கு முன்பதிவு; வீட்டிலேயே SPANE; உங்கள் ஜாய் லெட்ஜர் ஒரு வாரம் முன்பே திறக்கப்படும்.', 'त्वचा इमेजिंग बुक; घर पर SPANE; आपका जॉय लेजर एक हफ़्ता पहले खुलेगा।'],
   'Your Joy Ledger opened a week early; SPANE and the savouring scale at home.': ['உங்கள் ஜாய் லெட்ஜர் ஒரு வாரம் முன்பே திறக்கப்படும்; வீட்டிலேயே SPANE மற்றும் ரசிப்பு அளவுகோல்.', 'आपका जॉय लेजर एक हफ़्ता पहले खुलेगा; घर पर SPANE और सेवरिंग स्केल।'],
@@ -1050,7 +1050,7 @@ const DATA: Record<string, [string, string]> = {
   'Music we grew up with': ['நாம் வளர்ந்த இசை', 'वह संगीत जिसके साथ हम बड़े हुए'],
 
   // events
-  'Arrival; the Check at the door for guests': ['வருகை; விருந்தினர்களுக்கு வாசலில் Check', 'आगमन; मेहमानों के लिए दरवाज़े पर Check'],
+  'Arrival; the Check at the door for guests': ['வருகை; விருந்தினர்களுக்கு வாசலிலேயே செக்', 'आगमन; मेहमानों के लिए दरवाज़े पर चेक'],
   'Opening: the Mentor, in conversation': ['தொடக்கம்: வழிகாட்டியுடன் உரையாடல்', 'शुरुआत: मेंटर, बातचीत में'],
   'Experience Zone: Pleasure': ['அனுபவ மண்டலம்: மகிழ்ச்சி', 'अनुभव ज़ोन: आनंद'],
   'Experience Zone: Body · capacity battery': ['அனுபவ மண்டலம்: உடல் · திறன் சோதனைகள்', 'अनुभव ज़ोन: शरीर · क्षमता जाँच'],
@@ -1068,7 +1068,7 @@ const DATA: Record<string, [string, string]> = {
   'The Ikigai wall; write your Tomorrow Question on a card and keep it.': ['இகிகாய் சுவர்; உங்கள் நாளைய கேள்வியை ஒரு அட்டையில் எழுதி வைத்துக்கொள்ளுங்கள்.', 'इकिगाई दीवार; अपना कल का सवाल एक कार्ड पर लिखिए और अपने पास रखिए।'],
   'Main hall foyer': ['பிரதான அரங்க முகப்பு', 'मुख्य हॉल की लॉबी'],
   'People Zone': ['மனிதர்கள் மண்டலம்', 'लोग ज़ोन'],
-  'The Connections table; the Couples Check booth, each partner privately.': ['உறவுகள் மேசை; Couples Check அறை, ஒவ்வொரு துணையும் தனியாக.', 'रिश्तों की मेज़; Couples Check बूथ, हर साथी अलग से।'],
+  'The Connections table; the Couples Check booth, each partner privately.': ['உறவுகள் மேசை; தம்பதியர் சரிபார்ப்பு அறை, ஒவ்வொரு துணையும் தனியாக.', 'रिश्तों की मेज़; कपल्स चेक बूथ, हर साथी अलग से।'],
   'Freedom Zone': ['சுதந்திர மண்டலம்', 'स्वतंत्रता ज़ोन'],
   'The time-audit lab and the No list. Never financial advice.': ['நேரத் தணிக்கை ஆய்வகமும் “வேண்டாம்” பட்டியலும். நிதி ஆலோசனை ஒருபோதும் இல்லை.', 'समय-हिसाब लैब और “ना” सूची। वित्तीय सलाह कभी नहीं।'],
   'Pleasure Zone': ['மகிழ்ச்சி மண்டலம்', 'आनंद ज़ोन'],
@@ -1116,7 +1116,7 @@ const DATA: Record<string, [string, string]> = {
   'Visceral fat, ALMI, HbA1c or HOMA-IR': ['உள்ளுறுப்புக் கொழுப்பு, ALMI, HbA1c அல்லது HOMA-IR', 'विसरल फ़ैट, ALMI, HbA1c या HOMA-IR'],
   'Grip, sit-to-stand, VO₂max, ALMI': ['பிடி, உட்கார்ந்து-எழுதல், VO₂max, ALMI', 'पकड़, बैठना-उठना, VO₂max, ALMI'],
   'Ikigai-9, MLQ-Presence; PSS-4 secondary': ['Ikigai-9, MLQ-Presence; PSS-4 துணை அளவீடு', 'Ikigai-9, MLQ-Presence; PSS-4 सहायक'],
-  'CSI-4 for each partner; Couples Check agreement': ['ஒவ்வொரு துணைக்கும் CSI-4; Couples Check ஒத்திசைவு', 'हर साथी के लिए CSI-4; Couples Check में सहमति'],
+  'CSI-4 for each partner; Couples Check agreement': ['ஒவ்வொரு துணைக்கும் CSI-4; தம்பதியர் சரிபார்ப்பில் ஒத்துப்போதல்', 'हर साथी के लिए CSI-4; कपल्स चेक में सहमति'],
   'Autonomy, time affluence, CFPB': ['சுயாட்சி, நேர வளம், CFPB', 'स्वायत्तता, समय की भरपूरता, CFPB'],
   'Skin imaging re-read; SPANE; joy moments': ['தோல் படங்கள் மறு ஆய்வு; SPANE; மகிழ்ச்சித் தருணங்கள்', 'त्वचा इमेजिंग दोबारा; SPANE; खुशी के पल'],
   'Joy Ledger density, savouring, SPANE': ['ஜாய் லெட்ஜர் அடர்த்தி, ரசிப்பு, SPANE', 'जॉय लेजर घनत्व, सेवरिंग, SPANE'],

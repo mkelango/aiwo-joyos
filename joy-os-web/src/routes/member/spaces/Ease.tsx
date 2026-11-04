@@ -13,6 +13,7 @@ import { readSpaceState, useSpaceState } from './_state'
 import { CARE_PERSON, careThreadHref, postCareMessage, specimenNow, type CareRecipient } from '@/routes/member/account/_careInbox'
 import { INSTRUMENT_NOTE } from '@/lib/i18n'
 import { useIsMinor } from '@/lib/minor'
+import { DUR, growFade, useReduceMotion } from '@/lib/motion'
 
 // EASE · Preventable Suffering (Memo p.19, p.24): the Second Arrow journal, sleep
 // plan and wind-down (CBT-I informed), the “keep meaning to” list, PHQ-4 / ISI /
@@ -273,6 +274,7 @@ function bandFor(screen: Screen, score: number) {
 type History = typeof SCREEN_HISTORY
 
 function Screens({ history, setHistory }: { history: History; setHistory: Dispatch<SetStateAction<History>> }) {
+  const reduce = useReduceMotion()
   const [screen, setScreen] = useState<Screen>('PHQ-4')
   const [taking, setTaking] = useState(false)
   const [answers, setAnswers] = useState<(number | null)[]>([])
@@ -324,7 +326,7 @@ function Screens({ history, setHistory }: { history: History; setHistory: Dispat
             {h.map((x, i) => (
               <div key={x.date + i} className="flex h-full flex-1 flex-col items-center justify-end gap-1.5">
                 <span className="num text-[13px] text-ink">{x.score}</span>
-                <motion.div className={clsx('hatch-b w-full max-w-[56px] rounded-t-lg', i !== h.length - 1 && 'opacity-60')} initial={{ height: 0 }} animate={{ height: `${Math.max(4, (x.score / meta.max) * 100)}%` }} transition={{ duration: 0.24, delay: i * 0.04 }} />
+                <motion.div className="hatch-b w-full max-w-[56px] rounded-t-lg" {...growFade(reduce, 'height', `${Math.max(4, (x.score / meta.max) * 100)}%`, DUR.settle, i * 40, i !== h.length - 1 ? 0.6 : 1)} />
               </div>
             ))}
           </div>

@@ -15,6 +15,7 @@ import { CONSENT_SEED, latestFor, type ConsentHistory } from '@/routes/member/ac
 import { DEVICE_CONSENT, consentAllows, readConsents, setDeviceConsent, type ConsentRecord, type DevicePurpose } from '@/routes/member/account/_links'
 import { EmptyIllustration } from '@/components/joy/EmptyIllustration'
 import { useDict } from '@/lib/i18n'
+import { expandFade, useReduceMotion } from '@/lib/motion'
 import { VIZ } from '@/lib/viz'
 import { postCareMessage } from '@/routes/member/account/_careInbox'
 import { BIOMARKERS, CAPACITY, CAPACITY_HISTORY_START, LE8, LE8_HEIGHT_CM, LE8_KEY, LE8_LOG_START, PANEL_META, SIGNALS, SPACE_TODAY, bmiOf, le8Latest, le8Score, le8Series, le8Status, type Le8Key, type Le8Reading, type Marker, type MarkerStatus } from './_data'
@@ -292,6 +293,7 @@ function useLe8Reading() {
 }
 
 function Le8Tracker() {
+  const reduce = useReduceMotion()
   const [open, setOpen] = useState<string | null>('lipids')
   const [store, setStore] = useSpaceState<{ log: Le8Reading[] }>(LE8_KEY, { log: LE8_LOG_START })
   const [logging, setLogging] = useState<Le8Key | null>(null)
@@ -370,7 +372,7 @@ function Le8Tracker() {
               </button>
               <AnimatePresence initial={false}>
                 {open === m.key && (
-                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
+                  <motion.div {...expandFade(reduce, 200)} className="overflow-hidden">
                     <div className="mb-3 rounded-xl bg-paper-sunk p-3.5 text-[14px]">
                       <div className="grid gap-3 sm:grid-cols-[auto_1fr]">
                         <div>
@@ -831,7 +833,7 @@ function CapacityBattery() {
             </ol>
           )}
           <AnimatePresence mode="wait" initial={false}>
-            <motion.div key={step} initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} transition={{ duration: 0.2 }} className="flex flex-1 flex-col">
+            <motion.div key={step} initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} className="flex flex-1 flex-col">
               {step === 'grip' && (
                 <>
                   <Eyebrow>{t('body.cap.stepName', { n: 1, name: d(CAPACITY[0].name) })}</Eyebrow>
@@ -959,7 +961,7 @@ function BiologicalAge() {
       <div className="flex flex-1 flex-col">
         <AnimatePresence mode="wait" initial={false}>
           {signedView ? (
-            <motion.div key="signed" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }}>
+            <motion.div key="signed" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <div className="flex h-28 flex-col items-center justify-center rounded-2xl border border-line bg-paper-raised" role="img" aria-label={t('body.ba.signedAria', { a: BIO_AGE.low, b: BIO_AGE.high, name: doc })}>
                 <span className="num text-[3rem] font-light leading-none text-ink" aria-hidden>{BIO_AGE.low} – {BIO_AGE.high}</span>
                 <span className="mt-1.5 text-[13px] text-ink-3" aria-hidden>{t('body.ba.years')}</span>
@@ -968,7 +970,7 @@ function BiologicalAge() {
               <p className="mt-1.5 text-[15px] text-ink-2">{tn('body.ba.signedB', { name: doc })}</p>
             </motion.div>
           ) : (
-            <motion.div key="locked" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }}>
+            <motion.div key="locked" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <div className="flex h-28 items-center justify-center rounded-2xl border border-dashed border-line-strong">
                 <span className="num text-[3rem] font-light text-ink-3" aria-label={t('body.ba.locked')}>— —</span>
               </div>

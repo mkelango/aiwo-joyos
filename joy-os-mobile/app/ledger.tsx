@@ -1,5 +1,5 @@
 import { router } from 'expo-router'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { View } from 'react-native'
 import {
   ArrowLink,
@@ -24,13 +24,14 @@ import {
 import { useDict, useT } from '@/lib/i18n'
 import { LEDGER, SCHEDULE_LABEL, WEEKDAY_LETTERS } from '@/screens/b/i18n/ledger'
 import { LEDGER_TAG, useCommon, useTx } from '@/screens/b/i18n/common'
+import { SETTINGS } from '@/screens/b/i18n/account'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import { LEDGER_CALENDAR, LEDGER_SCHEDULE, LEDGER_STORY } from '@/screens/a/coreData'
 import { H2, isSpecimenToday, ledgerStamp, madeHere, ledgerWhen, shiftTime, useLocal } from '@/screens/a/local'
 import { BarRow, Chip, IconButton, Provenance, TextField } from '@/screens/a/parts'
 import { LEDGER as SEED_LEDGER, LEDGER_TAGS, LEDGER_WEEK } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
-import { notifPrefsStore, useAccountId, useStore } from '@/screens/b/bStore'
+import { a11yStore, accountStore, notifPrefsStore, useAccountId, useStore } from '@/screens/b/bStore'
 import { memberOnly } from '@/screens/b/parts'
 import { txFor } from '@/screens/a/i18n'
 import { MonoNums } from '@/lib/monoNums'
@@ -40,6 +41,9 @@ import { MonoNums } from '@/lib/monoNums'
 // held against you; an empty day is fine.
 // The Ledger is the signed-in account's own (useApp().ledger). The specimen week, calendar and
 // story are Arjun's, so anyone else sees only the moments they kept here.
+// Voice-first (Memo p21): with the switch on, the prompt is read aloud as it opens. The same switch
+// and the same simulated read-aloud as Settings: no speech module is installed, so the words show
+// as a caption for about as long as they would take to read, labelled specimen; no sound plays.
 
 /** Three full weeks and Monday to Wednesday of this one; today (Thursday 28 Jan) follows. */
 const CAL = LEDGER_CALENDAR.slice(-24)
@@ -49,13 +53,15 @@ export default memberOnly(Ledger)
 function Ledger() {
   const t = useT()
   const tl = useDict(LEDGER)
+  const ts = useDict(SETTINGS)
   const tc = useCommon()
   const tx = useTx()
   const tag = (tg: string) => tx(LEDGER_TAG[tg], tg)
   const slotLabel = (s: { prompt: number; label: string }) => tx(SCHEDULE_LABEL[s.prompt], s.label)
   const { c, space, term } = useTheme()
   const { ledger, addLedger, setCrisisOpen, lang } = useApp()
-  const seeded = useAccountId() === 'arjun'
+  const accountId = useAccountId()
+  const seeded = accountId === 'arjun'
   const calendar = useMemo(() => (seeded ? CAL : CAL.map(() => 0)), [seeded])
   const WEEKDAYS = WEEKDAY_LETTERS[lang]
   const [tags, setTags] = useState<string[]>([])
@@ -68,6 +74,30 @@ function Ledger() {
   const [draftTimes, setDraftTimes] = useState<string[]>(times)
   const [timesSaved, setTimesSaved] = useState(false)
   const col = term('D')
+  // Lakshmi's is her elder mode's voice; everyone else's is kept with Accessibility (as in Settings).
+  const [a11y] = useStore(a11yStore)
+  const [acct] = useStore(accountStore)
+  const voiceOn = accountId === 'lakshmi' ? acct.elder.voice : !!a11y.voice
+  const promptWords = t('ledgerPrompt')
+  const [reading, setReading] = useState<string | null>(null)
+  const readTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const stopReading = () => {
+    if (readTimer.current) clearTimeout(readTimer.current)
+    setReading(null)
+  }
+  /** Simulated read-aloud: the caption stays up for about as long as reading the words would take. */
+  const readAloud = (text: string) => {
+    if (readTimer.current) clearTimeout(readTimer.current)
+    setReading(text)
+    readTimer.current = setTimeout(() => setReading(null), Math.max(2600, text.length * 70))
+  }
+  useEffect(() => {
+    if (voiceOn && state === 'ask') readAloud(promptWords)
+    else stopReading()
+    return () => {
+      if (readTimer.current) clearTimeout(readTimer.current)
+    }
+  }, [voiceOn, state, promptWords]) // eslint-disable-line react-hooks/exhaustive-deps
   // The same quiet hours and channels that Settings, Notifications and onboarding keep.
   const [prefs] = useStore(notifPrefsStore)
   const toMin = (x: string) => Number(x.slice(0, 2)) * 60 + Number(x.slice(3))
@@ -124,6 +154,19 @@ function Ledger() {
       {/* The prompt */}
       {state === 'ask' ? (
         <Card tone="raised" style={{ gap: space.s2 }}>
+          {voiceOn ? (
+            <Card tone="sunk" padding={16} style={{ gap: space.s1 }}>
+              <Button size="sm" variant="secondary" icon={reading ? 'square' : 'volume-2'} onPress={() => (reading ? stopReading() : readAloud(promptWords))} style={{ alignSelf: 'flex-start' }}>
+                {reading ? ts('vtStop') : ts('vtRead')}
+              </Button>
+              {reading ? (
+                <View accessibilityLiveRegion="polite" style={{ gap: 2 }}>
+                  <Meta size={13} tone="ink3">{ts('vtReading')}</Meta>
+                  <Body>{`“${reading}”`}</Body>
+                </View>
+              ) : null}
+            </Card>
+          ) : null}
           <View style={{ gap: 6 }}>
             <Eyebrow>{tl('where')}</Eyebrow>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -152,9 +195,12 @@ function Ledger() {
               <IconButton icon="x" label={tl('removePhoto')} onPress={() => setPhoto(false)} />
             </View>
           ) : (
-            <Button variant="ghost" size="sm" icon="camera" onPress={() => setPhoto(true)} accessibilityHint={tl('addPhotoHint')}>
-              {tl('addPhoto')}
-            </Button>
+            <View style={{ gap: 4 }}>
+              <Button variant="ghost" size="sm" icon="camera" onPress={() => setPhoto(true)} accessibilityHint={tl('addPhotoHint')}>
+                {tl('addPhoto')}
+              </Button>
+              <Meta size={14} tone="ink3">{tl('photoStay')}</Meta>
+            </View>
           )}
           {error ? (
             <Meta tone="error" accessibilityLiveRegion="polite">
@@ -179,7 +225,7 @@ function Ledger() {
                   {tl('keptA')}<Serif>{tl('keptSerif')}</Serif>
                 </>
               ) : (
-                tl('fine', { time: nextPrompt.time })
+                <MonoNums text={tl('fine', { time: nextPrompt.time })} />
               )}
             </Title>
             <Meta>{state === 'saved' ? `${tags.map(tag).join(' · ')}${word.trim() ? ` · “${word.trim()}”` : ''}${photo ? tl('withPhoto') : ''}${tl('savedSync')}` : tl('emptyOk')}</Meta>
@@ -267,7 +313,7 @@ function Ledger() {
           ))}
         </View>
         <Meta size={14} tone="ink3">
-          {todayCount ? tl('todayRing', { n: todayCount, unit: todayCount === 1 ? tl('moment') : tl('moments') }) : tl('todayNone')}
+          <MonoNums text={todayCount ? tl('todayRing', { n: todayCount, unit: todayCount === 1 ? tl('moment') : tl('moments') }) : tl('todayNone')} />
         </Meta>
       </Card>
 
@@ -306,13 +352,13 @@ function Ledger() {
               {s.time}
             </Mono>
             <Meta style={{ flex: 1 }}><MonoNums text={slotLabel(s)} /></Meta>
-            {s.prompt === prompt.prompt ? <Eyebrow tone="daybreak">{tl('now')}</Eyebrow> : null}
+            {s.prompt === prompt.prompt ? <Eyebrow tone="ink">{tl('now')}</Eyebrow> : null}
           </View>
         ))}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
           <Icon name="moon" size={14} color={c.ink3} />
           <Meta size={14} tone="ink3" style={{ flex: 1 }}>
-            {`${tl('quietLine', { from: prefs.quiet.from, to: prefs.quiet.to })}${prefs.channels.whatsapp ? tl('waOn') : tl('waOff')}`}
+            <MonoNums text={`${tl('quietLine', { from: prefs.quiet.from, to: prefs.quiet.to })}${prefs.channels.whatsapp ? tl('waOn') : tl('waOff')}`} />
           </Meta>
         </View>
         {timesSaved ? (

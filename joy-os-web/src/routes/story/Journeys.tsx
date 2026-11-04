@@ -9,6 +9,7 @@ import { JOURNEYS } from '@/data/platform'
 import { MEMBER } from '@/data/member'
 import { DAY_IN_JOY_OS, JOURNEY_DETAIL, LOOP_STATIONS } from './_data'
 import { LinkButton, LoopDiagram, StorySection, TermLabel, stationForDay, useEnterAs } from './_parts'
+import { brandTransition, useReduceMotion } from '@/lib/motion'
 
 // JOURNEYS (Plan §4D; Memo p.13, p.17, p.22): five ways in, one loop. Each journey is a
 // horizontal timeline; each step says what Joy OS does, who is involved, which term, and
@@ -37,6 +38,7 @@ export default function Journeys() {
 
 // ─── The journey explorer ────────────────────────────────────────────────────
 function JourneyExplorer() {
+  const reduce = useReduceMotion()
   const [jid, setJid] = useState(JOURNEYS[0].id)
   const [step, setStep] = useState(0)
   const stepRefs = useRef<(HTMLButtonElement | null)[]>([])
@@ -169,7 +171,7 @@ function JourneyExplorer() {
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={brandTransition(reduce, 200)}
             id={`${uid}-step-panel`}
             role="tabpanel"
             aria-labelledby={`${uid}-step-${step}`}
@@ -222,6 +224,7 @@ function JourneyExplorer() {
 
 // ─── The ninety-day loop (Memo p.13) ─────────────────────────────────────────
 function LoopExplorer() {
+  const reduce = useReduceMotion()
   const [day, setDay] = useState(MEMBER.dayOfLoop)
   const [sel, setSel] = useState<string>(stationForDay(MEMBER.dayOfLoop))
   const st = LOOP_STATIONS.find((s) => s.id === sel)!
@@ -278,7 +281,7 @@ function LoopExplorer() {
               <span className="num text-[13px] text-ink-3">{idx + 1} / {LOOP_STATIONS.length}</span>
             </div>
             <AnimatePresence mode="wait">
-              <motion.div key={st.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+              <motion.div key={st.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={brandTransition(reduce, 180)}>
                 <h3 className="text-[1.8rem] font-light leading-tight text-ink">{st.label}</h3>
                 <p className="mt-2 text-[17px] leading-relaxed text-ink-2">{st.does}</p>
                 <dl className="mt-5 grid gap-4 border-t border-line pt-4 text-[15px] sm:grid-cols-2">

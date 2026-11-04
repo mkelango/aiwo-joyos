@@ -33,6 +33,11 @@ export const METHOD = {
   current: { en: 'Current', ta: 'நடப்பு', hi: 'मौजूदा' },
   calibrating: { en: 'Calibrating', ta: 'அளவுதிருத்தத்தில்', hi: 'कैलिब्रेशन जारी' },
   planned: { en: 'Planned', ta: 'திட்டமிடப்பட்டது', hi: 'योजना में' },
+  // Who signed a published version (Architecture p11: method.definition signedBy). Names stay as written.
+  signedBy: { en: 'Signed by', ta: 'கையொப்பமிட்டவர்கள்', hi: 'हस्ताक्षरकर्ता' },
+  roleHead: { en: 'Head of Joyspan Science', ta: 'ஜாய்ஸ்பான் அறிவியல் தலைவர்', hi: 'जॉयस्पैन साइंस प्रमुख' },
+  roleMedical: { en: 'Medical Director', ta: 'மருத்துவ இயக்குநர்', hi: 'मेडिकल डायरेक्टर' },
+  notSigned: { en: 'Not signed yet', ta: 'இன்னும் கையொப்பமிடப்படவில்லை', hi: 'अभी हस्ताक्षर नहीं हुए' },
   neverRewrite: { en: 'A new version never rewrites an old score. Each score keeps the method it was made with.', ta: 'புதிய பதிப்பு பழைய மதிப்பெண்ணை ஒருபோதும் மாற்றி எழுதாது. ஒவ்வொரு மதிப்பெண்ணும் அது உருவான முறையையே வைத்திருக்கும்.', hi: 'नया संस्करण पुराना स्कोर कभी नहीं बदलता। हर स्कोर उसी तरीके के साथ रहता है जिससे वह बना था।' },
   rules: { en: 'Display rules', ta: 'காட்சி விதிகள்', hi: 'दिखाने के नियम' },
   never: { en: 'Never imported into the Index', ta: 'குறியீட்டில் ஒருபோதும் சேர்க்கப்படாதவை', hi: 'जो इंडेक्स में कभी नहीं आता' },

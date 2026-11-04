@@ -6,7 +6,8 @@ import { KIT } from './_i18n'
 
 const MARKS = [15, 45, 60, 76, 90]
 
-/** Day N of 90 — the loop is the heartbeat (Memo p.13). Milestones D15·45·60·76·90 as ticks. */
+/** Day N of 90 — the loop is the heartbeat (Memo p.13). Milestones D15·45·60·76·90 as ticks.
+ *  A measure, so Ink, not Daybreak (Playbook p39). */
 export function LoopRing({ day, of = 90, size = 64 }: { day: number; of?: number; size?: number }) {
   const { c, fonts } = useTheme()
   const t = useDict(KIT)
@@ -22,7 +23,7 @@ export function LoopRing({ day, of = 90, size = 64 }: { day: number; of?: number
           cy={h}
           r={r}
           fill="none"
-          stroke={c.daybreak}
+          stroke={c.vizInk}
           strokeWidth={3}
           strokeDasharray={`${(day / of) * circ} ${circ}`}
           strokeLinecap="round"
@@ -30,7 +31,7 @@ export function LoopRing({ day, of = 90, size = 64 }: { day: number; of?: number
         />
         {MARKS.map((m) => {
           const a = (m / of) * 2 * Math.PI - Math.PI / 2
-          return <Circle key={m} cx={h + Math.cos(a) * r} cy={h + Math.sin(a) * r} r={2} fill={m <= day ? c.daybreak : c.ink3} />
+          return <Circle key={m} cx={h + Math.cos(a) * r} cy={h + Math.sin(a) * r} r={2} fill={m <= day ? c.vizInk : c.ink3} />
         })}
         <SvgText x={h} y={h + size * 0.09} textAnchor="middle" fontFamily={fonts.mono} fontSize={size * 0.26} fill={c.ink}>
           {String(day)}

@@ -32,7 +32,7 @@ import { TEAM } from '@/shared/member'
 import { useTheme } from '@/theme/ThemeProvider'
 import { CARE_LADDER, CLINICIANS, DEVICES as LINKABLE, ERX, PAST_CONSULTS, PEOPLE_DETAIL, RESULTS } from '@/screens/b/accountData'
 import { accountStore, devicesStore, messagesStore, refCode, useAccountThreads, useStore } from '@/screens/b/bStore'
-import { ChoiceCard, Done, Field, HereMarker, KeyValue, TimelineStep, useAccount, usePlanLabel, useSheetCrisisGuard } from '@/screens/b/parts'
+import { ChoiceCard, Done, Field, HereMarker, KeyValue, ReadAloud, TimelineStep, useAccount, usePlanLabel, useSheetCrisisGuard } from '@/screens/b/parts'
 import { localDate, Rich, useA } from '@/screens/a/i18n'
 import { slotsFor, useCareConsults, type Clinician, type ConsultRow } from '@/screens/a/care'
 import { Chip, monoNums, useIsSpecimen } from '@/screens/a/parts'
@@ -198,6 +198,8 @@ export default function Care() {
             {t('More ways to get help')}
           </Button>
         </View>
+        {/* Voice-first (Settings · Accessibility): the way to a person, read aloud. Hidden while it is off. */}
+        <ReadAloud text={`${t('If today is heavy, talk to someone now.')} ${t('Tele-MANAS *14416* · free · 24 hours · in your language').replace(/\*/g, '')}`} />
       </Card>
 
       {/* Messages entry */}
@@ -755,6 +757,7 @@ export default function Care() {
               ))}
               {tried && bookErrors.slot ? <Meta tone="error" accessibilityLiveRegion="polite">{monoNums(bookErrors.slot)}</Meta> : null}
             </View>
+            <ReadAloud text={`${t('What would you like to talk about?')} ${t('Seen only by the clinician and kept in your clinical record.')}`} />
             <Field
               label={t('What would you like to talk about?')}
               help={t('Seen only by the clinician and kept in your clinical record.')}

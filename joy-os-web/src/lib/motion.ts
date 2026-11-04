@@ -69,6 +69,25 @@ export function useFade(ms: number = DUR.settle) {
   return { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: brandTransition(reduce, ms) }
 }
 
+// MotionConfig reducedMotion="always" drops transforms only: a height or width animation still
+// grows under reduced motion, so those two shapes take a preset that never animates the size.
+
+/** An expander: opens to its height in `ms`; under reduced motion it is at full height at once
+ *  and fades over 120 ms. Spread it on a motion element that has overflow-hidden. */
+export function expandFade(reduce: boolean, ms: number = DUR.settle) {
+  return reduce
+    ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: FADE_REDUCED }
+    : { initial: { height: 0, opacity: 0 }, animate: { height: 'auto', opacity: 1 }, exit: { height: 0, opacity: 0 }, transition: brandTransition(false, ms) }
+}
+
+/** A bar: grows from nothing to `to` on `axis`; under reduced motion it is at `to` at once and
+ *  fades over 120 ms, up to `opacity` for a bar that is not drawn at full strength. */
+export function growFade(reduce: boolean, axis: 'height' | 'width', to: string, ms: number = DUR.settle, delayMs = 0, opacity = 1) {
+  return reduce
+    ? { initial: { [axis]: to, opacity: 0 }, animate: { [axis]: to, opacity }, transition: FADE_REDUCED }
+    : { initial: { [axis]: 0, opacity }, animate: { [axis]: to, opacity }, transition: brandTransition(false, ms, delayMs) }
+}
+
 /** Below it, any framer animation without its own transition settles in 240 ms on the brand
  *  easing — and under reduced motion fades over 120 ms with no transform. */
 export function BrandMotion({ children }: { children: ReactNode }) {

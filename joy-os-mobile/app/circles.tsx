@@ -26,8 +26,9 @@ import { useIsMinor } from '@/lib/minor'
 // concerns are its own (kept with the account when another signs in).
 // The circle of eight is the specimen member's (hasCircle). Any other account sees no one else's
 // seats, history or invitations: Free is offered Plus, Plus the Index and then asking to join,
-// which goes to the concierge in Messages and shows here and on the Passport. Under 18, on any
-// plan, nothing is scored, so no circle can form: an honest line, and no plan or circle on offer.
+// which goes to the concierge in Messages and shows here and on the Passport. Circle bought as the
+// plan says its seat is included and not placed yet, and takes the same steps as Plus. Under 18, on
+// any plan, nothing is scored, so no circle can form: an honest line, and no plan or circle on offer.
 
 /**
  * The circle as the signed-in account sees it: its own seat carries its own first name. The own
@@ -229,7 +230,7 @@ function Circles() {
                 <Pill tone={oc.status === 'Invited' ? 'daybreak' : oc.status === 'Member' ? 'ink' : 'neutral'}>{tx(CIRCLE_STATUS[oc.status], oc.status)}</Pill>
               </View>
               <Meta tone="ink">{tx(ot?.who, oc.who)}</Meta>
-              <Meta size={14}><MonoNums text={t('ledBy', { when: tx(ot?.when, oc.when), lead: oc.lead })} /></Meta>
+              <Meta size={14}><MonoNums text={t('ledBy', { when: tx(ot?.when, oc.when), lead: tx(ot?.lead, oc.lead) })} /></Meta>
               <Meta size={14} tone="ink3">
                 {tx(ot?.note, oc.note)}
               </Meta>
@@ -417,6 +418,7 @@ function NoCircle() {
   const asked = !!acct.circleRequests?.next
   const [withdrawn, setWithdrawn] = useState(false)
   const free = acct.plan === 'Free'
+  const held = acct.plan === 'Circle' && !minor
   const noIndex = !latest
   const ask = (on: boolean) => {
     setAcct((a) => ({ ...a, circleRequests: { ...(a.circleRequests ?? {}), next: on } }))
@@ -426,7 +428,7 @@ function NoCircle() {
   return (
     <Card tone="sunk" style={{ gap: space.s1, alignItems: 'flex-start' }}>
       <EmptyIllustration kind="circle" />
-      <Body weight="medium">{t('noneTitle')}</Body>
+      <Body weight="medium">{held ? t('noneTitleHeld') : t('noneTitle')}</Body>
       {minor ? (
         <Meta><MonoNums text={t('noneMinor')} /></Meta>
       ) : free ? (

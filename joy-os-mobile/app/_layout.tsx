@@ -34,11 +34,11 @@ import { DaybreakMark, WORDMARK_PATH, WORDMARK_VIEWBOX } from '../src/components
 import { LockScreen } from '../src/components/LockScreen'
 import { sessionStore, useStore } from '../src/screens/b/bStore'
 import { kit } from '../src/components/_i18n'
-import { AppProvider, useApp, type Lang } from '../src/lib/store'
+import { AppProvider, useApp, useReduceMotion, type Lang } from '../src/lib/store'
 // Loaded first: settles a signed-out first run's session (and the onboarding draft's layout).
 import '../src/lib/onboardingAccount'
 import { ThemeProvider, useTheme } from '../src/theme/ThemeProvider'
-import { fonts as latinFonts, indicFonts, palettes, radius, space } from '../src/theme/tokens'
+import { fonts as latinFonts, indicFonts, motion, palettes, radius, space } from '../src/theme/tokens'
 
 SplashScreen.preventAutoHideAsync().catch(() => {})
 
@@ -77,6 +77,7 @@ export default function RootLayout() {
 function RootNavigator() {
   const { scheme, c } = useTheme()
   const { lang, locked } = useApp()
+  const reduce = useReduceMotion()
   const [session] = useStore(sessionStore)
   // Biometric lock: only a signed-in member has anything to lock.
   const showLock = locked && session.signedIn
@@ -102,7 +103,9 @@ function RootNavigator() {
         importantForAccessibility={showLock ? 'no-hide-descendants' : 'auto'}
         aria-hidden={showLock || undefined}
       >
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.paper } }}>
+        {/* Under Reduce Motion a push or a full-screen modal fades instead of sliding (Playbook p53),
+            over 120 ms where the platform lets the duration be set (iOS; Android keeps its own short fade). */}
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.paper }, ...(reduce ? { animation: 'fade' as const, animationDuration: motion.d1 } : null) }}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="index-take" options={{ presentation: 'fullScreenModal' }} />
           <Stack.Screen name="check" options={{ presentation: 'fullScreenModal' }} />
@@ -195,7 +198,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
           <Text style={{ fontFamily: latinFonts.mono, fontSize: 12, letterSpacing: 12 * 0.24, color: c.ink2 }}>JOY OS</Text>
         </View>
         <View style={{ gap: space.s1 }}>
-          <Text style={{ fontFamily: script ? fonts.sansSemi : fonts.mono, fontSize: 12, letterSpacing: script ? 0 : 1.7, textTransform: 'uppercase', color: c.daybreakInk }}>{t('errEyebrow')}</Text>
+          <Text style={{ fontFamily: script ? fonts.sansSemi : fonts.mono, fontSize: 12, letterSpacing: script ? 0 : 1.7, textTransform: 'uppercase', color: c.ink3 }}>{t('errEyebrow')}</Text>
           <Text accessibilityRole="header" style={{ fontFamily: fonts.sansLight, fontSize: 32, lineHeight: 40, color: c.ink }}>
             {t('errTitleA')}
             <Text style={{ fontFamily: fonts.serifLightItalic }}>{t('errTitleSerif')}</Text>

@@ -109,7 +109,7 @@ export function MethodLine({ method, grade, takenOn, next, signedBy, className }
   if (takenOn) parts.push(t('measured', { d: fmtDate(takenOn, lang) }))
   if (next) parts.push(t('nextMeasureLine', { d: fmtDate(next, lang) }))
   if (signedBy) parts.push(t('signed', { who: signedBy }))
-  return <p className={clsx('eyebrow text-ink-3', className)}>{parts.join(' · ')}</p>
+  return <p className={clsx('eyebrow text-ink-3', className)}>{nums(parts.join(' · '))}</p>
 }
 
 /** Daybreak button — one per screen, the one action (Principle 01). */

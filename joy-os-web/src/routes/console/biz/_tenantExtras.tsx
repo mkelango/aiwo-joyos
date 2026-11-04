@@ -75,12 +75,14 @@ export function BrandLineCard({ kind }: { kind: TenantKind }) {
   const dirty = draft.trim() !== (saved.tagline ?? '')
   const shown = draft.trim()
   const live = kind === 'employer'
+  const hospital = kind === 'hospital'
+  const from = hospital ? 'J4' : 'J3'
 
   const save = () => {
     if (err) return
     setSaved({ tagline: draft.trim() })
     setDraft(draft.trim())
-    setNotice(draft.trim() ? (live ? 'Saved. Members see the line under the Joy OS mark on their next screen. Logged to the audit trail.' : 'Saved. Policyholders see it once Star Health routes go live at J3. Logged to the audit trail.') : 'Line removed. Members see the Joy OS mark alone.')
+    setNotice(draft.trim() ? (live ? 'Saved. Members see the line under the Joy OS mark on their next screen. Logged to the audit trail.' : hospital ? 'Saved. Patients see it once the unit goes live at J4. Logged to the audit trail.' : 'Saved. Policyholders see it once Star Health routes go live at J3. Logged to the audit trail.') : 'Line removed. Members see the Joy OS mark alone.')
   }
   const remove = () => {
     setSaved({ tagline: '' })
@@ -93,11 +95,11 @@ export function BrandLineCard({ kind }: { kind: TenantKind }) {
       <CardHead
         eyebrow="Brand line"
         title="A line of type under the mark, never your logo"
-        aside={saved.tagline ? <StatusTag tone="ok">{live ? 'Live in the member app' : 'Saved · shows from J3'}</StatusTag> : <StatusTag tone="off">No line set</StatusTag>}
+        aside={saved.tagline ? <StatusTag tone="ok">{live ? 'Live in the member app' : `Saved · shows from ${from}`}</StatusTag> : <StatusTag tone="off">No line set</StatusTag>}
         lead={`Joy OS is an AIWO house: tenants get one line of type under the mark and no logo upload. It passes the same claims gate as every other word in the product.`}
       />
       <Field label="Line" htmlFor={id} error={err} hint={`${shown.length}/${LINE_MAX} characters. Leave it empty for no line.`}>
-        <input id={id} className={fieldCls} value={draft} maxLength={LINE_MAX + 12} placeholder={kind === 'employer' ? 'e.g. Offered to Northwind people, free' : 'e.g. Included with your Star Health policy'} onChange={(e) => { setDraft(e.target.value); setNotice(null) }} aria-invalid={!!err} aria-describedby={err ? `${id}-err` : undefined} />
+        <input id={id} className={fieldCls} value={draft} maxLength={LINE_MAX + 12} placeholder={live ? 'e.g. Offered to Northwind people, free' : hospital ? 'e.g. Joyspan Inside at Harbourline Hospital' : 'e.g. Included with your Star Health policy'} onChange={(e) => { setDraft(e.target.value); setNotice(null) }} aria-invalid={!!err} aria-describedby={err ? `${id}-err` : undefined} />
       </Field>
 
       <div className="mt-5 rounded-card border border-line bg-paper p-5">
@@ -114,7 +116,7 @@ export function BrandLineCard({ kind }: { kind: TenantKind }) {
         {live && <Link to="/app" className="ml-auto text-[14px] text-ink-2 underline decoration-line-strong underline-offset-2 hover:text-ink focus-ring rounded">See it in the member app</Link>}
       </div>
       <p className="mt-3 text-[14px] text-ink" aria-live="polite">{notice && <><Check size={15} className="mr-1 inline" aria-hidden />{notice}</>}</p>
-      {!live && <p className="mt-1 text-[13px] text-ink-3">Star Health tenant routes are off until J3 (release flag tenant_star_health), so the line is held for {cfg.short} until then.</p>}
+      {!live && <p className="mt-1 text-[13px] text-ink-3">{hospital ? 'Hospital units arrive at J4' : 'Star Health tenant routes are off until J3 (release flag tenant_star_health)'}, so the line is held for {cfg.short} until then.</p>}
     </Card>
   )
 }
@@ -122,10 +124,11 @@ export function BrandLineCard({ kind }: { kind: TenantKind }) {
 // ─── Clinical features ───────────────────────────────────────────────────
 
 export function ClinicalFeaturesCard({ kind }: { kind: TenantKind }) {
-  const cp = CLINICAL_PARTNER[kind]
+  const cp: { partner: string | null; note: string; when?: string } = CLINICAL_PARTNER[kind]
+  const on = cp.when ? `From ${cp.when}` : 'On'
   return (
     <Card className="lg:col-span-5">
-      <CardHead eyebrow="Clinical features" title={cp.partner ? 'On, with a licensed clinical partner' : 'Off: no licensed clinical partner'} aside={<Pill><Lock size={12} aria-hidden /> Read-only</Pill>} />
+      <CardHead eyebrow="Clinical features" title={cp.partner ? `${on}, with a licensed clinical partner` : 'Off: no licensed clinical partner'} aside={<Pill><Lock size={12} aria-hidden /> Read-only</Pill>} />
       <dl>
         <Row k="Licensed clinical partner" v={cp.partner ?? <span className="text-ink-2">None for this tenant</span>} />
       </dl>
@@ -137,7 +140,7 @@ export function ClinicalFeaturesCard({ kind }: { kind: TenantKind }) {
               <p className="flex items-center gap-2 text-[15px] text-ink"><Stethoscope size={14} className="shrink-0 text-ink-3" aria-hidden />{f.label}</p>
               <p className="text-[13px] text-ink-3">{f.note}</p>
             </div>
-            <StatusTag tone={cp.partner ? 'ok' : 'off'} className="self-start">{cp.partner ? 'On' : 'Disabled · no licensed partner'}</StatusTag>
+            <StatusTag tone={cp.when ? 'draft' : cp.partner ? 'ok' : 'off'} className="self-start">{cp.partner ? on : 'Disabled · no licensed partner'}</StatusTag>
           </li>
         ))}
       </ul>
@@ -234,6 +237,7 @@ export function ApiAccessCard({ kind }: { kind: TenantKind }) {
             {creating !== 'key' && <Button variant="ghost" size="sm" onClick={() => { setCreating('key'); setNotice(null) }}><Plus size={14} aria-hidden /> Create a key</Button>}
           </div>
           {creating === 'key' && <NewKeyForm kind={kind} onCreate={addKey} onCancel={() => setCreating(null)} />}
+          {store.keys.length === 0 && creating !== 'key' && <p className="mt-3 text-[14px] text-ink-2">No keys yet. Credentials are issued when the tenant goes live.</p>}
           <ul className="mt-3 divide-y divide-line">
             {store.keys.map((k) => (
               <li key={k.id} className="py-3">
@@ -416,7 +420,7 @@ export const AGG_TERMS: AggTermFilter[] = ['all', 'H', 'P', 'R', 'F', 'D', 'B']
 
 /**
  * Cohort, term and period filters, mirrored as the partner API query. The employer's wave cohorts and threshold of
- * fifty are the default; the insurer view passes its policy-type cohorts, its own periods and its threshold of ten.
+ * fifty are the default; the insurer and hospital views pass their own cohorts, periods and threshold of ten.
  */
 export function AggregateFilters<C extends string = AggCohortKey>({ cohort, term, period, onCohort, onTerm, onPeriod, cohorts, periods = AGG_PERIODS, minGroup = 50 }: {
   cohort: C

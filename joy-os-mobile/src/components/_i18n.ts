@@ -9,6 +9,8 @@ export const KIT = {
   // AppBar
   appBarHome: { en: 'AIWO {label}, Today', ta: 'AIWO {label}, இன்று', hi: 'AIWO {label}, आज' },
   notifUnread: { en: 'Notifications, {n} not yet opened', ta: 'அறிவிப்புகள், {n} இன்னும் திறக்கப்படவில்லை', hi: 'सूचनाएँ, {n} अभी खोली नहीं गईं' },
+  // The word beside the bell: icons never replace words (Playbook p51).
+  notifWord: { en: 'Notifications', ta: 'அறிவிப்புகள்', hi: 'सूचनाएँ' },
   notifAllRead: { en: 'Notifications, all read', ta: 'அறிவிப்புகள், அனைத்தும் படிக்கப்பட்டன', hi: 'सूचनाएँ, सब पढ़ ली गईं' },
 
   // Sheet / ScreenHeader

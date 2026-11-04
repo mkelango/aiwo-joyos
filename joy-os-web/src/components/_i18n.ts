@@ -14,6 +14,7 @@ export const SHARED = {
   ledger: { en: 'Joy Ledger', ta: 'ஜாய் லெட்ஜர்', hi: 'जॉय लेजर' },
   myIndex: { en: 'My Index', ta: 'என் குறியீடு', hi: 'मेरा इंडेक्स' },
   viva: { en: 'VIVA companion', ta: 'VIVA துணை', hi: 'VIVA साथी' },
+  vivaWord: { en: 'VIVA', ta: 'VIVA', hi: 'VIVA' },
   circles: { en: 'Circles', ta: 'வட்டங்கள்', hi: 'सर्कल' },
   events: { en: 'Events', ta: 'நிகழ்வுகள்', hi: 'कार्यक्रम' },
   household: { en: 'Household', ta: 'குடும்பம்', hi: 'परिवार' },

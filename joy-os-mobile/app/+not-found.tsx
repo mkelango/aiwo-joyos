@@ -31,7 +31,7 @@ export default function NotFound() {
       </View>
 
       <View style={{ gap: space.s1 }}>
-        <Eyebrow tone="daybreak">{t('eyebrow')}</Eyebrow>
+        <Eyebrow>{t('eyebrow')}</Eyebrow>
         <Title size={34} accessibilityRole="header">
           {t('titleA')}<Serif>{t('titleSerif')}</Serif>{t('titleB')}
         </Title>

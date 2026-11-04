@@ -112,7 +112,7 @@ function WithCation({ demo }: { demo: ReactNode }) {
             <Title size={24}>{monoNums(t('{name} at {venue}', { name: mine.name, venue: MY_CATION.venue }))}</Title>
             <Mono tone="ink2">{`${fmtDate(MY_CATION.arrived, lang)} – ${fmtDate(MY_CATION.checkedOut, lang)}`}</Mono>
             <Meta>
-              {tx(mine.nights)} · <Mono tone="ink2">{MY_CATION.bookingRef}</Mono>
+              {monoNums(tx(mine.nights))} · <Mono tone="ink2">{MY_CATION.bookingRef}</Mono>
             </Meta>
           </View>
           <LoopRing day={MEMBER.dayOfLoop} size={56} />

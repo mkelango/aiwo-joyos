@@ -372,7 +372,7 @@ function Events() {
       {/* The invitation and the delegate badge (Playbook p61) */}
       {attended ? (
       <InvitationAndBadge
-        invitee={{ who: 'Mr and Mrs Rao', two: true }}
+        invitee={{ who: t('inviteeRaos'), two: true }}
         holder={account.name}
         flagshipWhere={flagship.where}
         badgeNo={passportFor(account.id, account.aiwoId).number.split('-').slice(-1)[0]}

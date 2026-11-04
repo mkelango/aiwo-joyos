@@ -140,7 +140,7 @@ function ClinicalGate({ submitted, rec }: { submitted: boolean; rec: ReturnType<
           <X size={16} /> {c('close')}
         </Link>
       </div>
-      <Eyebrow tone="daybreak">{c('gradeFullClinical')}</Eyebrow>
+      <Eyebrow>{c('gradeFullClinical')}</Eyebrow>
       <h1 className="mt-3 break-words text-[2.2rem] font-light leading-tight text-ink">{rich(x(submitted ? 'tkClDoneTitle' : 'tkClGateTitle'))}</h1>
       <p className="mt-4 text-[17px] leading-relaxed text-ink-2">{nums(returned ? x('rmReturnedBody', { who: returned.who, reason: returned.reason, concierge: returned.concierge }) : x(submitted ? 'tkClDoneBody' : 'tkClGateBody', { who: SIGNER.name }))}</p>
       <div className="mt-auto flex flex-col gap-2 pt-10">
@@ -309,7 +309,7 @@ function TakeFlow({ clinical, onClinicalStart, onClinicalSubmit, x }: { clinical
             {step.type === 'item' && <span className="num shrink-0">{c('tkItemOf', { n: step.item.position, t: sittingOf.total })}</span>}
             {step.type === 'signals' && <span className="eyebrow shrink-0 text-ink-3">{c('tkSignals')}</span>}
           </div>
-          <Progress className="mt-2" value={progressValue} max={sittingOf.total} label={c('tkProgress', { n: sittingOf.n })} />
+          <Progress className="mt-2" color="var(--ink)" value={progressValue} max={sittingOf.total} label={c('tkProgress', { n: sittingOf.n })} />
           <div className="mt-2 flex gap-1" aria-hidden>
             {sittingOf.blocks.map((bl, i) => (
               <span key={bl.code} className="h-1 flex-1 rounded-full" style={{ background: (step.type === 'intro' || step.type === 'item') && i === step.b ? termColor[bl.term] : 'var(--line)' }} />
@@ -325,7 +325,6 @@ function TakeFlow({ clinical, onClinicalStart, onClinicalSubmit, x }: { clinical
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.2 }}
             className="flex flex-1 flex-col"
           >
             {stage === 'overview' && (
@@ -507,7 +506,7 @@ function Overview({ resumable, resumeLabel, answered, clinical, onStart, onResta
   const x = useX()
   return (
     <div className="flex flex-1 flex-col">
-      <Eyebrow tone="daybreak">
+      <Eyebrow>
         {c('ovEyebrow', { kind: c(IN_REMEASURE_WINDOW || clinical ? 'mbRemeasure' : 'mbPreview'), grade: c(clinical ? 'gradeFullClinical' : 'gradeFullIndex'), method: method('v1.0'), day: clinical ? tr('dayOf', { n: 76 }) : tr('dayOf', { n: MEMBER.dayOfLoop }) })}
       </Eyebrow>
       <h1 className="mt-3 text-[2.2rem] font-light leading-tight text-ink md:text-[2.8rem]">
@@ -705,7 +704,7 @@ function SignalsStep({ sitting, off, down, fromReview, onToggle, onConfirm, onBa
   const wearableOff = WEARABLE_SIGNAL_IDS.every((id) => off.includes(id))
   return (
     <div className="flex flex-1 flex-col">
-      <Eyebrow tone="daybreak">{c('sgEyebrow', { n: sitting + 1 })}</Eyebrow>
+      <Eyebrow>{c('sgEyebrow', { n: sitting + 1 })}</Eyebrow>
       <h1 className="mt-3 text-[2rem] font-light leading-tight text-ink md:text-[2.4rem]">
         {rich(c('sgTitle'))}
       </h1>
@@ -768,7 +767,7 @@ function SittingBreak({ onContinue, onLater }: { onContinue: () => void; onLater
   const { t: c, pick, lang } = useCore()
   return (
     <div className="flex flex-1 flex-col">
-      <Eyebrow tone="daybreak">{c('brEyebrow')}</Eyebrow>
+      <Eyebrow>{c('brEyebrow')}</Eyebrow>
       <h1 className="mt-3 text-[2.2rem] font-light leading-tight text-ink">{rich(c('brTitle'))}</h1>
       <p className="mt-4 text-[17px] leading-relaxed text-ink-2">
         {nums(c('brBody', { s1: pick(SITTING_TITLE[1], SITTINGS[0].title), s2: pick(SITTING_TITLE[2], SITTINGS[1].title), tail: IN_REMEASURE_WINDOW ? c('brTail') : '' }))}
@@ -804,7 +803,7 @@ function ClinicalStep({ parts, onChange, fromReview, onContinue, onBack, x }: { 
   const set = (p: Partial<ClinicalParts>) => onChange({ ...parts, ...p })
   return (
     <div className="flex flex-1 flex-col">
-      <Eyebrow tone="daybreak">{x('clEyebrow')}</Eyebrow>
+      <Eyebrow>{x('clEyebrow')}</Eyebrow>
       <h1 className="mt-3 break-words text-[2.2rem] font-light leading-tight text-ink">{rich(x('clTitle'))}</h1>
       <p className="mt-4 text-[17px] leading-relaxed text-ink-2">{x('clBody')}</p>
 
@@ -873,7 +872,7 @@ function Review({ answers, answered, signalsOff, confirmed, skipped, clinical, o
   const { t: c, lang, pick, name } = useCore()
   return (
     <div className="flex flex-1 flex-col">
-      <Eyebrow tone="daybreak">{c('rvEyebrow')}</Eyebrow>
+      <Eyebrow>{c('rvEyebrow')}</Eyebrow>
       <h1 className="mt-3 text-[2.2rem] font-light leading-tight text-ink">{rich(c('rvTitle'))}</h1>
       <p className="mt-3 text-[17px] text-ink-2">
         {rich(c('rvCount'), { a: <span className="num text-ink">{answered}</span>, n: <span className="num text-ink">{due.length}</span> })}
@@ -1020,7 +1019,7 @@ function Scoring({ answers, signalsOff, skipped, offline, clinical, x, onSee }: 
 
   return (
     <div className="flex flex-1 flex-col">
-      <Eyebrow tone="daybreak">{c('scEyebrow', { m: method(latest.method) })}</Eyebrow>
+      <Eyebrow>{c('scEyebrow', { m: method(latest.method) })}</Eyebrow>
       <h1 className="mt-3 text-[2.2rem] font-light leading-tight text-ink">{finished ? rich(c('scReady')) : c('scMoment')}</h1>
       <ol className="mt-6 space-y-3" aria-live="polite">
         {STAGES.map((s, i) => (
@@ -1028,14 +1027,14 @@ function Scoring({ answers, signalsOff, skipped, offline, clinical, x, onSee }: 
             <span className={clsx('flex h-6 w-6 shrink-0 items-center justify-center rounded-full border', i < done ? 'border-ink bg-ink text-paper' : 'border-line-strong')}>
               {i < done ? <Check size={13} /> : i === done ? <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-ink-2" /> : null}
             </span>
-            <span className={i === 2 ? 'num text-[14px]' : undefined}>{s}</span>
+            <span className={i === 2 ? 'num text-[14px]' : undefined}>{nums(s)}</span>
           </li>
         ))}
       </ol>
 
       <AnimatePresence>
         {finished && (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24 }} className="mt-8">
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-8">
             <Card tone="raised">
               <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
                 <div className="flex flex-col items-center gap-2">
@@ -1235,7 +1234,7 @@ function TermFlow({ term, clinical }: { term: TermKey; clinical: boolean }) {
       ) : stage === 'overview' ? (
         <div className="flex flex-1 flex-col">
           {clinical && <Eyebrow>{c('gradeFullClinical')}</Eyebrow>}
-          <Eyebrow tone="daybreak">{x('tmEyebrow', { term: name(term), date: fmtDate(src!.takenOn) })}</Eyebrow>
+          <Eyebrow>{x('tmEyebrow', { term: name(term), date: fmtDate(src!.takenOn) })}</Eyebrow>
           <h1 className="mt-3 text-[2.2rem] font-light leading-tight text-ink">{rich(x('tmTitle'))}</h1>
           <p className="mt-4 text-[17px] leading-relaxed text-ink-2">{clinical ? x('tmBodyClinical', { who: SIGNER.name }) : x('tmBody')}</p>
           <ul className="mt-6 flex flex-wrap gap-2">
@@ -1270,7 +1269,7 @@ function TermFlow({ term, clinical }: { term: TermKey; clinical: boolean }) {
         />
       ) : (
         <div className="flex flex-1 flex-col">
-          <Eyebrow tone="daybreak">{x('tmEyebrow', { term: name(term), date: fmtDate(src!.takenOn) })}</Eyebrow>
+          <Eyebrow>{x('tmEyebrow', { term: name(term), date: fmtDate(src!.takenOn) })}</Eyebrow>
           <h1 className="mt-3 text-[2.2rem] font-light leading-tight text-ink">{rich(x('tmReviewTitle'))}</h1>
           <p className="mt-3 text-[17px] text-ink-2">{rich(x('tmCount'), { a: <span className="num text-ink">{answered}</span>, n: <span className="num text-ink">{items.length}</span> })}</p>
           <ul className="mt-6 divide-y divide-line rounded-card border border-line bg-paper-raised">

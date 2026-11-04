@@ -25,7 +25,7 @@ import { IndexCardView } from './_card'
 import { RemeasureCard } from './_remeasure'
 import { useX } from './_i18nX'
 import { SHARED } from '@/components/_i18n'
-import { ACTION_TEXT, CONFIDENCE_KEY, SIGNAL_SOURCE_TEXT, TERM_DETAIL_TEXT, fmtLocal, rich, useCore } from './_i18n'
+import { ACTION_TEXT, CONFIDENCE_KEY, SIGNAL_SOURCE_TEXT, TERM_DETAIL_TEXT, fmtLocal, monoFigures, rich, useCore } from './_i18n'
 import { useDict, useT } from '@/lib/i18n'
 import type { Lang } from '@/lib/store'
 
@@ -235,7 +235,7 @@ function TermDetailPanel({ termKey }: { termKey: TermKey }) {
   return (
     <Card tone="raised" className="overflow-hidden" aria-live="polite">
       <AnimatePresence mode="wait">
-        <motion.div key={termKey} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.2 }}>
+        <motion.div key={termKey} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <TermChip term={termKey} withSpace={term.space !== term.name} size="md" />
             <Link to={`/app/spaces/${term.slug}`} className="inline-flex items-center gap-1 text-[14px] text-ink-2 underline-offset-4 hover:text-ink hover:underline focus-ring">
@@ -347,7 +347,7 @@ function FormulaCard() {
         <p className="mt-2 text-[13px] text-ink-2">{x('eqCredit')} {x('eqOwns')}</p>
       </div>
       <p className="text-[17px] text-ink">
-        {rich(c('fxLine'), { f: <span className="num">JI = GM(H, P, R, F, D) − λ·B</span>, l: <span className="num">{METHODS[latest.method].lambda}</span>, method: method(latest.method) })}
+        {rich(c('fxLine'), { f: <span className="num">JI = GM(H, P, R, F, D) − λ·B</span>, l: <span className="num">{METHODS[latest.method].lambda}</span>, method: monoFigures(method(latest.method)) })}
       </p>
 
       <ol className="mt-5 space-y-3">

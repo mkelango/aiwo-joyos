@@ -6,6 +6,7 @@ import type { Person, TermKey } from '@/domain/types'
 import { EmptyIllustration, type IllustrationKind } from '@/components/joy/EmptyIllustration'
 import { useDict } from '@/lib/i18n'
 import { DUR, brandTransition, useReduceMotion } from '@/lib/motion'
+import { VIZ } from '@/lib/viz'
 import { SHARED } from '@/components/_i18n'
 
 export function Card({ children, className, tone = 'raised', as: As = 'section', ...rest }: { children: ReactNode; className?: string; tone?: 'raised' | 'sunk' | 'ink' | 'soft' | 'outline'; as?: 'section' | 'div' | 'article' | 'li' } & React.HTMLAttributes<HTMLElement>) {
@@ -27,7 +28,8 @@ export function PageHeader({ eyebrow, title, lead, actions, className }: { eyebr
   return (
     <header className={clsx('mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between', className)}>
       <div className="min-w-0 max-w-3xl break-words">
-        {eyebrow && <p className="eyebrow mb-3 text-daybreak-ink">{eyebrow}</p>}
+        {/* Neutral, like the screen labels on Playbook p62: Daybreak is the screen's one action. */}
+        {eyebrow && <p className="eyebrow mb-3 text-ink-3">{eyebrow}</p>}
         <h1 className="font-sans text-[2rem] font-light leading-tight tracking-tight text-ink md:text-[2.6rem]">{title}</h1>
         {lead && <p className="mt-3 text-[17px] leading-relaxed text-ink-2">{lead}</p>}
       </div>
@@ -97,7 +99,8 @@ export function Stat({ label, value, sub, className }: { label: ReactNode; value
   )
 }
 
-export function Progress({ value, max = 100, className, color = 'var(--daybreak)', label }: { value: number; max?: number; className?: string; color?: string; label?: string }) {
+/** A measure, so it is drawn in Ink by default: Daybreak never draws a measure (Playbook p39). */
+export function Progress({ value, max = 100, className, color = VIZ.ink, label }: { value: number; max?: number; className?: string; color?: string; label?: string }) {
   return (
     <div className={clsx('h-1.5 w-full overflow-hidden rounded-full bg-paper-sunk', className)} role="progressbar" aria-valuenow={value} aria-valuemin={0} aria-valuemax={max} aria-label={label}>
       <div className="h-full rounded-full transition-[width] duration-700" style={{ width: `${(value / max) * 100}%`, background: color }} />
@@ -105,7 +108,7 @@ export function Progress({ value, max = 100, className, color = 'var(--daybreak)
   )
 }
 
-/** Day N of 90 ring — the loop is the heartbeat (Memo p.13). */
+/** Day N of 90 ring — the loop is the heartbeat (Memo p.13). A measure, so Ink, not Daybreak. */
 export function LoopRing({ day, of = 90, size = 64 }: { day: number; of?: number; size?: number }) {
   const t = useDict(SHARED)
   const r = size / 2 - 4
@@ -114,10 +117,10 @@ export function LoopRing({ day, of = 90, size = 64 }: { day: number; of?: number
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={t('loopDay', { n: day, of })}>
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--line)" strokeWidth={3} />
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--daybreak)" strokeWidth={3} strokeDasharray={`${(day / of) * circ} ${circ}`} strokeLinecap="round" transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={VIZ.ink} strokeWidth={3} strokeDasharray={`${(day / of) * circ} ${circ}`} strokeLinecap="round" transform={`rotate(-90 ${size / 2} ${size / 2})`} />
       {marks.map((m) => {
         const a = (m / of) * 2 * Math.PI - Math.PI / 2
-        return <circle key={m} cx={size / 2 + Math.cos(a) * r} cy={size / 2 + Math.sin(a) * r} r={2} fill={m <= day ? 'var(--daybreak)' : 'var(--ink-3)'} />
+        return <circle key={m} cx={size / 2 + Math.cos(a) * r} cy={size / 2 + Math.sin(a) * r} r={2} fill={m <= day ? VIZ.ink : 'var(--ink-3)'} />
       })}
       <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" className="font-mono" fontSize={size * 0.26} fill="var(--ink)">
         {day}

@@ -112,8 +112,8 @@ export function PrintOnly({ id }: { id: string }) {
 
 /**
  * Mono for every number, inside running text too (the brand rule). Splits a finished sentence
- * and sets each figure ("1.9", "−3", "22:00", "Day-90") in the mono style. A digit that is part
- * of an instrument's name (PHQ-4, LE8, UCLA-3, v1.0) stays in the sentence's face.
+ * and sets each figure ("1.9", "−3", "22:00", "Day-90", "v1.0") in the mono style. A digit that is
+ * part of an instrument's name (PHQ-4, LE8, UCLA-3) stays in the sentence's face.
  */
 export function nums(text: string): ReactNode {
   return monoFigures(text)

@@ -10,10 +10,11 @@ import { INDEX_HISTORY } from '@/data/member'
 import { TERMS } from '@/data/terms'
 import { METHODS } from '@/domain/indexEngine'
 import { useDict, useLang, useTermText } from '@/lib/i18n'
+import { brandTransition, useReduceMotion } from '@/lib/motion'
 import { useApp } from '@/lib/store'
 import { COUNTRIES, DEMO_ACCOUNTS, EMAIL_RE, ROLE_ACCOUNTS, countryName, phoneError, type CountryCode, type DemoAccount } from './_data'
 import { E, SI } from './_i18n'
-import { FlowTopBar, JoyspanCredit, enterCodeDigits, rich } from './_parts'
+import { FlowTopBar, JoyspanCredit, enterCodeDigits, nums, rich } from './_parts'
 
 // AIWO ID SIGN IN (Architecture: one identity across LifeOS and Joy OS).
 // Passkey first, then phone OTP, then email link. No real authentication:
@@ -30,6 +31,7 @@ export default function SignIn() {
   const nav = useNavigate()
   const { setRole } = useApp()
   const [method, setMethod] = useState<Method>('passkey')
+  const reduce = useReduceMotion()
   const t = useDict(SI)
   const te = useDict(E)
 
@@ -48,7 +50,7 @@ export default function SignIn() {
         <div className="mt-12 grid gap-10 border-t border-line pt-10 lg:grid-cols-[minmax(0,30rem)_1fr] lg:gap-16 md:mt-14 md:pt-14">
           {/* Sign in */}
           <div className="min-w-0">
-            <Eyebrow tone="daybreak">{t('eyebrow')}</Eyebrow>
+            <Eyebrow>{t('eyebrow')}</Eyebrow>
             <h2 className="mt-4 text-[1.75rem] font-light leading-tight tracking-tight text-ink md:text-[2rem]">
               {t('h2')}
             </h2>
@@ -69,7 +71,7 @@ export default function SignIn() {
               />
               <div className="mt-6">
                 <AnimatePresence mode="wait" initial={false}>
-                  <motion.div key={method} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
+                  <motion.div key={method} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={brandTransition(reduce, 200)}>
                     {method === 'passkey' && <PasskeyPanel onDone={enterMember} onFallback={() => setMethod('phone')} />}
                     {method === 'phone' && <PhonePanel onDone={enterMember} />}
                     {method === 'email' && <EmailPanel onDone={enterMember} />}
@@ -119,7 +121,7 @@ function ProductPromise() {
   return (
     <section aria-labelledby="promise-h" className="grid items-center gap-8 md:grid-cols-[1fr_auto] md:gap-12">
       <div className="min-w-0 max-w-3xl">
-        <p className="eyebrow mb-4 text-daybreak-ink">{t('brand')}</p>
+        <p className="eyebrow mb-4 text-ink-3">{t('brand')}</p>
         <h1 id="promise-h" className="text-[2.4rem] font-light leading-[1.08] tracking-tight text-ink md:text-[3.4rem]">
           {rich(t('h1'), { em: <em>{t('h1em')}</em> })}
         </h1>
@@ -131,7 +133,7 @@ function ProductPromise() {
           <p className="num rounded-full bg-paper-sunk px-4 py-2 text-[15px] text-ink md:text-[16px]" aria-label={t('formulaAria', { l: lambda })}>
             JI = GM(H,P,R,F,D) − {lambda}·B
           </p>
-          <span className="eyebrow text-ink-3">{t('methodPublished')}</span>
+          <span className="eyebrow text-ink-3">{nums(t('methodPublished'))}</span>
         </div>
         <ul className="mt-5 flex flex-wrap gap-x-4 gap-y-2" aria-label={t('sixSpaces')}>
           {TERMS.map((x) => (
@@ -402,7 +404,7 @@ function DemoAccounts({ onEnter }: { onEnter: (a: DemoAccount) => void }) {
                     {title}
                     {current && <span className="eyebrow rounded-full bg-paper-sunk px-2 py-0.5 text-ink-2">{t('current')}</span>}
                   </p>
-                  <p className="text-[14px] text-ink-2">{who}</p>
+                  <p className="text-[14px] text-ink-2">{nums(who)}</p>
                   <p className="num mt-1 break-all text-[13px] text-ink-3">{a.email} <span aria-hidden>→</span> {a.to}</p>
                 </div>
                 <Button variant={a.key === 'member' ? 'ink' : 'secondary'} size="sm" onClick={() => onEnter(a)} className="shrink-0 self-start sm:self-center" aria-label={t('enterAria', { title, who })}>

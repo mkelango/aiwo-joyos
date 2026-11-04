@@ -241,7 +241,7 @@ function Moments() {
             </View>
             <View style={{ flex: 1, gap: 2 }}>
               <Body weight="medium">{monoNums(tx(f.title))}</Body>
-              <Meta size={14}>{f.who}</Meta>
+              <Meta size={14}>{monoNums(f.who)}</Meta>
             </View>
             <Mono size={13} tone="ink3">
               {f.minutes}

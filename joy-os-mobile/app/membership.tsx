@@ -15,19 +15,21 @@ import { useDict } from '@/lib/i18n'
 import { MEMBERSHIP, CADENCE, PLAN_POINT, ENTITLEMENT_USE, INVOICE_ITEM, PAY_WORD } from '@/screens/b/i18n/membership'
 import { useCommon, useTx } from '@/screens/b/i18n/common'
 
-// MEMBERSHIP: the plan you are on, what it includes, the ladder (Free · Plus · Patron) with a
-// confirm step, GST invoices and the payment method on file (never editable here: Razorpay
+// MEMBERSHIP: the plan you are on, what it includes, the ladder (Free · Plus · Circle · Clinical ·
+// Patron) with a confirm step, GST invoices and the payment method on file (never editable here: Razorpay
 // owns card and UPI entry). A missed payment never locks your data. One Daybreak: Upgrade to Patron.
 // Store billing (Arch 8b-19; Memo p26): on the native app, Joy OS Plus is bought through Apple or
 // Google in-app purchase where store rules require it; the web build and Patron use Razorpay.
 // Specimen: no store sheet opens and nothing is charged; the plan and who bills it are kept.
-// Everything follows the account and its plan (L2): what is included (Free, Plus, Patron, and
-// Circle only where the account has it), its own invoices and payment method, and the grace
-// state, which bills the plan's own renewal (Plus monthly by UPI autopay; Patron's yearly renewal
-// is beyond a UPI autopay mandate, so it comes as a Razorpay invoice link).
+// Stripe (Memo p26): a member of an international tenant pays through Stripe instead of Razorpay.
+// Chosen in the change-plan step; specimen, no Stripe page opens and only who bills it is kept.
+// Everything follows the account and its plan (L2): what is included (Free, Plus, a yearly plan's
+// own points, and Circle where the account already holds it beside its plan), its own invoices and payment method, and the grace
+// state, which bills the plan's own renewal (Plus monthly by UPI autopay; a yearly renewal is
+// beyond a UPI autopay mandate, so it comes as a Razorpay invoice link).
 
 /** The phone's store for Joy OS Plus: the App Store on an iPhone, Google Play on Android, none on the web build. */
-type StoreBilling = Exclude<Billing, 'razorpay'>
+type StoreBilling = Exclude<Billing, 'razorpay' | 'stripe'>
 const STORE: StoreBilling | null = Platform.OS === 'ios' ? 'app-store' : Platform.OS === 'android' ? 'google-play' : null
 const STORE_NAME: Record<StoreBilling, string> = { 'app-store': 'App Store', 'google-play': 'Google Play' }
 const STORE_ACCOUNT: Record<StoreBilling, string> = { 'app-store': 'Apple ID', 'google-play': 'Google account' }
@@ -50,6 +52,8 @@ function Membership() {
   const [changeOpen, setChangeOpen] = useState(false)
   const [pick, setPick] = useState<PlanKey>('Patron')
   const [confirm, setConfirm] = useState(false)
+  // Who takes the payment for a paid plan bought here: Razorpay, or Stripe for an international tenant.
+  const [payBy, setPayBy] = useState<'razorpay' | 'stripe'>('razorpay')
   // The store purchase step for Joy OS Plus on the native app: confirm in the store, then approving.
   const [storeStep, setStoreStep] = useState<'idle' | 'store' | 'approving'>('idle')
   const storeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -74,19 +78,19 @@ function Membership() {
   const current = PLANS.find((p) => p.key === acct.plan)!
   const pending = acct.planChange
   // Payments grace (§4B): the plan's own renewal, read the way the app-wide banner reads it.
-  const { yearly, renews, renewYear, overdue, graceUntil, storeBilled, hasMethod, canGrace, overduePaid } = renewalOf(acct, account.id)
+  const { yearly, renews, renewYear, overdue, graceUntil, storeBilled, stripeBilled, hasMethod, canGrace, overduePaid } = renewalOf(acct, account.id)
   /** An invoice still to pay: the failed UPI renewal, or the unpaid Patron link. */
   const isDue = (inv: Invoice | null) => !!inv && (inv.status === 'Retrying' || inv.status === 'Unpaid')
   const inGrace = paymentsGrace && canGrace && !overduePaid
   const invoiceRows: Invoice[] = [...(inGrace && overdue ? [overdue] : []), ...paidHere.map(({ ref: _ref, ...i }) => i), ...ownInvoices]
-  // What the plan includes: its own points (Plus also for Patron), then Circle where the account
-  // has it. The specimen member's rows say how he uses each one.
+  // What the plan includes: its own points (Plus also for the yearly plans), then Circle where the
+  // account has it. The specimen member's rows say how he uses each one.
   const points = (k: PlanKey) => PLANS.find((p) => p.key === k)!.points
   const useOf = (name: string) => (account.id === 'arjun' ? ENTITLEMENTS.find((e) => e.name === name)?.use : undefined) ?? 'Included'
   const included: Entitlement[] = [
     ...(acct.plan === 'Free' ? points('Free').map((n) => ({ name: n, from: current.name, use: 'Included' })) : []),
     ...(acct.plan !== 'Free' ? points('Plus').map((n) => ({ name: n, from: 'Plus', use: useOf(n) })) : []),
-    ...(acct.plan === 'Patron' ? points('Patron').map((n) => ({ name: n, from: 'Patron', use: 'Included' })) : []),
+    ...(acct.plan !== 'Free' && acct.plan !== 'Plus' ? points(acct.plan).map((n) => ({ name: n, from: current.name, use: 'Included' })) : []),
     ...(circle ? ENTITLEMENTS.filter((e) => e.from === 'Circle') : []),
   ]
   const base = current.price
@@ -177,6 +181,7 @@ function Membership() {
   const openChange = (to: PlanKey) => {
     setPick(to)
     setConfirm(false)
+    setPayBy(acct.billing === 'stripe' ? 'stripe' : 'razorpay')
     setStoreStep('idle')
     setChangeOpen(true)
   }
@@ -240,7 +245,7 @@ function Membership() {
 
       {inGrace && overdue ? (
         <Card tone="soft" style={{ gap: space.s1 }}>
-          <Eyebrow tone="daybreak">{fig(t('graceEyebrow'))}</Eyebrow>
+          <Eyebrow tone="ink2">{fig(t('graceEyebrow'))}</Eyebrow>
           <Title size={22}>
             {yearly ? t('graceTitlePatron') : t('graceTitle')}
             <Mono size={20} tone="ink">{fmtDate(graceUntil)}</Mono>
@@ -309,7 +314,8 @@ function Membership() {
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{t('plans')}</SectionTitle>
         {PLANS.map((p) => {
-          const on = p.key === acct.plan
+          // Circle held beside the plan counts as held: it is not offered again.
+          const on = p.key === acct.plan || (p.key === 'Circle' && circle)
           return (
             <Card key={p.key} tone={on ? 'soft' : 'raised'} style={{ gap: space.s1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s1, flexWrap: 'wrap' }}>
@@ -348,7 +354,18 @@ function Membership() {
       <View style={{ gap: space.s2 }}>
         <SectionTitle>{t('payment')}</SectionTitle>
         <Card tone="raised" style={{ gap: space.s1 }}>
-          {storeBilled ? (
+          {stripeBilled ? (
+            <>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <Icon name="credit-card" size={18} color={c.ink2} />
+                <View style={{ flex: 1 }}>
+                  <Body>{t('billedStripe', { name: current.name })}</Body>
+                  <Meta size={14}>{t('stripeTenant')}</Meta>
+                </View>
+              </View>
+              <Meta size={14} tone="ink3">{t('stripeNever')}</Meta>
+            </>
+          ) : storeBilled ? (
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 <Icon name="smartphone" size={18} color={c.ink2} />
@@ -373,10 +390,16 @@ function Membership() {
                 </View>
               </View>
               <Meta size={14} tone="ink3">{t('razorpay')}</Meta>
-              {yearly ? <Meta size={14} tone="ink3">{t('patronByLink')}</Meta> : null}
+              {yearly ? <Meta size={14} tone="ink3">{t('patronByLink', { name: current.name })}</Meta> : null}
             </>
           )}
-          <Meta size={14} tone="ink3">{STORE ? t('plusInStore', { store: STORE_NAME[STORE] }) : t('plusOnWeb')}</Meta>
+          {/* Who bills the other plans: left out once Stripe bills this one, its own lines say it all. */}
+          {stripeBilled ? null : (
+            <>
+              <Meta size={14} tone="ink3">{STORE ? t('plusInStore', { store: STORE_NAME[STORE] }) : t('plusOnWeb')}</Meta>
+              <Meta size={14} tone="ink3">{t('stripeNote')}</Meta>
+            </>
+          )}
         </Card>
         <Card tone="sunk" padding={16} style={{ flexDirection: 'row', gap: 10 }}>
           <Icon name="shield" size={16} color={c.ink2} />
@@ -463,7 +486,7 @@ function Membership() {
               {t('storeContinue', { store: STORE_NAME[viaStore] })}
             </Button>
           ) : (
-            <Button variant="ink" block onPress={() => doChange()}>
+            <Button variant="ink" block onPress={() => doChange(payBy)}>
               {t('confirm', { name: PLANS.find((p) => p.key === pick)!.name })}
             </Button>
           )
@@ -482,11 +505,13 @@ function Membership() {
               <Mono tone="ink">{acct.planChange.ref}</Mono>
             </KeyValue>
             <Meta>
-              {acct.planChange.to === acct.plan && acct.billing && acct.billing !== 'razorpay' && acct.planChange.to === 'Plus'
+              {acct.planChange.to === acct.plan && acct.billing && acct.billing !== 'razorpay' && acct.billing !== 'stripe' && acct.planChange.to === 'Plus'
                 ? t('storeDone', { store: STORE_NAME[acct.billing], account: STORE_ACCOUNT[acct.billing] })
                 : acct.planChange.to !== acct.plan && storeBilled
                   ? t('storeCancel', { store: STORE_NAME[storeBilled], account: STORE_ACCOUNT[storeBilled] })
-                  : t('raviLink')}
+                  : stripeBilled
+                    ? t('stripeLink')
+                    : t('raviLink')}
             </Meta>
           </>
         ) : storeStep !== 'idle' && viaStore ? (
@@ -504,7 +529,7 @@ function Membership() {
         ) : (
           <>
             <View style={{ gap: space.s1 }} accessibilityRole="radiogroup" accessibilityLabel={t('plan')}>
-              {PLANS.filter((p) => p.key !== acct.plan).map((p) => (
+              {PLANS.filter((p) => p.key !== acct.plan && !(p.key === 'Circle' && circle)).map((p) => (
                 <ChoiceCard
                   key={p.key}
                   selected={pick === p.key}
@@ -515,6 +540,17 @@ function Membership() {
                 />
               ))}
             </View>
+            {/* A paid plan bought here: Razorpay, or Stripe for a member of an international tenant. */}
+            {isUpgrade && !viaStore ? (
+              <View style={{ gap: 8 }}>
+                <Eyebrow>{t('payThrough')}</Eyebrow>
+                <View style={{ gap: space.s1 }} accessibilityRole="radiogroup" accessibilityLabel={t('payThrough')}>
+                  <ChoiceCard selected={payBy === 'razorpay'} onPress={() => setPayBy('razorpay')} accessibilityLabel={t('razorpayIndia')} title={t('razorpayIndia')} />
+                  <ChoiceCard selected={payBy === 'stripe'} onPress={() => setPayBy('stripe')} accessibilityLabel={t('stripeIntl')} title={t('stripeIntl')} />
+                </View>
+                {payBy === 'stripe' ? <Meta size={14} tone="ink3">{t('stripeNote')}</Meta> : null}
+              </View>
+            ) : null}
             <Meta>
               {isUpgrade
                 ? viaStore

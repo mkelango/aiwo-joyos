@@ -175,7 +175,7 @@ function Day90() {
     return (
       <InkScreen top={back}>
         <View style={{ gap: space.s1 }}>
-          <Eyebrow tone="daybreak">{t('inviteEyebrow')}</Eyebrow>
+          <Eyebrow>{t('inviteEyebrow')}</Eyebrow>
           <Title size={34} accessibilityRole="header">
             {t('inviteA')}<Serif>{t('inviteSerif')}</Serif>{t('inviteB')}
           </Title>
@@ -218,7 +218,7 @@ function Day90() {
     return (
       <InkScreen top={back}>
         <View style={{ gap: space.s1 }}>
-          <Eyebrow tone="daybreak">{t('awaitEyebrow')}</Eyebrow>
+          <Eyebrow>{t('awaitEyebrow')}</Eyebrow>
           <Title size={34} accessibilityRole="header">
             {t('awaitA')}<Serif>{t('awaitSerif')}</Serif>{t('awaitB')}
           </Title>
@@ -260,7 +260,7 @@ function Day90() {
         </View>
       ) : null}
       <View style={{ gap: space.s1 }}>
-        <Eyebrow tone="daybreak">{t('eyebrow')}</Eyebrow>
+        <Eyebrow>{t('eyebrow')}</Eyebrow>
         <Title size={34} accessibilityRole="header">
           {dir === 'down' ? (
             <>
@@ -478,9 +478,9 @@ function Day90() {
 
       <View style={{ gap: space.s1, borderTopWidth: 1, borderTopColor: INK.line, paddingTop: space.s2 }}>
         <Meta><MonoNums text={t('nothingCounts')} /></Meta>
-        <Button variant="ghost" icon="book-open" onPress={() => router.push('/index-result')} style={{ alignSelf: 'flex-start' }}>
+        <ArrowLink joyIcon="index" onPress={() => router.push('/index-result')}>
           {t('howMade')}
-        </Button>
+        </ArrowLink>
         {own ? (
           <Button variant="link" onPress={() => setRm(REMEASURE_INITIAL)}>
             {t('walkAgain')}

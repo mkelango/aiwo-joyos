@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom'
 import { SpecimenTag } from '@/components/joy/primitives'
 import { Button, Card, Pill } from '@/components/ui'
 import { useDict, useLang } from '@/lib/i18n'
+import { brandTransition, useReduceMotion } from '@/lib/motion'
 import { useApp } from '@/lib/store'
 import { useCore } from '@/routes/member/core/_i18n'
 import { Toggle } from './_parts'
@@ -38,6 +39,7 @@ export function useWatch() {
 /** The simulated watch and its controls. `compact` drops the pairing controls (WhatsApp screen). */
 export function WatchComplication({ onToast, compact = false }: { onToast: (m: string) => void; compact?: boolean }) {
   const t = useDict(DEV)
+  const reduce = useReduceMotion()
   const { tag: tagText } = useCore()
   const lang = useLang()
   const { addLedger } = useApp()
@@ -69,7 +71,7 @@ export function WatchComplication({ onToast, compact = false }: { onToast: (m: s
           ) : (
             <AnimatePresence mode="wait" initial={false}>
               {screen === 'face' && (
-                <motion.div key="face" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="flex flex-col items-center">
+                <motion.div key="face" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={brandTransition(reduce, 150)} className="flex flex-col items-center">
                   <span className={clsx('eyebrow', ON_GROUND_2)}>{now.toLocaleDateString(lang === 'en' ? 'en-GB' : `${lang}-IN`, { weekday: 'short', day: 'numeric', numberingSystem: 'latn' })}</span>
                   <span className="num mt-1 text-[3rem] font-light leading-none">{hhmm(now)}</span>
                   {w.complication ? (
@@ -87,7 +89,7 @@ export function WatchComplication({ onToast, compact = false }: { onToast: (m: s
                 </motion.div>
               )}
               {screen === 'pick' && (
-                <motion.div key="pick" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="flex w-full flex-col items-center">
+                <motion.div key="pick" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={brandTransition(reduce, 150)} className="flex w-full flex-col items-center">
                   <p className="text-[15px]">{t('wxAsk')}</p>
                   <div className="mt-3 grid w-full grid-cols-2 gap-1.5">
                     {WATCH_TAGS.map((tag) => (
@@ -100,7 +102,7 @@ export function WatchComplication({ onToast, compact = false }: { onToast: (m: s
                 </motion.div>
               )}
               {screen === 'saved' && (
-                <motion.div key="saved" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="flex flex-col items-center text-center" role="status">
+                <motion.div key="saved" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={brandTransition(reduce, 150)} className="flex flex-col items-center text-center" role="status">
                   <span className="flex h-12 w-12 items-center justify-center rounded-full border border-[color:color-mix(in_srgb,var(--aiwo-stone)_35%,transparent)]"><Check size={22} /></span>
                   <p className="mt-3 text-[16px]">{t('wxSaved')}</p>
                   <p className={clsx('text-[12px]', ON_GROUND_2)}>{t('wxSavedSub')}</p>

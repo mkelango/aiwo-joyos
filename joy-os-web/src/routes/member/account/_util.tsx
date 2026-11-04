@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { DEFAULT_NOTIF_PREFS, type NotifPrefs } from './_data'
 import { MEMBER } from '@/data/member'
+import { brandTransition, useReduceMotion } from '@/lib/motion'
 import { activeLang } from '@/lib/store'
 import { seedFromOnboarding } from './_onboarding'
 import { ACCT_CHANGED } from './_prefs'
@@ -41,8 +42,9 @@ export function rich(s: string, nodes: Record<string, ReactNode>): ReactNode {
   return parts.map((p, i) => <Fragment key={i}>{i % 2 ? (p in nodes ? nodes[p] : `{${p}}`) : nums(p)}</Fragment>)
 }
 
-// A number inside running text: digits with their separators (19:00, 60,000, 3.2, v1.0's 1.0).
-const NUM_RUN = /(\d+(?:[.,:]\d+)*)/
+// A number inside running text: digits with their separators (19:00, 60,000, 3.2), and a method
+// version whole (v1.0, v2).
+const NUM_RUN = /(\bv\d+(?:\.\d+)*|\d+(?:[.,:]\d+)*)/
 
 /** Mono for every number (brand): the digits inside a sentence in Mono, the words in the sans.
  *  For JSX children only; anything that is not a plain string (already styled) passes through. */
@@ -55,6 +57,7 @@ export function nums(s: ReactNode): ReactNode {
 /** A quiet toast — a status line, never a celebration. */
 export function useToast() {
   const [msg, setMsg] = useState<string | null>(null)
+  const reduce = useReduceMotion()
   const timer = useRef<number | undefined>(undefined)
   const show = useCallback((m: string) => {
     window.clearTimeout(timer.current)
@@ -70,7 +73,7 @@ export function useToast() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            transition={{ duration: 0.2 }}
+            transition={brandTransition(reduce, 200)}
             className="pointer-events-auto max-w-md rounded-full bg-ink px-5 py-2.5 text-center text-[14px] text-paper shadow-lift"
           >
             {nums(msg)}

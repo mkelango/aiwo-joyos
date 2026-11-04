@@ -53,8 +53,9 @@ export function Section({ id, eyebrow, title, lead, children, className }: { id?
 }
 
 // A number in running text: digits with their decimal, time or ratio separators, a sign, a
-// percent and a range ("0–100", "06:42", "48%", "−3"). Words around it stay in the sans.
-const NUM_RE = /[−+]?\d+(?:[.,:/]\d+)*%?(?:\s?[–-]\s?\d+(?:[.,:/]\d+)*%?)?/g
+// percent and a range ("0–100", "06:42", "48%", "−3"), and a method version whole ("v1.0").
+// Words around it stay in the sans.
+const NUM_RE = /\bv\d+(?:\.\d+)*|[−+]?\d+(?:[.,:/]\d+)*%?(?:\s?[–-]\s?\d+(?:[.,:/]\d+)*%?)?/g
 
 /** Set every number inside a sentence in the Mono (Playbook: Mono for every number). */
 export function nums(text: string): ReactNode {

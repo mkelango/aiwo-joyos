@@ -17,6 +17,8 @@ export const PARTS = {
   downloading: { en: 'Downloading… {pct}%', ta: 'பதிவிறக்குகிறது… {pct}%', hi: 'डाउनलोड हो रहा है… {pct}%' },
   savedDevice: { en: 'Saved on this device · 4.6 MB · plays with no signal', ta: 'இந்தச் சாதனத்தில் சேமிக்கப்பட்டது · 4.6 MB · சிக்னல் இல்லாமலும் இயங்கும்', hi: 'इस डिवाइस पर सेव · 4.6 MB · बिना सिग्नल के भी चलेगा' },
   downloadHint: { en: 'Download this week’s audio for a flight or the car.', ta: 'விமானப் பயணத்துக்கோ காருக்கோ இந்த வார ஒலிப்பதிவைப் பதிவிறக்குங்கள்.', hi: 'फ़्लाइट या गाड़ी के लिए इस हफ़्ते का ऑडियो डाउनलोड करें।' },
+  // The same player on the Letter: an issue, not a week of the Practice.
+  issueNeedsSignal: { en: 'This issue needs a connection to play.', ta: 'இந்த இதழை இயக்க இணைப்பு தேவை.', hi: 'इस अंक को चलाने के लिए कनेक्शन चाहिए।' },
   transcriptFollows: { en: 'Transcript · follows the audio', ta: 'எழுத்து வடிவம் · ஒலியுடன் தொடரும்', hi: 'लिखित पाठ · ऑडियो के साथ चलता है' },
   stepOf: { en: 'Step {n} of {total}', ta: 'படி {n} / {total}', hi: 'चरण {n} / {total}' },
   stepOfA11y: { en: 'Step {n} of {total}: {name}', ta: 'படி {n} / {total}: {name}', hi: 'चरण {n} / {total}: {name}' },

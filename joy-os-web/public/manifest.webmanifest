@@ -1,7 +1,7 @@
 {
   "name": "Joy OS · AIWO",
   "short_name": "Joy OS",
-  "description": "The operating system for a joyful life. Joy, measured. Years worth living.",
+  "description": "The operating system for a joyful life. Joy, measured. Years Worth Living.",
   "start_url": "/app",
   "scope": "/",
   "display": "standalone",

@@ -6,21 +6,25 @@ import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 
 import { DaybreakButton, Delta, Eyebrow, MethodLine, SpecimenTag, TermChip, TermDot } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill, Sheet, Tabs, Toggle } from '@/components/ui'
 import { TENANT } from '@/data/platform'
+import { DUR, brandTransition, growFade, useReduceMotion } from '@/lib/motion'
 import { termByKey, termColor } from '@/data/terms'
 import type { TermKey } from '@/domain/types'
-import { AGG_COHORTS, AGG_PERIODS, EAP_ROUTING, INSURER, INSURER_BAND_LABELS, INSURER_COHORTS, INSURER_FLAGS, INSURER_PERIODS, INSURER_PROFILE, INSURER_ROUTING, TENANT_FLAGS, TENANT_HOME, TENANT_KIND, TENANT_PROFILE, publishedDepartments, type AdminRole, type AggCohortKey, type AggPeriod, type InsurerCohortKey, type PublishedDept, type TenantKind } from './_data'
+import { AGG_COHORTS, AGG_PERIODS, EAP_ROUTING, HOSPITAL, HOSPITAL_COHORTS, HOSPITAL_FLAGS, HOSPITAL_PERIODS, HOSPITAL_PROFILE, HOSPITAL_ROUTING, INSURER, INSURER_BAND_LABELS, INSURER_COHORTS, INSURER_FLAGS, INSURER_PERIODS, INSURER_PROFILE, INSURER_ROUTING, TENANT_FLAGS, TENANT_HOME, TENANT_KIND, TENANT_PROFILE, publishedDepartments, type AdminRole, type AggCohortKey, type AggPeriod, type HospitalCohortKey, type InsurerCohortKey, type PublishedDept, type TenantKind } from './_data'
 import { AGG_TERMS, AggregateFilters, ApiAccessCard, BrandLineCard, ClinicalFeaturesCard, type AggTermFilter } from './_tenantExtras'
 import { PreviewBanner, useConsoleAccess } from '../care/_gate'
 import { AccessNote, CanActProvider, CardHead, ChartLead, Field, Kpi, Legend, Meter, Row, ScrollTabs, StatusTag, Swatch, Writes, downloadHtml, esc, fieldCls, fmtDate, inr, pct, tabPanelProps, tick, tipLabel, tipStyle, useCanAct, useTabParam } from './_parts'
 
-// TENANT ADMIN (Memo p.25; Architecture p.24): Joyspan@Work and insurer tenants.
+// TENANT ADMIN (Memo p.25; Architecture p.6, p.24): Joyspan@Work, insurer and hospital-unit tenants.
 // Aggregates only: k ≥ 10 for any cell, employers see groups of 50 or more, no drill-down,
 // no free text, never an Ease screen or journal. AIWO, not the employer, holds the data.
 
 const TABS = ['outcomes', 'enrolment', 'access', 'settings'] as const
 type Tab = (typeof TABS)[number]
-const VIEWS = ['employer', 'insurer'] as const
+const VIEWS = ['employer', 'insurer', 'hospital'] as const
 type View = TenantKind
+const NAME: Record<View, string> = { employer: TENANT.name, insurer: INSURER.name, hospital: HOSPITAL.name }
+/** One value for each kind of tenant. */
+const pick = <T,>(k: View, employer: T, insurer: T, hospital: T) => (k === 'employer' ? employer : k === 'insurer' ? insurer : hospital)
 type Report = { id: string; title: string; date: string; downloads: number }
 
 const INITIAL_REPORTS: Record<View, Report[]> = {
@@ -29,19 +33,24 @@ const INITIAL_REPORTS: Record<View, Report[]> = {
     { id: 'RPT-NW-0001', title: 'Day-0 baseline · Cycle 1', date: '28 Oct 2026', downloads: 5 },
   ],
   insurer: [{ id: 'RPT-SH-0001', title: 'Pilot Day-0 baseline', date: '12 Dec 2026', downloads: 2 }],
+  hospital: [],
 }
 const NEXT_REPORT: Record<View, { id: string; title: string }> = {
   employer: { id: 'RPT-NW-0003', title: 'Quarterly report · Q3 FY27, Oct–Dec 2026' },
   insurer: { id: 'RPT-SH-0002', title: 'Quarterly outcome report · Q3 FY27' },
+  hospital: { id: 'RPT-HL-0001', title: 'Quarterly unit report · first cycle, from J4' },
 }
+/** The preparing bar: 5% to 92%, or at 92% at once with the 120 ms fade under reduced motion. */
+const reportBar = (reduce: boolean) => (reduce ? growFade(true, 'width', '92%') : { initial: { width: '5%' }, animate: { width: '92%' }, transition: { duration: 0.85 } })
 const WORD = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten']
 
 export default function Tenant() {
+  const reduce = useReduceMotion()
   const [view, setView] = useTabParam(VIEWS, 'employer', 'view')
   const [tab, setTab] = useTabParam(TABS, 'outcomes')
   const [reportOpen, setReportOpen] = useState(false)
   const [reports, setReports] = useState(INITIAL_REPORTS)
-  const [stepUp, setStepUp] = useState<Record<View, boolean>>({ employer: true, insurer: true })
+  const [stepUp, setStepUp] = useState<Record<View, boolean>>({ employer: true, insurer: true, hospital: true })
   // Panels mount on first visit and stay mounted, so work in progress survives a tab or view change.
   const seen = useRef(new Set<string>())
   seen.current.add(`${view}:${tab}`)
@@ -49,7 +58,7 @@ export default function Tenant() {
   // The tenant admin acts here; every other role sees a read-only preview (the care gate).
   const { canAct } = useConsoleAccess('/console/tenant')
   // The gate is per tenant as well as per role: the tenant admin role belongs to Northwind, so it acts on Northwind
-  // only. Any other tenant (the Star Health insurer view) is a read-only preview for every role, writes switched off.
+  // only. Any other tenant (the Star Health and Harbourline views) is a read-only preview for every role, writes switched off.
   const actsOn = (k: View) => canAct && k === TENANT_HOME
 
   const addReport = (v: View) => setReports((r) => (r[v].some((x) => x.id === NEXT_REPORT[v].id) ? r : { ...r, [v]: [{ ...NEXT_REPORT[v], date: '28 Jan 2027', downloads: 0 }, ...r[v]] }))
@@ -62,26 +71,27 @@ export default function Tenant() {
         <ReportLibrary view={k} reports={reports[k]} stepUp={stepUp[k]} onDownloaded={(id) => countDownload(k, id)} />
       </Card>
     )
-    if (t === 'outcomes') return <>{k === 'employer' ? <Outcomes /> : <InsurerOutcomes />}{library}</>
+    if (t === 'outcomes') return <>{pick(k, <Outcomes />, <InsurerOutcomes />, <HospitalOutcomes />)}{library}</>
     // Enrolment, sign-in and settings are all writes: one switch turns each panel off for a role that cannot act.
     if (t === 'enrolment') return <Writes><Enrolment kind={k} /></Writes>
     if (t === 'access') return <Writes><Access kind={k} stepUp={stepUp[k]} setStepUp={(v) => setStepUp((x) => ({ ...x, [k]: v }))} /></Writes>
-    return <Writes><Settings kind={k} lastPublished={reports[k][0].date} /></Writes>
+    return <Writes><Settings kind={k} lastPublished={reports[k][0]?.date ?? 'None yet'} /></Writes>
   }
 
   return (
     <div>
       <PageHeader
-        eyebrow={<>Tenant admin · {view === 'employer' ? TENANT.name : INSURER.name}</>}
-        title={view === 'employer' ? <>How your people are, <em>together</em></> : <>Paid for a measured <em>fall</em> in suffering</>}
-        lead={
-          view === 'employer'
-            ? <>Aggregate outcomes for Cycle 1, Day 0 on 23 Oct 2026 to Day 90 on 21 Jan 2027. Every figure is a group of {TENANT.minCohort} or more, no cell under {TENANT.minCell}, and none of it leads back to a person.</>
-            : <>{INSURER.stage}. A projection of the J3 pilot, for the conversation with Star Health: no policyholder has reached Day 90, and the first could on {INSURER.firstDay90}. Joy OS as a policy benefit: the insurer sees aggregate outcomes only and pays on an audited fall in preventable suffering. Never individual underwriting.</>
-        }
+        eyebrow={<>Tenant admin · {NAME[view]}</>}
+        title={pick(view, <>How your people are, <em>together</em></>, <>Paid for a measured <em>fall</em> in suffering</>, <>A hospital unit, reported against the <em>Index</em></>)}
+        lead={pick(
+          view,
+          <>Aggregate outcomes for Cycle 1, Day 0 on 23 Oct 2026 to Day 90 on 21 Jan 2027. Every figure is a group of {TENANT.minCohort} or more, no cell under {TENANT.minCell}, and none of it leads back to a person.</>,
+          <>{INSURER.stage}. A projection of the J3 pilot, for the conversation with Star Health: no policyholder has reached Day 90, and the first could on {INSURER.firstDay90}. Joy OS as a policy benefit: the insurer sees aggregate outcomes only and pays on an audited fall in preventable suffering. Never individual underwriting.</>,
+          <>{HOSPITAL.stage}. An illustration of the tenant, not a live one: no hospital unit runs on Joy OS yet. Under Joyspan Inside a unit runs the Clinical grade and the 90 days under its own line of type, reports against the Index and routes complex care back. This console shows it aggregate outcomes only.</>,
+        )}
         actions={
-          <div className="flex flex-col items-start gap-3 md:items-end">
-            <Tabs<View> value={view} onChange={setView} items={[{ value: 'employer', label: 'Employer view' }, { value: 'insurer', label: 'Insurer view' }]} />
+          <div className="flex w-full min-w-0 flex-col items-start gap-3 md:w-auto md:items-end">
+            <Tabs<View> value={view} onChange={setView} items={[{ value: 'employer', label: 'Employer view' }, { value: 'insurer', label: 'Insurer view' }, { value: 'hospital', label: 'Hospital unit view' }]} />
             <div className="flex flex-wrap items-center gap-3">
               <SpecimenTag />
               <DaybreakButton onClick={() => setReportOpen(true)}>Prepare quarterly report</DaybreakButton>
@@ -94,7 +104,7 @@ export default function Tenant() {
       {canAct && view !== TENANT_HOME && <OtherTenantBanner view={view} onHome={() => setView(TENANT_HOME)} />}
 
       <AccessNote icon="shield" className="mb-8">
-        <span className="text-ink">AIWO, not the {view === 'employer' ? 'employer' : 'insurer'}, holds the data.</span> This console shows aggregates only: groups of {cfg.group} or more, small cells suppressed and rounded, no drill-down to individuals and no free text. Ease screens, journals and any term below the aggregate never reach a tenant.
+        <span className="text-ink">AIWO, not the {view}, holds the data.</span> This console shows aggregates only: groups of {cfg.group} or more, small cells suppressed and rounded, no drill-down to individuals and no free text. Ease screens, journals and any term below the aggregate never reach a tenant.
       </AccessNote>
 
       <ScrollTabs<Tab>
@@ -105,7 +115,7 @@ export default function Tenant() {
         className="mb-6"
         items={[
           { value: 'outcomes', label: 'Outcomes' },
-          { value: 'enrolment', label: view === 'employer' ? 'Eligibility & enrolment' : 'Policyholder eligibility' },
+          { value: 'enrolment', label: pick(view, 'Eligibility & enrolment', 'Policyholder eligibility', 'Patient eligibility') },
           { value: 'access', label: 'Sign-in & admins' },
           { value: 'settings', label: 'Settings & API' },
         ]}
@@ -120,7 +130,7 @@ export default function Tenant() {
           // Outcomes holds charts and no work in progress: unmount it when hidden, so no chart measures a zero-size box.
           if (!active && t === 'outcomes') return null
           return (
-            <motion.div key={id} hidden={!active} {...(active ? tabPanelProps('tenant', t) : { role: 'tabpanel', 'aria-label': `${k} ${t}` })} initial={{ opacity: 0, y: 6 }} animate={active ? { opacity: 1, y: 0 } : { opacity: 0, y: 6 }} transition={{ duration: 0.2 }}>
+            <motion.div key={id} hidden={!active} {...(active ? tabPanelProps('tenant', t) : { role: 'tabpanel', 'aria-label': `${k} ${t}` })} initial={{ opacity: 0, y: 6 }} animate={active ? { opacity: 1, y: 0 } : { opacity: 0, y: 6 }} transition={brandTransition(reduce)}>
               <CanActProvider value={actsOn(k)}>{panel(k, t)}</CanActProvider>
             </motion.div>
           )
@@ -145,7 +155,7 @@ function OtherTenantBanner({ view, onHome }: { view: View; onHome: () => void })
         <Eye size={18} className="mt-0.5 shrink-0" aria-hidden />
         <span>
           Read-only preview of {other}. Your tenant admin role belongs to {home}, so every {other} write is switched off here: eligibility and invitations, sign-in and admins, the brand line, API keys and webhooks, and report downloads.
-          <span className="mt-0.5 block text-[13px] text-ink-2">Shown as a specimen so the two kinds of tenant can be compared. In production a tenant admin signs in to their own tenant only and never opens another tenant’s aggregates.</span>
+          <span className="mt-0.5 block text-[13px] text-ink-2">Shown as a specimen so the kinds of tenant can be compared. In production a tenant admin signs in to their own tenant only and never opens another tenant’s aggregates.</span>
         </span>
       </p>
       <div className="flex shrink-0 flex-wrap gap-2">
@@ -161,6 +171,7 @@ function ReportSheet({ view, reports, stepUp, onPrepared, onDownloaded }: { view
   const ready = reports.some((r) => r.id === NEXT_REPORT[view].id)
   const [phase, setPhase] = useState<'idle' | 'preparing' | 'done'>(ready ? 'done' : 'idle')
   const canAct = useCanAct()
+  const reduce = useReduceMotion()
   const prepare = () => {
     if (!canAct) return
     setPhase('preparing')
@@ -169,12 +180,14 @@ function ReportSheet({ view, reports, stepUp, onPrepared, onDownloaded }: { view
   const group = TENANT_KIND[view].group
   return (
     <div>
-      <Eyebrow>{view === 'employer' ? TENANT.name : INSURER.name} · {NEXT_REPORT[view].title}</Eyebrow>
-      <p className="mt-3 text-[17px] leading-relaxed text-ink">The report opens with three numbers: people measured, people raising their Index, and the share improving their lowest term. Every figure carries method v1.0.</p>
+      <Eyebrow>{NAME[view]} · {NEXT_REPORT[view].title}</Eyebrow>
+      <p className="mt-3 text-[17px] leading-relaxed text-ink">The report opens with three numbers: {view === 'hospital' ? 'patients enrolled, patients measured at Day 0, and the re-measure rate' : 'people measured, people raising their Index, and the share improving their lowest term'}. Every figure carries {view === 'hospital' ? 'its method version' : 'method v1.0'}.</p>
       <ul className="mt-5 space-y-3 text-[15px] text-ink-2">
-        {(view === 'employer'
-          ? ['Funnel: eligible, enrolled, measured, re-measured', 'Day-0 and Day-90 term means, with Ease shown as a fall', `Departments of ${group} or more; smaller groups suppressed`, 'EAP routing volume, counts only, cells under ten shown as “fewer than 10”']
-          : ['Enrolled, measured and re-measured policyholders', 'Cohort Burden at Day 0 and Day 90, and how it changed', `Groups of ${group} or more; smaller cells suppressed`, 'The outcome-linked fee condition, met or not, as measured', 'Until the first Day 90 on ' + INSURER.firstDay90 + ', Day-90 figures are a J3 projection and say so']
+        {pick(
+          view,
+          ['Funnel: eligible, enrolled, measured, re-measured', 'Day-0 and Day-90 term means, with Ease shown as a fall', `Departments of ${group} or more; smaller groups suppressed`, 'EAP routing volume, counts only, cells under ten shown as “fewer than 10”'],
+          ['Enrolled, measured and re-measured policyholders', 'Cohort Burden at Day 0 and Day 90, and how it changed', `Groups of ${group} or more; smaller cells suppressed`, 'The outcome-linked fee condition, met or not, as measured', 'Until the first Day 90 on ' + INSURER.firstDay90 + ', Day-90 figures are a J3 projection and say so'],
+          ['Enrolled, measured and re-measured patients', 'Clinical-grade Day-0 and Day-90 term means, with Ease shown as a fall', `Pathways of ${group} or more; smaller groups suppressed`, 'Complex care routed back, counts only, cells under ten shown as “fewer than 10”', 'None exists yet: the first follows a unit’s first cycle, from J4'],
         ).map((l) => (
           <li key={l} className="flex gap-2.5"><Check size={16} className="mt-0.5 shrink-0 text-ink" aria-hidden />{l}</li>
         ))}
@@ -189,7 +202,7 @@ function ReportSheet({ view, reports, stepUp, onPrepared, onDownloaded }: { view
         {phase === 'preparing' && (
           <div>
             <p className="text-[15px] text-ink">Preparing {NEXT_REPORT[view].id}: suppressing small cells and pinning the method…</p>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-paper-sunk"><motion.div className="h-full bg-ink" initial={{ width: '5%' }} animate={{ width: '92%' }} transition={{ duration: 0.85 }} /></div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-paper-sunk"><motion.div className="h-full bg-ink" {...reportBar(reduce)} /></div>
           </div>
         )}
         {phase === 'done' && <p className="flex items-center gap-2 text-[15px] text-ink" role="status"><ShieldCheck size={17} aria-hidden /> Prepared and placed in the report library below. Download it when you are ready.</p>}
@@ -205,7 +218,7 @@ function ReportSheet({ view, reports, stepUp, onPrepared, onDownloaded }: { view
 }
 
 function reportBody(view: View, r: Report) {
-  const name = view === 'employer' ? TENANT.name : INSURER.name
+  const name = NAME[view]
   const head = `<p class="meta">${esc(r.id)} · prepared ${esc(r.date)} · method v1.0 · aggregates only</p><h1>${esc(r.title)}</h1><p>${esc(name)}</p>`
   const never = '<h2>Never included</h2><p>Names, member IDs, individual scores, Ease results, journal text, free-text answers, or any cell under ten. AIWO, not the tenant, holds the data.</p>'
   if (view === 'employer') {
@@ -213,6 +226,7 @@ function reportBody(view: View, r: Report) {
     const rows = TENANT.termMeans.map((t) => `<tr><td>${esc(termByKey(t.key).name)}</td><td class="num">${t.key === 'B' ? '−' : ''}${t.d0}</td><td class="num">${t.key === 'B' ? '−' : ''}${t.d90}</td></tr>`).join('')
     return `${head}<h2>Three numbers</h2><table><tr><td>People measured</td><td class="num">${TENANT.measured}</td></tr><tr><td>People re-measured at Day 90</td><td class="num">${re}</td></tr><tr><td>Improved their lowest term</td><td class="num">${pct(TENANT.improvedLowest)}</td></tr></table><h2>Funnel</h2><table><tr><td>Eligible</td><td class="num">${TENANT.eligible}</td></tr><tr><td>Enrolled</td><td class="num">${TENANT.enrolled}</td></tr><tr><td>Measured at Day 0</td><td class="num">${TENANT.measured}</td></tr><tr><td>Re-measured at Day 90</td><td class="num">${re}</td></tr></table><h2>Term means</h2><table><tr><th>Term</th><th>Day 0</th><th>Day 90</th></tr>${rows}</table><p class="meta">Preventable Suffering is a burden: a lower Day-90 figure is the improvement.</p>${never}`
   }
+  // Only the insurer reaches here: the hospital library stays empty until a unit goes live at J4.
   return `${head}<p class="meta">Projection for the J3 pilot conversation (Decision 7). Not measured results: the first possible Day 90 is ${esc(INSURER.firstDay90)}.</p><h2>Three numbers</h2><table><tr><td>Policyholders enrolled</td><td class="num">${INSURER.enrolled}</td></tr><tr><td>Measured at Day 0</td><td class="num">${INSURER.measured}</td></tr><tr><td>Re-measured at Day 90, projected</td><td class="num">${pct(INSURER.remeasureRate)}</td></tr></table><h2>Preventable Suffering</h2><table><tr><td>Cohort mean, Day 0</td><td class="num">−${INSURER.burdenD0}</td></tr><tr><td>Cohort mean, Day 90</td><td class="num">−${INSURER.burdenD90}</td></tr><tr><td>Share whose Burden fell</td><td class="num">${pct(INSURER.burdenFalling)}</td></tr></table><p class="meta">Never for individual underwriting, pricing or a claim decision.</p>${never}`
 }
 
@@ -244,6 +258,7 @@ function ReportLibrary({ view, reports, stepUp, onDownloaded, className }: { vie
   return (
     <Writes className={className}>
       <ul className="divide-y divide-line">
+        {reports.length === 0 && <li className="py-3 text-[15px] text-ink-2">No reports yet. A hospital unit’s first report follows its first cycle, from J4.</li>}
         {reports.map((r) => (
           <li key={r.id} className="py-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -284,6 +299,7 @@ const PERIOD_KEYS = AGG_PERIODS.map((p) => p.value)
 const DEPT_REF = { ji: 53, delta: 5 }
 
 function Outcomes() {
+  const reduce = useReduceMotion()
   const [cohort, setCohort] = useTabParam<AggCohortKey>(COHORT_KEYS, 'all', 'cohort')
   const [term, setTerm] = useTabParam<AggTermFilter>(AGG_TERMS, 'all', 'term')
   const [period, setPeriod] = useTabParam<AggPeriod>(PERIOD_KEYS, 'change', 'period')
@@ -369,7 +385,7 @@ function Outcomes() {
                 <span className="num text-[1.4rem] font-light text-ink">{f.n.toLocaleString('en-IN')}</span>
               </div>
               <div className="mt-1.5 h-2.5 w-full rounded-full bg-paper-sunk">
-                <motion.div className="h-full rounded-full" style={{ background: i === funnel.length - 1 ? 'var(--ink-2)' : 'var(--ink)', opacity: 1 - i * 0.12 }} initial={{ width: 0 }} animate={{ width: `${(f.n / top) * 100}%` }} transition={{ duration: 0.24, delay: i * 0.05 }} />
+                <motion.div className="h-full rounded-full" style={{ background: i === funnel.length - 1 ? 'var(--ink-2)' : 'var(--ink)' }} {...growFade(reduce, 'width', `${(f.n / top) * 100}%`, DUR.settle, i * 50, 1 - i * 0.12)} />
               </div>
               <p className="mt-1 text-[13px] text-ink-3">{f.note}</p>
             </li>
@@ -554,6 +570,7 @@ type Wave = { id: string; name: string; sent: string; invited: number; opened: n
 function Enrolment({ kind }: { kind: View }) {
   const cfg = TENANT_KIND[kind]
   const canAct = useCanAct()
+  const reduce = useReduceMotion()
   const inputId = useId()
   const [upload, setUpload] = useState<UploadState>({ phase: 'idle' })
   const [drag, setDrag] = useState(false)
@@ -567,8 +584,8 @@ function Enrolment({ kind }: { kind: View }) {
   const checkTimer = useRef<number | undefined>(undefined)
   useEffect(() => () => window.clearTimeout(checkTimer.current), [])
   const invitedBase = cfg.waves.slice(0, 2).reduce((a, w) => a + w.invited, 0)
-  const enrolledNow = kind === 'employer' ? TENANT.enrolled : INSURER.enrolled
-  const notEnrolled = kind === 'employer' ? TENANT.eligible - TENANT.enrolled : invitedBase - INSURER.enrolled
+  const enrolledNow = pick(kind, TENANT.enrolled, INSURER.enrolled, 0)
+  const notEnrolled = pick(kind, TENANT.eligible - TENANT.enrolled, invitedBase - INSURER.enrolled, 0)
   // "Never more than one reminder": the not-enrolled audience gets one reminder wave, sent or scheduled, ever.
   const reminderUsed = waves.some((w) => w.audience === 'not-enrolled' || /reminder/i.test(w.name))
   const audiences = cfg.audiences.map((a) => ({ ...a, n: a.value === 'not-enrolled' ? notEnrolled : a.n, closed: a.value === 'not-enrolled' && reminderUsed }))
@@ -620,7 +637,7 @@ function Enrolment({ kind }: { kind: View }) {
   return (
     <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
       <Card className="lg:col-span-7">
-        <CardHead eyebrow="Eligibility file" title={kind === 'employer' ? 'Who may join, never how they are' : 'Which policyholders may join, never how they are'} lead={`Upload the eligibility file each month. It carries no health data and is used only to send invitations and to form groups of ${cfg.group === 50 ? 'fifty' : 'ten'} or more.`} />
+        <CardHead eyebrow="Eligibility file" title={pick(kind, 'Who may join, never how they are', 'Which policyholders may join, never how they are', 'Which patients may join, never how they are')} lead={`Upload the eligibility file each month. It carries no health data and is used only to send invitations and to form groups of ${cfg.group === 50 ? 'fifty' : 'ten'} or more.`} />
         {upload.phase === 'idle' || upload.phase === 'error' || upload.phase === 'checking' ? (
           <div
             onDragOver={(e) => { e.preventDefault(); setDrag(true) }}
@@ -636,7 +653,7 @@ function Enrolment({ kind }: { kind: View }) {
                 <FileSpreadsheet size={16} aria-hidden /> Choose a file
                 <input id={inputId} type="file" accept=".csv,text/csv" className="sr-only" onChange={onFile} />
               </label>
-              <Button variant="ghost" onClick={() => take(cfg.fileName)}>Use the January file</Button>
+              <Button variant="ghost" onClick={() => take(cfg.fileName)}>{kind === 'hospital' ? 'Use the sample file' : 'Use the January file'}</Button>
             </div>
           </div>
         ) : null}
@@ -646,7 +663,7 @@ function Enrolment({ kind }: { kind: View }) {
           {upload.phase === 'checking' && (
             <div>
               <p className="text-[15px] text-ink">Checking {upload.name}…</p>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-paper-sunk"><motion.div className="h-full bg-ink" initial={{ width: '5%' }} animate={{ width: '92%' }} transition={{ duration: 0.85 }} /></div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-paper-sunk"><motion.div className="h-full bg-ink" {...reportBar(reduce)} /></div>
             </div>
           )}
           {(upload.phase === 'checked' || upload.phase === 'applied') && (
@@ -661,7 +678,7 @@ function Enrolment({ kind }: { kind: View }) {
               <div className="mt-4">
                 {upload.phase === 'applied' ? (
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="flex items-center gap-2 text-[15px] text-ink" role="status"><Check size={16} aria-hidden /> Applied. <span className="num">{cfg.file.eligible}</span> {kind === 'employer' ? 'people are' : 'policyholders are'} eligible from {cfg.file.from}.</p>
+                    <p className="flex items-center gap-2 text-[15px] text-ink" role="status"><Check size={16} aria-hidden /> Applied. <span className="num">{cfg.file.eligible}</span> {pick(kind, 'people are', 'policyholders are', 'patients are')} eligible from {cfg.file.from}.</p>
                     <Button variant="ghost" size="sm" onClick={() => setUpload({ phase: 'idle' })}><Upload size={14} aria-hidden /> Upload a new file</Button>
                   </div>
                 ) : (
@@ -688,9 +705,12 @@ function Enrolment({ kind }: { kind: View }) {
         </ul>
         <p className="mt-4 text-[14px] text-ink-2">
           Any other column is dropped on upload.{' '}
-          {kind === 'employer'
-            ? 'A person belongs to AIWO, not to the tenant: if someone leaves Northwind, they keep their record and you lose only aggregate visibility.'
-            : 'A person belongs to AIWO, not to the insurer: if a policy lapses or moves, the member keeps their record and Star Health loses only aggregate visibility.'}
+          {pick(
+            kind,
+            'A person belongs to AIWO, not to the tenant: if someone leaves Northwind, they keep their record and you lose only aggregate visibility.',
+            'A person belongs to AIWO, not to the insurer: if a policy lapses or moves, the member keeps their record and Star Health loses only aggregate visibility.',
+            'A person belongs to AIWO, not to the hospital: if a patient leaves the unit, they keep their record and Harbourline loses only aggregate visibility.',
+          )}
         </p>
       </Card>
 
@@ -711,6 +731,7 @@ function Enrolment({ kind }: { kind: View }) {
               </tr>
             </thead>
             <tbody>
+              {waves.length === 0 && <tr><td colSpan={6} className="py-3 text-ink-2">No waves yet. Invitations start when a unit goes live at J4.</td></tr>}
               {waves.map((w) => (
                 <tr key={w.id} className="border-b border-line/70 last:border-0">
                   <th scope="row" className="py-3 pr-4 font-normal text-ink">{w.name}</th>
@@ -751,7 +772,13 @@ function Enrolment({ kind }: { kind: View }) {
           )}
           <div className="rounded-card border border-line bg-paper p-5">
             <Eyebrow>Invitation preview</Eyebrow>
-            {kind === 'employer' ? (
+            {kind === 'hospital' ? (
+              <>
+                <p className="mt-3 text-[17px] leading-relaxed text-ink">Your Harbourline unit has made Joy OS by AIWO available to you.</p>
+                <p className="mt-2 text-[15px] leading-relaxed text-ink-2">Take the Joyspan Index at Clinical grade, get one small action a day and a re-measure every ninety days. AIWO, not Harbourline, holds your data. Harbourline’s reports show only totals for groups of ten or more, and a unit physician sees your record only with your consent.</p>
+                <p className="mt-4 text-[14px] text-ink-3">joy.aiwo.com/join/harbourline · link expires in 30 days</p>
+              </>
+            ) : kind === 'employer' ? (
               <>
                 <p className="mt-3 text-[17px] leading-relaxed text-ink">Northwind has made Joy OS by AIWO available to you, free.</p>
                 <p className="mt-2 text-[15px] leading-relaxed text-ink-2">Take the Joyspan Index, get one small action a day and a re-measure every ninety days. AIWO, not Northwind, holds your data. Northwind sees only totals for groups of fifty or more, never you.</p>
@@ -793,6 +820,8 @@ function Access({ kind, stepUp, setStepUp }: { kind: View; stepUp: boolean; setS
   const [removing, setRemoving] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const id = (k: string) => `${kind}-${k}`
+  // A planned tenant has no live sign-in yet: nothing is connected, and no secret or certificate has been exchanged.
+  const planned = kind === 'hospital'
 
   const issuerErr = proto === 'oidc' && !/^https:\/\/[^\s]+\.[^\s]+/.test(issuer) ? 'Issuer must be an https:// URL.' : null
   const clientErr = proto === 'oidc' && clientId.trim().length < 4 ? 'Enter the client ID from your identity provider.' : null
@@ -833,9 +862,9 @@ function Access({ kind, stepUp, setStepUp }: { kind: View; stepUp: boolean; setS
       <Card className="lg:col-span-7">
         <CardHead
           eyebrow="Single sign-on"
-          title={kind === 'employer' ? 'Members sign in with Northwind' : 'Star Health staff sign in with Star Health'}
-          aside={dirty ? <StatusTag tone="draft">Draft · not saved</StatusTag> : <StatusTag tone="ok">Connected · {protoLabel(savedProto)}</StatusTag>}
-          lead={kind === 'employer' ? 'SSO proves someone is eligible. It never tells Northwind whether they signed in, or what they did.' : 'SSO here admits the insurer’s console admins. Policyholders sign in with their own AIWO ID and confirm their policy once; Star Health never learns whether they did.'}
+          title={pick(kind, 'Members sign in with Northwind', 'Star Health staff sign in with Star Health', 'Harbourline staff would sign in with Harbourline')}
+          aside={planned ? <StatusTag tone="draft">Planned · J4</StatusTag> : dirty ? <StatusTag tone="draft">Draft · not saved</StatusTag> : <StatusTag tone="ok">Connected · {protoLabel(savedProto)}</StatusTag>}
+          lead={pick(kind, 'SSO proves someone is eligible. It never tells Northwind whether they signed in, or what they did.', 'SSO here admits the insurer’s console admins. Policyholders sign in with their own AIWO ID and confirm their policy once; Star Health never learns whether they did.', 'SSO here admits the unit’s console admins. Patients sign in with their own AIWO ID; Harbourline never learns from this console whether they did.')}
         />
         <Tabs<'oidc' | 'saml'> value={proto} onChange={(v) => { setProto(v); resetTest(); setSaved(false) }} items={[{ value: 'oidc', label: 'OIDC' }, { value: 'saml', label: 'SAML 2.0' }]} className="mb-6" />
 
@@ -851,8 +880,8 @@ function Access({ kind, stepUp, setStepUp }: { kind: View; stepUp: boolean; setS
               <div>
                 <span className="eyebrow mb-1.5 block text-ink-3">Client secret</span>
                 <div className="flex h-11 items-center justify-between gap-2 rounded-lg border border-line bg-paper-sunk px-3 text-[14px] text-ink-2">
-                  <span className="flex items-center gap-2"><KeyRound size={14} aria-hidden /> In the secrets manager</span>
-                  <span className="num text-[12px] text-ink-3">rotated 12 Jan</span>
+                  <span className="flex items-center gap-2"><KeyRound size={14} aria-hidden /> {planned ? 'Not issued yet' : 'In the secrets manager'}</span>
+                  <span className="num text-[12px] text-ink-3">{planned ? 'from J4' : 'rotated 12 Jan'}</span>
                 </div>
               </div>
               <ReadOnly label="Redirect URI" value={redirect} copied={copied === 'redirect'} onCopy={() => copy('redirect', redirect)} />
@@ -870,7 +899,7 @@ function Access({ kind, stepUp, setStepUp }: { kind: View; stepUp: boolean; setS
               </Field>
               <div className="sm:col-span-2">
                 <span className="eyebrow mb-1.5 block text-ink-3">Signing certificate</span>
-                <p className="num break-all rounded-lg bg-paper-sunk px-3 py-2.5 text-[13px] text-ink-2">SHA-256 4F:1A:9C:22:7B:E0:31:D8:…:6C:0E · expires 14 Sep 2027</p>
+                <p className="num break-all rounded-lg bg-paper-sunk px-3 py-2.5 text-[13px] text-ink-2">{planned ? 'Not exchanged yet · from J4' : 'SHA-256 4F:1A:9C:22:7B:E0:31:D8:…:6C:0E · expires 14 Sep 2027'}</p>
               </div>
             </>
           )}
@@ -880,7 +909,7 @@ function Access({ kind, stepUp, setStepUp }: { kind: View; stepUp: boolean; setS
           <div>
             <span className="eyebrow mb-1.5 block text-ink-3">Claims mapped</span>
             <p className="text-[15px] text-ink">{kind === 'employer' ? 'email · department · eligible_from' : 'email · role'}</p>
-            <p className="mt-1 text-[13px] text-ink-3">{kind === 'employer' ? 'Department is used only for groups of 50 or more.' : 'No policyholder attribute is mapped.'}</p>
+            <p className="mt-1 text-[13px] text-ink-3">{pick(kind, 'Department is used only for groups of 50 or more.', 'No policyholder attribute is mapped.', 'No patient attribute is mapped.')}</p>
           </div>
         </div>
 
@@ -936,9 +965,11 @@ function Access({ kind, stepUp, setStepUp }: { kind: View; stepUp: boolean; setS
         <Card tone="sunk">
           <Eyebrow>What an admin can never do</Eyebrow>
           <ul className="mt-3 space-y-2 text-[15px] text-ink-2">
-            {(kind === 'employer'
-              ? ['See whether a named person enrolled, measured or signed in', 'Open a group smaller than fifty', 'Read an Ease screen, a journal or a free-text answer', 'Contact a member through Joy OS']
-              : ['See whether a named policyholder enrolled, measured or was routed', 'Open a group smaller than ten', 'Use any figure to price a policy or decide a claim', 'Contact a member through Joy OS']
+            {pick(
+              kind,
+              ['See whether a named person enrolled, measured or signed in', 'Open a group smaller than fifty', 'Read an Ease screen, a journal or a free-text answer', 'Contact a member through Joy OS'],
+              ['See whether a named policyholder enrolled, measured or was routed', 'Open a group smaller than ten', 'Use any figure to price a policy or decide a claim', 'Contact a member through Joy OS'],
+              ['See from this console whether a named patient enrolled, measured or was routed back', 'Open a group smaller than ten', 'Read an Ease screen, a journal or a free-text answer', 'Contact a patient through this console'],
             ).map((l) => (
               <li key={l} className="flex gap-2"><Lock size={14} className="mt-1 shrink-0 text-ink-3" aria-hidden />{l}</li>
             ))}
@@ -997,7 +1028,7 @@ function InviteForm({ kind, domain, taken, onInvite, onClose }: { kind: View; do
       <ul className="space-y-1.5 text-[14px] text-ink-2">
         <li><span className="text-ink">Tenant admin</span> · outcomes, enrolment, sign-in and admins</li>
         <li><span className="text-ink">Read-only analyst</span> · outcomes and reports only</li>
-        <li><span className="text-ink">Routing volume only</span> · monthly {kind === 'employer' ? 'EAP' : 'clinician-offer'} counts, nothing else</li>
+        <li><span className="text-ink">Routing volume only</span> · monthly {pick(kind, 'EAP', 'clinician-offer', 'complex-care')} counts, nothing else</li>
       </ul>
       <div className="flex flex-wrap gap-2">
         <Button variant="ink" onClick={submit}><Mail size={15} aria-hidden /> Send invitation</Button>
@@ -1023,20 +1054,22 @@ function ReadOnly({ label, value, copied, onCopy }: { label: string; value: stri
 // ─── Settings: region, flags, brand line, clinical features, API ──────────────────────────────────────────────────────
 
 function Settings({ kind, lastPublished }: { kind: View; lastPublished: string }) {
-  const emp = kind === 'employer'
-  const prof = emp ? TENANT_PROFILE : INSURER_PROFILE
-  const flags = emp ? TENANT_FLAGS : INSURER_FLAGS
+  const prof = pick(kind, TENANT_PROFILE, INSURER_PROFILE, HOSPITAL_PROFILE)
+  const flags = pick(kind, TENANT_FLAGS, INSURER_FLAGS, HOSPITAL_FLAGS)
   return (
     <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
       <Card tone="ink" className="lg:col-span-12">
         <div className="flex items-start gap-4">
           <ShieldCheck size={26} className="mt-1 shrink-0" aria-hidden />
           <div>
-            <p className="text-[1.6rem] font-light leading-snug">AIWO, not the {emp ? 'employer' : 'insurer'}, <em>holds</em> the data.</p>
+            <p className="text-[1.6rem] font-light leading-snug">AIWO, not the {kind}, <em>holds</em> the data.</p>
             <p className="mt-2 max-w-3xl text-[15px] leading-relaxed opacity-80">
-              {emp
-                ? 'Northwind pays for Joy OS and sees whether it works, in aggregate. Each member owns their record, can export it within 72 hours and erase it within 24, and keeps it if they leave Northwind.'
-                : 'Star Health pays for Joy OS and sees whether it works, in aggregate, groups of ten or more. Nothing here can be used to price a policy or decide a claim. Each policyholder owns their record and keeps it if the policy lapses.'}
+              {pick(
+                kind,
+                'Northwind pays for Joy OS and sees whether it works, in aggregate. Each member owns their record, can export it within 72 hours and erase it within 24, and keeps it if they leave Northwind.',
+                'Star Health pays for Joy OS and sees whether it works, in aggregate, groups of ten or more. Nothing here can be used to price a policy or decide a claim. Each policyholder owns their record and keeps it if the policy lapses.',
+                'A hospital unit would pay a platform fee and a per-patient fee, and see whether it works, in aggregate, groups of ten or more. Each patient owns their record and keeps it if they leave the unit.',
+              )}
             </p>
           </div>
         </div>
@@ -1050,7 +1083,7 @@ function Settings({ kind, lastPublished }: { kind: View; lastPublished: string }
           <Row k="Stage" v={prof.stage} />
           <Row k="Recovery region" v={prof.recovery} />
           <Row k="Encryption" v={prof.keys} />
-          <Row k="Tenancy" v={emp ? 'Pooled tables, tenant ID and row-level security' : 'Pooled now; a bridge schema with its own key at J4'} />
+          <Row k="Tenancy" v={pick(kind, 'Pooled tables, tenant ID and row-level security', 'Pooled now; a bridge schema with its own key at J4', 'Pooled tables, tenant ID and row-level security, from J4')} />
           <Row k="Last aggregate published" v={<span className="num">{lastPublished}</span>} />
         </dl>
       </Card>
@@ -1252,6 +1285,138 @@ function InsurerOutcomes() {
             <Eyebrow>The insurer never receives</Eyebrow>
             <ul className="mt-3 space-y-2 text-[15px] text-ink-2">
               {['Any individual score, band, flag or term', 'Whether a named policyholder enrolled or was routed', 'Ease screens, journals or free text', 'Anything usable for individual underwriting or a claim decision'].map((l) => <li key={l} className="flex gap-2"><Lock size={14} className="mt-1 shrink-0 text-ink-3" aria-hidden />{l}</li>)}
+            </ul>
+          </div>
+        </div>
+      </Card>
+    </div>
+  )
+}
+
+// ─── Hospital unit view ──────────────────────────────────────────────────
+
+const HOSPITAL_COHORT_KEYS = HOSPITAL_COHORTS.map((c) => c.value)
+
+function HospitalOutcomes() {
+  // Own URL keys, like the insurer's, so one tenant's filters never overwrite another's.
+  const [cohort, setCohort] = useTabParam<HospitalCohortKey>(HOSPITAL_COHORT_KEYS, 'all', 'hcohort')
+  const [term, setTerm] = useTabParam<AggTermFilter>(AGG_TERMS, 'all', 'hterm')
+  const [period, setPeriod] = useTabParam<AggPeriod>(PERIOD_KEYS, 'change', 'hperiod')
+  const c = HOSPITAL_COHORTS.find((x) => x.value === cohort) ?? HOSPITAL_COHORTS[0]
+  const k = TENANT_KIND.hospital.group
+  const filters = <AggregateFilters<HospitalCohortKey> cohort={cohort} term={term} period={period} onCohort={setCohort} onTerm={setTerm} onPeriod={setPeriod} cohorts={HOSPITAL_COHORTS} periods={HOSPITAL_PERIODS} minGroup={k} />
+
+  const illustration = (
+    <Card tone="soft" className="lg:col-span-12">
+      <div className="flex items-start gap-3">
+        <Building2 size={22} className="mt-1 shrink-0 text-ink-2" aria-hidden />
+        <div>
+          <p className="text-[1.35rem] font-light leading-snug text-ink">The unit runs the Clinical grade and the 90 days, and reports against the Index.</p>
+          <p className="mt-1 text-[15px] text-ink-2">Its line of type sits under the Joy OS mark, never its logo. Complex care is routed back, and only the count reaches this console.</p>
+          <p className="mt-3 flex flex-wrap items-center gap-2 text-[14px] text-ink-2"><StatusTag tone="draft">Illustration · J4</StatusTag> No hospital unit is live and no patient has enrolled. Every figure below is made up to show the shape of the report: not a result, and not a forecast.</p>
+        </div>
+      </div>
+    </Card>
+  )
+
+  if (c.enrolled < k || c.measured < k) {
+    return (
+      <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
+        {illustration}
+        {filters}
+        <Card className="lg:col-span-12">
+          <div className="flex items-start gap-3">
+            <Lock size={20} className="mt-1 shrink-0 text-ink-3" aria-hidden />
+            <div>
+              <p className="text-[1.35rem] font-light leading-snug text-ink">Suppressed · fewer than {k} in this cohort</p>
+              <p className="mt-2 max-w-2xl text-[15px] text-ink-2">{c.label}. {c.note} A hospital unit sees a group only once it holds {k} or more patients, so no count, mean or chart is shown, not even a rounded one.</p>
+              <Button variant="secondary" size="sm" className="mt-4" onClick={() => setCohort('all')}>Back to the whole unit</Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    )
+  }
+
+  const focus = c.termMeans.find((t) => t.key === (term === 'all' ? 'B' : term))!
+  const focusB = focus.key === 'B'
+  const sign = focusB ? '−' : ''
+  const periodName = period === 'd0' ? 'Day 0' : period === 'd90' ? 'Day 90' : 'Day 0 and Day 90'
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-12 [&>*]:min-w-0">
+      {illustration}
+      {filters}
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:col-span-12 xl:grid-cols-4">
+        <Kpi label="Patients enrolled · illustration" value={c.enrolled.toLocaleString('en-IN')} sub={c.value === 'all' ? 'One ninety-day cycle' : `${pct(c.enrolled / HOSPITAL_COHORTS[0].enrolled)} of the unit cohort`} />
+        <Kpi label="Measured at Day 0 · illustration" value={c.measured.toLocaleString('en-IN')} sub={`${pct(c.measured / c.enrolled)} of enrolled`} />
+        <Kpi label="Re-measured at Day 90 · illustration" value={pct(c.remeasureRate)} sub="The gate is 70% of each cohort" foot={<Meter value={c.remeasureRate * 100} target={70} label="Re-measure rate against the 70% gate" />} />
+        <Kpi
+          label={`${termByKey(focus.key).name}, cohort mean · illustration`}
+          value={period === 'd0' ? <>{sign}{focus.d0}</> : <span className="flex items-baseline gap-3">{sign}{focus.d90}<Delta value={focus.d90 - focus.d0} inverse={focusB} className="text-[15px]" /></span>}
+          sub={period === 'd0' ? <>At Day 0.{focusB ? ' Lower is better.' : ''}</> : focusB ? <>From −{focus.d0} at Day 0. Lower is better.</> : <>From {focus.d0} at Day 0.</>}
+        />
+      </div>
+
+      <TermMeansCard
+        className="lg:col-span-7"
+        means={c.termMeans}
+        term={term}
+        period={period}
+        eyebrow={`Term means · ${periodName}`}
+        title={term === 'all' ? `Six term means, ${periodName}` : `${termByKey(term).name}, ${periodName}`}
+        hatchId="hatch-b-hs"
+        aside={<StatusTag tone="draft">Illustration · J4</StatusTag>}
+        lead={
+          <>
+            Illustrated mean score {term === 'all' ? 'for each of the six terms' : `for ${termByKey(term).name}`} for {c.label.toLowerCase()}
+            {period === 'change' ? ', at Day 0 (outline) and Day 90 (filled)' : `, at ${periodName}`}. For Ease the bar is the burden, so a shorter bar is the better place to be.
+          </>
+        }
+      />
+
+      <Card className="lg:col-span-5">
+        <CardHead eyebrow="Complex care routed back · monthly" title="Counted for the unit, nothing more" aside={<StatusTag tone="draft">Illustration · J4</StatusTag>} />
+        {c.value === 'all' ? (
+          <>
+            <ChartLead>How many patients in one cycle had complex care routed back, month by month. Counts only: who, why and what was said never reach this console.</ChartLead>
+            <dl>
+              {HOSPITAL_ROUTING.map((m) => <Row key={m.month} k={m.month} v={m.routed < TENANT.minCell ? <span className="text-ink-2">fewer than {TENANT.minCell}</span> : <span className="num">{m.routed}</span>} />)}
+            </dl>
+            <p className="mt-3 text-[13px] text-ink-3">No total is shown, so a month under ten cannot be worked out by subtraction.</p>
+          </>
+        ) : (
+          <div className="flex items-start gap-3 rounded-card bg-paper-sunk p-4 text-[14px] text-ink-2">
+            <Lock size={15} className="mt-0.5 shrink-0 text-ink-3" aria-hidden />
+            <p>Routing counts are published for the whole unit only. Split by pathway, most months would fall under ten, so no cohort figure is shown. <button className="underline decoration-line-strong underline-offset-2 hover:text-ink focus-ring" onClick={() => setCohort('all')}>See the unit total</button></p>
+          </div>
+        )}
+        <MethodLine method="v1.0" grade="clinical" className="mt-5" />
+      </Card>
+
+      <Card className="lg:col-span-5">
+        <CardHead eyebrow="Commercial model" title="A platform fee, plus a fee per patient" />
+        <dl>
+          <Row k="Platform fee" v="Not set" />
+          <Row k="Per patient" v="Not set" />
+          <Row k="First possible unit" v="J4 · FY29 – FY31" />
+        </dl>
+        <p className="mt-4 text-[13px] text-ink-3">The commercial model names the two fees and no amounts. Not an offer.</p>
+      </Card>
+
+      <Card tone="sunk" className="lg:col-span-7">
+        <div className="grid gap-6 md:grid-cols-2">
+          <div>
+            <Eyebrow>The unit receives here</Eyebrow>
+            <ul className="mt-3 space-y-2 text-[15px] text-ink-2">
+              {['Cohort-level term means, groups of ten or more', 'Re-measure rate, against the 70% gate', 'Monthly count of complex care routed back, whole unit', 'Method version and grade on every figure'].map((l) => <li key={l} className="flex gap-2"><Check size={15} className="mt-1 shrink-0 text-ink" aria-hidden />{l}</li>)}
+            </ul>
+          </div>
+          <div>
+            <Eyebrow>Never in this console</Eyebrow>
+            <ul className="mt-3 space-y-2 text-[15px] text-ink-2">
+              {['Any individual score, band, flag or term', 'Whether a named patient enrolled or was routed back', 'Ease screens, journals or free text'].map((l) => <li key={l} className="flex gap-2"><Lock size={14} className="mt-1 shrink-0 text-ink-3" aria-hidden />{l}</li>)}
             </ul>
           </div>
         </div>

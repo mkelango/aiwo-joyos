@@ -100,7 +100,7 @@ function CalendarOptIn({ note, onConnect }: { note: string; onConnect: (p: CalPr
     <ToolCard eyebrow={step === 'grant' ? t('fr.cal.grantEyebrow', { p: name }) : t('fr.cal.eyebrow')} title={step === 'grant' ? t('fr.cal.grantTitle') : t('fr.cal.title')} sub={step === 'choose' ? t('fr.cal.sub') : undefined} aside={<SpecimenTag />}>
       <AnimatePresence mode="wait" initial={false}>
         {step === 'choose' && (
-          <motion.div key="choose" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }}>
+          <motion.div key="choose" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             {note && <p role="status" className="mb-4 rounded-2xl border border-line px-4 py-3 text-[14px] text-ink-2">{t(note as SpKey)}</p>}
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)]">
               <div>
@@ -126,7 +126,7 @@ function CalendarOptIn({ note, onConnect }: { note: string; onConnect: (p: CalPr
           </motion.div>
         )}
         {step === 'grant' && (
-          <motion.div key="grant" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }} className="max-w-[40rem]">
+          <motion.div key="grant" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="max-w-[40rem]">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-line p-4">
                 <Eyebrow>{t('fr.cal.can')}</Eyebrow>
@@ -151,7 +151,7 @@ function CalendarOptIn({ note, onConnect }: { note: string; onConnect: (p: CalPr
           </motion.div>
         )}
         {step === 'reading' && (
-          <motion.div key="reading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }} className="max-w-[32rem]">
+          <motion.div key="reading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="max-w-[32rem]">
             <Progress value={phase + 1} max={3} color="var(--term-f)" label={t('fr.cal.readingLabel')} />
             <ol className="mt-4 space-y-2 text-[15px]" aria-live="polite">
               {(['fr.cal.reading1', 'fr.cal.reading2', 'fr.cal.reading3'] as const).map((k, i) => (
@@ -209,7 +209,7 @@ function AuditView({ provider, rerun, onRerun, onDisconnect }: { provider: CalPr
       </div>
       <AnimatePresence mode="wait" initial={false}>
         {view === 'day' ? (
-          <motion.div key="day" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+          <motion.div key="day" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <p className="mt-5 text-[15px] text-ink-2">{t('fr.ta.perDay')}</p>
             <div className="mt-3 h-[260px]" aria-hidden>
               <ResponsiveContainer width="100%" height="100%">
@@ -226,7 +226,7 @@ function AuditView({ provider, rerun, onRerun, onDisconnect }: { provider: CalPr
             <p className="sr-only">{TIME_AUDIT.map((x) => t('fr.ta.sr', { day: dayLabel(x.day), a: x.mine, b: x.chosenWork, c: x.asked, d: x.admin })).join('; ')}.</p>
           </motion.div>
         ) : (
-          <motion.div key="total" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }} className="mt-6">
+          <motion.div key="total" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mt-6">
             <div className="flex h-10 overflow-hidden rounded-xl" role="img" aria-label={TIME_KINDS.map((k) => `${d(k.label)} ${pct(totals[k.key])}%`).join(', ')}>
               {TIME_KINDS.map((k) => <div key={k.key} style={{ width: `${pct(totals[k.key])}%`, background: k.color }} />)}
             </div>

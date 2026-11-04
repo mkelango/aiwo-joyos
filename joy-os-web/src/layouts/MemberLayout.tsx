@@ -114,6 +114,14 @@ export default function MemberLayout() {
     { to: '/app/profile', label: s('profile'), icon: UserRound },
     { to: '/app/settings', label: s('settings'), icon: Settings },
   ]
+  // Below the rail these four stay in the top bar, each with its word beside the icon (Playbook
+  // p51: icons never replace words), and the Trust centre stays one tap away (p62).
+  const TOP = [
+    { to: '/app/notifications', word: s('notifications'), icon: Bell },
+    { to: '/app/viva', word: s('vivaWord'), name: s('viva'), icon: Sparkles },
+    { to: '/app/trust', word: s('trust'), icon: ShieldCheck },
+    { to: '/app/settings', word: s('settings'), icon: Settings },
+  ]
   const immersive = pathname.startsWith('/app/index/take')
   const name = useMemberName()
   const lock = useAppLock()
@@ -163,14 +171,21 @@ export default function MemberLayout() {
 
       {/* Mobile top bar */}
       {!immersive && (
-        <header className={clsx('sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-line bg-paper/90 px-4 backdrop-blur lg:hidden', tagline ? 'h-16' : 'h-14')}>
-          <MarkWithTagline tagline={tagline} />
-          <div className="flex items-center gap-1">
-            <NavLink to="/app/notifications" className="rounded-full p-2 text-ink-2 focus-ring" aria-label={s('notifications')}><Bell size={19} /></NavLink>
-            <NavLink to="/app/viva" className="rounded-full p-2 text-ink-2 focus-ring" aria-label={s('viva')}><Sparkles size={19} /></NavLink>
-            <NavLink to="/app/settings" className="rounded-full p-2 text-ink-2 focus-ring" aria-label={s('settings')}><Settings size={19} /></NavLink>
+        <header data-member-bar className="sticky top-0 z-30 border-b border-line bg-paper/90 px-4 backdrop-blur lg:hidden">
+          <div className={clsx('flex items-center justify-between gap-2', tagline ? 'h-16' : 'h-14')}>
+            <MarkWithTagline tagline={tagline} />
             <ThemeToggle />
           </div>
+          {/* A two-word label breaks onto two lines in Tamil and Hindi and on the narrowest phones, and below 375 px Tamil's longer
+              words stand without the icon (the word is what must stay, p51), so at the default text size the four hold one row. */}
+          <nav aria-label={s('navMember')} className="-mx-1 flex flex-wrap items-center justify-between sm:justify-end sm:gap-x-3">
+            {TOP.map(({ to, word, name, icon: Icon }) => (
+              <NavLink key={to} to={to} aria-label={name} className={({ isActive }) => clsx('inline-flex min-h-9 items-center gap-1 rounded-full px-1 text-[12px] leading-tight focus-ring', indic ? 'w-min' : 'max-[359px]:w-min', isActive ? 'text-ink' : 'text-ink-2')}>
+                <Icon size={14} className={clsx('shrink-0', lang === 'ta' && 'max-[374px]:hidden')} aria-hidden />
+                {word}
+              </NavLink>
+            ))}
+          </nav>
         </header>
       )}
 

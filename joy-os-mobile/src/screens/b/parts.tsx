@@ -1,12 +1,12 @@
 import { Redirect } from 'expo-router'
 import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import { Platform, Pressable, ScrollView, Share, Text, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native'
-import { Body, Eyebrow, Icon, Meta, Mono, TermChip, TermDot, Title, Toggle, fmtDate, useToneColor, type ButtonVariant, type IconName, type PillTone } from '@/components'
+import { Body, Button, Eyebrow, Icon, Meta, Mono, TermChip, TermDot, Title, Toggle, fmtDate, useToneColor, type ButtonVariant, type IconName, type PillTone } from '@/components'
 import { interceptsCrisis, useApp } from '@/lib/store'
 import type { TermKey } from '@/shared/types'
 import { useTheme } from '@/theme/ThemeProvider'
 import { palettes } from '@/theme/tokens'
-import { ACCOUNT_PROFILES, accountStore, claimFor, measuredClaimed, phoneOwnersStore, sessionStore, useStore } from './bStore'
+import { ACCOUNT_PROFILES, a11yStore, accountStore, claimFor, measuredClaimed, phoneOwnersStore, sessionStore, useStore, type AccountState } from './bStore'
 import { MEASURED_KEY, useLatestIndex, type LatestIndex } from '@/lib/indexRecord'
 import { useCationRequests, useLocal } from '@/screens/a/local'
 import { measuredScore, type MeasuredIndex } from '@/shared/indexScoring'
@@ -14,6 +14,7 @@ import { INDEX_HISTORY, MEMBER } from '@/shared/member'
 import { onboardingAccountStore } from '@/lib/onboardingAccount'
 import { useDict } from '@/lib/i18n'
 import { MonoNums, splitNums } from '@/lib/monoNums'
+import { SETTINGS } from './i18n/account'
 import { PARTS } from './i18n/parts'
 
 // Lane B helpers: ’Cation, Practice, Care, account and entry screens.
@@ -452,8 +453,51 @@ export function useAccountCationRequests() {
   return Object.fromEntries(Object.entries(requests).filter(([, r]) => (owners.cation[r.ref] ?? (fresh.includes(r.ref) ? id : null)) === id))
 }
 
-/** Circle membership (coach, concierge, quarterly Index, Sessions) is the specimen member's own;
- *  Lakshmi and an account made in onboarding have the plan alone. */
+/** Voice-first, as Settings reads it: Lakshmi's is her elder mode's voice; everyone else's is kept with Accessibility. */
+export function useVoiceFirst() {
+  const [session] = useStore(sessionStore)
+  const [acct] = useStore(accountStore)
+  const [a11y] = useStore(a11yStore)
+  return session.account === 'lakshmi' ? acct.elder.voice : !!a11y.voice
+}
+
+/**
+ * "Read aloud" for one prompt, shown only while voice-first is on. The same simulation as Settings:
+ * no speech module is installed, so the words show as a caption for about as long as they would
+ * take to read, labelled specimen; no sound plays.
+ */
+export function ReadAloud({ text, label }: { text: string; label?: string }) {
+  const { space } = useTheme()
+  const on = useVoiceFirst()
+  const t = useDict(SETTINGS)
+  const [reading, setReading] = useState<string | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
+  if (!on) return null
+  const toggle = () => {
+    if (timer.current) clearTimeout(timer.current)
+    if (reading) return setReading(null)
+    setReading(text)
+    timer.current = setTimeout(() => setReading(null), Math.max(2600, text.length * 70))
+  }
+  return (
+    <View style={{ gap: space.s1, alignItems: 'flex-start' }}>
+      <Button size="sm" variant="secondary" icon={reading ? 'square' : 'volume-2'} onPress={toggle}>
+        {reading ? t('vtStop') : label ?? t('vtRead')}
+      </Button>
+      {reading ? (
+        <View accessibilityLiveRegion="polite" style={{ gap: 2, alignSelf: 'stretch' }}>
+          <Meta size={13} tone="ink3">{t('vtReading')}</Meta>
+          <Body><MonoNums text={`“${reading}”`} /></Body>
+        </View>
+      ) : null}
+    </View>
+  )
+}
+
+/** Circle held beside the plan, with its seat in the circle of eight, is the specimen member's own.
+ *  Lakshmi and an account made in onboarding have the plan alone: Circle bought as that plan opens
+ *  its entitlements on Membership and the Passport, and its seat still waits to be placed in Circles. */
 export const hasCircle = (account: 'arjun' | 'lakshmi' | 'new') => account === 'arjun'
 
 /** "Joy OS Plus + Circle": the signed-in account's plan, with Circle only when it has it. */
@@ -463,7 +507,7 @@ export function usePlanLabel() {
   const name = PLAN_NAMES[acct.plan]
   return hasCircle(session.account ?? 'arjun') ? `${name} + ${MEMBER.membership}` : name
 }
-const PLAN_NAMES: Record<'Free' | 'Plus' | 'Patron', string> = { Free: 'Joy OS', Plus: 'Joy OS Plus', Patron: 'Patron' }
+const PLAN_NAMES: Record<AccountState['plan'], string> = { Free: 'Joy OS', Plus: 'Joy OS Plus', Circle: 'Circle', Clinical: 'Clinical', Patron: 'Patron' }
 
 /** One vertical timeline step: marker, connector, content. state drives the marker. */
 export function TimelineStep({ index, state, last, children }: { index: number; state: 'done' | 'now' | 'next'; last?: boolean; children: ReactNode }) {
@@ -692,7 +736,7 @@ export function StepHead({ eyebrow, title, lead }: { eyebrow: string; title: Rea
   useElderType()
   return (
     <View style={{ gap: space.s1 }}>
-      <Eyebrow tone="daybreak">{fig(eyebrow)}</Eyebrow>
+      <Eyebrow>{fig(eyebrow)}</Eyebrow>
       <Title accessibilityRole="header" size={30}>
         {title}
       </Title>

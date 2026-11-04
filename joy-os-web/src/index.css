@@ -36,6 +36,11 @@
   }
 }
 
+/* Below the rail the member top bar has a second row of words: anchors stop clear of it. */
+@media (max-width: 1023.98px) {
+  html:has([data-member-bar]) { scroll-padding-top: 2.25rem; }
+}
+
 @layer components {
   /* Mono caps label, +140 tracking (Playbook p41) */
   .eyebrow {

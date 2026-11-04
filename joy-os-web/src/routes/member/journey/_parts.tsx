@@ -11,7 +11,7 @@ import type { ItemKind } from './_data'
 import { useJ } from './_i18n'
 import { setOffline as setOfflineWeek, useJourney } from './_store'
 import { useMeasured } from '@/routes/member/core/_store'
-import { DUR, useReduceMotion } from '@/lib/motion'
+import { DUR, FADE_REDUCED, useReduceMotion } from '@/lib/motion'
 import { monoDigits } from './_mono'
 
 const ORDER: TermKey[] = ['H', 'P', 'R', 'F', 'D', 'B']
@@ -123,8 +123,12 @@ export const kindIcon: Record<ItemKind, typeof Bed> = {
 
 export const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
 
-/** The Mentor’s five-minute audio — simulated playback, offline toggle, transcript. */
-export function AudioPlayer({ week, title, seconds, transcript, term }: { week: number; title: string; seconds: number; transcript: string[]; term?: TermKey | 'ALL' }) {
+/**
+ * The Mentor’s five-minute audio — simulated playback, offline toggle, transcript.
+ * The Letter reuses it with its own eyebrow and byline: its transcript is the issue on the page,
+ * so an empty one hides the button, and offlineToggle={false} drops the offline copy.
+ */
+export function AudioPlayer({ week, title, seconds, transcript, term, eyebrow, by, offlineToggle = true }: { week: number; title: ReactNode; seconds: number; transcript: string[]; term?: TermKey | 'ALL'; eyebrow?: ReactNode; by?: ReactNode; offlineToggle?: boolean }) {
   const [playing, setPlaying] = useState(false)
   const [pos, setPos] = useState(week === 4 ? 74 : 0)
   const [rate, setRate] = useState<1 | 1.25 | 0.8>(1)
@@ -166,9 +170,9 @@ export function AudioPlayer({ week, title, seconds, transcript, term }: { week: 
     <div className="rounded-card border border-line bg-paper-raised p-5 shadow-card md:p-6">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="eyebrow text-ink-3">{r('audioEyebrow', { week, min: 5 })}</p>
+          <p className="eyebrow text-ink-3">{eyebrow ?? r('audioEyebrow', { week, min: 5 })}</p>
           <h3 className="mt-2 text-[1.35rem] font-light leading-snug text-ink">{title}</h3>
-          <p className="mt-1 text-[14px] text-ink-2">{t('audioBy')}</p>
+          <p className="mt-1 text-[14px] text-ink-2">{by ?? t('audioBy')}</p>
         </div>
         {term && <span className="hidden sm:block"><PrimaryChip primary={term} /></span>}
       </div>
@@ -192,7 +196,7 @@ export function AudioPlayer({ week, title, seconds, transcript, term }: { week: 
                   className="flex-1 rounded-full"
                   style={{ height: `${b * 100}%`, background: on ? 'var(--ink)' : 'var(--line-strong)' }}
                   animate={playing && !reduce && Math.abs((i / bars.length) * 100 - pct) < 4 ? { scaleY: [1, 1.25, 1] } : { scaleY: 1 }}
-                  transition={{ duration: 0.6, repeat: playing ? Infinity : 0 }}
+                  transition={reduce ? FADE_REDUCED : { duration: 0.6, repeat: playing ? Infinity : 0 }}
                 />
               )
             })}
@@ -221,19 +225,23 @@ export function AudioPlayer({ week, title, seconds, transcript, term }: { week: 
         <button type="button" onClick={() => setRate((r) => (r === 1 ? 1.25 : r === 1.25 ? 0.8 : 1))} className="inline-flex h-9 items-center rounded-full border border-line px-3 font-mono text-[13px] text-ink-2 hover:text-ink focus-ring" aria-label={t('speed', { rate })}>
           {rate}×
         </button>
-        <button type="button" onClick={() => setShowText((s) => !s)} aria-expanded={showText} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line px-3 text-[13px] text-ink-2 hover:text-ink focus-ring">
-          {t('transcript')} <ChevronDown size={14} className={clsx('transition-transform', showText && 'rotate-180')} />
-        </button>
+        {transcript.length > 0 && (
+          <button type="button" onClick={() => setShowText((s) => !s)} aria-expanded={showText} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line px-3 text-[13px] text-ink-2 hover:text-ink focus-ring">
+            {t('transcript')} <ChevronDown size={14} className={clsx('transition-transform', showText && 'rotate-180')} />
+          </button>
+        )}
       </div>
 
-      <div className="mt-5 border-t border-line pt-4">
-        <Toggle
-          checked={offline}
-          onChange={setOffline}
-          label={<span className="inline-flex items-center gap-2"><Download size={15} /> {t('keepOffline')}</span>}
-          description={offline ? (downloading < 100 ? r('downloading', { pct: downloading }) : r('savedDevice', { mb: { n: '4.6' } })) : t('offlineDesc')}
-        />
-      </div>
+      {offlineToggle && (
+        <div className="mt-5 border-t border-line pt-4">
+          <Toggle
+            checked={offline}
+            onChange={setOffline}
+            label={<span className="inline-flex items-center gap-2"><Download size={15} /> {t('keepOffline')}</span>}
+            description={offline ? (downloading < 100 ? r('downloading', { pct: downloading }) : r('savedDevice', { mb: { n: '4.6' } })) : t('offlineDesc')}
+          />
+        </div>
+      )}
 
       {showText && (
         <motion.div {...fade} className="mt-5 space-y-3 rounded-card bg-paper-sunk p-4 md:p-5">

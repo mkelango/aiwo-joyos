@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, ArrowRight, BellOff, Check, Fingerprint, KeyRound, Link2, Loader2, Lock, Mail, MessageCircle, Plus, RotateCcw, ShieldCheck, Smartphone, Trash2, UserPlus, Users, Watch } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -8,6 +8,7 @@ import { DaybreakButton, Eyebrow, TermDot } from '@/components/joy/primitives'
 import { Button, Card, Pill, Tabs, Toggle } from '@/components/ui'
 import type { TermKey, TermScore } from '@/domain/types'
 import { LANGS, useDict, useLang, useTermText } from '@/lib/i18n'
+import { brandTransition, useReduceMotion } from '@/lib/motion'
 import { interceptsCrisis, useApp, type Lang } from '@/lib/store'
 import { CrisisSheet } from '@/layouts/shared'
 import { CONSENT_ARTEFACTS } from '@/routes/member/account/_consent'
@@ -78,7 +79,7 @@ function contactLabel(a: Account) {
 
 export default function Onboarding() {
   const nav = useNavigate()
-  const reduce = useReducedMotion()
+  const reduce = useReduceMotion()
   const { lang, setLang, setRole, setCrisisOpen } = useApp()
   const L = ONBOARDING_COPY[lang] ?? ONBOARDING_COPY.en
   const t = useDict(OB)
@@ -284,7 +285,7 @@ export default function Onboarding() {
             initial={{ opacity: 0, x: offset }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -offset }}
-            transition={{ duration: 0.22, ease: [0.2, 0, 0, 1] }}
+            transition={brandTransition(reduce, 220)}
             className="flex-1"
           >
             {name === 'Welcome' && <Welcome headingRef={headingRef} lang={lang} onLang={setLang} resumable={resumable} resumeStep={resumeTarget} resumeName={STEPS[resumeTarget]} savedAt={saved?.savedAt} completedAt={saved?.completedAt} firstName={account.name} onStartAgain={startAgain} />}
@@ -343,7 +344,7 @@ function StepDots({ step, names }: { step: number; names: Record<OnboardingStep,
 function StepHead({ headingRef, eyebrow, title, lead }: { headingRef: React.Ref<HTMLHeadingElement>; eyebrow: string; title: ReactNode; lead?: ReactNode }) {
   return (
     <header className="mb-8">
-      <p className="eyebrow mb-3 text-daybreak-ink">{eyebrow}</p>
+      <p className="eyebrow mb-3 text-ink-3">{eyebrow}</p>
       <h1 ref={headingRef} tabIndex={-1} className="break-words text-[2rem] font-light leading-tight tracking-tight text-ink outline-none md:text-[2.6rem]">{title}</h1>
       {lead && <p className="mt-3 text-[17px] leading-relaxed text-ink-2">{lead}</p>}
     </header>

@@ -300,6 +300,14 @@ export const XTRA = {
   ltSettings: { en: 'Change it in Settings', ta: 'அமைப்புகளில் மாற்றவும்', hi: 'सेटिंग्स में बदलें' },
   ltMentorRole: { en: 'Mentor, AIWO Limited · creator of Joyspiration', ta: 'வழிகாட்டி, AIWO Limited · Joyspiration-ஐ உருவாக்கியவர்', hi: 'मार्गदर्शक, AIWO Limited · Joyspiration के रचयिता' },
   ltPrint: { en: 'Print this issue', ta: 'இந்த இதழை அச்சிடவும்', hi: 'यह अंक प्रिंट करें' },
+  ltListen: { en: 'Listen to this issue', ta: 'இந்த இதழைக் கேளுங்கள்', hi: 'यह अंक सुनें' },
+  ltListenEyebrow: { en: 'Letter No. {n} · the Mentor’s voice', ta: 'கடிதம் எண் {n} · வழிகாட்டியின் குரல்', hi: 'पत्र संख्या {n} · मार्गदर्शक की आवाज़' },
+  ltListenBy: { en: 'C. Sivasankaran, Mentor, AIWO Limited · English', ta: 'C. Sivasankaran, வழிகாட்டி, AIWO Limited · ஆங்கிலம்', hi: 'C. Sivasankaran, मार्गदर्शक, AIWO Limited · अंग्रेज़ी' },
+  ltListenNote: {
+    en: 'Specimen: this player makes no sound and no recording exists yet. In Joy OS the Mentor records each issue in his own voice, with his written consent.',
+    ta: 'மாதிரி: இந்த இயக்கியில் ஒலி வராது, பதிவும் இன்னும் இல்லை. Joy OS-இல் வழிகாட்டி ஒவ்வொரு இதழையும் தன் சொந்தக் குரலில், தன் எழுத்துப்பூர்வ ஒப்புதலுடன் பதிவு செய்கிறார்.',
+    hi: 'नमूना: इस प्लेयर में कोई आवाज़ नहीं आती और अभी कोई रिकॉर्डिंग नहीं है। Joy OS में मार्गदर्शक हर अंक अपनी आवाज़ में, अपनी लिखित सहमति से रिकॉर्ड करते हैं।',
+  },
   ltWriteBack: { en: 'Write back', ta: 'பதில் எழுதுங்கள்', hi: 'जवाब लिखें' },
   ltWriteBackHint: {
     en: 'Your reply goes to the Letter desk. The Mentor reads a selection; nothing you write is published without your consent.',

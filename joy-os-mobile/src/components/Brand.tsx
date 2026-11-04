@@ -47,7 +47,8 @@ export function AppBar({ right, label = 'Joy OS' }: { right?: ReactNode; label?:
   )
 }
 
-/** Bell in the app bar: opens Notifications; a small Daybreak dot (no count, no badge number)
+/** Bell in the app bar, with its word (icons never replace words, Playbook p51): opens
+ *  Notifications; a small Ink dot (no count, no badge number; Daybreak is the screen's one action)
  *  says something is not yet opened. The same count the Notifications screen reads, so
  *  "Mark all read" clears the dot. */
 function NotificationsBell() {
@@ -60,10 +61,13 @@ function NotificationsBell() {
       accessibilityRole="button"
       accessibilityLabel={unread ? t('notifUnread', { n: unread }) : t('notifAllRead')}
       hitSlop={6}
-      style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+      style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}
     >
-      <Icon name="bell" size={20} color={c.ink2} />
-      {unread > 0 ? <View style={{ position: 'absolute', top: 10, right: 11, width: 8, height: 8, borderRadius: 4, backgroundColor: c.daybreak, borderWidth: 1.5, borderColor: c.paper }} /> : null}
+      <View>
+        <Icon name="bell" size={20} color={c.ink2} />
+        {unread > 0 ? <View style={{ position: 'absolute', top: 0, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: c.ink, borderWidth: 1.5, borderColor: c.paper }} /> : null}
+      </View>
+      <Meta size={11} numberOfLines={1}>{t('notifWord')}</Meta>
     </Pressable>
   )
 }

@@ -5,7 +5,7 @@ import { Body, Button, Card, DaybreakButton, Divider, EmptyIllustration, Eyebrow
 import { useTheme } from '@/theme/ThemeProvider'
 import type { Notice } from '@/screens/b/_data'
 import { notifPrefsStore, notifReadStore, useAccountNotices, useStore, useUnreadNotices, validatePrefs, type NotifPrefs } from '@/screens/b/bStore'
-import { Done, NumberSegmented, TimeStepper, memberOnly } from '@/screens/b/parts'
+import { Done, NumberSegmented, ReadAloud, TimeStepper, memberOnly } from '@/screens/b/parts'
 import { MonoNums } from '@/lib/monoNums'
 import { useDict, useLang } from '@/lib/i18n'
 import { parseIsoDate } from '@/components/MethodLine'
@@ -57,6 +57,11 @@ function Notifications() {
   const mine = useAccountNotices()
   const shown = mine.filter((n) => !rd.cleared.includes(n.id))
   const unread = useUnreadNotices()
+  // Voice-first: what has not been opened yet, in the member's language, one notice after another.
+  const unreadWords = shown
+    .filter((n) => !rd.read.includes(n.id))
+    .map((n) => `${tx(NOTICE_TEXT[n.id]?.title, n.title).replace(/[^.?!।]$/, '$&.')} ${tx(NOTICE_TEXT[n.id]?.body, n.body)}`)
+    .join(' ')
   const edit = (fn: (d: NotifPrefs) => NotifPrefs) => {
     setDraft(fn)
     setDirty(true)
@@ -105,6 +110,9 @@ function Notifications() {
           ) : null}
         </View>
       </View>
+
+      {/* Voice-first (Settings · Accessibility): the unread, read aloud. Hidden while it is off. */}
+      <ReadAloud label={t('readUnread')} text={unreadWords || `${t('allRead')}. ${t('nothingNew')}`} />
 
       {shown.length === 0 ? (
         <Card tone="sunk" style={{ gap: space.s1, alignItems: 'flex-start' }}>

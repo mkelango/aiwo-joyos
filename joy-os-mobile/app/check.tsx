@@ -122,7 +122,7 @@ function Intro({ onBegin }: { onBegin: () => void }) {
   return (
     <>
       <View style={{ gap: space.s1 }}>
-        <Eyebrow tone="daybreak">{t('introEyebrow')}</Eyebrow>
+        <Eyebrow>{t('introEyebrow')}</Eyebrow>
         <Title size={40} accessibilityRole="header">
           {t('titleA')}<Serif>{t('titleSerif')}</Serif>
         </Title>
@@ -317,7 +317,7 @@ function Result({ answers, onRestart }: { answers: Record<string, number>; onRes
   return (
     <>
       <View style={{ gap: space.s1 }}>
-        <Eyebrow tone="daybreak">{t('resEyebrow')}</Eyebrow>
+        <Eyebrow>{t('resEyebrow')}</Eyebrow>
         <Title size={32} accessibilityRole="header">
           {t('lowestA')}<Serif>{lowName}</Serif>{t('lowestB')}
         </Title>
@@ -358,7 +358,7 @@ function Result({ answers, onRestart }: { answers: Record<string, number>; onRes
 
       <Card tone="sunk" style={{ gap: space.s1 + 4 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: space.s1 }}>
-          <Eyebrow tone="daybreak">{t('oneNext')}</Eyebrow>
+          <Eyebrow color={c.vizBronze}>{t('oneNext')}</Eyebrow>
           <TermChip term={result.lowest} withSpace />
         </View>
         <Title size={24}>{tx(nextT.step, next.step)}</Title>
@@ -402,7 +402,7 @@ function Result({ answers, onRestart }: { answers: Record<string, number>; onRes
             <View accessibilityLiveRegion="polite" style={{ gap: 4 }}>
               <Body weight="medium"><MonoNums text={t('onWay')} /></Body>
               <Meta><MonoNums text={t('letterSent', { name: lowName })} /></Meta>
-              <ArrowLink icon="mail" onPress={() => router.push('/letter')}>
+              <ArrowLink joyIcon="letter" onPress={() => router.push('/letter')}>
                 {t('readLetter')}
               </ArrowLink>
             </View>
@@ -413,7 +413,7 @@ function Result({ answers, onRestart }: { answers: Record<string, number>; onRes
               <Button variant="secondary" icon="mail" onPress={sendLetter}>
                 {t('sendLetter')}
               </Button>
-              <ArrowLink icon="book-open" onPress={() => router.push('/letter')}>
+              <ArrowLink joyIcon="letter" onPress={() => router.push('/letter')}>
                 {t('readLetter')}
               </ArrowLink>
             </>
@@ -422,7 +422,7 @@ function Result({ answers, onRestart }: { answers: Record<string, number>; onRes
 
         <Card tone="raised" style={{ gap: space.s1 + 4 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 }}>
-            <Eyebrow tone="daybreak" style={{ flexShrink: 1 }}>{t('door2')}</Eyebrow>
+            <Eyebrow color={c.vizBronze} style={{ flexShrink: 1 }}>{t('door2')}</Eyebrow>
             <Meta size={14}>
               ≈ <Mono size={14} tone="ink2">20</Mono>{t('min')}
             </Meta>

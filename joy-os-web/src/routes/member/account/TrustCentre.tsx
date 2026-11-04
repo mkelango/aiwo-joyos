@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, Building2, Check, Download, FileJson, Globe2, HelpCircle, KeyRound, Lock, Server, ShieldCheck, Trash2, UserRound } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { EmptyIllustration } from '@/components/joy/EmptyIllustration'
 import { DaybreakButton, SpecimenTag, fmtDate } from '@/components/joy/primitives'
 import { Button, Card, DataTable, PageHeader, Pill, Sheet } from '@/components/ui'
 import { CONSENTS, INDEX_HISTORY, MEMBER } from '@/data/member'
@@ -17,6 +18,7 @@ import { ARTEFACT_VERSION, CONSENT_SEED, latestFor, makeEvent, type ConsentActio
 import { StepUp } from './_stepup'
 import { CALENDAR_NAME, CALENDAR_NONE, CONSENT_DEVICE, EXTRA_DEVICE_CONSENTS, calendarProvider, disconnectForConsent, type ConsentRecord } from './_links'
 import { useMemberAccessLog, type MemberAccess } from './_access'
+import { brandTransition, useReduceMotion } from '@/lib/motion'
 import { useDict, useTermText } from '@/lib/i18n'
 import { useScoresHidden } from '@/lib/minor'
 import { interceptsCrisis, useApp } from '@/lib/store'
@@ -142,7 +144,7 @@ function AccessLog({ log, onAsk }: { log: MemberAccess[]; onAsk: (who: string) =
   const [role, setRole] = useState('all')
   const [q, setQ] = useState('')
   const [asked, setAsked] = useState<Set<string>>(() => new Set())
-  const ask = (e: MemberAccess) => { setAsked((s) => new Set(s).add(e.id)); onAsk(e.who) }
+  const ask = (e: MemberAccess) => { setAsked((s) => new Set(s).add(e.id)); onAsk(dx(e.who)) }
   // The specimen log plus every console read of this record in this browser, newest first.
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -167,6 +169,7 @@ function AccessLog({ log, onAsk }: { log: MemberAccess[]; onAsk: (who: string) =
         <p className="mt-4 text-[14px] text-ink-2" aria-live="polite">{rich(t(rows.length === 1 ? 'entryOne' : 'entryMany'), { n: <span className="num">{rows.length}</span> })}{live > 0 && rich(t('accessSession'), { n: <span className="num">{live}</span> })}{asked.size > 0 && rich(t(asked.size === 1 ? 'questionsOne' : 'questionsMany'), { n: <span className="num">{asked.size}</span> })}</p>
         {rows.length === 0 ? (
           <div className="mt-4 rounded-card bg-paper-sunk p-6 text-center">
+            <EmptyIllustration kind="generic" width={120} className="mb-4" />
             <p className="text-[15px] text-ink-2">{t('noMatch')}</p>
             <Button size="sm" variant="ghost" className="mt-2" onClick={() => { setRole('all'); setQ('') }}>{t('clearFilters')}</Button>
           </div>
@@ -324,6 +327,7 @@ function ConsentLog({ history }: { history: ConsentHistory }) {
 type ExportStatus = 'idle' | 'requested' | 'preparing' | 'ready'
 function ExportCard({ list, consents, onDone }: { list: Consent[]; consents: ConsentRecord; onDone: (m: string) => void }) {
   const t = useDict(TRUST)
+  const reduce = useReduceMotion()
   const dx = useData()
   const profile = useMemberProfile()
   // Under 18 nothing is scored, so the file carries no Index (Architecture p26).
@@ -376,11 +380,11 @@ function ExportCard({ list, consents, onDone }: { list: Consent[]; consents: Con
       </div>
       <AnimatePresence mode="wait">
         {status === 'idle' ? (
-          <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mt-6">
+          <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={brandTransition(reduce)} className="mt-6">
             <DaybreakButton onClick={() => setStepUp(true)} className="w-full sm:w-auto">{t('requestExport')}</DaybreakButton>
           </motion.div>
         ) : (
-          <motion.div key="track" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="mt-6 rounded-card bg-paper-sunk p-4">
+          <motion.div key="track" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={brandTransition(reduce)} className="mt-6 rounded-card bg-paper-sunk p-4">
             <ol className="flex flex-col gap-3 sm:flex-row sm:gap-2" aria-label={t('exportStatus')}>
               {steps.map((s, i) => (
                 <li key={s.key} className="flex flex-1 items-center gap-2 text-[14px]" aria-current={i === idx ? 'step' : undefined}>
@@ -550,7 +554,7 @@ function ResearchCard({ onChange, onRecord }: { onChange: (m: string) => void; o
           checked={on}
           onChange={(v) => { setOn(v); onRecord('research', v ? 'granted' : 'withdrawn'); onChange(v ? t('researchOn') : t('researchOff')) }}
           label={t('researchLabel')}
-          description={t('researchDesc')}
+          description={nums(t('researchDesc'))}
         />
       </div>
     </Card>

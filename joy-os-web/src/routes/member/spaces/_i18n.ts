@@ -75,6 +75,7 @@ export const SP = {
   'sh.viva': { en: 'VIVA in this space', ta: 'இந்த இடத்தில் VIVA', hi: 'इस स्पेस में VIVA' },
   'sh.tapToAsk': { en: 'Tap to ask · {tool}', ta: 'கேட்கத் தட்டுங்கள் · {tool}', hi: 'पूछने के लिए टैप करें · {tool}' },
   'sh.drafting': { en: 'VIVA is drafting…', ta: 'VIVA எழுதுகிறது…', hi: 'VIVA लिख रहा है…' },
+  'sh.privacy': { en: 'Who has seen my data · Export · Delete', ta: 'என் தரவை யார் பார்த்தார்கள் · ஏற்றுமதி · நீக்கு', hi: 'मेरा डेटा किसने देखा · निर्यात · हटाएँ' },
   'sh.draftedBy': { en: 'Drafted by VIVA · {tool} · method v1.0 · {reviewer}', ta: 'VIVA வரைந்தது · {tool} · முறை v1.0 · {reviewer}', hi: 'VIVA का मसौदा · {tool} · तरीक़ा v1.0 · {reviewer}' },
   'sh.guardrail': { en: 'Guardrail · no AI text on any screen result', ta: 'பாதுகாப்பு வரம்பு · எந்தச் சோதனை முடிவிலும் AI உரை இல்லை', hi: 'सुरक्षा नियम · किसी भी स्क्रीनिंग नतीजे पर AI का लिखा कुछ नहीं' },
   'sh.guardrailBody': { en: 'VIVA reflects your Second Arrow journal text back to you, and nothing else here. Screen results on this page are pre-approved copy written and signed by the Clinical Office.', ta: 'இங்கே VIVA உங்கள் இரண்டாவது அம்பு நாட்குறிப்பு உரையை மட்டுமே உங்களுக்குத் திருப்பிக் காட்டுகிறது, வேறு எதையும் இல்லை. இந்தப் பக்கத்தில் உள்ள சோதனை முடிவுகள், கிளினிக்கல் அலுவலகம் எழுதிக் கையொப்பமிட்ட, முன்பே அங்கீகரிக்கப்பட்ட வாசகங்கள்.', hi: 'यहाँ VIVA सिर्फ़ आपकी दूसरा तीर डायरी का लिखा आपको वापस दिखाता है, और कुछ नहीं। इस पेज के स्क्रीनिंग नतीजे क्लिनिकल ऑफ़िस के लिखे और हस्ताक्षर किए, पहले से मंज़ूर शब्द हैं।' },
@@ -1367,10 +1368,10 @@ function lit(s: string, i: number): ReactNode {
 
 /**
  * Numbers in Mono (Playbook p40), also inside a sentence or a translated line: every number
- * (146, 06:42, 2,000, 1.73, −17, the 9 of Ikigai-9) becomes a .num span, as the instrument
- * names in the shell already do.
+ * (146, 06:42, 2,000, 1.73, −17, the 9 of Ikigai-9) and method version (v1.0, set whole)
+ * becomes a .num span, as the instrument names in the shell already do.
  */
-const NUM_RE = /(−?\d+(?:[.,:]\d+)*)/
+const NUM_RE = /(\bv\d+(?:\.\d+)*|−?\d+(?:[.,:]\d+)*)/
 export function mono(s: string): ReactNode {
   if (!/\d/.test(s)) return s
   // One wrapping span, so a flex row still sees a single item.

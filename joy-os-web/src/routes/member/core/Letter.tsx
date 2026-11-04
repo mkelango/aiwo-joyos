@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { ArrowRight, Check, Printer } from 'lucide-react'
+import { ArrowRight, Check, Headphones, Printer } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AiwoMark } from '@/components/joy/Brand'
@@ -7,9 +7,10 @@ import { EmptyIllustration } from '@/components/joy/EmptyIllustration'
 import { DaybreakButton, Eyebrow, SpecimenTag, useFmtDate } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill } from '@/components/ui'
 import { interceptsCrisis, useApp } from '@/lib/store'
+import { AudioPlayer } from '@/routes/member/journey/_parts'
 import { PrintOnly } from './_parts'
 import { SPECIMEN_TODAY, useLocal } from './_store'
-import { rich, useCore } from './_i18n'
+import { monoFigures, rich, useCore } from './_i18n'
 import { useX } from './_i18nX'
 
 // THE JOYSPAN LETTER (Memo p17; Playbook p63, "The Mentor goes first").
@@ -18,7 +19,8 @@ import { useX } from './_i18nX'
 // English; his words are his own and are not machine-translated, so the issues stay
 // English in every language (the chrome around them is translated).
 // The member reads every issue here and can write back; a reply is kept in this browser
-// (specimen) as if sent to the Letter desk.
+// (specimen) as if sent to the Letter desk. The Mentor records each issue in his own voice
+// (Playbook p54); the Practice player stands in here and says no recording exists yet.
 
 interface Issue {
   n: number
@@ -76,6 +78,9 @@ interface Reply {
 const monthText = (ym: string, lang: string) =>
   new Date(`${ym}-15T12:00:00`).toLocaleDateString(lang === 'en' ? 'en-GB' : `${lang}-IN`, { month: 'short', year: 'numeric', numberingSystem: 'latn' } as Intl.DateTimeFormatOptions)
 
+/** The length a read-aloud issue would run, at an unhurried 2.2 words a second. */
+const readSeconds = (paras: string[]) => Math.round(paras.join(' ').split(/\s+/).length / 2.2)
+
 /** "*word*" in a title becomes the serif italic word. */
 function titleParts(t: string) {
   return t.split(/(\*[^*]+\*)/).map((p, i) => (p.startsWith('*') && p.endsWith('*') ? <em key={i}>{p.slice(1, -1)}</em> : p))
@@ -96,6 +101,7 @@ export default function Letter() {
   const [sent, setSent] = useState<string | null>(null)
   // Held after the emergency intercept: nothing is kept or sent, and support stays one tap away.
   const [held, setHeld] = useState(false)
+  const [listening, setListening] = useState(false)
   const issue = ISSUES.find((i) => i.n === sel) ?? ISSUES[0]
   const mine = replies.filter((r) => r.issue === issue.n)
 
@@ -179,20 +185,37 @@ export default function Letter() {
             </div>
             {/* Editorial illustration: single-weight Ink line, one Daybreak fill (Playbook p51). */}
             <EmptyIllustration kind="letter" width={150} className="!mx-0 mt-6" />
-            <p className="eyebrow mt-6 text-daybreak-ink">{x('ltEyebrow')} · <span className="num">{monthText(issue.month, lang)}</span></p>
+            <p className="eyebrow mt-6 text-ink-3">{x('ltEyebrow')} · <span className="num">{monthText(issue.month, lang)}</span></p>
             <div lang="en">
               <h2 className="mt-3 text-[2rem] font-light leading-tight text-ink md:text-[2.4rem]">{titleParts(issue.title)}</h2>
               <div className="mt-6 max-w-[62ch] space-y-4 font-serif text-[18px] leading-[1.6] text-ink">
-                {issue.paras.map((p, i) => <p key={i}>{p}</p>)}
+                {issue.paras.map((p, i) => <p key={i}>{monoFigures(p, i)}</p>)}
               </div>
               <p className="eyebrow num mt-8 border-y border-line py-3 text-ink-2">{issue.numbers}</p>
               <p className="mt-8 font-serif text-[1.4rem] italic text-ink">C. Sivasankaran</p>
             </div>
             <p className="mt-1 text-[14px] text-ink-3">{x('ltMentorRole')}</p>
           </article>
-          <div className="mt-3 flex justify-end">
+          <div className="mt-3 flex flex-wrap justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setListening((l) => !l)} aria-expanded={listening}><Headphones size={14} aria-hidden /> {x('ltListen')}</Button>
             <Button variant="ghost" size="sm" onClick={() => window.print()}><Printer size={14} /> {x('ltPrint')}</Button>
           </div>
+          {listening && (
+            <div className="mt-3">
+              {/* A week number outside Practice's eight: here it only seeds the waveform and the seek field's id. */}
+              <AudioPlayer
+                key={issue.n}
+                week={100 + issue.n}
+                title={<span lang="en">{titleParts(issue.title)}</span>}
+                seconds={readSeconds(issue.paras)}
+                transcript={[]}
+                eyebrow={x('ltListenEyebrow', { n: issue.n })}
+                by={x('ltListenBy')}
+                offlineToggle={false}
+              />
+              <p className="mt-2 text-[14px] text-ink-2">{x('ltListenNote')}</p>
+            </div>
+          )}
 
           {/* Write back */}
           <Card tone="raised" className="mt-6">

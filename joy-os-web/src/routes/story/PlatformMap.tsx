@@ -9,6 +9,7 @@ import { TERMS, termColor } from '@/data/terms'
 import type { TermKey } from '@/domain/types'
 import { ARCH_LAYERS, MODULES, OUTCOMES, SURFACES, TWO_APPS, type Module, type OutcomeKey, type SurfaceKey } from './_data'
 import { LinkButton, StorySection, TermTraceButton, useEnterAs } from './_parts'
+import { brandTransition, useReduceMotion } from '@/lib/motion'
 
 /** A pinned trace: a term back to the modules that raise it, or a surface to the modules it carries. */
 type Trace = { kind: 'term'; key: TermKey } | { kind: 'surface'; key: SurfaceKey } | null
@@ -411,11 +412,12 @@ function OpenSurface({ to, name }: { to: string; name: string }) {
 
 // ─── The module's detail card ────────────────────────────────────────────────
 function ModuleDetail({ mod, trace, onTraceTerm }: { mod: Module; trace: Trace; onTraceTerm: (k: TermKey) => void }) {
+  const reduce = useReduceMotion()
   const enterAs = useEnterAs()
   return (
     <div id="module-detail" className="scroll-mt-24" aria-live="polite">
       <AnimatePresence mode="wait">
-        <motion.div key={mod.n} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+        <motion.div key={mod.n} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={brandTransition(reduce, 200)}>
           <Card tone="raised" className="grid gap-8 md:p-8 lg:grid-cols-[1.1fr_1fr_1fr] lg:gap-10">
             <div className="flex flex-col gap-4">
               <div className="flex items-center gap-3">

@@ -10,6 +10,7 @@ import { DEFAULT_NOTIF_PREFS, LEDGER_TIMES, NOTIFICATIONS, NOTIF_TYPES, pushesPe
 import { Field, LinkButton, Section, Select, Toggle } from './_parts'
 import { nums, rich, usePersisted, useToast } from './_util'
 import { useDict } from '@/lib/i18n'
+import { brandTransition, useReduceMotion } from '@/lib/motion'
 import { NOTIF, useData } from './_i18n'
 import { ReadAloud } from './_voice'
 
@@ -37,6 +38,7 @@ export default function Notifications() {
   // The times found on arrival stay listed, so a setup time such as 22:15 can be chosen again after a change.
   const [arrived] = useState({ from: prefs.quietFrom, to: prefs.quietTo })
   const [tab, setTab] = useState<'all' | 'unread'>('all')
+  const reduce = useReduceMotion()
   // Keep a just-read item visible under "Unread" until the filter changes.
   const [sticky, setSticky] = useState<Set<string>>(() => new Set())
 
@@ -145,7 +147,7 @@ export default function Notifications() {
                       <ul className="divide-y divide-line">
                         <AnimatePresence initial={false}>
                           {items.map((n) => (
-                            <motion.li key={n.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+                            <motion.li key={n.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={brandTransition(reduce, 180)}>
                               <Row n={n} read={isRead(n)} muted={!prefs.types[n.kind]} onOpen={() => markRead(n, true)} onRead={() => markRead(n)} />
                             </motion.li>
                           ))}

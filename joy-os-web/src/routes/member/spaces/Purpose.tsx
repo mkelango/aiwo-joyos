@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { DaybreakButton, Eyebrow, fmtDate } from '@/components/joy/primitives'
 import { Button, Pill } from '@/components/ui'
 import { MEMBER } from '@/data/member'
+import { expandFade, useReduceMotion } from '@/lib/motion'
 import { CONTRIBUTIONS, IKIGAI_START, SPACE_TODAY, STATEMENT_START, TOMORROW_ANSWERS } from './_data'
 import { SpaceShell, ToolCard, useCrisisGuard, Toggle } from './_SpaceShell'
 import { mono, useSpaceText, type SpKey } from './_i18n'
@@ -203,6 +204,7 @@ function TomorrowQuestion() {
 // ─── The 25-year statement ────────────────────────────────────────────────
 
 function Statement() {
+  const reduce = useReduceMotion()
   const guard = useCrisisGuard()
   const [versions, setVersions] = useSpaceState('purpose.statement.v1', [
     { v: 2, date: '2027-01-18', text: STATEMENT_START },
@@ -284,7 +286,7 @@ function Statement() {
       </div>
       <AnimatePresence initial={false}>
         {showV && (
-          <motion.ol initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mt-4 space-y-3 overflow-hidden">
+          <motion.ol {...expandFade(reduce)} className="mt-4 space-y-3 overflow-hidden">
             {versions.map((v) => (
               <li key={v.v} className="rounded-xl bg-paper-sunk p-3.5 text-[14px]">
                 <span className="eyebrow text-ink-3">{mono(t('pur.st.version', { v: v.v, date: fmtDate(v.date) }))}{v.v === 1 ? t('pur.st.atelier') : ''}</span>
@@ -361,6 +363,7 @@ const VENN_START: Record<VennKey, string[]> = {
 }
 
 function CareerVenn() {
+  const reduce = useReduceMotion()
   const guard = useCrisisGuard()
   const [on, setOn] = useState(false)
   const [sel, setSel] = useState<VennKey>('love')
@@ -389,7 +392,7 @@ function CareerVenn() {
       <Toggle checked={on} onChange={setOn} label={t('pur.v.show')} description={t('pur.v.private')} />
       <AnimatePresence initial={false}>
         {on && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.24 }} className="overflow-hidden">
+          <motion.div {...expandFade(reduce)} className="overflow-hidden">
             <div className="mt-6 grid items-start gap-6 md:grid-cols-[300px_1fr]">
               <svg viewBox="0 0 300 330" className="mx-auto w-full max-w-[300px]" role="group" aria-label={t('pur.v.aria', { list: VENN.map((x) => `${t(x.label)}: ${items[x.key].join(', ') || t('pur.v.nothingYet')}`).join('. ') })}>
                 {VENN.map((x) => (

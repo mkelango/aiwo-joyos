@@ -6,6 +6,7 @@ import {
   Card,
   DaybreakButton,
   Divider,
+  EmptyIllustration,
   Eyebrow,
   Icon,
   type IconName,
@@ -317,7 +318,10 @@ function Trust() {
             <MonoNums text={t('entries', { n: rows.length, unit: rows.length === 1 ? t('entry') : t('entriesW') })} />
           </Meta>
           {rows.length === 0 ? (
-            <Meta style={{ paddingVertical: 12 }}>{t('noLooks')}</Meta>
+            <View style={{ alignItems: 'flex-start', gap: space.s1, paddingVertical: 12 }}>
+              <EmptyIllustration kind="letter" width={128} />
+              <Meta>{t('noLooks')}</Meta>
+            </View>
           ) : null}
           {visible.map((e) => (
             <View key={e.id} accessible accessibilityLabel={t('rowA11y', { at: e.at, who: aWho(e), role: role_(e.role), what: aWhat(e), purpose: aPurpose(e) })} style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.line, gap: 4 }}>
@@ -326,7 +330,7 @@ function Trust() {
                 <Eyebrow tone="ink2">{role_(e.role)}</Eyebrow>
               </View>
               <Meta tone="ink">{aWhat(e)}</Meta>
-              <Meta size={14}>{aPurpose(e)}</Meta>
+              <Meta size={14}><MonoNums text={aPurpose(e)} /></Meta>
               <Mono size={12} tone="ink3">
                 {e.at}
               </Mono>
@@ -534,7 +538,7 @@ function Trust() {
       {/* Research */}
       <Card tone="raised" style={{ gap: space.s1 }}>
         <Eyebrow>{t('research')}</Eyebrow>
-        <Toggle
+        <FigureToggle
           checked={research}
           onChange={(v) => {
             setResearch(v)
@@ -585,10 +589,10 @@ function Trust() {
           {CLAIMS_LOG.map((cl, i) => (
             <View key={cl.claim} style={{ gap: 4, paddingVertical: 12, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: c.line }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: space.s1 }}>
-                <Body style={{ flex: 1 }}>{tx(CLAIM_T[i]?.claim, cl.claim)}</Body>
+                <Body style={{ flex: 1 }}><MonoNums text={tx(CLAIM_T[i]?.claim, cl.claim)} /></Body>
                 <Pill tone={cl.state === 'Approved' ? 'ink' : 'neutral'}>{tx(CLAIM_STATE[cl.state], cl.state)}</Pill>
               </View>
-              <Meta size={14}>{tx(CLAIM_T[i]?.note, cl.note)}</Meta>
+              <Meta size={14}><MonoNums text={tx(CLAIM_T[i]?.note, cl.note)} /></Meta>
               <Meta size={13} tone="ink3">
                 {tx(CLAIM_BY[cl.by], cl.by)} · <Mono size={13} tone="ink3">{fmtDate(cl.on)}</Mono>
               </Meta>

@@ -9,7 +9,9 @@ export const LEDGER = {
   wordPh: { en: 'Lunch with Kavya', ta: 'Kavya-வுடன் மதிய உணவு', hi: 'Kavya के साथ लंच' },
   wordPhOwn: { en: 'Lunch with a friend', ta: 'நண்பருடன் மதிய உணவு', hi: 'दोस्त के साथ लंच' },
   photo: { en: 'Photo attached', ta: 'புகைப்படம் இணைக்கப்பட்டது', hi: 'फ़ोटो जुड़ी है' },
-  photoKept: { en: 'Kept on this phone with the moment.', ta: 'அந்தத் தருணத்துடன் இந்தத் தொலைபேசியில் வைக்கப்பட்டது.', hi: 'उस पल के साथ इसी फ़ोन पर रखी गई।' },
+  photoKept: { en: 'Kept on this phone with the moment. Excluded from AI, always.', ta: 'அந்தத் தருணத்துடன் இந்தத் தொலைபேசியில் வைக்கப்பட்டது. அது எப்போதும் AI-இலிருந்து விலக்கி வைக்கப்படும்.', hi: 'उस पल के साथ इसी फ़ोन पर रखी गई। इसे हमेशा AI से दूर रखा जाता है।' },
+  // Said before a photo is chosen as well: Ledger photos never reach AI (Architecture p26).
+  photoStay: { en: 'Photos stay on this phone. They are excluded from AI, always.', ta: 'புகைப்படங்கள் இந்தத் தொலைபேசியிலேயே இருக்கும். அவை எப்போதும் AI-இலிருந்து விலக்கி வைக்கப்படும்.', hi: 'फ़ोटो इसी फ़ोन पर रहती हैं। उन्हें हमेशा AI से दूर रखा जाता है।' },
   removePhoto: { en: 'Remove the photo', ta: 'புகைப்படத்தை நீக்கு', hi: 'फ़ोटो हटाएँ' },
   addPhotoHint: { en: 'Attaches a photo to this moment', ta: 'இந்தத் தருணத்துடன் ஒரு புகைப்படத்தை இணைக்கும்', hi: 'इस पल के साथ एक फ़ोटो जोड़ता है' },
   addPhoto: { en: 'Add a photo · optional', ta: 'புகைப்படம் சேர் · விருப்பத்தேர்வு', hi: 'फ़ोटो जोड़ें · वैकल्पिक' },

@@ -1,7 +1,8 @@
-import { Activity, ArrowRight, Building2, Compass, FileQuestion, FlaskConical, Gauge, Hotel, LayoutGrid, Map, Presentation, Route as RouteIcon, ShieldCheck, Sparkles, Stethoscope, Users } from 'lucide-react'
+import { Activity, ArrowRight, Building2, Compass, FileQuestion, FlaskConical, Gauge, Hotel, LayoutGrid, Map, Presentation, Route as RouteIcon, ShieldCheck, Stethoscope, Users } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { JoyspanWheel } from '@/components/joy/JoyspanWheel'
+import { JoyIcon } from '@/components/joy/icons'
 import { DaybreakButton } from '@/components/joy/primitives'
 import type { Role, TermKey, TermScore } from '@/domain/types'
 import { useDict, useLang, useT, useTermText } from '@/lib/i18n'
@@ -25,7 +26,7 @@ function useLinks() {
   const lang = useLang()
   const spaces = (['H', 'P', 'R', 'F', 'D', 'B'] as TermKey[]).map((k) => tt.space(k)).join(', ')
   const member: Dest[] = [
-    { to: '/app/index', label: t('myIndex'), line: t('myIndexLine'), icon: <Sparkles size={18} aria-hidden /> },
+    { to: '/app/index', label: t('myIndex'), line: t('myIndexLine'), icon: <JoyIcon name="index" size={18} /> },
     { to: '/app/spaces', label: ui('spaces'), line: `${spaces}${lang === 'hi' ? '।' : '.'}`, icon: <LayoutGrid size={18} aria-hidden /> },
     { to: '/app/trust', label: te('trustCentre'), line: t('trustLine'), icon: <ShieldCheck size={18} aria-hidden /> },
   ]
@@ -114,7 +115,7 @@ function Body({ path, lead, primary, secondary, links, linksTitle }: { path: str
   return (
     <div className="grid gap-10 lg:grid-cols-[1.2fr_1fr] lg:items-start lg:gap-16">
       <div className="min-w-0">
-        <p className="eyebrow mb-4 flex flex-wrap items-center gap-2 text-daybreak-ink">
+        <p className="eyebrow mb-4 flex flex-wrap items-center gap-2 text-ink-3">
           <FileQuestion size={14} aria-hidden /> {t('notFound')}
           <span className="num break-all rounded-full bg-paper-sunk px-2.5 py-0.5 normal-case tracking-normal text-ink-2">{path}</span>
         </p>

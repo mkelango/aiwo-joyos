@@ -6,6 +6,7 @@ import { Bar, BarChart, Line, LineChart, ReferenceLine, ResponsiveContainer, Too
 import { DaybreakButton, Eyebrow, SpecimenTag, TermChip } from '@/components/joy/primitives'
 import { Button, Card, PageHeader, Pill, Sheet, Tabs, Toggle } from '@/components/ui'
 import type { Role } from '@/domain/types'
+import { brandTransition, useReduceMotion } from '@/lib/motion'
 import { PreviewBanner, useConsoleAccess, useConsoleRole } from '../care/_gate'
 import { DURATIONS, OPS_JIT_READ, OPS_JIT_WRITE, PURPOSES, access, addAccessRequest, decideAccessRequest, isLive, scopeLabel as accessScopeLabel, standingRequest, statusLabel, useAccessRequests, type AccessRequest } from '../care/_accessStore'
 import { fmtClock, fmtDuration } from '../care/_parts'
@@ -94,6 +95,7 @@ function initialNotices(r: (typeof RIGHTS_JOBS)[number]): Job['notices'] {
 }
 
 export default function Ops() {
+  const reduce = useReduceMotion()
   const [tab, setTab] = useTabParam(TABS, 'flags')
   // JIT only: GATE gives no role standing access here, so nobody acts without a live grant from a second engineer.
   const { canAct, chosen, role, roleLabel, person, now, grant } = useConsoleAccess(OPS)
@@ -297,7 +299,7 @@ export default function Ops() {
 
       <CanActProvider value={canAct}>
       <AnimatePresence mode="wait">
-        <motion.div key={tab} {...tabPanelProps('ops', tab)} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+        <motion.div key={tab} {...tabPanelProps('ops', tab)} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={brandTransition(reduce, 180)}>
           {tab === 'flags' && <Flags tools={tools} flags={flagStates} changes={changes} ask={ask} />}
           {tab === 'evals' && <Evals tools={tools} run={evalRun} onRun={runEvals} reviews={traceReviews} onRequestReview={requestTraceReview} log={log} />}
           {tab === 'slos' && <Slos />}

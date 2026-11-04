@@ -236,7 +236,12 @@ function OrbitPicker({ open, onClose, people, orbit, setOrbit }: { open: boolean
             <SpecimenTag />
           </View>
           <TextField label={t('Search contacts')} hideLabel placeholder={t('Search contacts')} value={q} onChangeText={setQ} returnKeyType="search" />
-          {shown.length === 0 ? <Meta tone="ink3">{monoNums(t('No contact matches “{q}”.', { q: q.trim() }))}</Meta> : null}
+          {shown.length === 0 ? (
+            <View style={{ alignItems: 'center', gap: 8, paddingVertical: 8 }}>
+              <EmptyIllustration kind="circle" fill="R" width={120} />
+              <Meta tone="ink3" align="center">{monoNums(t('No contact matches “{q}”.', { q: q.trim() }))}</Meta>
+            </View>
+          ) : null}
           {shown.map((n) => {
             const first = n.split(' ')[0]
             const inCircle = has(first)

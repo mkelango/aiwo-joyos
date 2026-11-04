@@ -11,6 +11,7 @@ import { ACTION_LIBRARY } from '@/data/member'
 import { termByKey } from '@/data/terms'
 import { lowestTerm } from '@/domain/indexEngine'
 import type { TermKey } from '@/domain/types'
+import { brandTransition, useReduceMotion } from '@/lib/motion'
 import { COACH_CASELOAD, CURATED_ACTIONS, DAY_N, OVERRIDE_REASONS, PRIYA, digestFor, type CoachDigest } from './_data'
 import { PreviewBanner, actorOf, useConsoleAccess, withGrant } from './_gate'
 import { APP_MEMBER_ID, clearNbaOverride, recordSessionRead, useNbaOverride, writeNbaOverride } from './_memberShare'
@@ -139,6 +140,7 @@ function NotInCaseload({ id }: { id?: string }) {
 }
 
 function Digest({ d, reason, onChangeReason }: { d: CoachDigest; reason: string; onChangeReason: () => void }) {
+  const reduce = useReduceMotion()
   const now = useConsoleNow()
   // A one-named-member grant acts on this digest only if it names this member.
   const acc = useConsoleAccess('/console/coach', d.id)
@@ -499,7 +501,7 @@ function Digest({ d, reason, onChangeReason }: { d: CoachDigest; reason: string;
             </div>
             <AnimatePresence>
               {logged && (
-                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="rounded-lg bg-paper-sunk px-4 py-3 text-[14px] text-ink" role="status">
+                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={brandTransition(reduce)} className="rounded-lg bg-paper-sunk px-4 py-3 text-[14px] text-ink" role="status">
                   <p className="flex items-center gap-2"><Check size={15} aria-hidden /> Logged to the record at <span className="num">{logged.at}</span>{logged.closed && <> · drift task closed</>}.</p>
                   <div className="mt-2 flex flex-wrap gap-4">
                     <Link to="/console/coach" className="inline-flex items-center gap-1 text-ink underline underline-offset-4 focus-ring">Back to the queue <ArrowRight size={13} aria-hidden /></Link>
